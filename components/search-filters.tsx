@@ -1,7 +1,7 @@
 "use client";
 
 import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -109,11 +109,17 @@ const COLOR_OPTIONS = [
 
 export function SearchFilters({
   onFilter,
+  initialFilters,
 }: {
   onFilter: (filters: Filters) => void;
+  initialFilters?: Filters;
 }) {
-  const [filters, setFilters] = useState<Filters>(INITIAL_FILTERS);
+  const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    if (initialFilters) setFilters(initialFilters);
+  }, [initialFilters]);
 
   const activeCount = Object.entries(filters).filter(
     ([k, v]) => v && k !== "keyword"

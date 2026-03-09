@@ -1,371 +1,271 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { ArrowUpDown } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { Search, ArrowRight, MapPin, DollarSign, Zap, Shield } from "lucide-react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { CarCard } from "@/components/car-card";
-import { SearchFilters } from "@/components/search-filters";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { match } from "pinyin-pro";
-import { MAKES_ZH } from "@/lib/mock-data";
-import { getUserCoords, haversineDistance } from "@/lib/geocode";
-import { getRecentlyViewed } from "@/lib/recently-viewed";
-import { getPriceInsight } from "@/lib/price-insight";
-import { BackToTop } from "@/components/back-to-top";
-import type { DbCar } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { LocationCombobox } from "@/components/location-combobox";
+import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 
-interface Filters {
-  keyword: string;
-  make: string;
-  minPrice: string;
-  maxPrice: string;
-  minYear: string;
-  maxYear: string;
-  location: string;
-  sellerType: string;
-  fuelType: string;
-  transmission: string;
-  drivetrain: string;
-  maxMileage: string;
-  exteriorColor: string;
+const POPULAR_MAKES = ["Toyota", "Honda", "BMW", "Mercedes-Benz", "Tesla", "Lexus"];
+
+const PRICE_OPTIONS = [
+  { value: "5000", label: "$5,000" },
+  { value: "10000", label: "$10,000" },
+  { value: "15000", label: "$15,000" },
+  { value: "20000", label: "$20,000" },
+  { value: "25000", label: "$25,000" },
+  { value: "30000", label: "$30,000" },
+  { value: "40000", label: "$40,000" },
+  { value: "50000", label: "$50,000" },
+  { value: "75000", label: "$75,000" },
+  { value: "100000", label: "$100,000" },
+];
+
+const YEAR_OPTIONS = Array.from({ length: 15 }, (_, i) => {
+  const year = 2026 - i;
+  return { value: String(year), label: String(year) };
+});
+
+const QUICK_SEARCHES: { label: string; params: Record<string, string> }[] = [
+  { label: "$15K 以下好车", params: { maxPrice: "15000" } },
+  { label: "省油混动", params: { fuelType: "混动" } },
+  { label: "纯电车型", params: { fuelType: "纯电" } },
+  { label: "低里程精品", params: { maxMileage: "30000" } },
+];
+
+function buildBrowseUrl(params: Record<string, string>) {
+  const sp = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v) sp.set(k, v);
+  }
+  const qs = sp.toString();
+  return qs ? `/browse?${qs}` : "/browse";
 }
 
-type SortKey = "newest" | "price-asc" | "price-desc" | "mileage" | "year" | "distance";
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "newest", label: "最新发布" },
-  { value: "price-asc", label: "价格↑" },
-  { value: "price-desc", label: "价格↓" },
-  { value: "mileage", label: "里程最少" },
-  { value: "year", label: "年份最新" },
-  { value: "distance", label: "距离最近" },
-];
-
-const POPULAR_MAKES = [
-  "Toyota",
-  "Honda",
-  "BMW",
-  "Mercedes-Benz",
-  "Tesla",
-  "Lexus",
-];
-
 export default function Home() {
-  const [cars, setCars] = useState<DbCar[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<Filters>({
-    keyword: "",
-    make: "",
-    minPrice: "",
-    maxPrice: "",
-    minYear: "",
-    maxYear: "",
-    location: "",
-    sellerType: "",
-    fuelType: "",
-    transmission: "",
-    drivetrain: "",
-    maxMileage: "",
-    exteriorColor: "",
-  });
-  const [sort, setSort] = useState<SortKey>("newest");
-  const [userCoords, setUserCoords] = useState<{
-    lat: number;
-    lng: number;
-  } | null>(null);
-  const [recentCars, setRecentCars] = useState<DbCar[]>([]);
+  const router = useRouter();
+  const [keyword, setKeyword] = useState("");
+  const [make, setMake] = useState("");
+  const [location, setLocation] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [minYear, setMinYear] = useState("");
+  const [maxYear, setMaxYear] = useState("");
 
-  useEffect(() => {
-    async function fetchCars() {
-      const { data } = await supabase
-        .from("cars")
-        .select("*")
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
-      const allCars = (data as DbCar[]) || [];
-      setCars(allCars);
-      setLoading(false);
-
-      // Load recently viewed
-      const recentIds = getRecentlyViewed();
-      if (recentIds.length > 0) {
-        const recent = recentIds
-          .map((id) => allCars.find((c) => c.id === id))
-          .filter(Boolean) as DbCar[];
-        setRecentCars(recent.slice(0, 6));
-      }
-    }
-    fetchCars();
-    // Silently try to get user location for distance display
-    getUserCoords().then((coords) => {
-      if (coords) setUserCoords(coords);
-    });
-  }, []);
-
-  // Pre-compute distances
-  const distances = useMemo(() => {
-    if (!userCoords) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const car of cars) {
-      if (car.lat && car.lng) {
-        map.set(
-          car.id,
-          haversineDistance(userCoords.lat, userCoords.lng, car.lat, car.lng)
-        );
-      }
-    }
-    return map;
-  }, [cars, userCoords]);
-
-  const filtered = useMemo(() => {
-    let result = cars.filter((car) => {
-      if (filters.keyword) {
-        const kw = filters.keyword.toLowerCase();
-        const zhText = `${car.title_zh} ${MAKES_ZH[car.make] || ""} ${car.location_zh} ${car.seller_name} ${car.fuel_type} ${car.exterior_color || ""}`;
-        const enText = `${car.title} ${car.make} ${car.model}`.toLowerCase();
-        // pinyin-pro match: supports full pinyin, initials, and mixed input
-        if (!enText.includes(kw) && match(zhText, kw) === null) return false;
-      }
-      if (filters.make && car.make !== filters.make) return false;
-      if (filters.minPrice && car.price < Number(filters.minPrice))
-        return false;
-      if (filters.maxPrice && car.price > Number(filters.maxPrice))
-        return false;
-      if (filters.minYear && car.year < Number(filters.minYear)) return false;
-      if (filters.maxYear && car.year > Number(filters.maxYear)) return false;
-      if (
-        filters.location &&
-        !car.location.toLowerCase().includes(filters.location.toLowerCase()) &&
-        !car.location_zh.includes(filters.location)
-      )
-        return false;
-      if (filters.sellerType && car.seller_type !== filters.sellerType)
-        return false;
-      if (filters.fuelType && car.fuel_type !== filters.fuelType)
-        return false;
-      if (filters.transmission && car.transmission !== filters.transmission)
-        return false;
-      if (filters.drivetrain && car.drivetrain !== filters.drivetrain)
-        return false;
-      if (filters.maxMileage && car.mileage > Number(filters.maxMileage))
-        return false;
-      if (
-        filters.exteriorColor &&
-        car.exterior_color &&
-        !car.exterior_color.includes(filters.exteriorColor)
-      )
-        return false;
-      return true;
-    });
-
-    const sorted = [...result];
-    switch (sort) {
-      case "price-asc":
-        sorted.sort((a, b) => a.price - b.price);
-        break;
-      case "price-desc":
-        sorted.sort((a, b) => b.price - a.price);
-        break;
-      case "mileage":
-        sorted.sort((a, b) => a.mileage - b.mileage);
-        break;
-      case "year":
-        sorted.sort((a, b) => b.year - a.year);
-        break;
-      case "distance":
-        sorted.sort((a, b) => {
-          const da = distances.get(a.id) ?? Infinity;
-          const db = distances.get(b.id) ?? Infinity;
-          return da - db;
-        });
-        break;
-      default:
-        sorted.sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() -
-            new Date(a.created_at).getTime()
-        );
-    }
-    return sorted;
-  }, [cars, filters, sort, distances]);
+  function handleSearch() {
+    router.push(buildBrowseUrl({ q: keyword, make, location, minPrice, maxPrice, minYear, maxYear }));
+  }
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
 
-      {/* Hero */}
-      <section className="border-b border-border bg-foreground px-4 py-12 text-background">
-        <div className="mx-auto max-w-7xl">
-          <h1 className="font-mono text-2xl font-semibold tracking-tight md:text-3xl">
-            北美华人二手车交易平台
+      {/* Hero search */}
+      <section className="flex flex-1 flex-col items-center justify-center px-4 pb-12 pt-10">
+        <div className="mx-auto w-full max-w-2xl text-center">
+          <h1 className="font-mono text-3xl font-semibold tracking-tight md:text-4xl">
+            北美华人二手车
           </h1>
-          <p className="mt-2 font-mono text-sm text-background/60">
+          <p className="mt-3 font-mono text-sm text-muted-foreground">
             可靠车源 · 中文服务 · 覆盖全美主要华人社区
           </p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            {POPULAR_MAKES.map((make) => (
+
+          {/* Search bar */}
+          <form
+            onSubmit={(e) => { e.preventDefault(); handleSearch(); }}
+            className="mt-8 flex gap-2"
+          >
+            <div className="relative flex-1">
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+              <Input
+                placeholder="搜索品牌、车型、关键词..."
+                className="h-11 pl-10 font-mono text-sm"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <Button type="submit" className="h-11 gap-2 px-6 font-mono text-sm">
+              搜索
+              <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+            </Button>
+          </form>
+
+          {/* Filters */}
+          <div className="mt-5 grid grid-cols-2 gap-3 text-left md:grid-cols-3">
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">品牌</Label>
+              <Select value={make} onValueChange={setMake}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  {MAKES.map((m) => (
+                    <SelectItem key={m} value={m} className="font-mono text-xs">
+                      {MAKES_ZH[m]} {m}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">地区</Label>
+              <div className="mt-1">
+                <LocationCombobox value={location} onValueChange={setLocation} placeholder="不限" className="h-8" />
+              </div>
+            </div>
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">最低价格</Label>
+              <Select value={minPrice} onValueChange={setMinPrice}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRICE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">最高价格</Label>
+              <Select value={maxPrice} onValueChange={setMaxPrice}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRICE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">最早年份</Label>
+              <Select value={minYear} onValueChange={setMinYear}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEAR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">最新年份</Label>
+              <Select value={maxYear} onValueChange={setMaxYear}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="不限" />
+                </SelectTrigger>
+                <SelectContent>
+                  {YEAR_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Popular makes */}
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2">
+            <span className="font-mono text-[11px] text-muted-foreground">热门:</span>
+            {POPULAR_MAKES.map((m) => (
               <button
-                key={make}
-                onClick={() =>
-                  setFilters((f) => ({
-                    ...f,
-                    make: f.make === make ? "" : make,
-                  }))
-                }
-                className={`border px-3 py-1.5 font-mono text-xs transition-colors ${
-                  filters.make === make
-                    ? "border-background bg-background text-foreground"
-                    : "border-background/20 text-background/80 hover:border-background/40 hover:text-background"
-                }`}
+                key={m}
+                onClick={() => router.push(buildBrowseUrl({ make: m }))}
+                className="border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
               >
-                {MAKES_ZH[make]} {make}
+                {MAKES_ZH[m]} {m}
               </button>
             ))}
+          </div>
+
+          {/* Quick search tags */}
+          <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+            {QUICK_SEARCHES.map((qs) => (
+              <button
+                key={qs.label}
+                onClick={() => router.push(buildBrowseUrl(qs.params))}
+                className="bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {qs.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Browse all */}
+          <button
+            onClick={() => router.push("/browse")}
+            className="mt-6 font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            浏览全部车辆
+          </button>
+        </div>
+      </section>
+
+      {/* Features */}
+      <section className="border-t border-border bg-muted/30 px-4 py-12">
+        <div className="mx-auto grid max-w-3xl grid-cols-2 gap-6 md:grid-cols-4">
+          <div className="text-center">
+            <Shield className="mx-auto h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+            <p className="mt-2 font-mono text-xs font-medium">可靠车源</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">认证车行 + 个人</p>
+          </div>
+          <div className="text-center">
+            <MapPin className="mx-auto h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+            <p className="mt-2 font-mono text-xs font-medium">覆盖全美</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">10+ 华人社区</p>
+          </div>
+          <div className="text-center">
+            <DollarSign className="mx-auto h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+            <p className="mt-2 font-mono text-xs font-medium">价格透明</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">市场行情参考</p>
+          </div>
+          <div className="text-center">
+            <Zap className="mx-auto h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+            <p className="mt-2 font-mono text-xs font-medium">中文服务</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">沟通无障碍</p>
           </div>
         </div>
       </section>
 
-      <SearchFilters onFilter={setFilters} />
-
-      {/* Results */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="font-mono text-xs text-muted-foreground">
-            共{" "}
-            <span className="font-semibold text-foreground">
-              {filtered.length}
-            </span>{" "}
-            辆车
-          </p>
-          <div className="flex items-center gap-1">
-            <ArrowUpDown
-              className="mr-1 h-3 w-3 text-muted-foreground"
-              strokeWidth={1.5}
-            />
-            {SORT_OPTIONS.map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setSort(opt.value)}
-                className={`px-2 py-1 font-mono text-[11px] transition-colors ${
-                  sort === opt.value
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
+      {/* Stats */}
+      <section className="border-t border-border px-4 py-10">
+        <div className="mx-auto grid max-w-3xl grid-cols-2 gap-4 md:grid-cols-4">
+          <div className="border border-border p-4 text-center">
+            <p className="font-mono text-2xl font-semibold">1,200+</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">在售车辆</p>
+          </div>
+          <div className="border border-border p-4 text-center">
+            <p className="font-mono text-2xl font-semibold">50+</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">认证车行</p>
+          </div>
+          <div className="border border-border p-4 text-center">
+            <p className="font-mono text-2xl font-semibold">10</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">覆盖城市</p>
+          </div>
+          <div className="border border-border p-4 text-center">
+            <p className="font-mono text-2xl font-semibold">中文</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">全程服务</p>
           </div>
         </div>
-
-        {loading ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="border border-border">
-                <Skeleton className="aspect-[16/10] w-full" />
-                <div className="space-y-2 p-3">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                  <Skeleton className="h-3 w-full" />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((car) => (
-              <CarCard
-                key={car.id}
-                car={car}
-                distance={distances.get(car.id)}
-                priceInsight={getPriceInsight(car, cars)}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center py-20">
-            <p className="font-mono text-sm text-muted-foreground">
-              没有找到符合条件的车辆
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 font-mono text-xs"
-              onClick={() =>
-                setFilters({
-                  keyword: "",
-                  make: "",
-                  minPrice: "",
-                  maxPrice: "",
-                  minYear: "",
-                  maxYear: "",
-                  location: "",
-                  sellerType: "",
-                  fuelType: "",
-                  transmission: "",
-                  drivetrain: "",
-                  maxMileage: "",
-                  exteriorColor: "",
-                })
-              }
-            >
-              清除所有筛选
-            </Button>
-          </div>
-        )}
-
-        {/* Recently viewed */}
-        {recentCars.length > 0 && (
-          <section className="mt-10 border-t border-border pt-6">
-            <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
-            <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-              {recentCars.map((car) => (
-                <CarCard
-                  key={"recent-" + car.id}
-                  car={car}
-                  distance={distances.get(car.id)}
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Stats */}
-        <section className="mt-12 border-t border-border pt-8">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div className="border border-border p-4">
-              <p className="font-mono text-2xl font-semibold">1,200+</p>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                在售车辆
-              </p>
-            </div>
-            <div className="border border-border p-4">
-              <p className="font-mono text-2xl font-semibold">50+</p>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                认证车行
-              </p>
-            </div>
-            <div className="border border-border p-4">
-              <p className="font-mono text-2xl font-semibold">10</p>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                覆盖城市
-              </p>
-            </div>
-            <div className="border border-border p-4">
-              <p className="font-mono text-2xl font-semibold">中文</p>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                全程服务
-              </p>
-            </div>
-          </div>
-        </section>
-      </main>
+      </section>
 
       <Footer />
-      <BackToTop />
     </div>
   );
 }
