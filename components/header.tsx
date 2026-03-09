@@ -46,7 +46,7 @@ export function Header() {
 
         <nav className="hidden items-center gap-6 md:flex">
           <Link
-            href="/"
+            href="/browse"
             className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             买车
@@ -149,7 +149,7 @@ export function Header() {
           <SheetContent side="right" className="w-64">
             <SheetTitle className="sr-only">导航菜单</SheetTitle>
             <nav className="mt-8 flex flex-col gap-4">
-              <Link href="/" className="font-mono text-sm">
+              <Link href="/browse" className="font-mono text-sm">
                 买车
               </Link>
               <Link href="/post" className="font-mono text-sm">
