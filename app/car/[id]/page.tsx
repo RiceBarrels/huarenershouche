@@ -62,7 +62,7 @@ export default function CarDetailPage() {
     async function load() {
       const { data } = await supabase
         .from("cars")
-        .select("*")
+        .select("*, profiles!seller_id(account_type)")
         .eq("id", carId)
         .single();
       setCar(data as DbCar);
@@ -209,7 +209,7 @@ export default function CarDetailPage() {
                 </div>
               )}
               <div className="absolute left-3 top-3">
-                {car.seller_type === "dealer" ? (
+                {car.profiles?.account_type === "dealer" ? (
                   <Badge
                     variant="secondary"
                     className="font-mono text-[10px] font-medium"
@@ -439,16 +439,30 @@ export default function CarDetailPage() {
           <div className="lg:sticky lg:top-20 lg:self-start">
             <div className="border border-border p-4">
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
-              <div className="mt-3 space-y-2">
-                <p className="font-mono text-sm">{car.seller_name}</p>
-                <p className="font-mono text-[11px] text-muted-foreground">
-                  {car.seller_type === "dealer" ? "认证车行" : "个人卖家"}
-                </p>
-                <p className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                  <MapPin className="h-3 w-3" strokeWidth={1.5} />
-                  {car.location}
-                </p>
-              </div>
+              <Link
+                href={`/user/${car.seller_id}`}
+                className="mt-3 flex items-center gap-3 py-2 transition-colors"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+                  {car.profiles?.account_type === "dealer" ? (
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  ) : (
+                    <Eye className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  )}
+                </div>
+                <div>
+                  <p className="font-mono text-sm font-medium underline-offset-2 hover:underline">
+                    {car.seller_name}
+                  </p>
+                  <p className="font-mono text-[10px] text-muted-foreground">
+                    {car.profiles?.account_type === "dealer" ? "认证车行" : "个人卖家"} · 查看主页 →
+                  </p>
+                </div>
+              </Link>
+              <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                <MapPin className="h-3 w-3" strokeWidth={1.5} />
+                {car.location}
+              </p>
 
               <div className="mt-4 space-y-2">
                 <Button

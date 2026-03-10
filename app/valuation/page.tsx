@@ -75,6 +75,20 @@ function estimateValue(
   };
 }
 
+function calculateMonthlyPayment(
+  carPrice: number,
+  downPayment: number,
+  apr: number,
+  termMonths: number
+): number {
+  const principal = carPrice - downPayment;
+  if (principal <= 0) return 0;
+  if (apr === 0) return principal / termMonths;
+  const monthlyRate = apr / 100 / 12;
+  return (principal * monthlyRate * Math.pow(1 + monthlyRate, termMonths)) /
+    (Math.pow(1 + monthlyRate, termMonths) - 1);
+}
+
 export default function ValuationPage() {
   const [make, setMake] = useState("");
   const [year, setYear] = useState("");
@@ -85,6 +99,13 @@ export default function ValuationPage() {
     mid: number;
     high: number;
   } | null>(null);
+
+  // Loan calculator state
+  const [loanPrice, setLoanPrice] = useState("");
+  const [downPayment, setDownPayment] = useState("");
+  const [apr, setApr] = useState("6.5");
+  const [loanTerm, setLoanTerm] = useState("60");
+  const [loanResult, setLoanResult] = useState<number | null>(null);
 
   function handleEstimate(e: React.FormEvent) {
     e.preventDefault();
@@ -265,6 +286,135 @@ export default function ValuationPage() {
             </div>
           </div>
         )}
+        {/* Loan Calculator */}
+        <div className="mt-12 border-t border-border pt-8">
+          <div className="flex items-center gap-2">
+            <Calculator className="h-5 w-5" strokeWidth={1.5} />
+            <h1 className="font-mono text-lg font-semibold tracking-tight">
+              贷款计算器
+            </h1>
+          </div>
+          <p className="mt-1 font-mono text-xs text-muted-foreground">
+            输入购车价格，计算每月还款金额
+          </p>
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!loanPrice) return;
+              const monthly = calculateMonthlyPayment(
+                Number(loanPrice),
+                Number(downPayment || 0),
+                Number(apr || 0),
+                Number(loanTerm || 60)
+              );
+              setLoanResult(monthly);
+            }}
+            className="mt-6 space-y-4"
+          >
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="font-mono text-[11px] text-muted-foreground">
+                  车辆价格 ($) *
+                </Label>
+                <Input
+                  className="mt-1 h-9 font-mono text-xs"
+                  type="number"
+                  placeholder="30000"
+                  value={loanPrice}
+                  onChange={(e) => setLoanPrice(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <Label className="font-mono text-[11px] text-muted-foreground">
+                  首付金额 ($)
+                </Label>
+                <Input
+                  className="mt-1 h-9 font-mono text-xs"
+                  type="number"
+                  placeholder="5000"
+                  value={downPayment}
+                  onChange={(e) => setDownPayment(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="font-mono text-[11px] text-muted-foreground">
+                  年利率 APR (%)
+                </Label>
+                <Input
+                  className="mt-1 h-9 font-mono text-xs"
+                  type="number"
+                  step="0.1"
+                  placeholder="6.5"
+                  value={apr}
+                  onChange={(e) => setApr(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label className="font-mono text-[11px] text-muted-foreground">
+                  分期期数 (月)
+                </Label>
+                <Select value={loanTerm} onValueChange={setLoanTerm}>
+                  <SelectTrigger className="mt-1 h-9 font-mono text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="24" className="font-mono text-xs">24个月 (2年)</SelectItem>
+                    <SelectItem value="36" className="font-mono text-xs">36个月 (3年)</SelectItem>
+                    <SelectItem value="48" className="font-mono text-xs">48个月 (4年)</SelectItem>
+                    <SelectItem value="60" className="font-mono text-xs">60个月 (5年)</SelectItem>
+                    <SelectItem value="72" className="font-mono text-xs">72个月 (6年)</SelectItem>
+                    <SelectItem value="84" className="font-mono text-xs">84个月 (7年)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button type="submit" className="font-mono text-xs">
+              计算月供
+            </Button>
+          </form>
+
+          {loanResult !== null && (
+            <div className="mt-6 border border-border">
+              <div className="border-b border-border bg-card p-4">
+                <h2 className="font-mono text-sm font-semibold">贷款计算结果</h2>
+              </div>
+              <div className="p-6 text-center">
+                <p className="font-mono text-[11px] text-muted-foreground">每月还款</p>
+                <p className="mt-1 font-mono text-3xl font-bold">
+                  {formatUsd(Math.round(loanResult))}
+                </p>
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground">/月</p>
+              </div>
+              <div className="grid grid-cols-3 divide-x divide-border border-t border-border">
+                <div className="p-3 text-center">
+                  <p className="font-mono text-[10px] text-muted-foreground">贷款总额</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatUsd(Number(loanPrice) - Number(downPayment || 0))}
+                  </p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="font-mono text-[10px] text-muted-foreground">利息总额</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatUsd(Math.round(loanResult * Number(loanTerm) - (Number(loanPrice) - Number(downPayment || 0))))}
+                  </p>
+                </div>
+                <div className="p-3 text-center">
+                  <p className="font-mono text-[10px] text-muted-foreground">还款总额</p>
+                  <p className="mt-1 font-mono text-sm font-semibold">
+                    {formatUsd(Math.round(loanResult * Number(loanTerm)))}
+                  </p>
+                </div>
+              </div>
+              <div className="border-t border-border p-3">
+                <p className="font-mono text-[10px] text-muted-foreground/60">
+                  * 计算结果仅供参考，实际贷款条件以银行/金融机构为准
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
       <Footer />
     </div>

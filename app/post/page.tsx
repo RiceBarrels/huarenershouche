@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, X, Plus, Loader2, LocateFixed, MapPin } from "lucide-react";
+import { Upload, X, Plus, Loader2, Store, FileText } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -12,42 +12,67 @@ import { Label } from "@/components/ui/label";
 import { AuthDialog } from "@/components/auth-dialog";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
-import { LocationCombobox } from "@/components/location-combobox";
-import { detectUserCity, geocodeCity } from "@/lib/geocode";
+import { geocodeZipToCoords } from "@/lib/geocode";
+import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
-const TRANSMISSIONS = ["自动", "手动"];
+const TRANSMISSIONS = ["AT", "手动", "CVT", "双离合", "E-CVT"];
 const YEAR_OPTIONS = Array.from({ length: 30 }, (_, i) => 2026 - i);
 
 const EXTERIOR_COLORS = [
   { value: "珍珠白", hex: "#F5F5F0" },
   { value: "水晶白", hex: "#FFFFFF" },
+  { value: "雪花白", hex: "#FFFAFA" },
   { value: "曜石黑", hex: "#1A1A1A" },
   { value: "水晶黑", hex: "#2C2C2C" },
+  { value: "钢琴黑", hex: "#0D0D0D" },
   { value: "铂金灰", hex: "#8C8C8C" },
   { value: "暗影灰", hex: "#5A5A5A" },
   { value: "火山灰", hex: "#6B6B6B" },
   { value: "现代钢", hex: "#71797E" },
+  { value: "水泥灰", hex: "#95918C" },
   { value: "午夜银", hex: "#A9A9A9" },
+  { value: "亮银色", hex: "#C0C0C0" },
   { value: "矿石白", hex: "#E8E4DF" },
   { value: "深海蓝", hex: "#1B3A5C" },
   { value: "纳瓦拉蓝", hex: "#2E5090" },
+  { value: "天际蓝", hex: "#4A90D9" },
+  { value: "宝石蓝", hex: "#1E3A8A" },
+  { value: "冰川蓝", hex: "#A0C4E8" },
   { value: "超音速红", hex: "#C41E3A" },
   { value: "烈焰红", hex: "#E02020" },
+  { value: "勃艮第红", hex: "#6C1D45" },
+  { value: "酒红色", hex: "#722F37" },
   { value: "香槟金", hex: "#C9B37C" },
   { value: "棕褐色", hex: "#7B5B3A" },
+  { value: "摩卡棕", hex: "#6B4226" },
+  { value: "古铜色", hex: "#8B6E4E" },
   { value: "墨绿色", hex: "#2D5A3D" },
+  { value: "橄榄绿", hex: "#556B2F" },
+  { value: "英国赛车绿", hex: "#004225" },
   { value: "橙色", hex: "#E87830" },
+  { value: "日落橙", hex: "#FF6B35" },
+  { value: "紫色", hex: "#6A0DAD" },
+  { value: "珊瑚色", hex: "#FF7F7F" },
+  { value: "黄色", hex: "#FFD700" },
+  { value: "青色", hex: "#00CED1" },
 ];
 
 const INTERIOR_COLORS = [
   { value: "黑色真皮", hex: "#1A1A1A" },
   { value: "黑色织物", hex: "#2C2C2C" },
+  { value: "黑色翻毛皮", hex: "#333333" },
   { value: "米色真皮", hex: "#D4C5A9" },
+  { value: "米色织物", hex: "#C2B280" },
   { value: "棕色真皮", hex: "#8B6914" },
   { value: "红色真皮", hex: "#8B2500" },
+  { value: "红棕色真皮", hex: "#A0522D" },
   { value: "灰色织物", hex: "#808080" },
+  { value: "灰色真皮", hex: "#696969" },
   { value: "白色真皮", hex: "#F0EDE8" },
+  { value: "奶油色真皮", hex: "#FFFDD0" },
+  { value: "蓝色真皮", hex: "#1B3A5C" },
+  { value: "双色内饰", hex: "#D2B48C" },
 ];
 
 function colorDot(hex: string) {
@@ -93,10 +118,71 @@ const interiorColorOptions: ComboboxOption[] = INTERIOR_COLORS.map((c) => ({
   icon: colorDot(c.hex),
 }));
 
-const sellerTypeOptions: ComboboxOption[] = [
-  { value: "private", label: "个人" },
-  { value: "dealer", label: "车行" },
+const drivetrainOptions: ComboboxOption[] = [
+  { value: "FWD", label: "前驱 FWD" },
+  { value: "AWD", label: "全驱 AWD" },
+  { value: "4WD", label: "四驱 4WD" },
+  { value: "RWD", label: "后驱 RWD" },
 ];
+
+const bodyTypeOptions: ComboboxOption[] = [
+  { value: "sedan", label: "轿车 Sedan" },
+  { value: "suv", label: "越野车 SUV" },
+  { value: "van", label: "面包车 Van" },
+  { value: "sports", label: "跑车 Sports Car" },
+  { value: "wagon", label: "旅行车 Wagon" },
+  { value: "pickup", label: "皮卡 Pickup" },
+];
+
+const cylinderOptions: ComboboxOption[] = [
+  { value: "3", label: "3缸" },
+  { value: "4", label: "4缸" },
+  { value: "5", label: "5缸" },
+  { value: "6", label: "6缸" },
+  { value: "8", label: "8缸" },
+  { value: "10", label: "10缸" },
+  { value: "12", label: "12缸" },
+];
+
+const seatOptions: ComboboxOption[] = [
+  { value: "2", label: "2座" },
+  { value: "3", label: "3座" },
+  { value: "4", label: "4座" },
+  { value: "5", label: "5座" },
+  { value: "6", label: "6座" },
+  { value: "7", label: "7座" },
+  { value: "8", label: "8座" },
+  { value: "9", label: "9座" },
+  { value: "other", label: "其他" },
+];
+
+const conditionOptions: ComboboxOption[] = [
+  { value: "new", label: "新车 New" },
+  { value: "used", label: "二手 Used" },
+];
+
+const DRAFT_KEY = "huaren_post_draft";
+
+function loadDraft(): { form: Record<string, string>; imageUrls: string[]; features: string[] } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(form: Record<string, string>, imageUrls: string[], features: string[]) {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, imageUrls, features }));
+  } catch { /* ignore */ }
+}
+
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
 
 export default function PostCarPage() {
   const router = useRouter();
@@ -107,27 +193,77 @@ export default function PostCarPage() {
   const [featureInput, setFeatureInput] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
   const [error, setError] = useState("");
-  const [detectingLocation, setDetectingLocation] = useState(false);
-  const [locationStep, setLocationStep] = useState(true); // show location prompt first
+  const [dragging, setDragging] = useState(false);
+  const [hasDraft, setHasDraft] = useState(false);
 
-  const [form, setForm] = useState({
+  const [priceCallOnly, setPriceCallOnly] = useState(false);
+  const [showCallWarning, setShowCallWarning] = useState(false);
+  const [isDealer, setIsDealer] = useState(false);
+  const [dealerStores, setDealerStores] = useState<DbDealerStore[]>([]);
+  const [selectedStoreId, setSelectedStoreId] = useState("");
+
+  const defaultForm = {
     make: "",
     model: "",
     year: "",
     trim: "",
     price: "",
     mileage: "",
-    location: "",
+    zipcode: "",
+    address: "",
     fuel_type: "汽油",
-    transmission: "自动",
+    transmission: "AT",
     exterior_color: "",
     interior_color: "",
+    drivetrain: "",
+    body_type: "",
+    cylinders: "",
+    seats: "",
+    condition: "used",
     vin: "",
-    seller_type: "private",
     seller_name: "",
     phone: "",
     description_zh: "",
-  });
+  };
+
+  const [form, setForm] = useState(defaultForm);
+
+  // Load draft on mount
+  useEffect(() => {
+    const draft = loadDraft();
+    if (draft) {
+      setHasDraft(true);
+      setForm((f) => ({ ...f, ...draft.form }));
+      setImageUrls(draft.imageUrls || []);
+      setFeatures(draft.features || []);
+    }
+  }, []);
+
+  // Auto-save draft on changes (debounced)
+  const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formRef = useRef(form);
+  const imageUrlsRef = useRef(imageUrls);
+  const featuresRef = useRef(features);
+  formRef.current = form;
+  imageUrlsRef.current = imageUrls;
+  featuresRef.current = features;
+
+  const scheduleDraftSave = useCallback(() => {
+    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    draftTimeoutRef.current = setTimeout(() => {
+      saveDraft(formRef.current, imageUrlsRef.current, featuresRef.current);
+    }, 500);
+  }, []);
+
+  useEffect(() => {
+    scheduleDraftSave();
+  }, [form, imageUrls, features, scheduleDraftSave]);
+
+  useEffect(() => {
+    return () => {
+      if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }) => {
@@ -136,27 +272,39 @@ export default function PostCarPage() {
         // Ensure profile exists
         const { data: profile } = await supabase
           .from("profiles")
-          .select("full_name, phone")
+          .select("username, phone, account_type")
           .eq("id", data.user.id)
           .maybeSingle();
         if (!profile) {
           // Auto-create profile if trigger didn't fire
           await supabase.from("profiles").insert({
             id: data.user.id,
-            full_name:
-              data.user.user_metadata?.full_name || data.user.email || "",
+            username:
+              data.user.user_metadata?.username || data.user.email || "",
           });
           setForm((f) => ({
             ...f,
             seller_name:
-              data.user!.user_metadata?.full_name || data.user!.email || "",
+              data.user!.user_metadata?.username || data.user!.email || "",
           }));
         } else {
+          const dealer = profile.account_type === "dealer";
+          setIsDealer(dealer);
           setForm((f) => ({
             ...f,
-            seller_name: profile.full_name || "",
+            seller_name: profile.username || "",
             phone: profile.phone || "",
           }));
+
+          // Fetch dealer stores if dealer
+          if (dealer) {
+            const { data: stores } = await supabase
+              .from("dealer_stores")
+              .select("*")
+              .eq("owner_id", data.user!.id)
+              .order("created_at", { ascending: false });
+            setDealerStores((stores as DbDealerStore[]) || []);
+          }
         }
       }
     });
@@ -168,25 +316,33 @@ export default function PostCarPage() {
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
-    if (!files || !user) return;
-    setUploading(true);
+    if (!files) return;
+    await uploadFiles(Array.from(files));
+  }
 
-    for (const file of Array.from(files)) {
+  async function uploadFiles(files: File[]) {
+    if (!user || files.length === 0) return;
+    setUploading(true);
+    for (const file of files) {
+      if (!file.type.startsWith("image/")) continue;
       const ext = file.name.split(".").pop();
       const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-
       const { error } = await supabase.storage
         .from("car-images")
         .upload(path, file);
-
       if (!error) {
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("car-images").getPublicUrl(path);
+        const { data: { publicUrl } } = supabase.storage.from("car-images").getPublicUrl(path);
         setImageUrls((prev) => [...prev, publicUrl]);
       }
     }
     setUploading(false);
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    const files = Array.from(e.dataTransfer.files);
+    uploadFiles(files);
   }
 
   function removeImage(index: number) {
@@ -210,8 +366,8 @@ export default function PostCarPage() {
     const titleEn = `${form.year} ${form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
     const titleZh = `${form.year} ${MAKES_ZH[form.make] || form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
 
-    // Geocode location to get lat/lng
-    const coords = form.location ? await geocodeCity(form.location) : null;
+    // Geocode zipcode to get lat/lng
+    const coords = form.zipcode ? await geocodeZipToCoords(form.zipcode) : null;
 
     // Also save phone to profile
     if (form.phone) {
@@ -233,8 +389,8 @@ export default function PostCarPage() {
         trim: form.trim || null,
         price: Number(form.price),
         mileage: Number(form.mileage),
-        location: form.location,
-        location_zh: form.location,
+        location: form.address || form.zipcode,
+        location_zh: form.address || form.zipcode,
         image_url: imageUrls[0] || null,
         images: imageUrls.slice(1),
         fuel_type: form.fuel_type,
@@ -242,7 +398,6 @@ export default function PostCarPage() {
         exterior_color: form.exterior_color || null,
         interior_color: form.interior_color || null,
         vin: form.vin || null,
-        seller_type: form.seller_type,
         seller_name: form.seller_name,
         phone: form.phone || null,
         lat: coords?.lat || null,
@@ -258,6 +413,7 @@ export default function PostCarPage() {
     if (insertError) {
       setError(`发布失败: ${insertError.message}`);
     } else if (data) {
+      clearDraft();
       router.push(`/car/${data.id}`);
     }
   }
@@ -269,9 +425,30 @@ export default function PostCarPage() {
         <h1 className="font-mono text-lg font-semibold tracking-tight">
           发布车辆
         </h1>
-        <p className="mt-1 font-mono text-xs text-muted-foreground">
-          填写车辆信息，发布后即可被其他用户看到
-        </p>
+        <div className="mt-1 flex items-center gap-3">
+          <p className="font-mono text-xs text-muted-foreground">
+            填写车辆信息，发布后即可被其他用户看到
+          </p>
+          {hasDraft && (
+            <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+              <FileText className="h-3 w-3" strokeWidth={1.5} />
+              已恢复草稿
+              <button
+                type="button"
+                onClick={() => {
+                  clearDraft();
+                  setForm(defaultForm);
+                  setImageUrls([]);
+                  setFeatures([]);
+                  setHasDraft(false);
+                }}
+                className="ml-1 underline underline-offset-2 hover:text-foreground"
+              >
+                清除
+              </button>
+            </span>
+          )}
+        </div>
 
         {!user ? (
           <div className="mt-8 flex flex-col items-center border border-border p-8">
@@ -286,89 +463,23 @@ export default function PostCarPage() {
           </div>
         ) : (
           <>
-          {/* Location prompt step */}
-          {locationStep && !form.location && (
-            <div className="mt-6 border border-border p-6">
-              <div className="flex items-center gap-2">
-                <MapPin className="h-4 w-4" strokeWidth={1.5} />
-                <h2 className="font-mono text-sm font-semibold">
-                  你在哪里卖车？
-                </h2>
-              </div>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                设置位置后，附近的买家更容易找到你的车
-              </p>
-
-              <div className="mt-4 space-y-3">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full gap-2 font-mono text-xs"
-                  disabled={detectingLocation}
-                  onClick={async () => {
-                    setDetectingLocation(true);
-                    const result = await detectUserCity();
-                    if (result) {
-                      setForm((f) => ({ ...f, location: result.formatted }));
-                      setLocationStep(false);
-                    }
-                    setDetectingLocation(false);
-                  }}
-                >
-                  {detectingLocation ? (
-                    <Loader2
-                      className="h-3.5 w-3.5 animate-spin"
-                      strokeWidth={1.5}
-                    />
-                  ) : (
-                    <LocateFixed
-                      className="h-3.5 w-3.5"
-                      strokeWidth={1.5}
-                    />
-                  )}
-                  {detectingLocation ? "正在定位..." : "自动定位我的位置"}
-                </Button>
-
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-border" />
-                  <span className="font-mono text-[10px] text-muted-foreground">
-                    或
-                  </span>
-                  <div className="h-px flex-1 bg-border" />
-                </div>
-
-                <div>
-                  <LocationCombobox
-                    value={form.location}
-                    onValueChange={(v) => {
-                      update("location", v);
-                      setLocationStep(false);
-                    }}
-                    placeholder="输入城市名、地址或邮编"
-                  />
-                </div>
-
-                <button
-                  type="button"
-                  className="w-full font-mono text-[11px] text-muted-foreground hover:text-foreground"
-                  onClick={() => setLocationStep(false)}
-                >
-                  跳过，稍后填写
-                </button>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className={"mt-6 space-y-6" + (locationStep && !form.location ? " hidden" : "")}>
+          <form onSubmit={handleSubmit} className="mt-6 space-y-6">
             {/* Images */}
             <div>
               <Label className="font-mono text-xs font-semibold">
                 车辆照片
               </Label>
               <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                第一张将作为封面图，建议上传 5-10 张
+                第一张将作为封面图，建议上传 5-10 张，支持拖拽上传
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
+              <div
+                className={`mt-2 flex flex-wrap gap-2 rounded p-2 transition-colors ${
+                  dragging ? "bg-muted/80 ring-2 ring-foreground/20" : ""
+                }`}
+                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                onDragLeave={() => setDragging(false)}
+                onDrop={handleDrop}
+              >
                 {imageUrls.map((url, i) => (
                   <div
                     key={i}
@@ -481,16 +592,73 @@ export default function PostCarPage() {
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
+                    车况 *
+                  </Label>
+                  <div className="mt-1">
+                    <Combobox
+                      options={conditionOptions}
+                      value={form.condition}
+                      onValueChange={(v) => update("condition", v)}
+                      placeholder="选择车况"
+                      searchPlaceholder="搜索..."
+                      emptyText="未找到"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
                     价格 ($) *
                   </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    type="number"
-                    placeholder="25000"
-                    value={form.price}
-                    onChange={(e) => update("price", e.target.value)}
-                    required
-                  />
+                  <div className="mt-1 flex items-center gap-2">
+                    <Input
+                      className="h-9 font-mono text-xs"
+                      type="number"
+                      placeholder="25000"
+                      value={form.price}
+                      onChange={(e) => update("price", e.target.value)}
+                      required={!priceCallOnly}
+                      disabled={priceCallOnly}
+                    />
+                  </div>
+                  <label className="mt-1.5 flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={priceCallOnly}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setShowCallWarning(true);
+                        } else {
+                          setPriceCallOnly(false);
+                          setShowCallWarning(false);
+                        }
+                      }}
+                      className="h-3 w-3"
+                    />
+                    <span className="font-mono text-[10px] text-muted-foreground">电议</span>
+                  </label>
+                  {showCallWarning && !priceCallOnly && (
+                    <div className="mt-2 border border-yellow-500/50 bg-yellow-500/5 p-2">
+                      <p className="font-mono text-[11px] text-yellow-600 dark:text-yellow-400">
+                        注意：选择电议可能会影响曝光率
+                      </p>
+                      <div className="mt-1.5 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setPriceCallOnly(true); setShowCallWarning(false); update("price", "0"); }}
+                          className="font-mono text-[10px] text-foreground underline"
+                        >
+                          确认电议
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCallWarning(false)}
+                          className="font-mono text-[10px] text-muted-foreground"
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
@@ -574,6 +742,66 @@ export default function PostCarPage() {
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
+                    驱动方式
+                  </Label>
+                  <div className="mt-1">
+                    <Combobox
+                      options={drivetrainOptions}
+                      value={form.drivetrain}
+                      onValueChange={(v) => update("drivetrain", v)}
+                      placeholder="选择驱动"
+                      searchPlaceholder="搜索..."
+                      emptyText="未找到"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    车辆类型
+                  </Label>
+                  <div className="mt-1">
+                    <Combobox
+                      options={bodyTypeOptions}
+                      value={form.body_type}
+                      onValueChange={(v) => update("body_type", v)}
+                      placeholder="选择车型"
+                      searchPlaceholder="搜索..."
+                      emptyText="未找到"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    气缸数
+                  </Label>
+                  <div className="mt-1">
+                    <Combobox
+                      options={cylinderOptions}
+                      value={form.cylinders}
+                      onValueChange={(v) => update("cylinders", v)}
+                      placeholder="选择气缸"
+                      searchPlaceholder="搜索..."
+                      emptyText="未找到"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    座位数
+                  </Label>
+                  <div className="mt-1">
+                    <Combobox
+                      options={seatOptions}
+                      value={form.seats}
+                      onValueChange={(v) => update("seats", v)}
+                      placeholder="选择座位"
+                      searchPlaceholder="搜索..."
+                      emptyText="未找到"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
                     VIN
                   </Label>
                   <Input
@@ -585,34 +813,58 @@ export default function PostCarPage() {
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
-                    所在地区 *
+                    所在 Zipcode *
                   </Label>
-                  <div className="mt-1">
-                    {form.location ? (
-                      <div className="flex h-9 items-center justify-between border border-border px-3">
-                        <span className="flex items-center gap-1.5 font-mono text-xs">
-                          <MapPin
-                            className="h-3 w-3 text-muted-foreground"
-                            strokeWidth={1.5}
-                          />
-                          {form.location}
-                        </span>
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="如 91007"
+                    maxLength={5}
+                    value={form.zipcode}
+                    onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
+                    required
+                  />
+                </div>
+                <div className="col-span-2 sm:col-span-3">
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    详细地址
+                  </Label>
+                  {isDealer && dealerStores.length > 0 && (
+                    <div className="mt-1 mb-2 flex flex-wrap gap-1.5">
+                      {dealerStores.map((store) => (
                         <button
+                          key={store.id}
                           type="button"
-                          onClick={() => update("location", "")}
-                          className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                          onClick={() => {
+                            setSelectedStoreId(store.id);
+                            setForm((f) => ({
+                              ...f,
+                              address: store.address,
+                              zipcode: store.zipcode || f.zipcode,
+                              phone: store.phone || f.phone,
+                              seller_name: store.name,
+                            }));
+                          }}
+                          className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                            selectedStoreId === store.id
+                              ? "border-foreground bg-foreground text-background"
+                              : "border-border hover:border-foreground/30"
+                          }`}
                         >
-                          更改
+                          <Store className="h-3 w-3" strokeWidth={1.5} />
+                          {store.name}
                         </button>
-                      </div>
-                    ) : (
-                      <LocationCombobox
-                        value={form.location}
-                        onValueChange={(v) => update("location", v)}
-                        placeholder="搜索或定位城市"
-                      />
-                    )}
-                  </div>
+                      ))}
+                    </div>
+                  )}
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="123 Main St, City, CA"
+                    value={form.address}
+                    onChange={(e) => {
+                      update("address", e.target.value);
+                      setSelectedStoreId("");
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -668,21 +920,6 @@ export default function PostCarPage() {
             <div className="border-t border-border pt-6">
               <h2 className="font-mono text-xs font-semibold">卖家信息</h2>
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    卖家类型
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={sellerTypeOptions}
-                      value={form.seller_type}
-                      onValueChange={(v) => update("seller_type", v)}
-                      placeholder="选择类型"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
                     卖家名称 *

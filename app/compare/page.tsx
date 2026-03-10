@@ -23,7 +23,7 @@ function formatMileage(miles: number): string {
   return new Intl.NumberFormat("en-US").format(miles);
 }
 
-const COMPARE_FIELDS: { key: keyof DbCar | "make_zh"; label: string }[] = [
+const COMPARE_FIELDS: { key: keyof DbCar | "make_zh" | "account_type"; label: string }[] = [
   { key: "make_zh", label: "品牌" },
   { key: "year", label: "年份" },
   { key: "price", label: "价格" },
@@ -34,7 +34,7 @@ const COMPARE_FIELDS: { key: keyof DbCar | "make_zh"; label: string }[] = [
   { key: "exterior_color", label: "外观颜色" },
   { key: "interior_color", label: "内饰颜色" },
   { key: "location_zh", label: "所在地" },
-  { key: "seller_type", label: "卖家类型" },
+  { key: "account_type", label: "卖家类型" },
   { key: "views_count", label: "浏览量" },
 ];
 
@@ -48,7 +48,7 @@ export default function ComparePage() {
     async function fetchCars() {
       const { data } = await supabase
         .from("cars")
-        .select("*")
+        .select("*, profiles!seller_id(account_type)")
         .eq("status", "active")
         .order("created_at", { ascending: false });
       setAllCars((data as DbCar[]) || []);
@@ -91,8 +91,8 @@ export default function ComparePage() {
         return formatPrice(car.price);
       case "mileage":
         return `${formatMileage(car.mileage)} mi`;
-      case "seller_type":
-        return car.seller_type === "dealer" ? "车行" : "个人";
+      case "account_type":
+        return car.profiles?.account_type === "dealer" ? "车行" : "个人";
       case "views_count":
         return String(car.views_count || 0);
       default:

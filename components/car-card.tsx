@@ -1,7 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { MapPin, Gauge, Fuel, Calendar, Navigation } from "lucide-react";
+import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
+import { supabase } from "@/lib/supabase";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -12,8 +16,54 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+function estimateMonthly(price: number): string {
+  // Default: 0 down, 6.5% APR, 60 months
+  const principal = price;
+  const monthlyRate = 0.065 / 12;
+  const months = 60;
+  const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) /
+    (Math.pow(1 + monthlyRate, months) - 1);
+  return `~$${Math.round(payment)}/月`;
+}
+
 function formatMileage(miles: number): string {
   return new Intl.NumberFormat("en-US").format(miles);
+}
+
+function getFavorites(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(localStorage.getItem("huaren_favorites") || "[]");
+  } catch {
+    return [];
+  }
+}
+
+function toggleFavorite(carId: string): { liked: boolean; delta: number } {
+  const favs = getFavorites();
+  const idx = favs.indexOf(carId);
+  if (idx >= 0) {
+    favs.splice(idx, 1);
+    localStorage.setItem("huaren_favorites", JSON.stringify(favs));
+    return { liked: false, delta: -1 };
+  } else {
+    favs.unshift(carId);
+    localStorage.setItem("huaren_favorites", JSON.stringify(favs.slice(0, 100)));
+    return { liked: true, delta: 1 };
+  }
+}
+
+async function updateFavCount(carId: string, delta: number) {
+  const { data } = await supabase
+    .from("cars")
+    .select("favorites_count")
+    .eq("id", carId)
+    .single();
+  const current = data?.favorites_count ?? 0;
+  await supabase
+    .from("cars")
+    .update({ favorites_count: Math.max(0, current + delta) })
+    .eq("id", carId);
 }
 
 export function CarCard({
@@ -25,6 +75,13 @@ export function CarCard({
   distance?: number;
   priceInsight?: { label: string; className: string } | null;
 }) {
+  const [liked, setLiked] = useState(false);
+  const [favCount, setFavCount] = useState(car.favorites_count || 0);
+
+  useEffect(() => {
+    setLiked(getFavorites().includes(car.id));
+  }, [car.id]);
+
   return (
     <Link href={`/car/${car.id}`}>
       <article className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20">
@@ -41,7 +98,7 @@ export function CarCard({
             </div>
           )}
           <div className="absolute left-2 top-2 flex gap-1">
-            {car.seller_type === "dealer" ? (
+            {car.profiles?.account_type === "dealer" ? (
               <Badge
                 variant="secondary"
                 className="font-mono text-[10px] font-medium"
@@ -66,16 +123,44 @@ export function CarCard({
               </Badge>
             )}
           </div>
-          <div className="absolute bottom-2 right-2 flex items-center gap-1">
-            {priceInsight && (
-              <span
-                className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}
-              >
-                {priceInsight.label}
+          {/* Favorite button */}
+          <button
+            type="button"
+            className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              const { liked: newLiked, delta } = toggleFavorite(car.id);
+              setLiked(newLiked);
+              setFavCount((c) => Math.max(0, c + delta));
+              updateFavCount(car.id, delta);
+            }}
+          >
+            <Heart
+              className={`h-3.5 w-3.5 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+              strokeWidth={1.5}
+            />
+            {favCount > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {favCount}
               </span>
             )}
-            <span className="bg-foreground px-2 py-1 font-mono text-sm font-semibold text-background">
-              {formatPrice(car.price)}
+          </button>
+          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
+            <div className="flex items-center gap-1">
+              {priceInsight && (
+                <span
+                  className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}
+                >
+                  {priceInsight.label}
+                </span>
+              )}
+              <span className="bg-foreground px-2 py-1 font-mono text-sm font-semibold text-background">
+                {formatPrice(car.price)}
+              </span>
+            </div>
+            <span className="bg-foreground/80 px-1.5 py-0.5 font-mono text-[10px] text-background backdrop-blur-sm">
+              分期 {estimateMonthly(car.price)}
             </span>
           </div>
         </div>
@@ -114,11 +199,6 @@ export function CarCard({
               />
               <span className="font-mono text-[11px] text-muted-foreground">
                 {car.location_zh}
-                {distance !== undefined && (
-                  <span className="ml-1 text-muted-foreground/60">
-                    · {formatDistance(distance)}
-                  </span>
-                )}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -130,10 +210,28 @@ export function CarCard({
                 {car.year}年
               </span>
             </div>
+            {distance !== undefined && (
+              <div className="col-span-2 flex items-center gap-1.5">
+                <Navigation
+                  className="h-3 w-3 text-blue-500"
+                  strokeWidth={1.5}
+                />
+                <span className="font-mono text-[11px] font-medium text-blue-600 dark:text-blue-400">
+                  距你 {formatDistance(distance)}
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
-            <span className="font-mono text-[11px] text-muted-foreground">
+            <span
+              className="font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                window.location.href = `/user/${car.seller_id}`;
+              }}
+            >
               {car.seller_name}
             </span>
             <span className="font-mono text-[10px] text-muted-foreground/60">

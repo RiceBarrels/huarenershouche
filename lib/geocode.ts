@@ -169,6 +169,47 @@ export async function getUserCoords(): Promise<{
 }
 
 /**
+ * Auto-detect user's zipcode via browser geolocation + reverse geocode
+ */
+export async function detectUserZip(): Promise<string | null> {
+  try {
+    const pos = await getCurrentPosition();
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&addressdetails=1&accept-language=en`,
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const zip = data.address?.postcode;
+    if (zip && /^\d{5}/.test(zip)) return zip.slice(0, 5);
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Geocode a US zipcode to coordinates
+ */
+export async function geocodeZipToCoords(
+  zip: string
+): Promise<{ lat: number; lng: number } | null> {
+  if (!/^\d{5}$/.test(zip)) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&limit=1`,
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Forward geocode a location string to coordinates (cached)
  */
 const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
@@ -222,6 +263,31 @@ export function formatDistance(miles: number): string {
   if (miles < 1) return "< 1 mi";
   if (miles < 100) return `${Math.round(miles)} mi`;
   return `${Math.round(miles / 10) * 10} mi`;
+}
+
+/**
+ * Geocode a free-form address string and return coords + display name
+ */
+export async function geocodeAddress(
+  address: string
+): Promise<{ lat: number; lng: number; display: string } | null> {
+  if (!address.trim()) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1&accept-language=en`,
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data.length) return null;
+    return {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+      display: data[0].display_name,
+    };
+  } catch {
+    return null;
+  }
 }
 
 const STATE_ABBR: Record<string, string> = {

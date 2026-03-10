@@ -15,28 +15,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LocationCombobox } from "@/components/location-combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 const POPULAR_MAKES = ["Toyota", "Honda", "BMW", "Mercedes-Benz", "Tesla", "Lexus"];
 
-const PRICE_OPTIONS = [
-  { value: "5000", label: "$5,000" },
-  { value: "10000", label: "$10,000" },
-  { value: "15000", label: "$15,000" },
-  { value: "20000", label: "$20,000" },
-  { value: "25000", label: "$25,000" },
-  { value: "30000", label: "$30,000" },
-  { value: "40000", label: "$40,000" },
-  { value: "50000", label: "$50,000" },
-  { value: "75000", label: "$75,000" },
-  { value: "100000", label: "$100,000" },
+const US_STATES = [
+  { value: "CA", label: "加州 California" },
+  { value: "NY", label: "纽约 New York" },
+  { value: "TX", label: "德州 Texas" },
+  { value: "FL", label: "佛州 Florida" },
+  { value: "IL", label: "伊利诺伊 Illinois" },
+  { value: "WA", label: "华盛顿 Washington" },
+  { value: "MA", label: "麻省 Massachusetts" },
+  { value: "NJ", label: "新泽西 New Jersey" },
+  { value: "PA", label: "宾州 Pennsylvania" },
+  { value: "GA", label: "乔治亚 Georgia" },
+  { value: "OH", label: "俄亥俄 Ohio" },
+  { value: "MI", label: "密歇根 Michigan" },
+  { value: "NC", label: "北卡 North Carolina" },
+  { value: "VA", label: "弗吉尼亚 Virginia" },
+  { value: "AZ", label: "亚利桑那 Arizona" },
+  { value: "MD", label: "马里兰 Maryland" },
+  { value: "CO", label: "科罗拉多 Colorado" },
+  { value: "MN", label: "明尼苏达 Minnesota" },
+  { value: "OR", label: "俄勒冈 Oregon" },
+  { value: "NV", label: "内华达 Nevada" },
+  { value: "CT", label: "康州 Connecticut" },
+  { value: "HI", label: "夏威夷 Hawaii" },
 ];
-
-const YEAR_OPTIONS = Array.from({ length: 15 }, (_, i) => {
-  const year = 2026 - i;
-  return { value: String(year), label: String(year) };
-});
 
 const QUICK_SEARCHES: { label: string; params: Record<string, string> }[] = [
   { label: "$15K 以下好车", params: { maxPrice: "15000" } },
@@ -58,14 +66,11 @@ export default function Home() {
   const router = useRouter();
   const [keyword, setKeyword] = useState("");
   const [make, setMake] = useState("");
+  const [model, setModel] = useState("");
   const [location, setLocation] = useState("");
-  const [minPrice, setMinPrice] = useState("");
-  const [maxPrice, setMaxPrice] = useState("");
-  const [minYear, setMinYear] = useState("");
-  const [maxYear, setMaxYear] = useState("");
 
   function handleSearch() {
-    router.push(buildBrowseUrl({ q: keyword, make, location, minPrice, maxPrice, minYear, maxYear }));
+    router.push(buildBrowseUrl({ q: keyword || model, make, location }));
   }
 
   return (
@@ -103,13 +108,28 @@ export default function Home() {
             </Button>
           </form>
 
-          {/* Filters */}
-          <div className="mt-5 grid grid-cols-2 gap-3 text-left md:grid-cols-3">
+          {/* Filters - only region, brand, model */}
+          <div className="mt-5 grid grid-cols-3 gap-3 text-left">
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">地区</Label>
+              <Select value={location} onValueChange={setLocation}>
+                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+                  <SelectValue placeholder="选择地区" />
+                </SelectTrigger>
+                <SelectContent>
+                  {US_STATES.map((s) => (
+                    <SelectItem key={s.value} value={s.value} className="font-mono text-xs">
+                      {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div>
               <Label className="font-mono text-[11px] text-muted-foreground">品牌</Label>
               <Select value={make} onValueChange={setMake}>
                 <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                  <SelectValue placeholder="不限" />
+                  <SelectValue placeholder="选择品牌" />
                 </SelectTrigger>
                 <SelectContent>
                   {MAKES.map((m) => (
@@ -121,62 +141,13 @@ export default function Home() {
               </Select>
             </div>
             <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">地区</Label>
-              <div className="mt-1">
-                <LocationCombobox value={location} onValueChange={setLocation} placeholder="不限" className="h-8" />
-              </div>
-            </div>
-            <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">最低价格</Label>
-              <Select value={minPrice} onValueChange={setMinPrice}>
-                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                  <SelectValue placeholder="不限" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRICE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">最高价格</Label>
-              <Select value={maxPrice} onValueChange={setMaxPrice}>
-                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                  <SelectValue placeholder="不限" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRICE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">最早年份</Label>
-              <Select value={minYear} onValueChange={setMinYear}>
-                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                  <SelectValue placeholder="不限" />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEAR_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">最新年份</Label>
-              <Select value={maxYear} onValueChange={setMaxYear}>
-                <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                  <SelectValue placeholder="不限" />
-                </SelectTrigger>
-                <SelectContent>
-                  {YEAR_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label className="font-mono text-[11px] text-muted-foreground">型号</Label>
+              <Input
+                className="mt-1 h-8 font-mono text-xs"
+                placeholder="如 Camry, CR-V"
+                value={model}
+                onChange={(e) => setModel(e.target.value)}
+              />
             </div>
           </div>
 

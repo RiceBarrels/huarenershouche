@@ -1,7 +1,8 @@
 "use client";
 
-import { Search, SlidersHorizontal, X } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Search, X, Clock, Trash2 } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,9 +13,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { LocationCombobox } from "@/components/location-combobox";
+import { Slider } from "@/components/ui/slider";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+
+const US_STATES = [
+  { value: "CA", label: "加州 California" },
+  { value: "NY", label: "纽约 New York" },
+  { value: "TX", label: "德州 Texas" },
+  { value: "FL", label: "佛州 Florida" },
+  { value: "IL", label: "伊利诺伊 Illinois" },
+  { value: "WA", label: "华盛顿 Washington" },
+  { value: "MA", label: "麻省 Massachusetts" },
+  { value: "NJ", label: "新泽西 New Jersey" },
+  { value: "PA", label: "宾州 Pennsylvania" },
+  { value: "GA", label: "乔治亚 Georgia" },
+  { value: "OH", label: "俄亥俄 Ohio" },
+  { value: "MI", label: "密歇根 Michigan" },
+  { value: "NC", label: "北卡 North Carolina" },
+  { value: "VA", label: "弗吉尼亚 Virginia" },
+  { value: "AZ", label: "亚利桑那 Arizona" },
+  { value: "MD", label: "马里兰 Maryland" },
+  { value: "CO", label: "科罗拉多 Colorado" },
+  { value: "MN", label: "明尼苏达 Minnesota" },
+  { value: "OR", label: "俄勒冈 Oregon" },
+  { value: "NV", label: "内华达 Nevada" },
+  { value: "CT", label: "康州 Connecticut" },
+  { value: "HI", label: "夏威夷 Hawaii" },
+];
 
 interface Filters {
   keyword: string;
@@ -48,24 +73,6 @@ const INITIAL_FILTERS: Filters = {
   exteriorColor: "",
 };
 
-const PRICE_OPTIONS = [
-  { value: "5000", label: "$5,000" },
-  { value: "10000", label: "$10,000" },
-  { value: "15000", label: "$15,000" },
-  { value: "20000", label: "$20,000" },
-  { value: "25000", label: "$25,000" },
-  { value: "30000", label: "$30,000" },
-  { value: "40000", label: "$40,000" },
-  { value: "50000", label: "$50,000" },
-  { value: "75000", label: "$75,000" },
-  { value: "100000", label: "$100,000" },
-];
-
-const YEAR_OPTIONS = Array.from({ length: 15 }, (_, i) => {
-  const year = 2026 - i;
-  return { value: String(year), label: String(year) };
-});
-
 const MILEAGE_OPTIONS = [
   { value: "10000", label: "1万英里以内" },
   { value: "30000", label: "3万英里以内" },
@@ -84,8 +91,11 @@ const FUEL_OPTIONS = [
 ];
 
 const TRANSMISSION_OPTIONS = [
-  { value: "自动", label: "自动挡" },
+  { value: "AT", label: "AT 自动" },
   { value: "手动", label: "手动挡" },
+  { value: "CVT", label: "CVT 无级变速" },
+  { value: "双离合", label: "双离合 DCT" },
+  { value: "E-CVT", label: "E-CVT 电子无级" },
 ];
 
 const DRIVETRAIN_OPTIONS = [
@@ -105,6 +115,10 @@ const COLOR_OPTIONS = [
   { value: "绿", label: "绿色", color: "#16a34a" },
   { value: "金", label: "金色", color: "#ca8a04" },
   { value: "棕", label: "棕色", color: "#78350f" },
+  { value: "橙", label: "橙色", color: "#e87830" },
+  { value: "紫", label: "紫色", color: "#6a0dad" },
+  { value: "黄", label: "黄色", color: "#ffd700" },
+  { value: "青", label: "青色", color: "#00ced1" },
 ];
 
 export function SearchFilters({
@@ -115,11 +129,27 @@ export function SearchFilters({
   initialFilters?: Filters;
 }) {
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
+  const [history, setHistory] = useState<string[]>([]);
+  const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (initialFilters) setFilters(initialFilters);
   }, [initialFilters]);
+
+  useEffect(() => {
+    setHistory(getSearchHistory());
+  }, []);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setSearchFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
 
   const activeCount = Object.entries(filters).filter(
     ([k, v]) => v && k !== "keyword"
@@ -137,244 +167,265 @@ export function SearchFilters({
   }
 
   return (
-    <div className="border-b border-border bg-card">
-      <div className="mx-auto max-w-7xl px-4 py-4">
-        {/* Main search bar */}
-        <div className="flex gap-2">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-            <Input
-              placeholder="搜索品牌、车型、关键词..."
-              className="pl-9 font-mono text-sm"
-              value={filters.keyword}
-              onChange={(e) => update("keyword", e.target.value)}
-            />
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-1.5 font-mono text-xs"
-            onClick={() => setShowAdvanced(!showAdvanced)}
-          >
-            <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
-            筛选
-            {activeCount > 0 && (
-              <Badge variant="secondary" className="ml-1 h-4 min-w-4 px-1 font-mono text-[10px]">
-                {activeCount}
-              </Badge>
-            )}
-          </Button>
+    <aside className="w-full space-y-4">
+      {/* Search */}
+      <div ref={searchRef} className="relative">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+          <Input
+            placeholder="搜索品牌、车型..."
+            className="pl-9 font-mono text-sm"
+            value={filters.keyword}
+            onFocus={() => setSearchFocused(true)}
+            onChange={(e) => update("keyword", e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && filters.keyword.trim()) {
+                addSearchHistory(filters.keyword.trim());
+                setHistory(getSearchHistory());
+                setSearchFocused(false);
+              }
+            }}
+          />
         </div>
-
-        {/* Quick filters row */}
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Select value={filters.make} onValueChange={(v) => update("make", v)}>
-            <SelectTrigger className="h-8 w-auto min-w-[100px] font-mono text-xs">
-              <SelectValue placeholder="品牌" />
-            </SelectTrigger>
-            <SelectContent>
-              {MAKES.map((make) => (
-                <SelectItem key={make} value={make} className="font-mono text-xs">
-                  {MAKES_ZH[make]} {make}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <div className="w-auto min-w-[140px]">
-            <LocationCombobox
-              value={filters.location}
-              onValueChange={(v) => update("location", v)}
-              placeholder="地区"
-              className="h-8"
-            />
-          </div>
-
-          <Select value={filters.sellerType} onValueChange={(v) => update("sellerType", v)}>
-            <SelectTrigger className="h-8 w-auto min-w-[80px] font-mono text-xs">
-              <SelectValue placeholder="卖家类型" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="dealer" className="font-mono text-xs">
-                车行
-              </SelectItem>
-              <SelectItem value="private" className="font-mono text-xs">
-                个人
-              </SelectItem>
-            </SelectContent>
-          </Select>
-
-          {activeCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 gap-1 font-mono text-xs text-muted-foreground"
-              onClick={reset}
-            >
-              <X className="h-3 w-3" strokeWidth={1.5} />
-              清除
-            </Button>
-          )}
-        </div>
-
-        {/* Advanced filters */}
-        {showAdvanced && (
-          <div className="mt-3 space-y-3 border-t border-border pt-3">
-            {/* Row 1: Price & Year */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">最低价格</Label>
-                <Select value={filters.minPrice} onValueChange={(v) => update("minPrice", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRICE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">最高价格</Label>
-                <Select value={filters.maxPrice} onValueChange={(v) => update("maxPrice", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRICE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">最早年份</Label>
-                <Select value={filters.minYear} onValueChange={(v) => update("minYear", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEAR_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">最新年份</Label>
-                <Select value={filters.maxYear} onValueChange={(v) => update("maxYear", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {YEAR_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+        {searchFocused && !filters.keyword && history.length > 0 && (
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border bg-background shadow-md">
+            <div className="flex items-center justify-between px-3 py-1.5">
+              <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearSearchHistory();
+                  setHistory([]);
+                }}
+                className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+              >
+                <Trash2 className="h-2.5 w-2.5" strokeWidth={1.5} />
+                清除
+              </button>
             </div>
-
-            {/* Row 2: Fuel, Transmission, Drivetrain, Mileage */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">燃油类型</Label>
-                <Select value={filters.fuelType} onValueChange={(v) => update("fuelType", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {FUEL_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
-                <Select value={filters.transmission} onValueChange={(v) => update("transmission", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TRANSMISSION_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">驱动方式</Label>
-                <Select value={filters.drivetrain} onValueChange={(v) => update("drivetrain", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DRIVETRAIN_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">最高里程</Label>
-                <Select value={filters.maxMileage} onValueChange={(v) => update("maxMileage", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {MILEAGE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Row 3: Color */}
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              <div>
-                <Label className="font-mono text-[11px] text-muted-foreground">外观颜色</Label>
-                <Select value={filters.exteriorColor} onValueChange={(v) => update("exteriorColor", v)}>
-                  <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-                    <SelectValue placeholder="不限" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COLOR_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="inline-block h-3 w-3 rounded-full border border-border"
-                            style={{ backgroundColor: opt.color }}
-                          />
-                          {opt.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            {history.map((term) => (
+              <button
+                key={term}
+                type="button"
+                className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                onClick={() => {
+                  update("keyword", term);
+                  setSearchFocused(false);
+                }}
+              >
+                <Clock className="h-3 w-3" strokeWidth={1.5} />
+                {term}
+              </button>
+            ))}
           </div>
         )}
       </div>
-    </div>
+
+      {/* Clear all */}
+      {activeCount > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-full gap-1 font-mono text-xs text-muted-foreground"
+          onClick={reset}
+        >
+          <X className="h-3 w-3" strokeWidth={1.5} />
+          清除全部筛选 ({activeCount})
+        </Button>
+      )}
+
+      {/* Location */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">地区</Label>
+        <Select value={filters.location} onValueChange={(v) => update("location", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {US_STATES.map((state) => (
+              <SelectItem key={state.value} value={state.value} className="font-mono text-xs">
+                {state.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Input
+          placeholder="或输入 Zipcode"
+          className="mt-1.5 h-8 font-mono text-xs"
+          maxLength={5}
+          value={filters.location.match(/^\d{5}$/) ? filters.location : ""}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "").slice(0, 5);
+            if (val) update("location", val);
+          }}
+        />
+      </div>
+
+      {/* Brand */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">品牌</Label>
+        <Select value={filters.make} onValueChange={(v) => update("make", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {MAKES.map((make) => (
+              <SelectItem key={make} value={make} className="font-mono text-xs">
+                {MAKES_ZH[make]} {make}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Seller type */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">卖家类型</Label>
+        <Select value={filters.sellerType} onValueChange={(v) => update("sellerType", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="dealer" className="font-mono text-xs">车行</SelectItem>
+            <SelectItem value="private" className="font-mono text-xs">个人</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Price slider */}
+      <div>
+        <div className="flex items-center justify-between">
+          <Label className="font-mono text-[11px] text-muted-foreground">价格范围</Label>
+        </div>
+        <p className="mt-1 font-mono text-[11px] text-foreground">
+          ${Number(filters.minPrice || "0").toLocaleString()} - ${Number(filters.maxPrice || "200000").toLocaleString()}
+        </p>
+        <Slider
+          className="mt-2"
+          min={0}
+          max={200000}
+          step={5000}
+          value={[Number(filters.minPrice || "0"), Number(filters.maxPrice || "200000")]}
+          onValueChange={([min, max]) => {
+            const next = { ...filters, minPrice: String(min), maxPrice: max === 200000 ? "" : String(max) };
+            setFilters(next);
+            onFilter(next);
+          }}
+        />
+      </div>
+
+      {/* Year slider */}
+      <div>
+        <div className="flex items-center justify-between">
+          <Label className="font-mono text-[11px] text-muted-foreground">年份范围</Label>
+        </div>
+        <p className="mt-1 font-mono text-[11px] text-foreground">
+          {filters.minYear || "2000"} - {filters.maxYear || "2026"}
+        </p>
+        <Slider
+          className="mt-2"
+          min={2000}
+          max={2026}
+          step={1}
+          value={[Number(filters.minYear || "2000"), Number(filters.maxYear || "2026")]}
+          onValueChange={([min, max]) => {
+            const next = { ...filters, minYear: min === 2000 ? "" : String(min), maxYear: max === 2026 ? "" : String(max) };
+            setFilters(next);
+            onFilter(next);
+          }}
+        />
+      </div>
+
+      {/* Fuel type */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">燃油类型</Label>
+        <Select value={filters.fuelType} onValueChange={(v) => update("fuelType", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {FUEL_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Transmission */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
+        <Select value={filters.transmission} onValueChange={(v) => update("transmission", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {TRANSMISSION_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Drivetrain */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">驱动方式</Label>
+        <Select value={filters.drivetrain} onValueChange={(v) => update("drivetrain", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {DRIVETRAIN_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Max mileage */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">最高里程</Label>
+        <Select value={filters.maxMileage} onValueChange={(v) => update("maxMileage", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {MILEAGE_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                {opt.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Exterior color */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">外观颜色</Label>
+        <Select value={filters.exteriorColor} onValueChange={(v) => update("exteriorColor", v)}>
+          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
+            <SelectValue placeholder="不限" />
+          </SelectTrigger>
+          <SelectContent>
+            {COLOR_OPTIONS.map((opt) => (
+              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                <span className="flex items-center gap-2">
+                  <span
+                    className="inline-block h-3 w-3 rounded-full border border-border"
+                    style={{ backgroundColor: opt.color }}
+                  />
+                  {opt.label}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </aside>
   );
 }

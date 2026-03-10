@@ -1,12 +1,12 @@
 "use client";
 
-import { Car, Menu, LogOut, User, Plus, Moon, Sun, Scale } from "lucide-react";
+import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { AuthDialog } from "@/components/auth-dialog";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
@@ -95,7 +95,7 @@ export function Header() {
           )}
           {user ? (
             <>
-              <Link href="/my-cars">
+              <Link href="/account">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -146,29 +146,94 @@ export function Header() {
               <Menu className="h-4 w-4" strokeWidth={1.5} />
             </Button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-64">
+          <SheetContent side="right" className="w-72 p-0" showCloseButton={false}>
             <SheetTitle className="sr-only">导航菜单</SheetTitle>
-            <nav className="mt-8 flex flex-col gap-4">
-              <Link href="/browse" className="font-mono text-sm">
+
+            {/* Brand + close */}
+            <div className="flex items-center justify-between border-b border-border px-5 py-4">
+              <Link href="/" className="flex items-center gap-2">
+                <Car className="h-4 w-4" strokeWidth={1.5} />
+                <span className="font-mono text-xs font-semibold tracking-tight">华人二手车</span>
+              </Link>
+              <SheetClose asChild>
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <span className="font-mono text-xs">✕</span>
+                </Button>
+              </SheetClose>
+            </div>
+
+            {/* Nav links */}
+            <nav className="flex flex-col px-3 py-3">
+              <Link href="/browse" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 买车
               </Link>
-              <Link href="/post" className="font-mono text-sm">
+              <Link href="/post" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <FileText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 卖车
               </Link>
-              <Link href="/valuation" className="font-mono text-sm">
+              <Link href="/valuation" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <ScaleIcon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 估价
               </Link>
-              <Link href="/guide" className="font-mono text-sm">
+              <Link href="/guide" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <BookOpen className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 资讯
               </Link>
-              <Link href="/compare" className="font-mono text-sm">
+              <Link href="/compare" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <GitCompare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 对比
               </Link>
-              <div className="my-2 h-px bg-border" />
-              {mounted && (
+            </nav>
+
+            <div className="mx-5 h-px bg-border" />
+
+            {/* User section */}
+            <div className="flex flex-col px-3 py-3">
+              {user ? (
+                <>
+                  <Link href="/account" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                    <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                    我的车辆
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <LogOut className="h-4 w-4" strokeWidth={1.5} />
+                    退出登录
+                  </button>
+                  <div className="px-3 pt-2">
+                    <Link href="/post">
+                      <Button size="sm" className="w-full gap-1.5 font-mono text-xs">
+                        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        发布车辆
+                      </Button>
+                    </Link>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col gap-2 px-3 pt-1">
+                  <AuthDialog onSuccess={() => window.location.reload()}>
+                    <Button variant="outline" size="sm" className="w-full font-mono text-xs">
+                      登录
+                    </Button>
+                  </AuthDialog>
+                  <AuthDialog onSuccess={() => window.location.reload()}>
+                    <Button size="sm" className="w-full font-mono text-xs">
+                      免费发布
+                    </Button>
+                  </AuthDialog>
+                </div>
+              )}
+            </div>
+
+            {/* Theme toggle at bottom */}
+            {mounted && (
+              <div className="mt-auto border-t border-border px-3 py-3">
                 <button
                   onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="flex items-center gap-2 font-mono text-sm text-muted-foreground"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 >
                   {theme === "dark" ? (
                     <Sun className="h-4 w-4" strokeWidth={1.5} />
@@ -177,45 +242,8 @@ export function Header() {
                   )}
                   {theme === "dark" ? "浅色模式" : "深色模式"}
                 </button>
-              )}
-              {user ? (
-                <>
-                  <Link href="/my-cars" className="font-mono text-sm">
-                    我的车辆
-                  </Link>
-                  <Link href="/post">
-                    <Button size="sm" className="w-full font-mono text-sm">
-                      发布车辆
-                    </Button>
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="justify-start font-mono text-sm text-muted-foreground"
-                    onClick={handleLogout}
-                  >
-                    退出登录
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <AuthDialog onSuccess={() => window.location.reload()}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start font-mono text-sm"
-                    >
-                      登录
-                    </Button>
-                  </AuthDialog>
-                  <AuthDialog onSuccess={() => window.location.reload()}>
-                    <Button size="sm" className="font-mono text-sm">
-                      免费发布
-                    </Button>
-                  </AuthDialog>
-                </>
-              )}
-            </nav>
+              </div>
+            )}
           </SheetContent>
         </Sheet>
       </div>
