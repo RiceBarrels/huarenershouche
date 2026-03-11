@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Plus,
@@ -17,6 +17,7 @@ import {
   MapPin,
   Check,
   FileText,
+  MessageSquare,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { geocodeAddress } from "@/lib/geocode";
@@ -29,6 +30,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MAKES_ZH } from "@/lib/mock-data";
+import { ConversationList } from "@/components/conversation-list";
 import type { DbCar, DbProfile, DbDealerStore } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -59,8 +61,18 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
   removed: { label: "已下架", variant: "destructive" },
 };
 
-export default function MyCarsPage() {
+export default function AccountPage() {
+  return (
+    <Suspense>
+      <AccountContent />
+    </Suspense>
+  );
+}
+
+function AccountContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const defaultTab = searchParams.get("tab") || "listings";
   const [user, setUser] = useState<string | null>(null);
   const [myCars, setMyCars] = useState<DbCar[]>([]);
   const [favorites, setFavorites] = useState<DbCar[]>([]);
@@ -75,6 +87,7 @@ export default function MyCarsPage() {
     location: "",
     account_type: "private" as "private" | "dealer",
   });
+  const [unreadCount, setUnreadCount] = useState(0);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -175,6 +188,10 @@ export default function MyCarsPage() {
           .in("id", ids);
         setFavorites((favCars as DbCar[]) || []);
       }
+
+      // Load unread count
+      const { data: unreadData } = await supabase.rpc("get_unread_count");
+      setUnreadCount(unreadData || 0);
 
       // Load post draft from localStorage
       try {
@@ -344,13 +361,21 @@ export default function MyCarsPage() {
           </Link>
         </div>
 
-        <Tabs defaultValue="listings" className="mt-6">
+        <Tabs defaultValue={defaultTab} className="mt-6">
           <TabsList className="font-mono">
             <TabsTrigger value="listings" className="font-mono text-xs">
               我的发布 ({myCars.length})
             </TabsTrigger>
             <TabsTrigger value="favorites" className="font-mono text-xs">
               我的收藏 ({favorites.length})
+            </TabsTrigger>
+            <TabsTrigger value="messages" className="relative font-mono text-xs">
+              消息
+              {unreadCount > 0 && (
+                <span className="ml-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 font-mono text-[10px] font-medium text-background">
+                  {unreadCount}
+                </span>
+              )}
             </TabsTrigger>
             <TabsTrigger value="settings" className="font-mono text-xs">
               设置
@@ -566,6 +591,10 @@ export default function MyCarsPage() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          <TabsContent value="messages" className="mt-4">
+            {user && <ConversationList userId={user} />}
           </TabsContent>
 
           <TabsContent value="settings" className="mt-4">

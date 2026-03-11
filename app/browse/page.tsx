@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { match } from "pinyin-pro";
 import { MAKES_ZH } from "@/lib/mock-data";
-import { detectUserZip, geocodeZipToCoords, haversineDistance } from "@/lib/geocode";
+import { detectUserZip, geocodeZipToCoords, haversineDistance, lookupZip } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { getPriceInsight } from "@/lib/price-insight";
@@ -49,6 +49,8 @@ interface Filters {
   drivetrain: string;
   maxMileage: string;
   exteriorColor: string;
+  interiorColor: string;
+  cylinders: string;
 }
 
 const INITIAL_FILTERS: Filters = {
@@ -65,6 +67,8 @@ const INITIAL_FILTERS: Filters = {
   drivetrain: "",
   maxMileage: "",
   exteriorColor: "",
+  interiorColor: "",
+  cylinders: "",
 };
 
 type SortKey = "newest" | "price-asc" | "price-desc" | "mileage" | "year" | "distance";
@@ -93,6 +97,8 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     drivetrain: sp.get("drivetrain") || "",
     maxMileage: sp.get("maxMileage") || "",
     exteriorColor: sp.get("exteriorColor") || "",
+    interiorColor: sp.get("interiorColor") || "",
+    cylinders: sp.get("cylinders") || "",
   };
 }
 
@@ -114,6 +120,7 @@ function BrowseContent() {
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [userZip, setUserZip] = useState("");
+  const [zipLabel, setZipLabel] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -168,14 +175,18 @@ function BrowseContent() {
     }
   }, []);
 
-  // Geocode user zipcode for distance calculation
+  // Geocode user zipcode for distance calculation + location name
   useEffect(() => {
     if (/^\d{5}$/.test(userZip)) {
       geocodeZipToCoords(userZip).then((coords) => {
         setUserCoords(coords);
       });
+      lookupZip(userZip).then((geo) => {
+        setZipLabel(geo ? geo.formatted : "");
+      });
     } else {
       setUserCoords(null);
+      setZipLabel("");
     }
   }, [userZip]);
 
@@ -224,7 +235,9 @@ function BrowseContent() {
     if (filters.transmission) chips.push({ key: "transmission", label: filters.transmission });
     if (filters.drivetrain) chips.push({ key: "drivetrain", label: filters.drivetrain });
     if (filters.maxMileage) chips.push({ key: "maxMileage", label: `≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi` });
-    if (filters.exteriorColor) chips.push({ key: "exteriorColor", label: filters.exteriorColor + "色" });
+    if (filters.exteriorColor) chips.push({ key: "exteriorColor", label: "外" + filters.exteriorColor + "色" });
+    if (filters.interiorColor) chips.push({ key: "interiorColor", label: "内" + filters.interiorColor + "色" });
+    if (filters.cylinders) chips.push({ key: "cylinders", label: filters.cylinders + "缸" });
     return chips;
   }, [filters]);
 
@@ -241,23 +254,27 @@ function BrowseContent() {
       if (filters.maxPrice && car.price > Number(filters.maxPrice)) return false;
       if (filters.minYear && car.year < Number(filters.minYear)) return false;
       if (filters.maxYear && car.year > Number(filters.maxYear)) return false;
-      if (
-        filters.location &&
-        !car.location.toLowerCase().includes(filters.location.toLowerCase()) &&
-        !car.location_zh.includes(filters.location)
-      )
-        return false;
+      if (filters.location) {
+        const loc = filters.location;
+        // Sub-region: "CA-LA" → match state "CA" + city keyword
+        const locLower = car.location.toLowerCase();
+        const locZh = car.location_zh;
+        if (loc.includes("-")) {
+          const [state] = loc.split("-");
+          if (!locLower.includes(state.toLowerCase()) && !locZh.includes(state)) return false;
+        } else if (/^\d{5}$/.test(loc)) {
+          // Zipcode match handled by distance
+        } else {
+          if (!locLower.includes(loc.toLowerCase()) && !locZh.includes(loc)) return false;
+        }
+      }
       if (filters.sellerType && car.profiles?.account_type !== filters.sellerType) return false;
       if (filters.fuelType && car.fuel_type !== filters.fuelType) return false;
       if (filters.transmission && car.transmission !== filters.transmission) return false;
       if (filters.drivetrain && car.drivetrain !== filters.drivetrain) return false;
       if (filters.maxMileage && car.mileage > Number(filters.maxMileage)) return false;
-      if (
-        filters.exteriorColor &&
-        car.exterior_color &&
-        !car.exterior_color.includes(filters.exteriorColor)
-      )
-        return false;
+      if (filters.exteriorColor && car.exterior_color && !car.exterior_color.includes(filters.exteriorColor)) return false;
+      if (filters.interiorColor && car.interior_color && !car.interior_color.includes(filters.interiorColor)) return false;
       return true;
     });
 
@@ -436,13 +453,20 @@ function BrowseContent() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Input
-                placeholder="你的 Zipcode"
-                className="h-8 w-[110px] font-mono text-xs"
-                maxLength={5}
-                value={userZip}
-                onChange={(e) => setUserZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
-              />
+              <div className="flex items-center gap-1.5">
+                <Input
+                  placeholder="你的 Zipcode"
+                  className="h-8 w-[110px] font-mono text-xs"
+                  maxLength={5}
+                  value={userZip}
+                  onChange={(e) => setUserZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                />
+                {zipLabel && (
+                  <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
+                    {zipLabel}
+                  </span>
+                )}
+              </div>
               <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
                 <SelectTrigger className="h-8 w-auto min-w-[130px] gap-1 font-mono text-xs">
                   <ArrowUpDown className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />

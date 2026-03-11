@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare } from "lucide-react";
+import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -12,6 +12,7 @@ import type { User as SupaUser } from "@supabase/supabase-js";
 
 export function Header() {
   const [user, setUser] = useState<SupaUser | null>(null);
+  const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -20,11 +21,21 @@ export function Header() {
   }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+      if (data.user) {
+        supabase.rpc("get_unread_count").then(({ data: count }) => setUnreadCount(count || 0));
+      }
+    });
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        supabase.rpc("get_unread_count").then(({ data: count }) => setUnreadCount(count || 0));
+      } else {
+        setUnreadCount(0);
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -95,6 +106,20 @@ export function Header() {
           )}
           {user ? (
             <>
+              <Link href="/account?tab=messages" className="relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                >
+                  <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </Button>
+                {unreadCount > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </Link>
               <Link href="/account">
                 <Button
                   variant="ghost"
@@ -192,6 +217,15 @@ export function Header() {
             <div className="flex flex-col px-3 py-3">
               {user ? (
                 <>
+              <Link href="/account?tab=messages" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                    <MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                    消息
+                    {unreadCount > 0 && (
+                      <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </Link>
                   <Link href="/account" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
                     <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                     我的车辆

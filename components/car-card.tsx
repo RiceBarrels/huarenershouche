@@ -199,6 +199,11 @@ export function CarCard({
               />
               <span className="font-mono text-[11px] text-muted-foreground">
                 {car.location_zh}
+                {distance !== undefined && (
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    {" · "}{formatDistance(distance)}
+                  </span>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-1.5">
@@ -210,17 +215,6 @@ export function CarCard({
                 {car.year}年
               </span>
             </div>
-            {distance !== undefined && (
-              <div className="col-span-2 flex items-center gap-1.5">
-                <Navigation
-                  className="h-3 w-3 text-blue-500"
-                  strokeWidth={1.5}
-                />
-                <span className="font-mono text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                  距你 {formatDistance(distance)}
-                </span>
-              </div>
-            )}
           </div>
 
           <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">

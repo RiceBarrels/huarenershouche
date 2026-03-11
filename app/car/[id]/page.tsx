@@ -23,6 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
+import { CommentSection } from "@/components/comment-section";
 import { BackToTop } from "@/components/back-to-top";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -501,6 +502,42 @@ export default function CarDetailPage() {
                   </AuthDialog>
                 )}
 
+                {user && user !== car.seller_id && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-1.5 font-mono text-xs"
+                    onClick={async () => {
+                      // Find or create conversation
+                      const { data: existing } = await supabase
+                        .from("conversations")
+                        .select("id")
+                        .eq("car_id", carId)
+                        .eq("buyer_id", user)
+                        .eq("seller_id", car.seller_id)
+                        .maybeSingle();
+                      if (existing) {
+                        router.push(`/account?tab=messages&conv=${existing.id}`);
+                      } else {
+                        const { data: created } = await supabase
+                          .from("conversations")
+                          .insert({
+                            car_id: carId,
+                            buyer_id: user,
+                            seller_id: car.seller_id,
+                          })
+                          .select("id")
+                          .single();
+                        if (created) {
+                          router.push(`/account?tab=messages&conv=${created.id}`);
+                        }
+                      }
+                    }}
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    发消息给卖家
+                  </Button>
+                )}
+
                 <Button
                   variant="outline"
                   className="w-full gap-1.5 font-mono text-xs"
@@ -544,6 +581,9 @@ export default function CarDetailPage() {
             </div>
           </div>
         </div>
+        {/* Comments */}
+        <CommentSection carId={carId} />
+
         {/* Similar cars */}
         {similarCars.length > 0 && (
           <section className="mt-10 border-t border-border pt-6">

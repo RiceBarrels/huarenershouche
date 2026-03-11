@@ -58,3 +58,35 @@ export interface DbDealerStore {
   phone: string | null;
   created_at: string;
 }
+
+export interface DbConversation {
+  id: string;
+  car_id: string;
+  buyer_id: string;
+  seller_id: string;
+  last_message_at: string;
+  created_at: string;
+  // Joined
+  cars?: { id: string; title_zh: string; image_url: string | null; price: number };
+  buyer_profile?: { username: string; avatar_url: string | null };
+  seller_profile?: { username: string; avatar_url: string | null };
+}
+
+export interface DbMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  content: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface DbComment {
+  id: string;
+  car_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  // Joined
+  profiles?: { username: string; avatar_url: string | null };
+}
