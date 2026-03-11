@@ -26,10 +26,10 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
-export function ConversationList({ userId }: { userId: string }) {
+export function ConversationList({ userId, initialConvId }: { userId: string; initialConvId?: string | null }) {
   const [conversations, setConversations] = useState<(DbConversation & { last_message?: string; unread_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [activeConversation, setActiveConversation] = useState<string | null>(initialConvId || null);
   const [activeOtherName, setActiveOtherName] = useState("");
 
   useEffect(() => {
@@ -70,9 +70,19 @@ export function ConversationList({ userId }: { userId: string }) {
 
       setConversations(convs);
       setLoading(false);
+
+      // Auto-open conversation from URL param
+      if (initialConvId && !activeOtherName) {
+        const target = convs.find((c) => c.id === initialConvId);
+        if (target) {
+          const isBuyer = target.buyer_id === userId;
+          const otherProfile = isBuyer ? target.seller_profile : target.buyer_profile;
+          setActiveOtherName(otherProfile?.username || "用户");
+        }
+      }
     }
     load();
-  }, [userId]);
+  }, [userId, initialConvId]);
 
   if (activeConversation) {
     return (

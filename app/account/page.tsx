@@ -594,7 +594,7 @@ function AccountContent() {
           </TabsContent>
 
           <TabsContent value="messages" className="mt-4">
-            {user && <ConversationList userId={user} />}
+            {user && <ConversationList userId={user} initialConvId={searchParams.get("conv")} />}
           </TabsContent>
 
           <TabsContent value="settings" className="mt-4">

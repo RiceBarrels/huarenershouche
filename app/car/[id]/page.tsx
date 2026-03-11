@@ -502,40 +502,52 @@ export default function CarDetailPage() {
                   </AuthDialog>
                 )}
 
-                {user && user !== car.seller_id && (
-                  <Button
-                    variant="outline"
-                    className="w-full gap-1.5 font-mono text-xs"
-                    onClick={async () => {
-                      // Find or create conversation
-                      const { data: existing } = await supabase
-                        .from("conversations")
-                        .select("id")
-                        .eq("car_id", carId)
-                        .eq("buyer_id", user)
-                        .eq("seller_id", car.seller_id)
-                        .maybeSingle();
-                      if (existing) {
-                        router.push(`/account?tab=messages&conv=${existing.id}`);
-                      } else {
-                        const { data: created } = await supabase
+                {user ? (
+                  user !== car.seller_id && (
+                    <Button
+                      variant="outline"
+                      className="w-full gap-1.5 font-mono text-xs"
+                      onClick={async () => {
+                        // Find or create conversation
+                        const { data: existing } = await supabase
                           .from("conversations")
-                          .insert({
-                            car_id: carId,
-                            buyer_id: user,
-                            seller_id: car.seller_id,
-                          })
                           .select("id")
-                          .single();
-                        if (created) {
-                          router.push(`/account?tab=messages&conv=${created.id}`);
+                          .eq("car_id", carId)
+                          .eq("buyer_id", user)
+                          .eq("seller_id", car.seller_id)
+                          .maybeSingle();
+                        if (existing) {
+                          router.push(`/account?tab=messages&conv=${existing.id}`);
+                        } else {
+                          const { data: created } = await supabase
+                            .from("conversations")
+                            .insert({
+                              car_id: carId,
+                              buyer_id: user,
+                              seller_id: car.seller_id,
+                            })
+                            .select("id")
+                            .single();
+                          if (created) {
+                            router.push(`/account?tab=messages&conv=${created.id}`);
+                          }
                         }
-                      }
-                    }}
-                  >
-                    <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    发消息给卖家
-                  </Button>
+                      }}
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      发消息给卖家
+                    </Button>
+                  )
+                ) : (
+                  <AuthDialog onSuccess={() => window.location.reload()}>
+                    <Button
+                      variant="outline"
+                      className="w-full gap-1.5 font-mono text-xs"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      登录后私信
+                    </Button>
+                  </AuthDialog>
                 )}
 
                 <Button
