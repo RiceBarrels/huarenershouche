@@ -5,6 +5,61 @@ export interface GeoResult {
   formatted: string; // "City, ST"
 }
 
+const GOOGLE_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "";
+
+function useGoogle(): boolean {
+  return !!GOOGLE_KEY;
+}
+
+// ─── Google Geocoding helpers ────────────────────────────────────────
+
+function parseGoogleResult(
+  components: any[],
+  lang: "en" | "zh" = "en"
+): { city: string; state: string; stateCode: string } {
+  let city = "";
+  let state = "";
+  let stateCode = "";
+
+  for (const c of components) {
+    const types: string[] = c.types || [];
+    if (types.includes("locality")) {
+      city = c.long_name;
+    } else if (types.includes("sublocality_level_1") && !city) {
+      city = c.long_name;
+    } else if (types.includes("administrative_area_level_1")) {
+      state = c.long_name;
+      stateCode = c.short_name;
+    }
+  }
+  // For Chinese, stateCode might be Chinese too, keep short_name
+  return { city, state, stateCode };
+}
+
+async function googleGeocode(
+  params: Record<string, string>,
+  lang: "en" | "zh" = "en"
+): Promise<any | null> {
+  const sp = new URLSearchParams({
+    ...params,
+    key: GOOGLE_KEY,
+    language: lang === "zh" ? "zh-CN" : "en",
+  });
+  try {
+    const res = await fetch(
+      `https://maps.googleapis.com/maps/api/geocode/json?${sp.toString()}`
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data.status !== "OK" || !data.results?.length) return null;
+    return data.results[0];
+  } catch {
+    return null;
+  }
+}
+
+// ─── Public API ──────────────────────────────────────────────────────
+
 /**
  * Get user's current position via browser geolocation API
  */
@@ -23,68 +78,93 @@ export function getCurrentPosition(): Promise<GeolocationPosition> {
 }
 
 /**
- * Reverse geocode coordinates to city/state using free Nominatim API (OpenStreetMap)
- * Rate limit: 1 request/second, acceptable for single user lookups
+ * Reverse geocode coordinates to city/state
  */
 export async function reverseGeocode(
   lat: number,
   lng: number
 ): Promise<GeoResult | null> {
+  if (useGoogle()) {
+    const result = await googleGeocode({ latlng: `${lat},${lng}` });
+    if (result) {
+      const { city, state, stateCode } = parseGoogleResult(
+        result.address_components
+      );
+      return { city, state, stateCode, formatted: `${city}, ${stateCode}` };
+    }
+  }
+
+  // Fallback: Nominatim
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
-      {
-        headers: { "User-Agent": "HuarenCars/1.0" },
-      }
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
     );
     if (!res.ok) return null;
-
     const data = await res.json();
     const addr = data.address;
     if (!addr) return null;
-
     const city =
       addr.city || addr.town || addr.village || addr.hamlet || addr.county || "";
     const state = addr.state || "";
     const stateCode = STATE_ABBR[state] || state;
-
-    return {
-      city,
-      state,
-      stateCode,
-      formatted: `${city}, ${stateCode}`,
-    };
+    return { city, state, stateCode, formatted: `${city}, ${stateCode}` };
   } catch {
     return null;
   }
 }
 
 /**
- * Lookup by US zip code using Nominatim
+ * Lookup by US zip code
  */
-export async function lookupZip(zip: string): Promise<GeoResult | null> {
+export async function lookupZip(
+  zip: string,
+  lang: "en" | "zh" = "en"
+): Promise<GeoResult | null> {
+  if (useGoogle()) {
+    const result = await googleGeocode(
+      { address: zip, components: "country:US" },
+      lang
+    );
+    if (result) {
+      const { city, stateCode } = parseGoogleResult(
+        result.address_components,
+        lang
+      );
+      return {
+        city,
+        state: "",
+        stateCode,
+        formatted: lang === "zh" ? city : `${city}, ${stateCode} ${zip}`,
+      };
+    }
+  }
+
+  // Fallback: Nominatim
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&addressdetails=1&limit=1&accept-language=en`,
-      {
-        headers: { "User-Agent": "HuarenCars/1.0" },
-      }
+      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&addressdetails=1&limit=1&accept-language=${lang}`,
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.length) return null;
-
     const addr = data[0].address;
     const city =
-      addr?.city || addr?.town || addr?.village || addr?.hamlet || addr?.county || "";
+      addr?.city ||
+      addr?.town ||
+      addr?.village ||
+      addr?.hamlet ||
+      addr?.county ||
+      "";
     const state = addr?.state || "";
-    const stateCode = STATE_ABBR[state] || state;
-
+    const stateCode =
+      lang === "en" ? STATE_ABBR[state] || state : state;
     return {
       city,
       state,
       stateCode,
-      formatted: `${city}, ${stateCode} ${zip}`,
+      formatted: lang === "zh" ? city : `${city}, ${stateCode} ${zip}`,
     };
   } catch {
     return null;
@@ -92,12 +172,11 @@ export async function lookupZip(zip: string): Promise<GeoResult | null> {
 }
 
 /**
- * Forward geocode: search for cities by name using Nominatim
+ * Forward geocode: search for cities by name
  */
 export async function searchCities(query: string): Promise<GeoResult[]> {
   if (!query || query.length < 2) return [];
 
-  // If input looks like a zip code, use zip lookup
   const zipMatch = query.match(/^\d{5}$/);
   if (zipMatch) {
     const result = await lookupZip(query);
@@ -107,15 +186,11 @@ export async function searchCities(query: string): Promise<GeoResult[]> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=us&format=json&addressdetails=1&limit=8&accept-language=en`,
-      {
-        headers: { "User-Agent": "HuarenCars/1.0" },
-      }
+      { headers: { "User-Agent": "HuarenCars/1.0" } }
     );
     if (!res.ok) return [];
-
     const data = await res.json();
     const seen = new Set<string>();
-
     return data
       .map((item: any) => {
         const addr = item.address;
@@ -174,6 +249,21 @@ export async function getUserCoords(): Promise<{
 export async function detectUserZip(): Promise<string | null> {
   try {
     const pos = await getCurrentPosition();
+
+    if (useGoogle()) {
+      const result = await googleGeocode({
+        latlng: `${pos.coords.latitude},${pos.coords.longitude}`,
+      });
+      if (result) {
+        const pc = result.address_components?.find((c: any) =>
+          c.types?.includes("postal_code")
+        );
+        if (pc?.short_name && /^\d{5}/.test(pc.short_name))
+          return pc.short_name.slice(0, 5);
+      }
+    }
+
+    // Fallback: Nominatim
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&addressdetails=1&accept-language=en`,
       { headers: { "User-Agent": "HuarenCars/1.0" } }
@@ -195,6 +285,21 @@ export async function geocodeZipToCoords(
   zip: string
 ): Promise<{ lat: number; lng: number } | null> {
   if (!/^\d{5}$/.test(zip)) return null;
+
+  if (useGoogle()) {
+    const result = await googleGeocode({
+      address: zip,
+      components: "country:US",
+    });
+    if (result?.geometry?.location) {
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+      };
+    }
+  }
+
+  // Fallback: Nominatim
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&limit=1`,
@@ -219,6 +324,22 @@ export async function geocodeCity(
 ): Promise<{ lat: number; lng: number } | null> {
   if (geocodeCache.has(location)) return geocodeCache.get(location)!;
 
+  if (useGoogle()) {
+    const result = await googleGeocode({
+      address: location,
+      components: "country:US",
+    });
+    if (result?.geometry?.location) {
+      const coords = {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+      };
+      geocodeCache.set(location, coords);
+      return coords;
+    }
+  }
+
+  // Fallback: Nominatim
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&countrycodes=us&format=json&limit=1`,
@@ -227,8 +348,10 @@ export async function geocodeCity(
     if (!res.ok) return null;
     const data = await res.json();
     if (!data.length) return null;
-
-    const coords = { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    const coords = {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+    };
     geocodeCache.set(location, coords);
     return coords;
   } catch {
@@ -272,6 +395,19 @@ export async function geocodeAddress(
   address: string
 ): Promise<{ lat: number; lng: number; display: string } | null> {
   if (!address.trim()) return null;
+
+  if (useGoogle()) {
+    const result = await googleGeocode({ address });
+    if (result?.geometry?.location) {
+      return {
+        lat: result.geometry.location.lat,
+        lng: result.geometry.location.lng,
+        display: result.formatted_address || address,
+      };
+    }
+  }
+
+  // Fallback: Nominatim
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1&accept-language=en`,

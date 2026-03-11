@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
@@ -84,8 +85,12 @@ export function CarCard({
 
   return (
     <Link href={`/car/${car.id}`}>
-      <article className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20">
-        <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+      <motion.article
+        whileHover={{ y: -2 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20"
+      >
+        <div className="relative aspect-16/10 overflow-hidden bg-muted">
           {car.image_url ? (
             <img
               src={car.image_url}
@@ -146,23 +151,6 @@ export function CarCard({
               </span>
             )}
           </button>
-          <div className="absolute bottom-2 right-2 flex flex-col items-end gap-0.5">
-            <div className="flex items-center gap-1">
-              {priceInsight && (
-                <span
-                  className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}
-                >
-                  {priceInsight.label}
-                </span>
-              )}
-              <span className="bg-foreground px-2 py-1 font-mono text-sm font-semibold text-background">
-                {formatPrice(car.price)}
-              </span>
-            </div>
-            <span className="bg-foreground/80 px-1.5 py-0.5 font-mono text-[10px] text-background backdrop-blur-sm">
-              分期 {estimateMonthly(car.price)}
-            </span>
-          </div>
         </div>
 
         <div className="p-3">
@@ -172,6 +160,22 @@ export function CarCard({
           <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
             {car.title}
           </p>
+
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="font-mono text-base font-bold">
+              {formatPrice(car.price)}
+            </span>
+            {priceInsight && (
+              <span
+                className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}
+              >
+                {priceInsight.label}
+              </span>
+            )}
+            <span className="font-mono text-[10px] text-muted-foreground">
+              分期 {estimateMonthly(car.price)}
+            </span>
+          </div>
 
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
             <div className="flex items-center gap-1.5">
@@ -233,7 +237,7 @@ export function CarCard({
             </span>
           </div>
         </div>
-      </article>
+      </motion.article>
     </Link>
   );
 }

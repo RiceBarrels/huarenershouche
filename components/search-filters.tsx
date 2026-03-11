@@ -51,13 +51,13 @@ function formatMileageLabel(miles: number): string {
 }
 
 // --- All 50 states + DC with sub-regions for major ones ---
-interface StateOption {
+export interface StateOption {
   value: string;
   label: string;
   subRegions?: { value: string; label: string }[];
 }
 
-const US_STATES: StateOption[] = [
+export const US_STATES: StateOption[] = [
   {
     value: "CA", label: "加州 California",
     subRegions: [

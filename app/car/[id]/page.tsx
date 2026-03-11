@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import {
   ArrowLeft,
   MapPin,
@@ -197,7 +198,12 @@ export default function CarDetailPage() {
           {/* Left: Image + Details */}
           <div>
             {/* Main image with navigation */}
-            <div className="relative aspect-[16/10] overflow-hidden border border-border bg-muted">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+              className="relative aspect-16/10 overflow-hidden border border-border bg-muted"
+            >
               {allImages.length > 0 ? (
                 <img
                   src={allImages[currentImage]}
@@ -255,7 +261,7 @@ export default function CarDetailPage() {
                   </div>
                 </>
               )}
-            </div>
+            </motion.div>
 
             {/* Image thumbnails */}
             {allImages.length > 1 && (
@@ -281,7 +287,12 @@ export default function CarDetailPage() {
             )}
 
             {/* Car info */}
-            <div className="mt-6">
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+              className="mt-6"
+            >
               <h1 className="font-mono text-xl font-semibold tracking-tight">
                 {car.title_zh}
               </h1>
@@ -297,7 +308,7 @@ export default function CarDetailPage() {
                   {car.views_count || 0} 次浏览
                 </span>
               </div>
-            </div>
+            </motion.div>
 
             <Separator className="my-6" />
 
@@ -437,7 +448,12 @@ export default function CarDetailPage() {
           </div>
 
           {/* Right: Seller card */}
-          <div className="lg:sticky lg:top-20 lg:self-start">
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, delay: 0.25, ease: "easeOut" }}
+            className="lg:sticky lg:top-20 lg:self-start"
+          >
             <div className="border border-border p-4">
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
               <Link
@@ -591,21 +607,27 @@ export default function CarDetailPage() {
                 </li>
               </ul>
             </div>
-          </div>
+          </motion.div>
         </div>
         {/* Comments */}
         <CommentSection carId={carId} />
 
         {/* Similar cars */}
         {similarCars.length > 0 && (
-          <section className="mt-10 border-t border-border pt-6">
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-40px" }}
+            transition={{ duration: 0.4 }}
+            className="mt-10 border-t border-border pt-6"
+          >
             <h2 className="font-mono text-sm font-semibold">相似车辆推荐</h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {similarCars.map((c) => (
                 <CarCard key={c.id} car={c} />
               ))}
             </div>
-          </section>
+          </motion.section>
         )}
       </main>
       <Footer />

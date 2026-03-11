@@ -2,13 +2,14 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowUpDown, Search, SlidersHorizontal, X, Clock, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowUpDown, Search, SlidersHorizontal, X, Clock, Trash2, MapPin } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
-import { SearchFilters } from "@/components/search-filters";
+import { SearchFilters, US_STATES } from "@/components/search-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -175,14 +176,28 @@ function BrowseContent() {
     }
   }, []);
 
-  // Geocode user zipcode for distance calculation + location name
+  // Geocode user zipcode for distance calculation + location name + auto-set location
   useEffect(() => {
     if (/^\d{5}$/.test(userZip)) {
       geocodeZipToCoords(userZip).then((coords) => {
         setUserCoords(coords);
       });
       lookupZip(userZip).then((geo) => {
-        setZipLabel(geo ? geo.formatted : "");
+        if (!geo) { setZipLabel(""); return; }
+        setZipLabel(geo.formatted);
+        // Auto-set location filter from zip
+        const state = US_STATES.find((s) => s.value === geo.stateCode);
+        if (state) {
+          if (state.subRegions) {
+            const cityLower = geo.city.toLowerCase();
+            const sub = state.subRegions.find((sr) =>
+              sr.label.toLowerCase().includes(cityLower) && !sr.value.endsWith("-other")
+            );
+            setFilters((f) => ({ ...f, location: sub ? sub.value : state.value }));
+          } else {
+            setFilters((f) => ({ ...f, location: state.value }));
+          }
+        }
       });
     } else {
       setUserCoords(null);
@@ -452,11 +467,49 @@ function BrowseContent() {
                 辆车
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Select
+                value={filters.location || "_all"}
+                onValueChange={(v) => {
+                  const loc = v === "_all" ? "" : v;
+                  setFilters({ ...filters, location: loc });
+                  // Clear zipcode when manually selecting a region
+                  if (v !== "_all") {
+                    setUserZip("");
+                    setZipLabel("");
+                  }
+                }}
+              >
+                <SelectTrigger className="h-8 w-auto min-w-[100px] gap-1 font-mono text-xs">
+                  <MapPin className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
+                  <SelectValue placeholder="地区" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  <SelectItem value="_all" className="font-mono text-xs">全部地区</SelectItem>
+                  {US_STATES.map((state) =>
+                    state.subRegions ? (
+                      [
+                        <SelectItem key={state.value} value={state.value} className="font-mono text-xs font-medium">
+                          {state.label}
+                        </SelectItem>,
+                        ...state.subRegions.map((sub) => (
+                          <SelectItem key={sub.value} value={sub.value} className="pl-6 font-mono text-xs">
+                            {sub.label}
+                          </SelectItem>
+                        )),
+                      ]
+                    ) : (
+                      <SelectItem key={state.value} value={state.value} className="font-mono text-xs">
+                        {state.label}
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
               <div className="flex items-center gap-1.5">
                 <Input
-                  placeholder="你的 Zipcode"
-                  className="h-8 w-[110px] font-mono text-xs"
+                  placeholder="Zipcode"
+                  className="h-8 w-[90px] font-mono text-xs"
                   maxLength={5}
                   value={userZip}
                   onChange={(e) => setUserZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
@@ -497,16 +550,32 @@ function BrowseContent() {
               ))}
             </div>
           ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: { transition: { staggerChildren: 0.04 } },
+              }}
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            >
               {filtered.map((car) => (
-                <CarCard
+                <motion.div
                   key={car.id}
-                  car={car}
-                  distance={distances.get(car.id)}
-                  priceInsight={getPriceInsight(car, cars)}
-                />
+                  variants={{
+                    hidden: { opacity: 0, y: 16 },
+                    visible: { opacity: 1, y: 0 },
+                  }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                >
+                  <CarCard
+                    car={car}
+                    distance={distances.get(car.id)}
+                    priceInsight={getPriceInsight(car, cars)}
+                  />
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20">
               <p className="font-mono text-sm text-muted-foreground">
@@ -524,7 +593,13 @@ function BrowseContent() {
           )}
 
           {recentCars.length > 0 && (
-            <section className="mt-10 border-t border-border pt-6">
+            <motion.section
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-40px" }}
+              transition={{ duration: 0.4 }}
+              className="mt-10 border-t border-border pt-6"
+            >
               <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
               <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
                 {recentCars.map((car) => (
@@ -535,7 +610,7 @@ function BrowseContent() {
                   />
                 ))}
               </div>
-            </section>
+            </motion.section>
           )}
         </main>
       </div>

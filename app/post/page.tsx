@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { AuthDialog } from "@/components/auth-dialog";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
-import { geocodeZipToCoords } from "@/lib/geocode";
+import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -211,6 +211,9 @@ export default function PostCarPage() {
     mileage: "",
     zipcode: "",
     address: "",
+    address2: "",
+    city: "",
+    state: "",
     fuel_type: "汽油",
     transmission: "AT",
     exterior_color: "",
@@ -310,6 +313,32 @@ export default function PostCarPage() {
     });
   }, []);
 
+  // Auto-resolve zipcode to city name (English + Chinese)
+  const [zipCity, setZipCity] = useState("");
+  const [zipCityZh, setZipCityZh] = useState("");
+  useEffect(() => {
+    if (form.zipcode.length !== 5) {
+      setZipCity("");
+      setZipCityZh("");
+      return;
+    }
+    Promise.all([
+      lookupZip(form.zipcode, "en"),
+      lookupZip(form.zipcode, "zh"),
+    ]).then(([en, zh]) => {
+      setZipCity(en ? `${en.city}, ${en.stateCode}` : "");
+      setZipCityZh(zh?.city || "");
+      // Auto-fill city and state
+      if (en) {
+        setForm((f) => ({
+          ...f,
+          city: f.city || en.city,
+          state: f.state || en.stateCode,
+        }));
+      }
+    });
+  }, [form.zipcode]);
+
   function update(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -366,6 +395,16 @@ export default function PostCarPage() {
     const titleEn = `${form.year} ${form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
     const titleZh = `${form.year} ${MAKES_ZH[form.make] || form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
 
+    // Build location from structured fields
+    const fullAddress = [form.address, form.address2].filter(Boolean).join(", ");
+    const cityState = [form.city, form.state].filter(Boolean).join(", ");
+    const locationEn = fullAddress
+      ? `${fullAddress}, ${cityState} ${form.zipcode}`.trim()
+      : cityState
+        ? `${cityState} ${form.zipcode}`.trim()
+        : zipCity || form.zipcode;
+    const locationZh = zipCityZh || cityState || zipCity || form.zipcode;
+
     // Geocode zipcode to get lat/lng
     const coords = form.zipcode ? await geocodeZipToCoords(form.zipcode) : null;
 
@@ -389,8 +428,8 @@ export default function PostCarPage() {
         trim: form.trim || null,
         price: Number(form.price),
         mileage: Number(form.mileage),
-        location: form.address || form.zipcode,
-        location_zh: form.address || form.zipcode,
+        location: locationEn,
+        location_zh: locationZh,
         image_url: imageUrls[0] || null,
         images: imageUrls.slice(1),
         fuel_type: form.fuel_type,
@@ -811,60 +850,110 @@ export default function PostCarPage() {
                     onChange={(e) => update("vin", e.target.value)}
                   />
                 </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    所在 Zipcode *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="如 91007"
-                    maxLength={5}
-                    value={form.zipcode}
-                    onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
-                    required
-                  />
+              </div>
+            </div>
+
+            {/* Location */}
+            <div className="border-t border-border pt-6">
+              <h2 className="font-mono text-xs font-semibold">所在位置</h2>
+              {isDealer && dealerStores.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5">
+                  {dealerStores.map((store) => (
+                    <button
+                      key={store.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedStoreId(store.id);
+                        setForm((f) => ({
+                          ...f,
+                          address: store.address,
+                          zipcode: store.zipcode || f.zipcode,
+                          phone: store.phone || f.phone,
+                          seller_name: store.name,
+                        }));
+                      }}
+                      className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                        selectedStoreId === store.id
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border hover:border-foreground/30"
+                      }`}
+                    >
+                      <Store className="h-3 w-3" strokeWidth={1.5} />
+                      {store.name}
+                    </button>
+                  ))}
                 </div>
+              )}
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="col-span-2 sm:col-span-3">
                   <Label className="font-mono text-[11px] text-muted-foreground">
-                    详细地址
+                    Address *
                   </Label>
-                  {isDealer && dealerStores.length > 0 && (
-                    <div className="mt-1 mb-2 flex flex-wrap gap-1.5">
-                      {dealerStores.map((store) => (
-                        <button
-                          key={store.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedStoreId(store.id);
-                            setForm((f) => ({
-                              ...f,
-                              address: store.address,
-                              zipcode: store.zipcode || f.zipcode,
-                              phone: store.phone || f.phone,
-                              seller_name: store.name,
-                            }));
-                          }}
-                          className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
-                            selectedStoreId === store.id
-                              ? "border-foreground bg-foreground text-background"
-                              : "border-border hover:border-foreground/30"
-                          }`}
-                        >
-                          <Store className="h-3 w-3" strokeWidth={1.5} />
-                          {store.name}
-                        </button>
-                      ))}
-                    </div>
-                  )}
                   <Input
                     className="mt-1 h-9 font-mono text-xs"
-                    placeholder="123 Main St, City, CA"
+                    placeholder="123 Main St"
                     value={form.address}
                     onChange={(e) => {
                       update("address", e.target.value);
                       setSelectedStoreId("");
                     }}
+                    required
                   />
+                </div>
+                <div className="col-span-2 sm:col-span-3">
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    Address Line 2
+                  </Label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="Apt, Suite, Unit (optional)"
+                    value={form.address2}
+                    onChange={(e) => update("address2", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    City *
+                  </Label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="City"
+                    value={form.city}
+                    onChange={(e) => update("city", e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    State *
+                  </Label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="CA"
+                    maxLength={2}
+                    value={form.state}
+                    onChange={(e) => update("state", e.target.value.toUpperCase())}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label className="font-mono text-[11px] text-muted-foreground">
+                    Zip Code *
+                  </Label>
+                  <Input
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="91007"
+                    maxLength={5}
+                    value={form.zipcode}
+                    onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
+                    inputMode="numeric"
+                    required
+                  />
+                  {(zipCityZh || zipCity) && (
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      {zipCityZh ? `${zipCityZh} · ${zipCity}` : zipCity}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

@@ -15,7 +15,6 @@ import {
   Loader2,
   Store,
   MapPin,
-  Check,
   FileText,
   MessageSquare,
 } from "lucide-react";
@@ -94,14 +93,8 @@ function AccountContent() {
 
   // Dealer stores state
   const [stores, setStores] = useState<DbDealerStore[]>([]);
-  const [newStore, setNewStore] = useState({ name: "", address: "", zipcode: "", phone: "" });
+  const [newStore, setNewStore] = useState({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "" });
   const [addingStore, setAddingStore] = useState(false);
-  const [addressCheck, setAddressCheck] = useState<{
-    status: "idle" | "checking" | "found" | "not_found";
-    display?: string;
-    lat?: number;
-    lng?: number;
-  }>({ status: "idle" });
 
   // Auto-save profile with debounce
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -269,47 +262,33 @@ function AccountContent() {
     if (avatarInputRef.current) avatarInputRef.current.value = "";
   }
 
-  async function checkAddress() {
-    if (!newStore.address.trim()) return;
-    setAddressCheck({ status: "checking" });
-    const result = await geocodeAddress(newStore.address);
-    if (result) {
-      setAddressCheck({
-        status: "found",
-        display: result.display,
-        lat: result.lat,
-        lng: result.lng,
-      });
-    } else {
-      setAddressCheck({ status: "not_found" });
-    }
-  }
-
   async function addStore() {
-    if (!user || !newStore.name || !newStore.address) return;
-    // Must have verified address
-    if (addressCheck.status !== "found") {
-      await checkAddress();
-      return;
-    }
+    if (!user || !newStore.name || !newStore.address || !newStore.city || !newStore.state || !newStore.zipcode) return;
     setAddingStore(true);
+
+    // Build full address string from structured fields
+    const addrParts = [newStore.address, newStore.address2].filter(Boolean).join(", ");
+    const fullAddress = `${addrParts}, ${newStore.city}, ${newStore.state} ${newStore.zipcode}`;
+
+    // Geocode the full address
+    const result = await geocodeAddress(fullAddress);
+
     const { data, error } = await supabase
       .from("dealer_stores")
       .insert({
         owner_id: user,
         name: newStore.name,
-        address: newStore.address,
+        address: fullAddress,
         zipcode: newStore.zipcode || null,
         phone: newStore.phone || null,
-        lat: addressCheck.lat || null,
-        lng: addressCheck.lng || null,
+        lat: result?.lat || null,
+        lng: result?.lng || null,
       })
       .select()
       .single();
     if (!error && data) {
       setStores((prev) => [data as DbDealerStore, ...prev]);
-      setNewStore({ name: "", address: "", zipcode: "", phone: "" });
-      setAddressCheck({ status: "idle" });
+      setNewStore({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "" });
     }
     setAddingStore(false);
   }
@@ -796,68 +775,82 @@ function AccountContent() {
                     </div>
                     <div>
                       <Label className="font-mono text-[11px] text-muted-foreground">
-                        地址 *
-                      </Label>
-                      <div className="mt-1 flex gap-2">
-                        <Input
-                          className="h-8 font-mono text-xs"
-                          placeholder="123 Main St, City, CA"
-                          value={newStore.address}
-                          onChange={(e) => {
-                            setNewStore((s) => ({ ...s, address: e.target.value }));
-                            setAddressCheck({ status: "idle" });
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 shrink-0 gap-1 font-mono text-[11px]"
-                          onClick={checkAddress}
-                          disabled={!newStore.address.trim() || addressCheck.status === "checking"}
-                        >
-                          {addressCheck.status === "checking" ? (
-                            <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
-                          ) : (
-                            <MapPin className="h-3 w-3" strokeWidth={1.5} />
-                          )}
-                          验证地址
-                        </Button>
-                      </div>
-                      {addressCheck.status === "found" && (
-                        <p className="mt-1.5 flex items-start gap-1 font-mono text-[11px] text-green-600 dark:text-green-400">
-                          <Check className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2} />
-                          {addressCheck.display}
-                        </p>
-                      )}
-                      {addressCheck.status === "not_found" && (
-                        <p className="mt-1.5 font-mono text-[11px] text-destructive">
-                          未找到该地址，请检查后重试
-                        </p>
-                      )}
-                    </div>
-                    <div className="w-1/2">
-                      <Label className="font-mono text-[11px] text-muted-foreground">
-                        Zipcode
+                        Address *
                       </Label>
                       <Input
                         className="mt-1 h-8 font-mono text-xs"
-                        placeholder="91007"
-                        maxLength={5}
-                        value={newStore.zipcode}
+                        placeholder="123 Main St"
+                        value={newStore.address}
                         onChange={(e) =>
-                          setNewStore((s) => ({
-                            ...s,
-                            zipcode: e.target.value.replace(/\D/g, "").slice(0, 5),
-                          }))
+                          setNewStore((s) => ({ ...s, address: e.target.value }))
                         }
                       />
+                    </div>
+                    <div>
+                      <Label className="font-mono text-[11px] text-muted-foreground">
+                        Address Line 2
+                      </Label>
+                      <Input
+                        className="mt-1 h-8 font-mono text-xs"
+                        placeholder="Apt, Suite, Unit (optional)"
+                        value={newStore.address2}
+                        onChange={(e) =>
+                          setNewStore((s) => ({ ...s, address2: e.target.value }))
+                        }
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <Label className="font-mono text-[11px] text-muted-foreground">
+                          City *
+                        </Label>
+                        <Input
+                          className="mt-1 h-8 font-mono text-xs"
+                          placeholder="City"
+                          value={newStore.city}
+                          onChange={(e) =>
+                            setNewStore((s) => ({ ...s, city: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="font-mono text-[11px] text-muted-foreground">
+                          State *
+                        </Label>
+                        <Input
+                          className="mt-1 h-8 font-mono text-xs"
+                          placeholder="CA"
+                          maxLength={2}
+                          value={newStore.state}
+                          onChange={(e) =>
+                            setNewStore((s) => ({ ...s, state: e.target.value.toUpperCase() }))
+                          }
+                        />
+                      </div>
+                      <div>
+                        <Label className="font-mono text-[11px] text-muted-foreground">
+                          Zip Code *
+                        </Label>
+                        <Input
+                          className="mt-1 h-8 font-mono text-xs"
+                          placeholder="91007"
+                          maxLength={5}
+                          inputMode="numeric"
+                          value={newStore.zipcode}
+                          onChange={(e) =>
+                            setNewStore((s) => ({
+                              ...s,
+                              zipcode: e.target.value.replace(/\D/g, "").slice(0, 5),
+                            }))
+                          }
+                        />
+                      </div>
                     </div>
                     <Button
                       size="sm"
                       className="gap-1.5 font-mono text-xs"
                       onClick={addStore}
-                      disabled={addingStore || !newStore.name || !newStore.address || addressCheck.status === "checking"}
+                      disabled={addingStore || !newStore.name || !newStore.address || !newStore.city || !newStore.state || !newStore.zipcode}
                     >
                       {addingStore ? (
                         <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
