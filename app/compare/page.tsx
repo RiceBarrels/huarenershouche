@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Scale } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getCompareIds, clearCompare } from "@/lib/compare";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,19 @@ export default function ComparePage() {
         .select("*, profiles!seller_id(account_type)")
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      setAllCars((data as DbCar[]) || []);
+      const all = (data as DbCar[]) || [];
+      setAllCars(all);
+
+      // Pre-fill from compare bar selections
+      const compareIds = getCompareIds();
+      if (compareIds.length > 0) {
+        const prefilled = compareIds
+          .map((id) => all.find((c) => c.id === id) || null)
+          .slice(0, 3);
+        while (prefilled.length < 3) prefilled.push(null);
+        setCars(prefilled);
+        clearCompare();
+      }
     }
     fetchCars();
   }, []);

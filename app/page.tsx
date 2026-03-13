@@ -27,8 +27,115 @@ import {
 } from "@/components/ui/select";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
+import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
 import { fadeInUp, staggerContainer, scaleIn } from "@/lib/motion";
 import type { DbCar } from "@/lib/types";
+import type { GeoResult } from "@/lib/geocode";
+
+// Map city names to Chinese region names, with NYC borough detection
+const CITY_ZH_MAP: Record<string, string> = {
+  "Los Angeles": "洛杉矶",
+  "San Francisco": "旧金山",
+  "San Diego": "圣地亚哥",
+  "San Jose": "圣何塞",
+  "Sacramento": "萨克拉门托",
+  "Houston": "休斯顿",
+  "Dallas": "达拉斯",
+  "Austin": "奥斯汀",
+  "San Antonio": "圣安东尼奥",
+  "Chicago": "芝加哥",
+  "Seattle": "西雅图",
+  "Boston": "波士顿",
+  "Philadelphia": "费城",
+  "Pittsburgh": "匹兹堡",
+  "Atlanta": "亚特兰大",
+  "Miami": "迈阿密",
+  "Orlando": "奥兰多",
+  "Tampa": "坦帕",
+  "Phoenix": "凤凰城",
+  "Denver": "丹佛",
+  "Portland": "波特兰",
+  "Las Vegas": "拉斯维加斯",
+  "Irvine": "尔湾",
+  "Fremont": "弗里蒙特",
+  "Cupertino": "库比蒂诺",
+  "Palo Alto": "帕罗奥图",
+  "Pasadena": "帕萨迪纳",
+  "Arcadia": "阿卡迪亚",
+  "Flushing": "法拉盛",
+};
+
+const NYC_BOROUGHS: { county: string; zh: string; en: string }[] = [
+  { county: "New York County", zh: "曼哈顿", en: "Manhattan" },
+  { county: "Kings County", zh: "布鲁克林", en: "Brooklyn" },
+  { county: "Queens County", zh: "皇后区", en: "Queens" },
+  { county: "Bronx County", zh: "布朗克斯", en: "Bronx" },
+  { county: "Richmond County", zh: "史丹顿岛", en: "Staten Island" },
+];
+
+interface LocationInfo {
+  formatted: string;       // "City, ST"
+  zhName: string;          // "洛杉矶" or "纽约 · 皇后区"
+}
+
+async function detectDetailedLocation(): Promise<LocationInfo | null> {
+  try {
+    const pos = await getCurrentPosition();
+    const { latitude: lat, longitude: lng } = pos.coords;
+
+    const geo = await reverseGeocode(lat, lng);
+    if (!geo) return null;
+
+    // Check if user is in NYC (stateCode=NY and city is New York/Brooklyn/etc)
+    const isNYC =
+      geo.stateCode === "NY" &&
+      (geo.city === "New York" || geo.city === "City of New York" || geo.city === "New York City" ||
+       NYC_BOROUGHS.some((b) => geo.city.includes(b.en)));
+
+    if (isNYC) {
+      // Use a more detailed reverse geocode to detect the borough via county
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
+          { headers: { "User-Agent": "HuarenCars/1.0" } }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const county = data.address?.county || "";
+          const borough = NYC_BOROUGHS.find((b) => county.includes(b.county.replace(" County", "")) || county === b.county);
+          if (borough) {
+            return {
+              formatted: `${borough.en}, New York`,
+              zhName: `纽约 · ${borough.zh}`,
+            };
+          }
+        }
+      } catch { /* fall through */ }
+      return { formatted: geo.formatted, zhName: "纽约市" };
+    }
+
+    // Regular city
+    const zhCity = CITY_ZH_MAP[geo.city] || "";
+    const stateZh = STATE_ZH_MAP[geo.stateCode] || "";
+    const zhName = zhCity
+      ? (stateZh ? `${stateZh} · ${zhCity}` : zhCity)
+      : (stateZh || geo.formatted);
+
+    return { formatted: geo.formatted, zhName };
+  } catch {
+    return null;
+  }
+}
+
+const STATE_ZH_MAP: Record<string, string> = {
+  CA: "加州", NY: "纽约", TX: "德州", FL: "佛州",
+  IL: "伊利诺伊", WA: "华盛顿", MA: "麻省", NJ: "新泽西",
+  PA: "宾州", GA: "乔治亚", OH: "俄亥俄", MI: "密歇根",
+  NC: "北卡", VA: "弗吉尼亚", AZ: "亚利桑那", MD: "马里兰",
+  CO: "科罗拉多", OR: "俄勒冈", NV: "内华达", CT: "康州",
+  HI: "夏威夷", MN: "明尼苏达", IN: "印第安纳", TN: "田纳西",
+  MO: "密苏里", WI: "威斯康辛", DC: "华盛顿特区",
+};
 
 const POPULAR_MAKES = [
   "Toyota",
@@ -76,6 +183,8 @@ export default function Home() {
   const [make, setMake] = useState("");
   const [zip, setZip] = useState("");
   const [featured, setFeatured] = useState<DbCar[]>([]);
+  const [userLocation, setUserLocation] = useState<LocationInfo | null>(null);
+  const [locationLoading, setLocationLoading] = useState(true);
 
   useEffect(() => {
     supabase
@@ -87,6 +196,17 @@ export default function Home() {
       .then(({ data }) => {
         if (data) setFeatured(data as DbCar[]);
       });
+
+    // Auto-detect user location with detailed region info
+    detectDetailedLocation()
+      .then((loc) => {
+        if (loc) setUserLocation(loc);
+      })
+      .finally(() => setLocationLoading(false));
+
+    detectUserZip().then((z) => {
+      if (z) setZip(z);
+    });
   }, []);
 
   function handleSearch() {
@@ -101,17 +221,25 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
 
-      {/* Hero */}
-      <section className="relative flex flex-col items-center justify-center px-4 pb-12 pt-16 md:pb-16 md:pt-24">
-        {/* Subtle background gradient */}
-        <div className="absolute inset-0 bg-linear-to-b from-muted/40 to-background" />
+      {/* Hero with banner image */}
+      <section className="relative flex flex-col items-center justify-center px-4 pb-12 pt-20 md:pb-20 md:pt-32">
+        {/* Background image */}
+        <div className="absolute inset-0 overflow-hidden">
+          <img
+            src="/hero-banner.jpg"
+            alt=""
+            className="h-full w-full object-cover object-center"
+          />
+          <div className="absolute inset-0 bg-black/50" />
+          <div className="absolute inset-0 bg-linear-to-b from-black/20 via-transparent to-background" />
+        </div>
 
         <div className="relative mx-auto w-full max-w-3xl text-center">
           <motion.h1
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
-            className="font-mono text-3xl font-semibold tracking-tight md:text-5xl"
+            className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl"
           >
             北美华人二手车
           </motion.h1>
@@ -119,10 +247,52 @@ export default function Home() {
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
-            className="mt-3 font-mono text-sm text-muted-foreground md:text-base"
+            className="mt-3 font-mono text-sm text-white/70 md:text-base"
           >
             可靠车源 · 中文服务 · 覆盖全美
           </motion.p>
+
+          {/* Current location indicator */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4, delay: 0.15 }}
+            className="mt-2 flex flex-col items-center gap-0.5"
+          >
+            <div className="flex items-center gap-1.5">
+              <MapPin className="h-3 w-3 text-white/50" strokeWidth={1.5} />
+              {locationLoading ? (
+                <span className="font-mono text-[11px] text-white/40">定位中...</span>
+              ) : userLocation ? (
+                <span className="font-mono text-[11px] text-white/60">
+                  {userLocation.formatted}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLocationLoading(true);
+                    detectDetailedLocation()
+                      .then((loc) => {
+                        if (loc) setUserLocation(loc);
+                      })
+                      .finally(() => setLocationLoading(false));
+                    detectUserZip().then((z) => {
+                      if (z) setZip(z);
+                    });
+                  }}
+                  className="font-mono text-[11px] text-white/50 underline underline-offset-2 transition-colors hover:text-white/80"
+                >
+                  点击获取当前位置
+                </button>
+              )}
+            </div>
+            {userLocation && (
+              <span className="font-mono text-[10px] text-white/40">
+                {userLocation.zhName}
+              </span>
+            )}
+          </motion.div>
 
           {/* Structured search form - cars.com style */}
           <motion.form
@@ -133,7 +303,7 @@ export default function Home() {
               e.preventDefault();
               handleSearch();
             }}
-            className="mt-8 overflow-hidden border border-border bg-background shadow-sm"
+            className="mt-8 overflow-hidden border border-white/10 bg-background shadow-lg"
           >
             {/* Row: Make | Keyword | ZIP | Search */}
             <div className="flex flex-col md:flex-row">
@@ -203,7 +373,7 @@ export default function Home() {
                 variants={fadeInUp}
                 transition={{ duration: 0.3 }}
                 onClick={() => router.push(buildUrl({ make: m }))}
-                className="border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                className="border border-white/20 px-2.5 py-1 font-mono text-[11px] text-white/70 transition-colors hover:border-white hover:text-white"
               >
                 {MAKES_ZH[m]}
               </motion.button>
@@ -221,7 +391,7 @@ export default function Home() {
               <button
                 key={t.label}
                 onClick={() => router.push(buildUrl(t.params))}
-                className="bg-muted/60 px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                className="bg-white/10 px-2.5 py-1 font-mono text-[11px] text-white/60 transition-colors hover:bg-white/20 hover:text-white"
               >
                 {t.label}
               </button>

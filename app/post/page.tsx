@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Upload, X, Plus, Loader2, Store, FileText } from "lucide-react";
+import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -13,6 +13,7 @@ import { AuthDialog } from "@/components/auth-dialog";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
+import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -196,6 +197,8 @@ export default function PostCarPage() {
   const [dragging, setDragging] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
 
+  const [vinDecoding, setVinDecoding] = useState(false);
+  const [vinAutoFilled, setVinAutoFilled] = useState(false);
   const [priceCallOnly, setPriceCallOnly] = useState(false);
   const [showCallWarning, setShowCallWarning] = useState(false);
   const [isDealer, setIsDealer] = useState(false);
@@ -224,6 +227,7 @@ export default function PostCarPage() {
     seats: "",
     condition: "used",
     vin: "",
+    customMake: "",
     seller_name: "",
     phone: "",
     description_zh: "",
@@ -386,14 +390,90 @@ export default function PostCarPage() {
     }
   }
 
+  async function handleVinAutoFill() {
+    const cleaned = form.vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
+    if (!isValidVinFormat(cleaned)) {
+      setError("请输入有效的 17 位 VIN 码");
+      return;
+    }
+    setVinDecoding(true);
+    setError("");
+    const result = await decodeVin(cleaned);
+    setVinDecoding(false);
+
+    if (!result || !hasVinData(result)) {
+      setError("无法识别此 VIN，请手动填写信息");
+      return;
+    }
+
+    // Map make to MAKES list or use "Other" + customMake
+    const matchedMake = MAKES.find(
+      (m) => m.toLowerCase() === result.make.toLowerCase()
+    );
+
+    // Map fuel type
+    const fuelLower = result.fuelType.toLowerCase();
+    const fuelMap: Record<string, string> = {
+      gasoline: "汽油", diesel: "柴油", electric: "纯电",
+      "plug-in hybrid": "插电混动", hybrid: "混动",
+    };
+    const mappedFuel = Object.entries(fuelMap).find(([k]) => fuelLower.includes(k))?.[1] || "";
+
+    // Map transmission
+    const transLower = result.transmission.toLowerCase();
+    const mappedTrans = transLower.includes("manual") ? "手动"
+      : transLower.includes("cvt") ? "CVT"
+      : transLower.includes("dct") || transLower.includes("dual") ? "双离合"
+      : transLower.includes("auto") ? "AT" : "";
+
+    // Map drivetrain
+    const driveLower = result.driveType.toLowerCase();
+    const mappedDrive = driveLower.includes("4wd") || driveLower.includes("4x4") ? "4WD"
+      : driveLower.includes("awd") || driveLower.includes("all") ? "AWD"
+      : driveLower.includes("rwd") || driveLower.includes("rear") ? "RWD"
+      : driveLower.includes("fwd") || driveLower.includes("front") ? "FWD" : "";
+
+    // Map body type
+    const bodyLower = result.bodyClass.toLowerCase();
+    const mappedBody = bodyLower.includes("sedan") ? "sedan"
+      : bodyLower.includes("suv") || bodyLower.includes("sport utility") ? "suv"
+      : bodyLower.includes("van") || bodyLower.includes("minivan") ? "van"
+      : bodyLower.includes("pickup") || bodyLower.includes("truck") ? "pickup"
+      : bodyLower.includes("wagon") ? "wagon"
+      : bodyLower.includes("coupe") || bodyLower.includes("convertible") || bodyLower.includes("roadster") ? "sports" : "";
+
+    setForm((prev) => ({
+      ...prev,
+      make: matchedMake || (result.make ? "Other" : prev.make),
+      customMake: matchedMake ? "" : result.make,
+      model: result.model || prev.model,
+      year: result.year ? String(result.year) : prev.year,
+      trim: result.trim || prev.trim,
+      fuel_type: mappedFuel || prev.fuel_type,
+      transmission: mappedTrans || prev.transmission,
+      drivetrain: mappedDrive || prev.drivetrain,
+      cylinders: result.engineCylinders || prev.cylinders,
+      body_type: mappedBody || prev.body_type,
+    }));
+    setVinAutoFilled(true);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
     setError("");
+
+    if (form.make === "Other" && !form.customMake.trim()) {
+      setError("请输入品牌名称");
+      return;
+    }
+
     setLoading(true);
 
-    const titleEn = `${form.year} ${form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
-    const titleZh = `${form.year} ${MAKES_ZH[form.make] || form.make} ${form.model}${form.trim ? " " + form.trim : ""}`;
+    const actualMake = form.make === "Other" ? form.customMake.trim() : form.make;
+    const titleEn = `${form.year} ${actualMake} ${form.model}${form.trim ? " " + form.trim : ""}`;
+    const makeZh = form.make === "Other" ? actualMake : (MAKES_ZH[form.make] || actualMake);
+    const titleZh = `${form.year} ${makeZh} ${form.model}${form.trim ? " " + form.trim : ""}`;
 
     // Build location from structured fields
     const fullAddress = [form.address, form.address2].filter(Boolean).join(", ");
@@ -423,7 +503,7 @@ export default function PostCarPage() {
         title: titleEn,
         title_zh: titleZh,
         year: Number(form.year),
-        make: form.make,
+        make: actualMake,
         model: form.model,
         trim: form.trim || null,
         price: Number(form.price),
@@ -572,6 +652,50 @@ export default function PostCarPage() {
               </div>
             </div>
 
+            {/* VIN Auto-fill */}
+            <div className="border-t border-border pt-6">
+              <h2 className="font-mono text-xs font-semibold">VIN 自动填写</h2>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                输入 VIN 码可自动填写车辆信息，也可跳过手动填写
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  className="h-9 flex-1 font-mono text-xs uppercase"
+                  placeholder="输入 17 位 VIN 码"
+                  value={form.vin}
+                  onChange={(e) => {
+                    const v = e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "").slice(0, 17);
+                    update("vin", v);
+                    if (vinAutoFilled) setVinAutoFilled(false);
+                  }}
+                  maxLength={17}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 font-mono text-[11px]"
+                  disabled={vinDecoding || form.vin.length !== 17}
+                  onClick={handleVinAutoFill}
+                >
+                  {vinDecoding ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                  ) : (
+                    <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  )}
+                  自动填写
+                </Button>
+              </div>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                {form.vin.length}/17 位
+              </p>
+              {vinAutoFilled && (
+                <p className="mt-1 font-mono text-[11px] text-green-600 dark:text-green-400">
+                  已根据 VIN 自动填写车辆信息，请核实并补充其余内容
+                </p>
+              )}
+            </div>
+
             {/* Basic info */}
             <div className="border-t border-border pt-6">
               <h2 className="font-mono text-xs font-semibold">基本信息</h2>
@@ -584,12 +708,24 @@ export default function PostCarPage() {
                     <Combobox
                       options={makeOptions}
                       value={form.make}
-                      onValueChange={(v) => update("make", v)}
+                      onValueChange={(v) => {
+                        update("make", v);
+                        if (v !== "Other") update("customMake", "");
+                      }}
                       placeholder="选择品牌"
                       searchPlaceholder="搜索品牌..."
                       emptyText="未找到该品牌"
                     />
                   </div>
+                  {form.make === "Other" && (
+                    <Input
+                      className="mt-2 h-9 font-mono text-xs"
+                      placeholder="请输入品牌名称"
+                      value={form.customMake || ""}
+                      onChange={(e) => update("customMake", e.target.value)}
+                      required
+                    />
+                  )}
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
@@ -607,16 +743,16 @@ export default function PostCarPage() {
                   <Label className="font-mono text-[11px] text-muted-foreground">
                     年份 *
                   </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={yearOptions}
-                      value={form.year}
-                      onValueChange={(v) => update("year", v)}
-                      placeholder="选择年份"
-                      searchPlaceholder="搜索年份..."
-                      emptyText="未找到"
-                    />
-                  </div>
+                  <Input
+                    type="number"
+                    className="mt-1 h-9 font-mono text-xs"
+                    placeholder="如 2020"
+                    value={form.year}
+                    onChange={(e) => update("year", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    min={1900}
+                    max={2030}
+                    required
+                  />
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
@@ -838,17 +974,6 @@ export default function PostCarPage() {
                       emptyText="未找到"
                     />
                   </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    VIN
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="车辆识别号"
-                    value={form.vin}
-                    onChange={(e) => update("vin", e.target.value)}
-                  />
                 </div>
               </div>
             </div>

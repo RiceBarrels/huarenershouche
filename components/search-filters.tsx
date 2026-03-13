@@ -74,7 +74,11 @@ export const US_STATES: StateOption[] = [
   {
     value: "NY", label: "纽约 New York",
     subRegions: [
-      { value: "NY-NYC", label: "纽约市 NYC" },
+      { value: "NY-MAN", label: "曼哈顿 Manhattan" },
+      { value: "NY-BK", label: "布鲁克林 Brooklyn" },
+      { value: "NY-QN", label: "皇后区 Queens" },
+      { value: "NY-BX", label: "布朗克斯 Bronx" },
+      { value: "NY-SI", label: "史丹顿岛 Staten Island" },
       { value: "NY-LI", label: "长岛 Long Island" },
       { value: "NY-UP", label: "上州 Upstate" },
     ],

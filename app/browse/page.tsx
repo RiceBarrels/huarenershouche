@@ -27,6 +27,7 @@ import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { getPriceInsight } from "@/lib/price-insight";
 import { BackToTop } from "@/components/back-to-top";
+import { CompareBar } from "@/components/compare-bar";
 import {
   Drawer,
   DrawerContent,
@@ -617,6 +618,7 @@ function BrowseContent() {
 
       <Footer />
       <BackToTop />
+      <CompareBar />
     </div>
   );
 }

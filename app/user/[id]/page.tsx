@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { User, Calendar, Car, MapPin } from "lucide-react";
+import { User, Calendar, Car, MapPin, Store, Star } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
+import { DealerReviews } from "@/components/dealer-reviews";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
@@ -16,6 +18,7 @@ interface SellerProfile {
   username: string;
   avatar_url: string | null;
   location: string | null;
+  account_type: "private" | "dealer";
   created_at: string;
 }
 
@@ -25,13 +28,14 @@ export default function UserProfilePage() {
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
+  const [avgRating, setAvgRating] = useState<{ avg: number; count: number } | null>(null);
 
   useEffect(() => {
     async function fetchData() {
-      const [profileRes, carsRes] = await Promise.all([
+      const [profileRes, carsRes, reviewsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, username, avatar_url, location, created_at")
+          .select("id, username, avatar_url, location, account_type, created_at")
           .eq("id", userId)
           .maybeSingle(),
         supabase
@@ -40,9 +44,20 @@ export default function UserProfilePage() {
           .eq("seller_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: false }),
+        supabase
+          .from("dealer_reviews")
+          .select("rating")
+          .eq("dealer_id", userId),
       ]);
       setProfile(profileRes.data as SellerProfile | null);
       setCars((carsRes.data as DbCar[]) || []);
+
+      const reviewData = (reviewsRes.data as { rating: number }[]) || [];
+      if (reviewData.length > 0) {
+        const sum = reviewData.reduce((s, r) => s + r.rating, 0);
+        setAvgRating({ avg: sum / reviewData.length, count: reviewData.length });
+      }
+
       setLoading(false);
     }
     fetchData();
@@ -109,10 +124,28 @@ export default function UserProfilePage() {
                 )}
               </div>
               <div className="flex-1">
-                <h1 className="font-mono text-lg font-semibold">
-                  {profile.username}
-                </h1>
+                <div className="flex items-center gap-2">
+                  <h1 className="font-mono text-lg font-semibold">
+                    {profile.username}
+                  </h1>
+                  {profile.account_type === "dealer" ? (
+                    <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
+                      <Store className="h-3 w-3" strokeWidth={1.5} />
+                      认证车行
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="font-mono text-[10px]">
+                      个人
+                    </Badge>
+                  )}
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-3 text-muted-foreground">
+                  {profile.account_type === "dealer" && avgRating && (
+                    <span className="flex items-center gap-1 font-mono text-[11px]">
+                      <Star className="h-3 w-3 fill-amber-400 text-amber-400" strokeWidth={1.5} />
+                      {avgRating.avg.toFixed(1)} ({avgRating.count}条评价)
+                    </span>
+                  )}
                   <span className="flex items-center gap-1 font-mono text-[11px]">
                     <Calendar className="h-3 w-3" strokeWidth={1.5} />
                     {memberSince} 加入
@@ -148,6 +181,11 @@ export default function UserProfilePage() {
                 </p>
               )}
             </div>
+
+            {/* Dealer reviews */}
+            {profile.account_type === "dealer" && (
+              <DealerReviews dealerId={userId} />
+            )}
           </>
         )}
       </main>

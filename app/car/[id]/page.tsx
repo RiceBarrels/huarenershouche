@@ -19,6 +19,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  BellRing,
+  BellOff,
+  Flag,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -33,6 +38,11 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AuthDialog } from "@/components/auth-dialog";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
+import { isWatching, addPriceWatch, removePriceWatch, getWatchedPrice } from "@/lib/price-watch";
+import { ReportDialog } from "@/components/report-dialog";
+import { VinCheck } from "@/components/vin-check";
+import { ImageLightbox } from "@/components/image-lightbox";
+import { VehicleHistoryPanel } from "@/components/vehicle-history";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -57,8 +67,11 @@ export default function CarDetailPage() {
   const [user, setUser] = useState<string | null>(null);
   const [contactVisible, setContactVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [similarCars, setSimilarCars] = useState<DbCar[]>([]);
   const [copied, setCopied] = useState(false);
+  const [watching, setWatching] = useState(false);
+  const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -98,6 +111,10 @@ export default function CarDetailPage() {
           setSimilarCars((priceSimilar as DbCar[]) || []);
         }
       }
+
+      // Check price watch
+      setWatching(isWatching(carId));
+      setWatchedPrice(getWatchedPrice(carId));
 
       // Check auth & favorite
       const {
@@ -208,7 +225,8 @@ export default function CarDetailPage() {
                 <img
                   src={allImages[currentImage]}
                   alt={car.title}
-                  className="h-full w-full object-cover"
+                  className="h-full w-full cursor-zoom-in object-cover"
+                  onClick={() => setLightboxOpen(true)}
                 />
               ) : (
                 <div className="flex h-full items-center justify-center font-mono text-sm text-muted-foreground">
@@ -304,6 +322,23 @@ export default function CarDetailPage() {
                 <span className="font-mono text-2xl font-bold">
                   {formatPrice(car.price)}
                 </span>
+                {watchedPrice !== null && watchedPrice !== car.price && (
+                  <span
+                    className={`flex items-center gap-0.5 font-mono text-xs font-semibold ${
+                      car.price < watchedPrice
+                        ? "text-green-600 dark:text-green-400"
+                        : "text-red-500"
+                    }`}
+                  >
+                    {car.price < watchedPrice ? (
+                      <TrendingDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    ) : (
+                      <TrendingUp className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    )}
+                    {car.price < watchedPrice ? "降" : "涨"}
+                    {formatPrice(Math.abs(car.price - watchedPrice))}
+                  </span>
+                )}
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {car.views_count || 0} 次浏览
                 </span>
@@ -438,13 +473,35 @@ export default function CarDetailPage() {
               <>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="font-mono text-sm font-semibold">VIN</h2>
+                  <h2 className="font-mono text-sm font-semibold">VIN 认证</h2>
                   <p className="mt-1 font-mono text-sm text-muted-foreground">
                     {car.vin}
                   </p>
+                  <VinCheck
+                    vin={car.vin}
+                    car={{ make: car.make, year: car.year, model: car.model }}
+                  />
                 </div>
               </>
             )}
+
+            {/* Vehicle history: recalls, complaints, safety */}
+            <Separator className="my-6" />
+            <div>
+              <h2 className="font-mono text-sm font-semibold">
+                事故与召回记录
+              </h2>
+              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                查询 {car.year} {car.make} {car.model} 的 NHTSA 安全召回、投诉和碰撞评级
+              </p>
+              <div className="mt-3">
+                <VehicleHistoryPanel
+                  make={car.make}
+                  model={car.model}
+                  year={car.year}
+                />
+              </div>
+            </div>
           </div>
 
           {/* Right: Seller card */}
@@ -570,6 +627,35 @@ export default function CarDetailPage() {
                   variant="outline"
                   className="w-full gap-1.5 font-mono text-xs"
                   onClick={() => {
+                    if (watching) {
+                      removePriceWatch(carId);
+                      setWatching(false);
+                      setWatchedPrice(null);
+                    } else {
+                      addPriceWatch({
+                        carId,
+                        title: car.title_zh,
+                        price: car.price,
+                        watchedAt: new Date().toISOString(),
+                        imageUrl: car.image_url,
+                      });
+                      setWatching(true);
+                      setWatchedPrice(car.price);
+                    }
+                  }}
+                >
+                  {watching ? (
+                    <BellOff className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  ) : (
+                    <BellRing className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  )}
+                  {watching ? "取消降价监控" : "降价监控"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-1.5 font-mono text-xs"
+                  onClick={() => {
                     if (navigator.share) {
                       navigator.share({
                         title: car.title_zh,
@@ -586,6 +672,16 @@ export default function CarDetailPage() {
                   <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                   {copied ? "已复制链接" : "分享"}
                 </Button>
+
+                <ReportDialog carId={carId}>
+                  <Button
+                    variant="ghost"
+                    className="w-full gap-1.5 font-mono text-xs text-muted-foreground"
+                  >
+                    <Flag className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    举报
+                  </Button>
+                </ReportDialog>
               </div>
             </div>
 
@@ -632,6 +728,14 @@ export default function CarDetailPage() {
       </main>
       <Footer />
       <BackToTop />
+
+      {/* Image Lightbox */}
+      <ImageLightbox
+        images={allImages}
+        initialIndex={currentImage}
+        open={lightboxOpen}
+        onClose={() => setLightboxOpen(false)}
+      />
     </div>
   );
 }

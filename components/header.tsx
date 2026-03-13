@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare } from "lucide-react";
+import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
@@ -85,6 +85,12 @@ export function Header() {
             className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             对比
+          </Link>
+          <Link
+            href="/vin"
+            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            VIN认证
           </Link>
         </nav>
 
@@ -208,6 +214,10 @@ export function Header() {
               <Link href="/compare" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
                 <GitCompare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 对比
+              </Link>
+              <Link href="/vin" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                VIN认证
               </Link>
             </nav>
 

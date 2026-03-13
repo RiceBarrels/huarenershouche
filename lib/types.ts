@@ -90,3 +90,14 @@ export interface DbComment {
   // Joined
   profiles?: { username: string; avatar_url: string | null };
 }
+
+export interface DbDealerReview {
+  id: string;
+  dealer_id: string;
+  user_id: string;
+  rating: number;
+  content: string;
+  created_at: string;
+  // Joined
+  profiles?: { username: string; avatar_url: string | null };
+}

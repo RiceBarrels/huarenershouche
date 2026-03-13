@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart } from "lucide-react";
+import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
+import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -78,9 +79,16 @@ export function CarCard({
 }) {
   const [liked, setLiked] = useState(false);
   const [favCount, setFavCount] = useState(car.favorites_count || 0);
+  const [inCompare, setInCompare] = useState(false);
 
   useEffect(() => {
     setLiked(getFavorites().includes(car.id));
+    setInCompare(isInCompare(car.id));
+    function onCompareChange() {
+      setInCompare(isInCompare(car.id));
+    }
+    window.addEventListener("compare-change", onCompareChange);
+    return () => window.removeEventListener("compare-change", onCompareChange);
   }, [car.id]);
 
   return (
@@ -128,29 +136,51 @@ export function CarCard({
               </Badge>
             )}
           </div>
-          {/* Favorite button */}
-          <button
-            type="button"
-            className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              const { liked: newLiked, delta } = toggleFavorite(car.id);
-              setLiked(newLiked);
-              setFavCount((c) => Math.max(0, c + delta));
-              updateFavCount(car.id, delta);
-            }}
-          >
-            <Heart
-              className={`h-3.5 w-3.5 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
-              strokeWidth={1.5}
-            />
-            {favCount > 0 && (
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {favCount}
-              </span>
-            )}
-          </button>
+          {/* Action buttons */}
+          <div className="absolute right-2 top-2 flex items-center gap-1">
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (inCompare) {
+                  removeFromCompare(car.id);
+                } else {
+                  addToCompare(car.id);
+                }
+              }}
+              title={inCompare ? "移出对比" : "加入对比"}
+            >
+              {inCompare ? (
+                <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
+              ) : (
+                <GitCompare className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+              )}
+            </button>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const { liked: newLiked, delta } = toggleFavorite(car.id);
+                setLiked(newLiked);
+                setFavCount((c) => Math.max(0, c + delta));
+                updateFavCount(car.id, delta);
+              }}
+            >
+              <Heart
+                className={`h-3.5 w-3.5 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+                strokeWidth={1.5}
+              />
+              {favCount > 0 && (
+                <span className="font-mono text-[10px] text-muted-foreground">
+                  {favCount}
+                </span>
+              )}
+            </button>
+          </div>
         </div>
 
         <div className="p-3">
