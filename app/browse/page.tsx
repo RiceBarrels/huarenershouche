@@ -10,6 +10,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { SearchFilters, US_STATES } from "@/components/search-filters";
+import { MobileFilterDrawer } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -328,7 +329,7 @@ function BrowseContent() {
       <Header />
 
       {/* Banner */}
-      <div className="border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06]">
+      <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
             <p className="font-mono text-sm font-semibold">华人二手车 HuarenCars</p>
@@ -420,8 +421,44 @@ function BrowseContent() {
               <DrawerHeader>
                 <DrawerTitle className="font-mono text-sm">筛选</DrawerTitle>
               </DrawerHeader>
-              <div className="overflow-y-auto px-4 pb-6">
-                <SearchFilters onFilter={setFilters} initialFilters={filters} />
+              <div className="overflow-y-auto pb-6">
+                <MobileFilterDrawer
+                  filters={filters}
+                  onFilter={setFilters}
+                  activeCount={activeFilterChips.length}
+                />
+              </div>
+            </DrawerContent>
+          </Drawer>
+          <Drawer>
+            <DrawerTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1 font-mono text-xs"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />
+                {SORT_OPTIONS.find((o) => o.value === sort)?.label || "排序"}
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle className="font-mono text-sm">排序方式</DrawerTitle>
+              </DrawerHeader>
+              <div className="px-4 pb-6">
+                {SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    className={`flex w-full items-center justify-between px-3 py-3 font-mono text-sm transition-colors ${sort === opt.value ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+                    onClick={() => setSort(opt.value)}
+                  >
+                    {opt.label}
+                    {sort === opt.value && (
+                      <span className="text-foreground">✓</span>
+                    )}
+                  </button>
+                ))}
               </div>
             </DrawerContent>
           </Drawer>
@@ -467,73 +504,6 @@ function BrowseContent() {
                 <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
                 辆车
               </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Select
-                value={filters.location || "_all"}
-                onValueChange={(v) => {
-                  const loc = v === "_all" ? "" : v;
-                  setFilters({ ...filters, location: loc });
-                  // Clear zipcode when manually selecting a region
-                  if (v !== "_all") {
-                    setUserZip("");
-                    setZipLabel("");
-                  }
-                }}
-              >
-                <SelectTrigger className="h-8 w-auto min-w-[100px] gap-1 font-mono text-xs">
-                  <MapPin className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-                  <SelectValue placeholder="地区" />
-                </SelectTrigger>
-                <SelectContent className="max-h-[300px]">
-                  <SelectItem value="_all" className="font-mono text-xs">全部地区</SelectItem>
-                  {US_STATES.map((state) =>
-                    state.subRegions ? (
-                      [
-                        <SelectItem key={state.value} value={state.value} className="font-mono text-xs font-medium">
-                          {state.label}
-                        </SelectItem>,
-                        ...state.subRegions.map((sub) => (
-                          <SelectItem key={sub.value} value={sub.value} className="pl-6 font-mono text-xs">
-                            {sub.label}
-                          </SelectItem>
-                        )),
-                      ]
-                    ) : (
-                      <SelectItem key={state.value} value={state.value} className="font-mono text-xs">
-                        {state.label}
-                      </SelectItem>
-                    )
-                  )}
-                </SelectContent>
-              </Select>
-              <div className="flex items-center gap-1.5">
-                <Input
-                  placeholder="Zipcode"
-                  className="h-8 w-[90px] font-mono text-xs"
-                  maxLength={5}
-                  value={userZip}
-                  onChange={(e) => setUserZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                />
-                {zipLabel && (
-                  <span className="hidden font-mono text-[11px] text-muted-foreground sm:inline">
-                    {zipLabel}
-                  </span>
-                )}
-              </div>
-              <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-                <SelectTrigger className="h-8 w-auto min-w-[130px] gap-1 font-mono text-xs">
-                  <ArrowUpDown className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-                  <SelectValue placeholder="排序方式" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
           </div>
 

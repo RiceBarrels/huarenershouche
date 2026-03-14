@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
+import { MobileTabBar } from "@/components/mobile-tab-bar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,7 +39,12 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <CapacitorProvider>{children}</CapacitorProvider>
+          <div vaul-drawer-wrapper="" className="min-h-[100vh] bg-background pb-[env(safe-area-inset-bottom,0px)] md:pb-0">
+            <CapacitorProvider>
+              {children}
+              <MobileTabBar />
+            </CapacitorProvider>
+          </div>
         </ThemeProvider>
       </body>
     </html>

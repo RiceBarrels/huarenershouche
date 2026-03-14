@@ -95,8 +95,9 @@ export function CarCard({
     <Link href={`/car/${car.id}`}>
       <motion.article
         whileHover={{ y: -2 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
-        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20"
+        whileTap={{ scale: 0.98 }}
+        transition={{ duration: 0.15, ease: "easeOut" }}
+        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20 active:bg-muted/30"
       >
         <div className="relative aspect-16/10 overflow-hidden bg-muted">
           {car.image_url ? (
@@ -140,7 +141,7 @@ export function CarCard({
           <div className="absolute right-2 top-2 flex items-center gap-1">
             <button
               type="button"
-              className="flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -153,14 +154,14 @@ export function CarCard({
               title={inCompare ? "移出对比" : "加入对比"}
             >
               {inCompare ? (
-                <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
+                <Check className="h-4 w-4 text-green-500" strokeWidth={2} />
               ) : (
-                <GitCompare className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                <GitCompare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
               )}
             </button>
             <button
               type="button"
-              className="flex items-center gap-1 rounded-full bg-background/80 px-2 py-1 backdrop-blur-sm transition-colors hover:bg-background"
+              className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -171,14 +172,9 @@ export function CarCard({
               }}
             >
               <Heart
-                className={`h-3.5 w-3.5 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+                className={`h-4 w-4 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
                 strokeWidth={1.5}
               />
-              {favCount > 0 && (
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {favCount}
-                </span>
-              )}
             </button>
           </div>
         </div>

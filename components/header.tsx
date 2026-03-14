@@ -1,12 +1,11 @@
 "use client";
 
-import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare, ShieldCheck, Wrench } from "lucide-react";
+import { Car, LogOut, User, Plus, Moon, Sun, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
 export function Header() {
@@ -46,7 +45,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+      <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 md:h-14">
         <Link href="/" className="flex items-center gap-2">
           <Car className="h-5 w-5" strokeWidth={1.5} />
           <span className="font-mono text-sm font-semibold tracking-tight">
@@ -117,7 +116,7 @@ export function Header() {
           )}
           {user ? (
             <>
-              <Link href="/account?tab=messages" className="relative">
+              <Link href="/messages" className="relative">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -176,129 +175,24 @@ export function Header() {
           )}
         </div>
 
-        <Sheet>
-          <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Menu className="h-4 w-4" strokeWidth={1.5} />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="right" className="w-72 p-0" showCloseButton={false}>
-            <SheetTitle className="sr-only">导航菜单</SheetTitle>
-
-            {/* Brand + close */}
-            <div className="flex items-center justify-between border-b border-border px-5 py-4">
-              <Link href="/" className="flex items-center gap-2">
-                <Car className="h-4 w-4" strokeWidth={1.5} />
-                <span className="font-mono text-xs font-semibold tracking-tight">华人二手车</span>
-              </Link>
-              <SheetClose asChild>
-                <Button variant="ghost" size="icon" className="h-7 w-7">
-                  <span className="font-mono text-xs">✕</span>
-                </Button>
-              </SheetClose>
-            </div>
-
-            {/* Nav links */}
-            <nav className="flex flex-col px-3 py-3">
-              <Link href="/browse" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                买车
-              </Link>
-              <Link href="/post" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <FileText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                卖车
-              </Link>
-              <Link href="/valuation" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <ScaleIcon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                估价
-              </Link>
-              <Link href="/guide" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <BookOpen className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                资讯
-              </Link>
-              <Link href="/compare" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <GitCompare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                对比
-              </Link>
-              <Link href="/vin" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                VIN认证
-              </Link>
-              <Link href="/services" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                <Wrench className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                服务
-              </Link>
-            </nav>
-
-            <div className="mx-5 h-px bg-border" />
-
-            {/* User section */}
-            <div className="flex flex-col px-3 py-3">
-              {user ? (
-                <>
-              <Link href="/account?tab=messages" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                    消息
-                    {unreadCount > 0 && (
-                      <span className="ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </Link>
-                  <Link href="/account" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
-                    <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                    我的车辆
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <LogOut className="h-4 w-4" strokeWidth={1.5} />
-                    退出登录
-                  </button>
-                  <div className="px-3 pt-2">
-                    <Link href="/post">
-                      <Button size="sm" className="w-full gap-1.5 font-mono text-xs">
-                        <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-                        发布车辆
-                      </Button>
-                    </Link>
-                  </div>
-                </>
+        {/* Mobile: theme toggle only (tab bar handles navigation) */}
+        <div className="flex items-center gap-2 md:hidden">
+          {mounted && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              aria-label="切换主题"
+            >
+              {theme === "dark" ? (
+                <Sun className="h-4 w-4" strokeWidth={1.5} />
               ) : (
-                <div className="flex flex-col gap-2 px-3 pt-1">
-                  <Link href="/login">
-                    <Button variant="outline" size="sm" className="w-full font-mono text-xs">
-                      登录
-                    </Button>
-                  </Link>
-                  <Link href="/register">
-                    <Button size="sm" className="w-full font-mono text-xs">
-                      免费发布
-                    </Button>
-                  </Link>
-                </div>
+                <Moon className="h-4 w-4" strokeWidth={1.5} />
               )}
-            </div>
-
-            {/* Theme toggle at bottom */}
-            {mounted && (
-              <div className="mt-auto border-t border-border px-3 py-3">
-                <button
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                  className="flex w-full items-center gap-3 px-3 py-2.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  {theme === "dark" ? (
-                    <Sun className="h-4 w-4" strokeWidth={1.5} />
-                  ) : (
-                    <Moon className="h-4 w-4" strokeWidth={1.5} />
-                  )}
-                  {theme === "dark" ? "浅色模式" : "深色模式"}
-                </button>
-              </div>
-            )}
-          </SheetContent>
-        </Sheet>
+            </Button>
+          )}
+        </div>
       </div>
     </header>
   );

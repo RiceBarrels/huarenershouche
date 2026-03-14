@@ -189,3 +189,22 @@ html.capacitor-native .fixed.bottom-0,
 html.capacitor-native .fixed.bottom-4 {
   padding-bottom: var(--safe-area-bottom);
 }
+
+/* Bottom tab bar spacing on mobile */
+@media (max-width: 767px) {
+  main {
+    padding-bottom: 4.5rem;
+  }
+}
+
+/* Smooth momentum scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Active press state for touch */
+@media (hover: none) {
+  .active\:scale-\[0\.97\]:active {
+    transform: scale(0.97);
+  }
+}

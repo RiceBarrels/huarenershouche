@@ -5,10 +5,40 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
+function triggerHaptic() {
+  // Native (Capacitor)
+  import("@capacitor/haptics")
+    .then(({ Haptics, ImpactStyle }) =>
+      Haptics.impact({ style: ImpactStyle.Light })
+    )
+    .catch(() => {
+      // Web fallback — navigator.vibrate
+      navigator?.vibrate?.(8);
+    });
+}
+
+function withHapticClose(
+  onOpenChange?: (open: boolean) => void
+): (open: boolean) => void {
+  return (open: boolean) => {
+    if (!open) triggerHaptic();
+    onOpenChange?.(open);
+  };
+}
+
 function Drawer({
+  shouldScaleBackground = true,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" {...props} />
+  return <DrawerPrimitive.Root data-slot="drawer" shouldScaleBackground={shouldScaleBackground} onOpenChange={withHapticClose(onOpenChange)} {...props} />
+}
+
+function DrawerNested({
+  onOpenChange,
+  ...props
+}: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) {
+  return <DrawerPrimitive.NestedRoot data-slot="drawer-nested" onOpenChange={withHapticClose(onOpenChange)} {...props} />
 }
 
 function DrawerTrigger({
@@ -119,6 +149,7 @@ function DrawerDescription({
 
 export {
   Drawer,
+  DrawerNested,
   DrawerPortal,
   DrawerOverlay,
   DrawerTrigger,

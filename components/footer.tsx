@@ -21,7 +21,7 @@ const helpLinks = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card">
+    <footer className="hidden border-t border-border bg-card md:block">
       <div className="mx-auto max-w-7xl px-4 py-10">
         <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
           {/* Brand */}

@@ -75,6 +75,7 @@ export default function CarDetailPage() {
   const [copied, setCopied] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -226,6 +227,19 @@ export default function CarDetailPage() {
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.4, ease: "easeOut" }}
               className="relative aspect-16/10 overflow-hidden border border-border bg-muted"
+              onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
+              onTouchEnd={(e) => {
+                if (touchStart === null) return;
+                const diff = e.changedTouches[0].clientX - touchStart;
+                if (Math.abs(diff) > 50) {
+                  if (diff < 0) {
+                    setCurrentImage((prev) => prev === allImages.length - 1 ? 0 : prev + 1);
+                  } else {
+                    setCurrentImage((prev) => prev === 0 ? allImages.length - 1 : prev - 1);
+                  }
+                }
+                setTouchStart(null);
+              }}
             >
               {allImages.length > 0 ? (
                 <img
@@ -602,7 +616,7 @@ export default function CarDetailPage() {
                           .eq("seller_id", car.seller_id)
                           .maybeSingle();
                         if (existing) {
-                          router.push(`/account?tab=messages&conv=${existing.id}`);
+                          router.push(`/messages?conv=${existing.id}`);
                         } else {
                           const { data: created } = await supabase
                             .from("conversations")
@@ -614,7 +628,7 @@ export default function CarDetailPage() {
                             .select("id")
                             .single();
                           if (created) {
-                            router.push(`/account?tab=messages&conv=${created.id}`);
+                            router.push(`/messages?conv=${created.id}`);
                           }
                         }
                       }}
@@ -752,6 +766,51 @@ export default function CarDetailPage() {
       </main>
       <Footer />
       <BackToTop />
+
+      {/* Mobile sticky bottom action bar */}
+      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden">
+        <div className="flex-1">
+          <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+        </div>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          onClick={toggleFavorite}
+        >
+          <Heart
+            className={`h-4 w-4 ${isFavorited ? "fill-red-500 text-red-500" : ""}`}
+            strokeWidth={1.5}
+          />
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-10 w-10 shrink-0"
+          onClick={async () => {
+            const { nativeShare } = await import("@/lib/capacitor");
+            const shared = await nativeShare({
+              title: car.title_zh,
+              text: `${car.title_zh} - ${formatPrice(car.price)}`,
+              url: window.location.href,
+            });
+            if (!shared) {
+              navigator.clipboard.writeText(window.location.href);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }
+          }}
+        >
+          <Share2 className="h-4 w-4" strokeWidth={1.5} />
+        </Button>
+        <Button
+          className="h-10 gap-1.5 font-mono text-xs"
+          onClick={() => setContactVisible(!contactVisible)}
+        >
+          <Phone className="h-4 w-4" strokeWidth={1.5} />
+          {contactVisible ? (car.phone || "无电话") : "联系卖家"}
+        </Button>
+      </div>
 
       {/* Image Lightbox */}
       <ImageLightbox
