@@ -161,3 +161,31 @@
 .animate-fade-in-up {
   animation: fade-in-up 0.4s ease-out both;
 }
+
+/* Capacitor native safe areas */
+html.capacitor-native {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --keyboard-height: 0px;
+}
+
+html.capacitor-native body {
+  padding-top: var(--safe-area-top);
+  padding-bottom: calc(var(--safe-area-bottom) + var(--keyboard-height));
+  padding-left: var(--safe-area-left);
+  padding-right: var(--safe-area-right);
+}
+
+/* Fix sticky header to account for safe area */
+html.capacitor-native header.sticky {
+  top: var(--safe-area-top);
+  padding-top: 0;
+}
+
+/* Fix bottom floating elements */
+html.capacitor-native .fixed.bottom-0,
+html.capacitor-native .fixed.bottom-4 {
+  padding-bottom: var(--safe-area-bottom);
+}

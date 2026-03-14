@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Star, Loader2, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { AuthDialog } from "@/components/auth-dialog";
+import Link from "next/link";
 import type { DbDealerReview } from "@/lib/types";
 
 function StarRating({
@@ -260,11 +260,11 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
           <span className="font-mono text-xs text-muted-foreground">
             登录后可以评价此车行
           </span>
-          <AuthDialog onSuccess={() => window.location.reload()}>
+          <Link href="/login">
             <Button size="sm" className="h-7 font-mono text-[11px]">
               登录
             </Button>
-          </AuthDialog>
+          </Link>
         </div>
       )}
 

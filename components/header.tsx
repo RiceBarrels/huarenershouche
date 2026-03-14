@@ -1,13 +1,12 @@
 "use client";
 
-import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare, ShieldCheck } from "lucide-react";
+import { Car, Menu, LogOut, User, Plus, Moon, Sun, Search, FileText, Scale as ScaleIcon, BookOpen, GitCompare, MessageSquare, ShieldCheck, Wrench } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { AuthDialog } from "@/components/auth-dialog";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
 export function Header() {
@@ -92,6 +91,12 @@ export function Header() {
           >
             VIN认证
           </Link>
+          <Link
+            href="/services"
+            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+          >
+            服务
+          </Link>
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -153,7 +158,7 @@ export function Header() {
             </>
           ) : (
             <>
-              <AuthDialog onSuccess={() => window.location.reload()}>
+              <Link href="/login">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -161,12 +166,12 @@ export function Header() {
                 >
                   登录
                 </Button>
-              </AuthDialog>
-              <AuthDialog onSuccess={() => window.location.reload()}>
+              </Link>
+              <Link href="/register">
                 <Button size="sm" className="font-mono text-xs">
                   免费发布
                 </Button>
-              </AuthDialog>
+              </Link>
             </>
           )}
         </div>
@@ -219,6 +224,10 @@ export function Header() {
                 <ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                 VIN认证
               </Link>
+              <Link href="/services" className="flex items-center gap-3 px-3 py-2.5 font-mono text-sm text-foreground transition-colors hover:bg-muted">
+                <Wrench className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                服务
+              </Link>
             </nav>
 
             <div className="mx-5 h-px bg-border" />
@@ -258,16 +267,16 @@ export function Header() {
                 </>
               ) : (
                 <div className="flex flex-col gap-2 px-3 pt-1">
-                  <AuthDialog onSuccess={() => window.location.reload()}>
+                  <Link href="/login">
                     <Button variant="outline" size="sm" className="w-full font-mono text-xs">
                       登录
                     </Button>
-                  </AuthDialog>
-                  <AuthDialog onSuccess={() => window.location.reload()}>
+                  </Link>
+                  <Link href="/register">
                     <Button size="sm" className="w-full font-mono text-xs">
                       免费发布
                     </Button>
-                  </AuthDialog>
+                  </Link>
                 </div>
               )}
             </div>

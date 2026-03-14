@@ -35,14 +35,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AuthDialog } from "@/components/auth-dialog";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
+import { recordPrice } from "@/lib/price-history";
+import { PriceHistoryChart } from "@/components/price-history-chart";
 import { isWatching, addPriceWatch, removePriceWatch, getWatchedPrice } from "@/lib/price-watch";
 import { ReportDialog } from "@/components/report-dialog";
 import { VinCheck } from "@/components/vin-check";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VehicleHistoryPanel } from "@/components/vehicle-history";
+import { LoanCalculator } from "@/components/loan-calculator";
+import { QrShare } from "@/components/qr-share";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -85,8 +88,11 @@ export default function CarDetailPage() {
 
       // Increment view count via RPC (bypasses RLS)
       if (data) {
-        supabase.rpc("increment_views", { car_id: carId });
+        supabase.rpc("increment_views", { car_id: carId }).then(() => {
+          setCar((prev) => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : prev);
+        });
         addRecentlyViewed(carId);
+        recordPrice(carId, data.title, data.price);
 
         // Load similar cars (same make, different id)
         const { data: similar } = await supabase
@@ -345,6 +351,8 @@ export default function CarDetailPage() {
               </div>
             </motion.div>
 
+            <PriceHistoryChart carId={carId} />
+
             <Separator className="my-6" />
 
             {/* Specs grid */}
@@ -485,23 +493,27 @@ export default function CarDetailPage() {
               </>
             )}
 
-            {/* Vehicle history: recalls, complaints, safety */}
-            <Separator className="my-6" />
-            <div>
-              <h2 className="font-mono text-sm font-semibold">
-                事故与召回记录
-              </h2>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                查询 {car.year} {car.make} {car.model} 的 NHTSA 安全召回、投诉和碰撞评级
-              </p>
-              <div className="mt-3">
-                <VehicleHistoryPanel
-                  make={car.make}
-                  model={car.model}
-                  year={car.year}
-                />
-              </div>
-            </div>
+            {/* Vehicle history: recalls, complaints, safety — only show when VIN is provided */}
+            {car.vin && car.make && car.model && car.year > 0 && (
+              <>
+                <Separator className="my-6" />
+                <div>
+                  <h2 className="font-mono text-sm font-semibold">
+                    事故与召回记录
+                  </h2>
+                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                    查询 {car.year} {car.make} {car.model} 的 NHTSA 安全召回、投诉和碰撞评级
+                  </p>
+                  <div className="mt-3">
+                    <VehicleHistoryPanel
+                      make={car.make}
+                      model={car.model}
+                      year={car.year}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Right: Seller card */}
@@ -564,7 +576,7 @@ export default function CarDetailPage() {
                     </Button>
                   </>
                 ) : (
-                  <AuthDialog onSuccess={() => window.location.reload()}>
+                  <Link href="/login">
                     <Button
                       variant="outline"
                       className="w-full gap-1.5 font-mono text-xs"
@@ -572,7 +584,7 @@ export default function CarDetailPage() {
                       <Heart className="h-3.5 w-3.5" strokeWidth={1.5} />
                       登录后收藏
                     </Button>
-                  </AuthDialog>
+                  </Link>
                 )}
 
                 {user ? (
@@ -612,7 +624,7 @@ export default function CarDetailPage() {
                     </Button>
                   )
                 ) : (
-                  <AuthDialog onSuccess={() => window.location.reload()}>
+                  <Link href="/login">
                     <Button
                       variant="outline"
                       className="w-full gap-1.5 font-mono text-xs"
@@ -620,7 +632,7 @@ export default function CarDetailPage() {
                       <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
                       登录后私信
                     </Button>
-                  </AuthDialog>
+                  </Link>
                 )}
 
                 <Button
@@ -655,14 +667,14 @@ export default function CarDetailPage() {
                 <Button
                   variant="outline"
                   className="w-full gap-1.5 font-mono text-xs"
-                  onClick={() => {
-                    if (navigator.share) {
-                      navigator.share({
-                        title: car.title_zh,
-                        text: `${car.title_zh} - ${formatPrice(car.price)}`,
-                        url: window.location.href,
-                      });
-                    } else {
+                  onClick={async () => {
+                    const { nativeShare } = await import("@/lib/capacitor");
+                    const shared = await nativeShare({
+                      title: car.title_zh,
+                      text: `${car.title_zh} - ${formatPrice(car.price)}`,
+                      url: window.location.href,
+                    });
+                    if (!shared) {
                       navigator.clipboard.writeText(window.location.href);
                       setCopied(true);
                       setTimeout(() => setCopied(false), 2000);
@@ -672,6 +684,11 @@ export default function CarDetailPage() {
                   <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                   {copied ? "已复制链接" : "分享"}
                 </Button>
+
+                <QrShare
+                  url={typeof window !== "undefined" ? window.location.href : ""}
+                  title={car.title_zh || car.title}
+                />
 
                 <ReportDialog carId={carId}>
                   <Button
@@ -684,6 +701,13 @@ export default function CarDetailPage() {
                 </ReportDialog>
               </div>
             </div>
+
+            {/* Loan Calculator */}
+            {car.price > 0 && (
+              <div className="mt-4 border border-border p-4">
+                <LoanCalculator price={car.price} />
+              </div>
+            )}
 
             {/* Safety tips */}
             <div className="mt-4 border border-border p-4">

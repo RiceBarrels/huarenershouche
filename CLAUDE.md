@@ -4,15 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HuarenCars (华人二手车) — a bilingual (Chinese/English) used car marketplace for Chinese communities in North America. Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend.
+HuarenCars (华人二手车) — a bilingual (Chinese/English) used car marketplace for Chinese communities in North America. Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend. use bun as cli.
 
 ## Commands
 
 ```bash
-npm run dev      # Start dev server (port 3000)
-npm run build    # Production build
-npm run start    # Start production server
-npm run lint     # ESLint
+bun run dev      # Start dev server (port 3000)
+bun run build    # Production build
+bun run start    # Start production server
+bun run lint     # ESLint
 ```
 
 No test framework is configured.

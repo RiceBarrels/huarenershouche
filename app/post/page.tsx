@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -9,7 +10,6 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AuthDialog } from "@/components/auth-dialog";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
@@ -574,11 +574,11 @@ export default function PostCarPage() {
             <p className="font-mono text-sm text-muted-foreground">
               请先登录后再发布车辆
             </p>
-            <AuthDialog onSuccess={() => window.location.reload()}>
+            <Link href="/login">
               <Button size="sm" className="mt-4 font-mono text-xs">
                 登录 / 注册
               </Button>
-            </AuthDialog>
+            </Link>
           </div>
         ) : (
           <>

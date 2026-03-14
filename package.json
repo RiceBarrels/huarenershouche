@@ -6,9 +6,22 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cap:sync": "bunx cap sync",
+    "cap:dev": "CAPACITOR_SERVER_URL=http://192.168.1.108:3000 bunx cap sync",
+    "cap:ios": "bunx cap sync ios && bunx cap open ios",
+    "cap:android": "bunx cap sync android && bunx cap open android"
   },
   "dependencies": {
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.2",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/geolocation": "^8.1.0",
+    "@capacitor/haptics": "^8.0.1",
+    "@capacitor/keyboard": "^8.0.1",
+    "@capacitor/share": "^8.0.1",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.1",
     "@supabase/supabase-js": "^2.98.0",
     "@types/leaflet": "^1.9.21",
     "class-variance-authority": "^0.7.1",
@@ -31,6 +44,9 @@
     "web-haptics": "^0.0.6"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/ios": "^8.2.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

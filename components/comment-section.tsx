@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { User, Trash2, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
-import { AuthDialog } from "@/components/auth-dialog";
+import Link from "next/link";
 import type { DbComment } from "@/lib/types";
 
 function timeAgo(dateStr: string): string {
@@ -141,11 +141,9 @@ export function CommentSection({ carId }: { carId: string }) {
             </Button>
           </div>
         ) : (
-          <AuthDialog onSuccess={() => window.location.reload()}>
-            <button className="w-full border border-dashed border-border px-4 py-3 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
-              登录后发表评论
-            </button>
-          </AuthDialog>
+          <Link href="/login" className="block w-full border border-dashed border-border px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
+            登录后发表评论
+          </Link>
         )}
       </div>
 
