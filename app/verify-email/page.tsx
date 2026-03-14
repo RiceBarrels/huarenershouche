@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Loader2, Mail, CheckCircle } from "lucide-react";
@@ -13,6 +13,22 @@ import { ProfileSetupDialog } from "@/components/profile-setup-dialog";
 const CODE_LENGTH = 6;
 
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen flex-col bg-background font-mono">
+        <Header />
+        <main className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center px-4 py-12">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" strokeWidth={1.5} />
+        </main>
+        <Footer />
+      </div>
+    }>
+      <VerifyEmailContent />
+    </Suspense>
+  );
+}
+
+function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get("email") || "";
