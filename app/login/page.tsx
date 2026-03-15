@@ -56,12 +56,14 @@ export default function LoginPage() {
     // On native (Capacitor), use in-app browser flow
     const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
     if (isNative()) {
-      const result = await signInWithGoogleNative();
+      const result = await signInWithGoogleNative(() => {
+        router.push("/");
+        router.refresh();
+      });
       if (result.error) {
         setError(result.error);
-        setGoogleLoading(false);
       }
-      // On success, deep link handler in CapacitorProvider will redirect
+      setGoogleLoading(false);
       return;
     }
 

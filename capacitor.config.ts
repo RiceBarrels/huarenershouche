@@ -1,8 +1,10 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { config as dotenvConfig } from "dotenv";
 
-// For development: point to local Next.js dev server
-// For production: set CAPACITOR_SERVER_URL to your deployed URL
-const serverUrl = process.env.CAPACITOR_SERVER_URL || "";
+// Load .env.local (Capacitor CLI doesn't read Next.js env files)
+dotenvConfig({ path: ".env.local" });
+
+const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://cars.ricebarrel.com/";
 
 const config: CapacitorConfig = {
   appId: "com.huarencars.app",
@@ -15,6 +17,11 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     iosScheme: "capacitor",
     cleartext: process.env.NODE_ENV !== "production",
+    allowNavigation: [
+      "cars.ricebarrel.com",
+      "*.supabase.co",
+      "accounts.google.com",
+    ],
   },
   plugins: {
     SplashScreen: {

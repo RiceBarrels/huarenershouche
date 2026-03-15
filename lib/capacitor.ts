@@ -118,9 +118,15 @@ export async function openBrowser(url: string) {
 }
 
 /** Native OAuth login — opens in-app browser and handles redirect */
-export async function signInWithGoogleNative(): Promise<{ error?: string }> {
+export async function signInWithGoogleNative(
+  onSuccess: () => void
+): Promise<{ error?: string }> {
   const { supabase } = await import("@/lib/supabase");
-  const redirectTo = "com.huarencars.app://auth/callback";
+  const { Browser } = await import("@capacitor/browser");
+
+  // Redirect to the web server, which will receive the tokens in the URL hash.
+  // We use a dedicated /auth/callback page that extracts tokens and shows "success".
+  const redirectTo = "https://cars.ricebarrel.com/auth/callback";
 
   // Get the OAuth URL without auto-opening in browser
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -135,8 +141,17 @@ export async function signInWithGoogleNative(): Promise<{ error?: string }> {
     return { error: error?.message || "Failed to get OAuth URL" };
   }
 
+  // Listen for when the in-app browser closes (user done or redirect landed)
+  const finishHandler = await Browser.addListener("browserFinished", async () => {
+    finishHandler.remove();
+    // Check if auth succeeded by getting current session
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (sessionData.session) {
+      onSuccess();
+    }
+  });
+
   // Open in-app browser (SFSafariViewController on iOS)
-  const { Browser } = await import("@capacitor/browser");
   await Browser.open({
     url: data.url,
     presentationStyle: "popover",
@@ -145,48 +160,36 @@ export async function signInWithGoogleNative(): Promise<{ error?: string }> {
   return {};
 }
 
-/** Handle deep link callback from OAuth redirect */
-export async function handleOAuthCallback(url: string): Promise<boolean> {
-  // URL format: com.huarencars.app://auth/callback#access_token=...&refresh_token=...
-  if (!url.includes("auth/callback")) return false;
-
-  const hashPart = url.split("#")[1];
-  if (!hashPart) return false;
-
-  const params = new URLSearchParams(hashPart);
-  const accessToken = params.get("access_token");
-  const refreshToken = params.get("refresh_token");
-
-  if (!accessToken || !refreshToken) return false;
-
-  // Close the in-app browser
-  try {
-    const { Browser } = await import("@capacitor/browser");
-    await Browser.close();
-  } catch {
-    // Browser may already be closed
-  }
-
-  // Set the session in Supabase
-  const { supabase } = await import("@/lib/supabase");
-  const { error } = await supabase.auth.setSession({
-    access_token: accessToken,
-    refresh_token: refreshToken,
-  });
-
-  return !error;
-}
-
 /** Set up deep link listener for OAuth callbacks */
 export async function setupDeepLinkListener(onAuth: () => void) {
   if (!isNative()) return;
   try {
     const { App } = await import("@capacitor/app");
     App.addListener("appUrlOpen", async ({ url }) => {
-      const handled = await handleOAuthCallback(url);
-      if (handled) {
-        onAuth();
-      }
+      // Handle com.huarencars.app:// deep links
+      if (!url.includes("auth/callback")) return;
+
+      const hashPart = url.split("#")[1];
+      if (!hashPart) return;
+
+      const params = new URLSearchParams(hashPart);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
+      if (!accessToken || !refreshToken) return;
+
+      // Close in-app browser
+      try {
+        const { Browser } = await import("@capacitor/browser");
+        await Browser.close();
+      } catch { /* already closed */ }
+
+      // Set session
+      const { supabase } = await import("@/lib/supabase");
+      const { error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      });
+      if (!error) onAuth();
     });
   } catch {
     // Plugin not available
