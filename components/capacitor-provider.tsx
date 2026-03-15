@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   setupStatusBar,
@@ -10,9 +10,11 @@ import {
   setupDeepLinkListener,
   isNative,
 } from "@/lib/capacitor";
+import { WelcomeScreen } from "@/components/welcome-screen";
 
 export function CapacitorProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (!isNative()) return;
@@ -24,9 +26,15 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for OAuth deep link callbacks
     setupDeepLinkListener(() => {
+      setShowWelcome(false);
       router.push("/");
       router.refresh();
     });
+
+    // Check if first launch
+    if (!localStorage.getItem("huaren_welcome_seen")) {
+      setShowWelcome(true);
+    }
 
     // Hide splash after a short delay to let the app render
     const timer = setTimeout(() => hideSplash(), 300);
@@ -37,5 +45,12 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
     return () => clearTimeout(timer);
   }, [router]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      {showWelcome && (
+        <WelcomeScreen onComplete={() => setShowWelcome(false)} />
+      )}
+    </>
+  );
 }
