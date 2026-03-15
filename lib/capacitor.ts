@@ -117,6 +117,82 @@ export async function openBrowser(url: string) {
   window.open(url, "_blank");
 }
 
+/** Native OAuth login — opens in-app browser and handles redirect */
+export async function signInWithGoogleNative(): Promise<{ error?: string }> {
+  const { supabase } = await import("@/lib/supabase");
+  const redirectTo = "com.huarencars.app://auth/callback";
+
+  // Get the OAuth URL without auto-opening in browser
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error || !data.url) {
+    return { error: error?.message || "Failed to get OAuth URL" };
+  }
+
+  // Open in-app browser (SFSafariViewController on iOS)
+  const { Browser } = await import("@capacitor/browser");
+  await Browser.open({
+    url: data.url,
+    presentationStyle: "popover",
+  });
+
+  return {};
+}
+
+/** Handle deep link callback from OAuth redirect */
+export async function handleOAuthCallback(url: string): Promise<boolean> {
+  // URL format: com.huarencars.app://auth/callback#access_token=...&refresh_token=...
+  if (!url.includes("auth/callback")) return false;
+
+  const hashPart = url.split("#")[1];
+  if (!hashPart) return false;
+
+  const params = new URLSearchParams(hashPart);
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+
+  if (!accessToken || !refreshToken) return false;
+
+  // Close the in-app browser
+  try {
+    const { Browser } = await import("@capacitor/browser");
+    await Browser.close();
+  } catch {
+    // Browser may already be closed
+  }
+
+  // Set the session in Supabase
+  const { supabase } = await import("@/lib/supabase");
+  const { error } = await supabase.auth.setSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+  });
+
+  return !error;
+}
+
+/** Set up deep link listener for OAuth callbacks */
+export async function setupDeepLinkListener(onAuth: () => void) {
+  if (!isNative()) return;
+  try {
+    const { App } = await import("@capacitor/app");
+    App.addListener("appUrlOpen", async ({ url }) => {
+      const handled = await handleOAuthCallback(url);
+      if (handled) {
+        onAuth();
+      }
+    });
+  } catch {
+    // Plugin not available
+  }
+}
+
 /** Get geolocation (native or web) */
 export async function getLocation(): Promise<{
   lat: number;

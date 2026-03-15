@@ -126,7 +126,9 @@ function getLocationLabel(filters: Filters): string {
 
 function getBrandLabel(filters: Filters): string {
   if (!filters.make) return "不限";
-  return MAKES_ZH[filters.make] || filters.make;
+  const items = filters.make.split(",");
+  const labels = items.map((m) => MAKES_ZH[m] || m);
+  return labels.length <= 2 ? labels.join("、") : `${labels[0]}等${labels.length}个`;
 }
 
 function getPriceYearLabel(filters: Filters): string {
@@ -146,18 +148,36 @@ function getPriceYearLabel(filters: Filters): string {
 
 function getSpecsLabel(filters: Filters): string {
   const parts: string[] = [];
-  if (filters.fuelType) parts.push(filters.fuelType);
-  if (filters.transmission) parts.push(filters.transmission);
-  if (filters.drivetrain) parts.push(filters.drivetrain);
-  if (filters.cylinders) parts.push(filters.cylinders + "缸");
+  if (filters.fuelType) {
+    const items = filters.fuelType.split(",");
+    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
+  }
+  if (filters.transmission) {
+    const items = filters.transmission.split(",");
+    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
+  }
+  if (filters.drivetrain) {
+    const items = filters.drivetrain.split(",");
+    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
+  }
+  if (filters.cylinders) {
+    const items = filters.cylinders.split(",");
+    parts.push(items.map((c) => c + "缸").join("/"));
+  }
   if (filters.maxMileage) parts.push(`≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi`);
   return parts.length > 0 ? parts.join(" · ") : "不限";
 }
 
 function getColorLabel(filters: Filters): string {
   const parts: string[] = [];
-  if (filters.exteriorColor) parts.push("外" + filters.exteriorColor);
-  if (filters.interiorColor) parts.push("内" + filters.interiorColor);
+  if (filters.exteriorColor) {
+    const items = filters.exteriorColor.split(",");
+    parts.push("外" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+  }
+  if (filters.interiorColor) {
+    const items = filters.interiorColor.split(",");
+    parts.push("内" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+  }
   return parts.length > 0 ? parts.join(" · ") : "不限";
 }
 
@@ -166,7 +186,24 @@ function getSellerLabel(filters: Filters): string {
   return filters.sellerType === "dealer" ? "车行" : "个人";
 }
 
-// --- Pill selector for single-select options ---
+// --- Multi-select helpers ---
+function toggleInList(current: string, value: string): string {
+  const items = current ? current.split(",") : [];
+  const idx = items.indexOf(value);
+  if (idx >= 0) {
+    items.splice(idx, 1);
+  } else {
+    items.push(value);
+  }
+  return items.join(",");
+}
+
+function isInList(list: string, value: string): boolean {
+  if (!list) return false;
+  return list.split(",").includes(value);
+}
+
+// --- Pill selector for multi-select options ---
 function PillSelect({
   options,
   value,
@@ -189,8 +226,8 @@ function PillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`border px-3 py-1.5 font-mono text-xs transition-colors ${value === opt.value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
-          onClick={() => onChange(opt.value === value ? "" : opt.value)}
+          className={`border px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          onClick={() => onChange(toggleInList(value, opt.value))}
         >
           {opt.label}
         </button>
@@ -199,7 +236,7 @@ function PillSelect({
   );
 }
 
-// --- Color pill selector ---
+// --- Color pill selector (multi-select) ---
 function ColorPillSelect({
   options,
   value,
@@ -222,8 +259,8 @@ function ColorPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1.5 border px-3 py-1.5 font-mono text-xs transition-colors ${value === opt.value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
-          onClick={() => onChange(opt.value === value ? "" : opt.value)}
+          className={`flex items-center gap-1.5 border px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          onClick={() => onChange(toggleInList(value, opt.value))}
         >
           <span
             className="inline-block h-3 w-3 rounded-full border border-border"
@@ -445,11 +482,11 @@ function BrandDrawerContent({
           <button
             key={make}
             type="button"
-            className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${filters.make === make ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-            onClick={() => onUpdate("make", make)}
+            className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${isInList(filters.make, make) ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+            onClick={() => onUpdate("make", toggleInList(filters.make, make))}
           >
             <span>{MAKES_ZH[make]} {make}</span>
-            {filters.make === make && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+            {isInList(filters.make, make) && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
           </button>
         ))}
       </div>
@@ -476,6 +513,8 @@ export function MobileFilterDrawer({
     onFilter(next);
   }
 
+  const isElectricOnly = filters.fuelType === "纯电";
+
   const priceMinIdx = priceToIndex(Number(filters.minPrice || "0"));
   const priceMaxIdx = filters.maxPrice ? priceToIndex(Number(filters.maxPrice)) : PRICE_STOPS.length - 1;
   const yearMin = Number(filters.minYear || "1999");
@@ -483,7 +522,7 @@ export function MobileFilterDrawer({
   const mileageIdx = filters.maxMileage
     ? mileageToIndex(Number(filters.maxMileage))
     : MILEAGE_STOPS.length - 1;
-  const isElectric = filters.fuelType === "纯电";
+  const isElectric = isElectricOnly;
 
   return (
     <div>

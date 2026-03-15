@@ -44,8 +44,8 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur-sm">
-      <div className="mx-auto flex h-12 max-w-7xl items-center justify-between px-4 md:h-14">
+    <header className="sticky top-0 z-50 hidden border-b border-border bg-background/95 backdrop-blur-sm md:block">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <Car className="h-5 w-5" strokeWidth={1.5} />
           <span className="font-mono text-sm font-semibold tracking-tight">
@@ -53,7 +53,7 @@ export function Header() {
           </span>
         </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
+        <nav className="flex items-center gap-6">
           <Link
             href="/browse"
             className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
@@ -98,7 +98,7 @@ export function Header() {
           </Link>
         </nav>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="flex items-center gap-3">
           {mounted && (
             <Button
               variant="ghost"
@@ -175,24 +175,6 @@ export function Header() {
           )}
         </div>
 
-        {/* Mobile: theme toggle only (tab bar handles navigation) */}
-        <div className="flex items-center gap-2 md:hidden">
-          {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="切换主题"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-4 w-4" strokeWidth={1.5} />
-              ) : (
-                <Moon className="h-4 w-4" strokeWidth={1.5} />
-              )}
-            </Button>
-          )}
-        </div>
       </div>
     </header>
   );

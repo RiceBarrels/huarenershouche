@@ -235,7 +235,11 @@ function BrowseContent() {
   // Build active filter chips for mobile display
   const activeFilterChips = useMemo(() => {
     const chips: { key: string; label: string }[] = [];
-    if (filters.make) chips.push({ key: "make", label: MAKES_ZH[filters.make] || filters.make });
+    if (filters.make) {
+      for (const m of filters.make.split(",")) {
+        chips.push({ key: "make", label: MAKES_ZH[m] || m });
+      }
+    }
     if (filters.location) chips.push({ key: "location", label: filters.location });
     if (filters.sellerType) chips.push({ key: "sellerType", label: filters.sellerType === "dealer" ? "车行" : "个人" });
     if (filters.minPrice || filters.maxPrice) {
@@ -248,55 +252,116 @@ function BrowseContent() {
       const max = filters.maxYear || "2026";
       chips.push({ key: "year", label: `${min}-${max}年` });
     }
-    if (filters.fuelType) chips.push({ key: "fuelType", label: filters.fuelType });
-    if (filters.transmission) chips.push({ key: "transmission", label: filters.transmission });
-    if (filters.drivetrain) chips.push({ key: "drivetrain", label: filters.drivetrain });
+    if (filters.fuelType) {
+      for (const v of filters.fuelType.split(",")) {
+        chips.push({ key: "fuelType", label: v });
+      }
+    }
+    if (filters.transmission) {
+      for (const v of filters.transmission.split(",")) {
+        chips.push({ key: "transmission", label: v });
+      }
+    }
+    if (filters.drivetrain) {
+      for (const v of filters.drivetrain.split(",")) {
+        chips.push({ key: "drivetrain", label: v });
+      }
+    }
     if (filters.maxMileage) chips.push({ key: "maxMileage", label: `≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi` });
-    if (filters.exteriorColor) chips.push({ key: "exteriorColor", label: "外" + filters.exteriorColor + "色" });
-    if (filters.interiorColor) chips.push({ key: "interiorColor", label: "内" + filters.interiorColor + "色" });
-    if (filters.cylinders) chips.push({ key: "cylinders", label: filters.cylinders + "缸" });
+    if (filters.exteriorColor) {
+      for (const v of filters.exteriorColor.split(",")) {
+        chips.push({ key: "exteriorColor", label: "外" + v + "色" });
+      }
+    }
+    if (filters.interiorColor) {
+      for (const v of filters.interiorColor.split(",")) {
+        chips.push({ key: "interiorColor", label: "内" + v + "色" });
+      }
+    }
+    if (filters.cylinders) {
+      for (const v of filters.cylinders.split(",")) {
+        chips.push({ key: "cylinders", label: v + "缸" });
+      }
+    }
     return chips;
   }, [filters]);
 
   const filtered = useMemo(() => {
-    let result = cars.filter((car) => {
+    // Helper: check if car value matches any of the comma-separated filter values
+    function matchesMulti(filterVal: string, carVal: string | undefined | null): boolean {
+      if (!filterVal) return true;
+      if (!carVal) return false;
+      return filterVal.split(",").includes(carVal);
+    }
+
+    function matchesColorMulti(filterVal: string, carVal: string | undefined | null): boolean {
+      if (!filterVal) return true;
+      if (!carVal) return false;
+      return filterVal.split(",").some((c) => carVal.includes(c));
+    }
+
+    // Filter without location first to check fallback
+    function applyNonLocationFilters(car: DbCar): boolean {
       if (filters.keyword) {
         const kw = filters.keyword.toLowerCase();
         const zhText = `${car.title_zh} ${MAKES_ZH[car.make] || ""} ${car.location_zh} ${car.seller_name} ${car.fuel_type} ${car.exterior_color || ""}`;
         const enText = `${car.title} ${car.make} ${car.model}`.toLowerCase();
         if (!enText.includes(kw) && match(zhText, kw) === null) return false;
       }
-      if (filters.make && car.make !== filters.make) return false;
+      if (filters.make && !matchesMulti(filters.make, car.make)) return false;
       if (filters.minPrice && car.price < Number(filters.minPrice)) return false;
       if (filters.maxPrice && car.price > Number(filters.maxPrice)) return false;
       if (filters.minYear && car.year < Number(filters.minYear)) return false;
       if (filters.maxYear && car.year > Number(filters.maxYear)) return false;
-      if (filters.location) {
-        const loc = filters.location;
-        // Sub-region: "CA-LA" → match state "CA" + city keyword
-        const locLower = car.location.toLowerCase();
-        const locZh = car.location_zh;
-        if (loc.includes("-")) {
-          const [state] = loc.split("-");
-          if (!locLower.includes(state.toLowerCase()) && !locZh.includes(state)) return false;
-        } else if (/^\d{5}$/.test(loc)) {
-          // Zipcode match handled by distance
-        } else {
-          if (!locLower.includes(loc.toLowerCase()) && !locZh.includes(loc)) return false;
-        }
-      }
       if (filters.sellerType && car.profiles?.account_type !== filters.sellerType) return false;
-      if (filters.fuelType && car.fuel_type !== filters.fuelType) return false;
-      if (filters.transmission && car.transmission !== filters.transmission) return false;
-      if (filters.drivetrain && car.drivetrain !== filters.drivetrain) return false;
+      if (filters.fuelType && !matchesMulti(filters.fuelType, car.fuel_type)) return false;
+      if (filters.transmission && !matchesMulti(filters.transmission, car.transmission)) return false;
+      if (filters.drivetrain && !matchesMulti(filters.drivetrain, car.drivetrain)) return false;
       if (filters.maxMileage && car.mileage > Number(filters.maxMileage)) return false;
-      if (filters.exteriorColor && car.exterior_color && !car.exterior_color.includes(filters.exteriorColor)) return false;
-      if (filters.interiorColor && car.interior_color && !car.interior_color.includes(filters.interiorColor)) return false;
+      if (filters.exteriorColor && !matchesColorMulti(filters.exteriorColor, car.exterior_color)) return false;
+      if (filters.interiorColor && !matchesColorMulti(filters.interiorColor, car.interior_color)) return false;
       return true;
-    });
+    }
+
+    function applyLocationFilter(car: DbCar): boolean {
+      if (!filters.location) return true;
+      const loc = filters.location;
+      const locLower = car.location.toLowerCase();
+      const locZh = car.location_zh;
+      if (loc.includes("-")) {
+        const [state] = loc.split("-");
+        if (!locLower.includes(state.toLowerCase()) && !locZh.includes(state)) return false;
+      } else if (/^\d{5}$/.test(loc)) {
+        // Zipcode — don't hard-filter, let distance sort handle it
+      } else {
+        if (!locLower.includes(loc.toLowerCase()) && !locZh.includes(loc)) return false;
+      }
+      return true;
+    }
+
+    // Apply non-location filters
+    const nonLocFiltered = cars.filter(applyNonLocationFilters);
+
+    // Try applying location filter
+    let result: DbCar[];
+    let usingDistanceFallback = false;
+    if (filters.location) {
+      const locFiltered = nonLocFiltered.filter(applyLocationFilter);
+      if (locFiltered.length > 0) {
+        result = locFiltered;
+      } else {
+        // Fallback: show all results sorted by distance
+        result = nonLocFiltered;
+        usingDistanceFallback = true;
+      }
+    } else {
+      result = nonLocFiltered;
+    }
 
     const sorted = [...result];
-    switch (sort) {
+    // If location yielded no results and we have coords, sort by distance
+    const effectiveSort = usingDistanceFallback && userCoords ? "distance" as SortKey : sort;
+    switch (effectiveSort) {
       case "price-asc":
         sorted.sort((a, b) => a.price - b.price);
         break;
@@ -322,7 +387,7 @@ function BrowseContent() {
         );
     }
     return sorted;
-  }, [cars, filters, sort, distances]);
+  }, [cars, filters, sort, distances, userCoords]);
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">

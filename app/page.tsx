@@ -303,7 +303,7 @@ export default function Home() {
               e.preventDefault();
               handleSearch();
             }}
-            className="mt-8 overflow-hidden border border-white/10 bg-background shadow-lg"
+            className="mt-8 overflow-hidden border border-white/10 bg-background shadow-lg rounded-xl"
           >
             {/* Row: Make | Keyword | ZIP | Search */}
             <div className="flex flex-col md:flex-row">
@@ -352,7 +352,7 @@ export default function Home() {
               {/* Search button */}
               <Button
                 type="submit"
-                className="h-12 gap-2 rounded-none px-8 font-mono text-sm"
+                className="h-12 gap-2 rounded-none px-8 font-mono text-sm rounded-lg"
               >
                 搜索
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />

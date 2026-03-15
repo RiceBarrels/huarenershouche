@@ -1,18 +1,11 @@
 "use client";
 
-import { Search, X, Clock, Trash2, ChevronRight } from "lucide-react";
+import { Search, X, Clock, Trash2, ChevronRight, Check } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 
@@ -276,6 +269,62 @@ export const INITIAL_FILTERS: Filters = {
   cylinders: "",
 };
 
+// --- Multi-select helpers ---
+function toggleInList(current: string, value: string): string {
+  const items = current ? current.split(",") : [];
+  const idx = items.indexOf(value);
+  if (idx >= 0) {
+    items.splice(idx, 1);
+  } else {
+    items.push(value);
+  }
+  return items.join(",");
+}
+
+function isInList(list: string, value: string): boolean {
+  if (!list) return false;
+  return list.split(",").includes(value);
+}
+
+// --- Compact pill select for desktop sidebar ---
+function SidebarPillSelect({
+  options,
+  value,
+  onChange,
+}: {
+  options: { value: string; label: string; color?: string }[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="mt-1 flex flex-wrap gap-1">
+      <button
+        type="button"
+        className={`border px-2 py-1 font-mono text-[11px] transition-colors ${!value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+        onClick={() => onChange("")}
+      >
+        不限
+      </button>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          onClick={() => onChange(toggleInList(value, opt.value))}
+        >
+          {opt.color && (
+            <span
+              className="inline-block h-2.5 w-2.5 rounded-full border border-border"
+              style={{ backgroundColor: opt.color }}
+            />
+          )}
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function SearchFilters({
   onFilter,
   initialFilters,
@@ -311,7 +360,7 @@ export function SearchFilters({
     ([k, v]) => v && k !== "keyword"
   ).length;
 
-  const isElectric = filters.fuelType === "纯电";
+  const isElectric = filters.fuelType === "纯电"; // only hide when exclusively electric
 
   function update(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
@@ -494,32 +543,40 @@ export function SearchFilters({
       {/* Brand */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">品牌</Label>
-        <Select value={filters.make} onValueChange={(v) => update("make", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            {MAKES.map((make) => (
-              <SelectItem key={make} value={make} className="font-mono text-xs">
-                {MAKES_ZH[make]} {make}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="mt-1 max-h-[160px] overflow-y-auto border border-border">
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-muted font-medium" : ""}`}
+            onClick={() => update("make", "")}
+          >
+            <span>不限</span>
+            {!filters.make && <Check className="h-3 w-3" strokeWidth={2} />}
+          </button>
+          {MAKES.map((make) => (
+            <button
+              key={make}
+              type="button"
+              className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-muted font-medium" : ""}`}
+              onClick={() => update("make", toggleInList(filters.make, make))}
+            >
+              <span>{MAKES_ZH[make]} {make}</span>
+              {isInList(filters.make, make) && <Check className="h-3 w-3" strokeWidth={2} />}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Seller type */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">卖家类型</Label>
-        <Select value={filters.sellerType} onValueChange={(v) => update("sellerType", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="dealer" className="font-mono text-xs">车行</SelectItem>
-            <SelectItem value="private" className="font-mono text-xs">个人</SelectItem>
-          </SelectContent>
-        </Select>
+        <SidebarPillSelect
+          options={[
+            { value: "dealer", label: "车行" },
+            { value: "private", label: "个人" },
+          ]}
+          value={filters.sellerType}
+          onChange={(v) => update("sellerType", v)}
+        />
       </div>
 
       {/* Price slider with custom breakpoints */}
@@ -575,36 +632,14 @@ export function SearchFilters({
       {/* Fuel type */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">燃油类型</Label>
-        <Select value={filters.fuelType} onValueChange={(v) => update("fuelType", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            {FUEL_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </div>
 
       {/* Transmission — hidden when electric */}
       {!isElectric && (
         <div>
           <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
-          <Select value={filters.transmission} onValueChange={(v) => update("transmission", v)}>
-            <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-              <SelectValue placeholder="不限" />
-            </SelectTrigger>
-            <SelectContent>
-              {TRANSMISSION_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
         </div>
       )}
 
@@ -612,36 +647,14 @@ export function SearchFilters({
       {!isElectric && (
         <div>
           <Label className="font-mono text-[11px] text-muted-foreground">气缸数</Label>
-          <Select value={filters.cylinders} onValueChange={(v) => update("cylinders", v)}>
-            <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-              <SelectValue placeholder="不限" />
-            </SelectTrigger>
-            <SelectContent>
-              {CYLINDER_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SidebarPillSelect options={CYLINDER_OPTIONS} value={filters.cylinders} onChange={(v) => update("cylinders", v)} />
         </div>
       )}
 
       {/* Drivetrain */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">驱动方式</Label>
-        <Select value={filters.drivetrain} onValueChange={(v) => update("drivetrain", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            {DRIVETRAIN_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SidebarPillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
       </div>
 
       {/* Mileage slider with breakpoints */}
@@ -671,47 +684,13 @@ export function SearchFilters({
       {/* Exterior color */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">外观颜色</Label>
-        <Select value={filters.exteriorColor} onValueChange={(v) => update("exteriorColor", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            {COLOR_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                <span className="flex items-center gap-2">
-                  <span
-                    className="inline-block h-3 w-3 rounded-full border border-border"
-                    style={{ backgroundColor: opt.color }}
-                  />
-                  {opt.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SidebarPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
       </div>
 
       {/* Interior color */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">内饰颜色</Label>
-        <Select value={filters.interiorColor} onValueChange={(v) => update("interiorColor", v)}>
-          <SelectTrigger className="mt-1 h-8 font-mono text-xs">
-            <SelectValue placeholder="不限" />
-          </SelectTrigger>
-          <SelectContent>
-            {INTERIOR_COLOR_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
-                <span className="flex items-center gap-2">
-                  <span
-                    className="inline-block h-3 w-3 rounded-full border border-border"
-                    style={{ backgroundColor: opt.color }}
-                  />
-                  {opt.label}
-                </span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
       </div>
     </aside>
   );
