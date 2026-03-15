@@ -118,17 +118,14 @@ export async function openBrowser(url: string) {
 }
 
 /** Native OAuth login — opens in-app browser and handles redirect */
-export async function signInWithGoogleNative(
-  onSuccess: () => void
-): Promise<{ error?: string }> {
+export async function signInWithGoogleNative(): Promise<{ error?: string }> {
   const { supabase } = await import("@/lib/supabase");
   const { Browser } = await import("@capacitor/browser");
 
-  // Redirect to the web server, which will receive the tokens in the URL hash.
-  // We use a dedicated /auth/callback page that extracts tokens and shows "success".
+  // Redirect to our callback page which extracts tokens and redirects
+  // back to the app via custom URL scheme (com.huarencars.app://)
   const redirectTo = "https://cars.ricebarrel.com/auth/callback";
 
-  // Get the OAuth URL without auto-opening in browser
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
@@ -140,16 +137,6 @@ export async function signInWithGoogleNative(
   if (error || !data.url) {
     return { error: error?.message || "Failed to get OAuth URL" };
   }
-
-  // Listen for when the in-app browser closes (user done or redirect landed)
-  const finishHandler = await Browser.addListener("browserFinished", async () => {
-    finishHandler.remove();
-    // Check if auth succeeded by getting current session
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (sessionData.session) {
-      onSuccess();
-    }
-  });
 
   // Open in-app browser (SFSafariViewController on iOS)
   await Browser.open({

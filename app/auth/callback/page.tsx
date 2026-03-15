@@ -3,39 +3,61 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Loader2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">("loading");
 
   useEffect(() => {
-    // Supabase automatically picks up the tokens from the URL hash
-    // when the page loads (via onAuthStateChange or getSession).
-    // We just need to wait for it to process.
-    async function handleCallback() {
-      // Give Supabase client a moment to process the hash tokens
-      // The supabase-js client auto-detects #access_token in the URL
-      const { data, error } = await supabase.auth.getSession();
-
-      if (error || !data.session) {
-        // Try waiting a bit longer — the client may still be processing
-        await new Promise((r) => setTimeout(r, 1000));
-        const retry = await supabase.auth.getSession();
-        if (retry.error || !retry.data.session) {
-          setStatus("error");
-          return;
-        }
+    function handleCallback() {
+      // The URL hash contains: #access_token=...&refresh_token=...&...
+      const hash = window.location.hash.substring(1);
+      if (!hash) {
+        setStatus("error");
+        return;
       }
 
-      setStatus("success");
+      const params = new URLSearchParams(hash);
+      const accessToken = params.get("access_token");
+      const refreshToken = params.get("refresh_token");
 
-      // On web (non-Capacitor), redirect to home
-      // On Capacitor, the user will close the in-app browser
-      // and the browserFinished listener handles the rest
-      setTimeout(() => {
-        router.push("/");
-      }, 1500);
+      if (!accessToken || !refreshToken) {
+        setStatus("error");
+        return;
+      }
+
+      // Check if we're inside a Capacitor in-app browser (SFSafariViewController).
+      // If so, redirect to the custom URL scheme to pass tokens back to the app.
+      // The in-app browser can open custom schemes which triggers appUrlOpen.
+      const isInAppBrowser =
+        // SFSafariViewController doesn't have Capacitor bridge
+        !window.hasOwnProperty("Capacitor") ||
+        // Or check if we're NOT in the main WKWebView
+        !(window as any).Capacitor?.isNativePlatform?.();
+
+      if (isInAppBrowser) {
+        // Redirect to custom URL scheme — this triggers the native app's deep link handler
+        setStatus("success");
+        // Small delay so user sees "登录成功" briefly
+        setTimeout(() => {
+          window.location.href = `com.huarencars.app://auth/callback#${hash}`;
+        }, 500);
+        return;
+      }
+
+      // Web browser: set session via Supabase client directly
+      import("@/lib/supabase").then(async ({ supabase }) => {
+        const { error } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+        if (error) {
+          setStatus("error");
+        } else {
+          setStatus("success");
+          setTimeout(() => router.push("/"), 1000);
+        }
+      });
     }
 
     handleCallback();
@@ -55,7 +77,7 @@ export default function AuthCallbackPage() {
             <Check className="h-7 w-7 text-foreground" strokeWidth={1.5} />
           </div>
           <p className="mt-4 text-sm font-medium">登录成功</p>
-          <p className="mt-1 text-xs text-muted-foreground">正在跳转...</p>
+          <p className="mt-1 text-xs text-muted-foreground">正在返回应用...</p>
         </>
       )}
       {status === "error" && (

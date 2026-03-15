@@ -54,16 +54,15 @@ export default function LoginPage() {
     setError("");
 
     // On native (Capacitor), use in-app browser flow
+    // Flow: Browser.open → Google → /auth/callback → com.huarencars.app:// deep link → appUrlOpen
     const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
     if (isNative()) {
-      const result = await signInWithGoogleNative(() => {
-        router.push("/");
-        router.refresh();
-      });
+      const result = await signInWithGoogleNative();
       if (result.error) {
         setError(result.error);
       }
       setGoogleLoading(false);
+      // Deep link listener in CapacitorProvider handles the redirect
       return;
     }
 

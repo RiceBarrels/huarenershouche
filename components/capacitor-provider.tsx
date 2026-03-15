@@ -26,6 +26,7 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for OAuth deep link callbacks
     setupDeepLinkListener(() => {
+      localStorage.setItem("huaren_welcome_seen", "1");
       setShowWelcome(false);
       router.push("/");
       router.refresh();

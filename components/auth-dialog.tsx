@@ -51,10 +51,7 @@ export function AuthDialog({
     // On native (Capacitor), use in-app browser flow
     const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
     if (isNative()) {
-      const result = await signInWithGoogleNative(() => {
-        setOpen(false);
-        onSuccess?.();
-      });
+      const result = await signInWithGoogleNative();
       if (result.error) {
         setError(result.error);
       }

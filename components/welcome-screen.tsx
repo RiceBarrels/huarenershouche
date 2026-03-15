@@ -53,15 +53,12 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
     setError("");
     const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
     if (isNative()) {
-      const result = await signInWithGoogleNative(() => {
-        localStorage.setItem("huaren_welcome_seen", "1");
-        onComplete();
-        router.refresh();
-      });
+      const result = await signInWithGoogleNative();
       if (result.error) {
         setError(result.error);
       }
       setGoogleLoading(false);
+      // Deep link listener handles the rest
     } else {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
