@@ -565,6 +565,13 @@ function BrowseContent() {
                 <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
               </button>
             ))}
+            <button
+              onClick={() => setFilters(INITIAL_FILTERS)}
+              className="flex items-center gap-1 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-2.5 w-2.5" strokeWidth={2} />
+              清空所有
+            </button>
           </div>
         )}
       </div>
