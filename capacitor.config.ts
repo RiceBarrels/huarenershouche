@@ -31,8 +31,9 @@ const config: CapacitorConfig = {
       showSpinner: false,
     },
     StatusBar: {
-      style: "DARK",
-      backgroundColor: "#0C0A09",
+      style: "DEFAULT",
+      backgroundColor: "#00000000",
+      overlaysWebView: true,
     },
     Keyboard: {
       resize: "body" as any,
@@ -40,13 +41,13 @@ const config: CapacitorConfig = {
     },
   },
   ios: {
-    contentInset: "automatic",
+    contentInset: "never",
     preferredContentMode: "mobile",
-    backgroundColor: "#0C0A09",
+    backgroundColor: "#FFFFFF",
   },
   android: {
     allowMixedContent: false,
-    backgroundColor: "#0C0A09",
+    backgroundColor: "#FFFFFF",
   },
 };
 

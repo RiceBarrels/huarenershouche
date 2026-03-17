@@ -67,6 +67,7 @@ export const US_STATES: StateOption[] = [
   {
     value: "NY", label: "纽约 New York",
     subRegions: [
+      { value: "NY-NYC", label: "全部纽约市 NYC" },
       { value: "NY-MAN", label: "曼哈顿 Manhattan" },
       { value: "NY-BK", label: "布鲁克林 Brooklyn" },
       { value: "NY-QN", label: "皇后区 Queens" },
@@ -634,22 +635,6 @@ export function SearchFilters({
         <Label className="font-mono text-[11px] text-muted-foreground">燃油类型</Label>
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </div>
-
-      {/* Transmission — hidden when electric */}
-      {!isElectric && (
-        <div>
-          <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
-          <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
-        </div>
-      )}
-
-      {/* Cylinders — hidden when electric */}
-      {!isElectric && (
-        <div>
-          <Label className="font-mono text-[11px] text-muted-foreground">气缸数</Label>
-          <SidebarPillSelect options={CYLINDER_OPTIONS} value={filters.cylinders} onChange={(v) => update("cylinders", v)} />
-        </div>
-      )}
 
       {/* Drivetrain */}
       <div>

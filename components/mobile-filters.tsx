@@ -609,7 +609,7 @@ export function MobileFilterDrawer({
         icon={<Gauge className="h-4 w-4" strokeWidth={1.5} />}
         label="车辆参数"
         value={getSpecsLabel(filters)}
-        active={!!(filters.fuelType || filters.transmission || filters.drivetrain || filters.cylinders || filters.maxMileage)}
+        active={!!(filters.fuelType || filters.drivetrain || filters.maxMileage)}
       >
         <div className="space-y-5">
           {/* Fuel */}
@@ -618,27 +618,11 @@ export function MobileFilterDrawer({
             <PillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
           </div>
 
-          {/* Transmission */}
-          {!isElectric && (
-            <div>
-              <p className="mb-2 font-mono text-xs font-medium">变速箱</p>
-              <PillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
-            </div>
-          )}
-
           {/* Drivetrain */}
           <div>
             <p className="mb-2 font-mono text-xs font-medium">驱动方式</p>
             <PillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
           </div>
-
-          {/* Cylinders */}
-          {!isElectric && (
-            <div>
-              <p className="mb-2 font-mono text-xs font-medium">气缸数</p>
-              <PillSelect options={CYLINDER_OPTIONS} value={filters.cylinders} onChange={(v) => update("cylinders", v)} />
-            </div>
-          )}
 
           {/* Mileage */}
           <div>

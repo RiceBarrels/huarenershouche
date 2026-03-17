@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
-import { MobileTabBar } from "@/components/mobile-tab-bar";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -20,6 +19,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -39,10 +39,17 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          <div vaul-drawer-wrapper="" className="min-h-[100vh] bg-background pb-[env(safe-area-inset-bottom,0px)] md:pb-0">
+          <div
+            vaul-drawer-wrapper=""
+            className="min-h-dvh bg-background"
+            style={{
+              paddingTop: "env(safe-area-inset-top, 0px)",
+              paddingLeft: "env(safe-area-inset-left, 0px)",
+              paddingRight: "env(safe-area-inset-right, 0px)",
+            }}
+          >
             <CapacitorProvider>
               {children}
-              <MobileTabBar />
             </CapacitorProvider>
           </div>
         </ThemeProvider>

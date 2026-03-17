@@ -61,9 +61,40 @@ async function googleGeocode(
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Get user's current position via browser geolocation API
+ * Get user's current position via Capacitor Geolocation (native) or browser API (web)
  */
-export function getCurrentPosition(): Promise<GeolocationPosition> {
+export async function getCurrentPosition(): Promise<GeolocationPosition> {
+  // On native, use Capacitor Geolocation plugin for proper permission handling
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+    if (Capacitor.isNativePlatform()) {
+      const { Geolocation } = await import("@capacitor/geolocation");
+      const perm = await Geolocation.checkPermissions();
+      if (perm.location === "prompt" || perm.location === "prompt-with-rationale") {
+        await Geolocation.requestPermissions();
+      }
+      const pos = await Geolocation.getCurrentPosition({
+        enableHighAccuracy: false,
+        timeout: 10000,
+      });
+      // Return a GeolocationPosition-compatible object
+      return {
+        coords: {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          altitude: pos.coords.altitude,
+          altitudeAccuracy: pos.coords.altitudeAccuracy,
+          heading: pos.coords.heading,
+          speed: pos.coords.speed,
+        },
+        timestamp: pos.timestamp,
+      } as GeolocationPosition;
+    }
+  } catch {
+    // Fall through to web API
+  }
+
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
       reject(new Error("Geolocation not supported"));

@@ -24,6 +24,25 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
     setupKeyboard();
     setupBackButton();
 
+    // Sync native WebView background with theme to prevent black edges on overscroll
+    function syncNativeBg() {
+      const bg = getComputedStyle(document.documentElement).getPropertyValue("--background").trim();
+      if (bg) {
+        // Set the webview scroll background via a meta theme-color tag
+        let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement;
+        if (!meta) {
+          meta = document.createElement("meta");
+          meta.name = "theme-color";
+          document.head.appendChild(meta);
+        }
+        meta.content = getComputedStyle(document.body).backgroundColor;
+      }
+    }
+    syncNativeBg();
+    // Watch for theme changes
+    const observer = new MutationObserver(syncNativeBg);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+
     // Listen for OAuth deep link callbacks
     setupDeepLinkListener(() => {
       localStorage.setItem("huaren_welcome_seen", "1");

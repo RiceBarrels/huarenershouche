@@ -18,8 +18,14 @@ export async function setupStatusBar() {
   if (!isNative()) return;
   try {
     const { StatusBar, Style } = await import("@capacitor/status-bar");
-    await StatusBar.setStyle({ style: Style.Dark });
+    // Let the status bar overlay the WebView so our CSS background shows through
     await StatusBar.setOverlaysWebView({ overlay: true });
+    // Set text color based on current theme
+    const isDark = document.documentElement.classList.contains("dark") ||
+      (window.matchMedia("(prefers-color-scheme: dark)").matches &&
+        !document.documentElement.classList.contains("light"));
+    await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
+    await StatusBar.setBackgroundColor({ color: "#00000000" }); // transparent
   } catch {
     // Plugin not available
   }
