@@ -9,7 +9,8 @@ import { Slider } from "@/components/ui/slider";
 import {
   DrawerNested, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerClose,
 } from "@/components/ui/drawer";
-import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
+import Image from "next/image";
 import { match } from "pinyin-pro";
 import { Input } from "@/components/ui/input";
 
@@ -307,9 +308,15 @@ function FilterRow({
         </button>
       </DrawerTrigger>
       <DrawerContent className="max-h-[85vh]">
-        <DrawerHeader>
-          <DrawerTitle className="font-mono text-sm">{label}</DrawerTitle>
-        </DrawerHeader>
+        <div className="flex items-center justify-between px-4 pb-2 pt-4">
+          <DrawerClose asChild>
+            <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          </DrawerClose>
+          <span className="font-mono text-sm font-semibold">{label}</span>
+          <div className="h-8 w-8" />
+        </div>
         <div className="overflow-y-auto px-4 pb-6">
           {children}
         </div>
@@ -445,6 +452,27 @@ function LocationDrawerContent({
 }
 
 // --- Brand drawer content with search ---
+function BrandItem({ make, selected, onToggle }: { make: string; selected: boolean; onToggle: () => void }) {
+  const logo = getBrandLogoUrl(make);
+  return (
+    <button
+      type="button"
+      className={`flex w-full items-center gap-3 px-3 py-2.5 font-mono text-xs transition-colors ${selected ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+      onClick={onToggle}
+    >
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center">
+        {logo ? (
+          <img src={logo} alt={make} className="h-6 w-6 object-contain" />
+        ) : (
+          <Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+        )}
+      </span>
+      <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
+      {selected && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />}
+    </button>
+  );
+}
+
 function BrandDrawerContent({
   filters,
   onUpdate,
@@ -453,6 +481,9 @@ function BrandDrawerContent({
   onUpdate: (key: keyof Filters, value: string) => void;
 }) {
   const [brandSearch, setBrandSearch] = useState("");
+  const [showAll, setShowAll] = useState(false);
+
+  const selectedMakes = filters.make ? filters.make.split(",") : [];
 
   const filteredMakes = MAKES.filter((make) => {
     if (!brandSearch) return true;
@@ -461,35 +492,113 @@ function BrandDrawerContent({
     return make.toLowerCase().includes(kw) || zh.includes(kw) || match(zh, kw) !== null;
   });
 
+  const isSearching = !!brandSearch;
+  const displayMakes = isSearching ? filteredMakes : showAll ? [...MAKES].filter((m) => m !== "Other") : [];
+
   return (
     <div className="space-y-3">
+      {/* Selected brands */}
+      {selectedMakes.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selectedMakes.map((make) => (
+            <button
+              key={make}
+              type="button"
+              className="flex items-center gap-1 border border-foreground bg-foreground px-2 py-1 font-mono text-[11px] text-background transition-colors"
+              onClick={() => onUpdate("make", toggleInList(filters.make, make))}
+            >
+              {getBrandLogoUrl(make) && (
+                <img src={getBrandLogoUrl(make)!} alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
+              )}
+              {MAKES_ZH[make] || make}
+              <X className="h-2.5 w-2.5" strokeWidth={2} />
+            </button>
+          ))}
+          <button
+            type="button"
+            className="px-2 py-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={() => onUpdate("make", "")}
+          >
+            清除
+          </button>
+        </div>
+      )}
+
       <Input
         placeholder="搜索品牌..."
         className="font-mono text-xs"
         value={brandSearch}
         onChange={(e) => setBrandSearch(e.target.value)}
       />
-      <div className="space-y-1">
-        <button
-          type="button"
-          className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${!filters.make ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-          onClick={() => onUpdate("make", "")}
-        >
-          <span>不限品牌</span>
-          {!filters.make && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-        </button>
-        {filteredMakes.map((make) => (
+
+      {/* Hot brands grid */}
+      {!isSearching && !showAll && (
+        <>
+          <p className="font-mono text-[11px] text-muted-foreground">热门品牌</p>
+          <div className="grid grid-cols-4 gap-2">
+            {HOT_MAKES.map((make) => {
+              const logo = getBrandLogoUrl(make);
+              const selected = isInList(filters.make, make);
+              return (
+                <button
+                  key={make}
+                  type="button"
+                  className={`flex flex-col items-center gap-1.5 border p-2.5 transition-colors ${selected ? "border-foreground bg-muted" : "border-border hover:border-foreground/30"}`}
+                  onClick={() => onUpdate("make", toggleInList(filters.make, make))}
+                >
+                  <span className="flex h-8 w-8 items-center justify-center">
+                    {logo ? (
+                      <img src={logo} alt={make} className="h-7 w-7 object-contain" />
+                    ) : (
+                      <Car className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+                    )}
+                  </span>
+                  <span className="font-mono text-[10px] leading-tight">{MAKES_ZH[make]}</span>
+                </button>
+              );
+            })}
+          </div>
           <button
-            key={make}
             type="button"
-            className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${isInList(filters.make, make) ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-            onClick={() => onUpdate("make", toggleInList(filters.make, make))}
+            className="flex w-full items-center justify-center gap-1 border border-border py-2 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            onClick={() => setShowAll(true)}
           >
-            <span>{MAKES_ZH[make]} {make}</span>
-            {isInList(filters.make, make) && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+            全部品牌
+            <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
-        ))}
-      </div>
+        </>
+      )}
+
+      {/* All brands list */}
+      {(isSearching || showAll) && (
+        <div className="space-y-0.5">
+          {!isSearching && (
+            <button
+              type="button"
+              className="mb-1 flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+              onClick={() => setShowAll(false)}
+            >
+              ← 返回热门
+            </button>
+          )}
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${!filters.make ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+            onClick={() => onUpdate("make", "")}
+          >
+            <span>不限品牌</span>
+            {!filters.make && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+          </button>
+          {displayMakes.map((make) => (
+            <BrandItem
+              key={make}
+              make={make}
+              selected={isInList(filters.make, make)}
+              onToggle={() => onUpdate("make", toggleInList(filters.make, make))}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

@@ -30,6 +30,7 @@ import { BackToTop } from "@/components/back-to-top";
 import { CompareBar } from "@/components/compare-bar";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
@@ -493,9 +494,15 @@ function BrowseContent() {
               </Button>
             </DrawerTrigger>
             <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle className="font-mono text-sm">筛选</DrawerTitle>
-              </DrawerHeader>
+              <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                <DrawerClose asChild>
+                  <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </DrawerClose>
+                <span className="font-mono text-sm font-semibold">筛选</span>
+                <div className="h-8 w-8" />
+              </div>
               <div className="overflow-y-auto pb-6">
                 <MobileFilterDrawer
                   filters={filters}
@@ -517,9 +524,15 @@ function BrowseContent() {
               </Button>
             </DrawerTrigger>
             <DrawerContent>
-              <DrawerHeader>
-                <DrawerTitle className="font-mono text-sm">排序方式</DrawerTitle>
-              </DrawerHeader>
+              <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                <DrawerClose asChild>
+                  <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </DrawerClose>
+                <span className="font-mono text-sm font-semibold">排序方式</span>
+                <div className="h-8 w-8" />
+              </div>
               <div className="px-4 pb-6">
                 {SORT_OPTIONS.map((opt) => (
                   <button
