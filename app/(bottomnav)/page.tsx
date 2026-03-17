@@ -238,7 +238,7 @@ export default function Home() {
           <h1
             className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl"
           >
-            北美华人二手车
+            车来车网
           </h1>
           <p
             className="mt-3 font-mono text-sm text-white/70 md:text-base"

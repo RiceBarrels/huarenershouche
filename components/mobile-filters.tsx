@@ -534,6 +534,32 @@ export function MobileFilterDrawer({
         active={!!filters.location}
       >
         <LocationDrawerContent filters={filters} onUpdate={update} />
+        {/* Distance */}
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="font-mono text-xs font-medium">距离范围</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {["", "10", "25", "50", "100", "200"].map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={`border px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+                onClick={() => update("maxDistance", v)}
+              >
+                {v === "" ? "不限" : `≤${v} mi`}
+              </button>
+            ))}
+          </div>
+          <Input
+            className="mt-2 h-9 font-mono text-xs"
+            placeholder="自定义距离 (miles)"
+            inputMode="numeric"
+            value={filters.maxDistance}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "");
+              update("maxDistance", val);
+            }}
+          />
+        </div>
       </FilterRow>
 
       {/* Brand */}
@@ -751,6 +777,7 @@ export function MobileFilterDrawer({
                 exteriorColor: "",
                 interiorColor: "",
                 cylinders: "",
+                maxDistance: "",
               });
             }}
           >

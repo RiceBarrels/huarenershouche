@@ -11,6 +11,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { MAKES_ZH } from "@/lib/mock-data";
 import type { DbCar } from "@/lib/types";
 
@@ -91,8 +92,17 @@ export default function ListingsPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+          <div className="mt-4 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3 border border-border p-3">
+                <Skeleton className="h-20 w-28 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
         <>

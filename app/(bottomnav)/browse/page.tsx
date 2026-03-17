@@ -35,6 +35,7 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
 interface Filters {
@@ -53,6 +54,7 @@ interface Filters {
   exteriorColor: string;
   interiorColor: string;
   cylinders: string;
+  maxDistance: string;
 }
 
 const INITIAL_FILTERS: Filters = {
@@ -71,6 +73,7 @@ const INITIAL_FILTERS: Filters = {
   exteriorColor: "",
   interiorColor: "",
   cylinders: "",
+  maxDistance: "",
 };
 
 type SortKey = "newest" | "price-asc" | "price-desc" | "mileage" | "year" | "distance";
@@ -101,6 +104,7 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     exteriorColor: sp.get("exteriorColor") || "",
     interiorColor: sp.get("interiorColor") || "",
     cylinders: sp.get("cylinders") || "",
+    maxDistance: sp.get("maxDistance") || "",
   };
 }
 
@@ -272,6 +276,7 @@ function BrowseContent() {
         chips.push({ key: "interiorColor", label: "内" + v + "色" });
       }
     }
+    if (filters.maxDistance) chips.push({ key: "maxDistance", label: `≤${filters.maxDistance}mi` });
     return chips;
   }, [filters]);
 
@@ -352,6 +357,17 @@ function BrowseContent() {
       result = nonLocFiltered;
     }
 
+    // Apply distance filter
+    if (filters.maxDistance && userCoords) {
+      const maxDist = Number(filters.maxDistance);
+      if (maxDist > 0) {
+        result = result.filter((car) => {
+          const d = distances.get(car.id);
+          return d !== undefined && d <= maxDist;
+        });
+      }
+    }
+
     const sorted = [...result];
     // If location yielded no results and we have coords, sort by distance
     const effectiveSort = usingDistanceFallback && userCoords ? "distance" as SortKey : sort;
@@ -391,7 +407,7 @@ function BrowseContent() {
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
-            <p className="font-mono text-sm font-semibold">华人二手车 HuarenCars</p>
+            <p className="font-mono text-sm font-semibold">车来车网</p>
             <p className="font-mono text-[11px] text-muted-foreground">
               北美华人最信赖的二手车交易平台 · 免费发布 · 中文服务
             </p>
@@ -567,8 +583,20 @@ function BrowseContent() {
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="border border-border">
+                  <Skeleton className="aspect-[16/10] w-full" />
+                  <div className="space-y-2 p-3">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <div className="flex justify-between">
+                      <Skeleton className="h-5 w-20" />
+                      <Skeleton className="h-3 w-16" />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filtered.length > 0 ? (
             <div

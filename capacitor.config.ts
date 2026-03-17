@@ -8,7 +8,7 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://cars.ricebarrel.c
 
 const config: CapacitorConfig = {
   appId: "com.huarencars.app",
-  appName: "华人二手车",
+  appName: "车来车网",
   webDir: "public",
   server: {
     // In production, load from deployed URL (supports SSR + dynamic routes)

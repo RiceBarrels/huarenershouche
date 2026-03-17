@@ -17,7 +17,7 @@ import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
-const TRANSMISSIONS = ["AT", "手动", "CVT", "双离合", "E-CVT"];
+const TRANSMISSIONS = ["AT 自动", "MT 手动", "CVT 无级", "DCT 双离合", "AMT 机械自动", "单速(电动车)"];
 const YEAR_OPTIONS = Array.from({ length: 30 }, (_, i) => 2026 - i);
 
 const EXTERIOR_COLORS = [
@@ -218,7 +218,7 @@ export default function PostCarPage() {
     city: "",
     state: "",
     fuel_type: "汽油",
-    transmission: "AT",
+    transmission: "AT 自动",
     exterior_color: "",
     interior_color: "",
     drivetrain: "",
@@ -421,10 +421,11 @@ export default function PostCarPage() {
 
     // Map transmission
     const transLower = result.transmission.toLowerCase();
-    const mappedTrans = transLower.includes("manual") ? "手动"
-      : transLower.includes("cvt") ? "CVT"
-      : transLower.includes("dct") || transLower.includes("dual") ? "双离合"
-      : transLower.includes("auto") ? "AT" : "";
+    const mappedTrans = transLower.includes("manual") && !transLower.includes("auto") ? "MT 手动"
+      : transLower.includes("cvt") ? "CVT 无级"
+      : transLower.includes("dct") || transLower.includes("dual") ? "DCT 双离合"
+      : transLower.includes("amt") || transLower.includes("automated manual") ? "AMT 机械自动"
+      : transLower.includes("auto") ? "AT 自动" : "";
 
     // Map drivetrain
     const driveLower = result.driveType.toLowerCase();

@@ -250,6 +250,7 @@ export interface Filters {
   exteriorColor: string;
   interiorColor: string;
   cylinders: string;
+  maxDistance: string;
 }
 
 export const INITIAL_FILTERS: Filters = {
@@ -268,6 +269,7 @@ export const INITIAL_FILTERS: Filters = {
   exteriorColor: "",
   interiorColor: "",
   cylinders: "",
+  maxDistance: "",
 };
 
 // --- Multi-select helpers ---
@@ -539,6 +541,33 @@ export function SearchFilters({
             ))}
           </div>
         )}
+      </div>
+
+      {/* Distance */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">距离范围 (miles)</Label>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {["", "10", "25", "50", "100", "200"].map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              onClick={() => { update("maxDistance", v); }}
+            >
+              {v === "" ? "不限" : `≤${v}mi`}
+            </button>
+          ))}
+        </div>
+        <Input
+          className="mt-1.5 h-8 font-mono text-[11px]"
+          placeholder="自定义距离 (miles)"
+          inputMode="numeric"
+          value={filters.maxDistance}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "");
+            update("maxDistance", val);
+          }}
+        />
       </div>
 
       {/* Brand */}

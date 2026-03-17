@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-HuarenCars (华人二手车) — a bilingual (Chinese/English) used car marketplace for Chinese communities in North America. Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend. use bun as cli.
+车来车网 (CheCarNet) — a bilingual (Chinese/English) used car marketplace for Chinese communities in North America. Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend. use bun as cli.
 
 ## Commands
 

@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -53,9 +54,16 @@ export default function FavoritesPage() {
         <h1 className="font-mono text-lg font-semibold">我的收藏</h1>
         <div className="mt-4 space-y-3">
           {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
-            </div>
+            [1, 2, 3].map((i) => (
+              <div key={i} className="flex gap-3 border border-border p-3">
+                <Skeleton className="h-20 w-28 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-8 w-24" />
+                </div>
+              </div>
+            ))
           ) : favorites.length === 0 ? (
             <div className="flex flex-col items-center py-16">
               <Heart className="h-10 w-10 text-muted-foreground" strokeWidth={1} />

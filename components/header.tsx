@@ -49,7 +49,7 @@ export function Header() {
         <Link href="/" className="flex items-center gap-2">
           <Car className="h-5 w-5" strokeWidth={1.5} />
           <span className="font-mono text-sm font-semibold tracking-tight">
-            华人二手车
+            车来车网
           </span>
         </Link>
 

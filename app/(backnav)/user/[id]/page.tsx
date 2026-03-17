@@ -11,6 +11,7 @@ import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
 interface SellerProfile {
@@ -78,8 +79,28 @@ export default function UserProfilePage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         <h2 className="font-mono text-sm font-semibold">卖家主页</h2>
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+          <div className="mt-4">
+            <div className="flex items-start gap-4 border-b border-border pb-6">
+              <Skeleton className="h-16 w-16 shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-5 w-32" />
+                <Skeleton className="h-3 w-48" />
+              </div>
+            </div>
+            <div className="mt-6 space-y-2">
+              <Skeleton className="h-4 w-24" />
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border border-border">
+                    <Skeleton className="aspect-[16/10] w-full" />
+                    <div className="space-y-2 p-3">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-5 w-20" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : !profile ? (
           <div className="flex flex-col items-center py-20">

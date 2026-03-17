@@ -91,7 +91,7 @@ export default function LoginPage() {
             登录
           </h1>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            登录你的华人二手车账号
+            登录你的车来车网账号
           </p>
         </div>
 

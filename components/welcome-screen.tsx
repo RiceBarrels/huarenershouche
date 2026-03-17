@@ -21,7 +21,7 @@ function GoogleIcon({ className }: { className?: string }) {
 const SLIDES = [
   {
     icon: Car,
-    title: "华人二手车",
+    title: "车来车网",
     subtitle: "北美华人最信赖的二手车交易平台",
     description: "免费发布 · 中文沟通 · 覆盖全美",
   },

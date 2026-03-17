@@ -28,7 +28,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
               <Car className="h-5 w-5" strokeWidth={1.5} />
-              <span className="font-mono text-sm font-semibold">华人二手车</span>
+              <span className="font-mono text-sm font-semibold">车来车网</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
               北美华人最信赖的二手车交易平台，让买卖车更简单、更安心。
@@ -103,14 +103,14 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} 华人二手车 HuarenCars. All rights reserved.
+            &copy; {new Date().getFullYear()} 车来车网 CheCarNet. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
-            <Link href="#" className="transition-colors hover:text-foreground">
-              使用条款
+            <Link href="/terms" className="transition-colors hover:text-foreground">
+              用户协议
             </Link>
             <span className="text-border">|</span>
-            <Link href="#" className="transition-colors hover:text-foreground">
+            <Link href="/terms" className="transition-colors hover:text-foreground">
               隐私政策
             </Link>
           </div>

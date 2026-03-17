@@ -23,7 +23,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "华人二手车 | HuarenCars - 北美华人二手车交易平台",
+  title: "车来车网 - 北美华人二手车交易平台",
   description:
     "北美华人最信赖的二手车交易平台。覆盖洛杉矶、旧金山、纽约等主要华人社区，提供中文服务，让买卖车更简单。",
 };

@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin,
-  FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun,
+  FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar, DbProfile } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -114,9 +115,23 @@ function AccountContent() {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
         {/* Profile card */}
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+          <>
+          <div className="flex items-center gap-4 px-2 py-4">
+            <Skeleton className="h-16 w-16 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-28" />
+              <Skeleton className="h-3 w-20" />
+            </div>
           </div>
+          <div className="flex border-y border-border">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex flex-1 flex-col items-center gap-1 py-3">
+                <Skeleton className="h-5 w-8" />
+                <Skeleton className="h-3 w-6" />
+              </div>
+            ))}
+          </div>
+          </>
         ) : (
         <>
         <div className="flex items-center gap-4 px-2 py-4">
@@ -224,6 +239,11 @@ function AccountContent() {
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               />
             )}
+            <MenuRow
+              icon={<ScrollText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="用户协议"
+              href="/terms"
+            />
             <MenuRow
               icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
               label="退出登录"

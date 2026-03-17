@@ -47,6 +47,7 @@ import { ImageLightbox } from "@/components/image-lightbox";
 import { VehicleHistoryPanel } from "@/components/vehicle-history";
 import { LoanCalculator } from "@/components/loan-calculator";
 import { QrShare } from "@/components/qr-share";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -163,8 +164,40 @@ export default function CarDetailPage() {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
         <Header />
-        <main className="flex flex-1 items-center justify-center">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+            <div>
+              <Skeleton className="aspect-[16/10] w-full" />
+              <div className="mt-6 space-y-3">
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                <Skeleton className="h-8 w-32" />
+              </div>
+              <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div key={i} className="border border-border p-3 space-y-2">
+                    <Skeleton className="h-3 w-12" />
+                    <Skeleton className="h-4 w-20" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div className="border border-border p-4 space-y-3">
+                <Skeleton className="h-4 w-20" />
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-3 w-16" />
+                  </div>
+                </div>
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-10 w-full" />
+                ))}
+              </div>
+            </div>
+          </div>
         </main>
         <Footer />
       </div>

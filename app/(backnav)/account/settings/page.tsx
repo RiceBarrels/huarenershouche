@@ -13,6 +13,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbProfile, DbDealerStore } from "@/lib/types";
 
 const StoreMap = dynamic(
@@ -155,8 +156,20 @@ export default function SettingsPage() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+          <div className="mt-4 space-y-6">
+            <div className="flex items-center gap-4">
+              <Skeleton className="h-20 w-20 rounded-full" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-3 w-12" />
+                <Skeleton className="h-11 w-full" />
+              </div>
+            ))}
           </div>
         ) : (
         <div className="mt-4 space-y-6">

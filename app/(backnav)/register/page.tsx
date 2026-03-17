@@ -64,7 +64,7 @@ export default function RegisterPage() {
             注册
           </h1>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            创建你的华人二手车账号
+            创建你的车来车网账号
           </p>
         </div>
 
