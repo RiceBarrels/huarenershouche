@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import {
-  Plus, Trash2, Camera, Loader2, Store, MapPin,
+  Plus, Trash2, Camera, Loader2, Store, MapPin, ImagePlus, ShieldCheck, Clock, XCircle, X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { geocodeAddress } from "@/lib/geocode";
@@ -36,9 +36,14 @@ export default function SettingsPage() {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(true);
 
+  const [email, setEmail] = useState("");
+  const [emailSaving, setEmailSaving] = useState(false);
+  const [emailMessage, setEmailMessage] = useState("");
+
   const [stores, setStores] = useState<DbDealerStore[]>([]);
   const [newStore, setNewStore] = useState({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "" });
   const [addingStore, setAddingStore] = useState(false);
+  const [submittingVerification, setSubmittingVerification] = useState<string | null>(null);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileFormRef = useRef(profileForm);
@@ -76,6 +81,7 @@ export default function SettingsPage() {
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (!authUser) { router.push("/login"); return; }
       setUser(authUser.id);
+      setEmail(authUser.email || "");
 
       const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
       if (profileData) {
@@ -115,6 +121,19 @@ export default function SettingsPage() {
     if (avatarInputRef.current) avatarInputRef.current.value = "";
   }
 
+  async function handleEmailUpdate() {
+    if (!email.trim()) return;
+    setEmailSaving(true);
+    setEmailMessage("");
+    const { error } = await supabase.auth.updateUser({ email });
+    if (error) {
+      setEmailMessage(error.message);
+    } else {
+      setEmailMessage("验证邮件已发送到新邮箱，请查收确认");
+    }
+    setEmailSaving(false);
+  }
+
   async function addStoreFn() {
     if (!user || !newStore.name || !newStore.address || !newStore.city || !newStore.state || !newStore.zipcode) return;
     setAddingStore(true);
@@ -136,6 +155,53 @@ export default function SettingsPage() {
     if (!confirm("确定要删除该门店吗？")) return;
     await supabase.from("dealer_stores").delete().eq("id", storeId);
     setStores((prev) => prev.filter((s) => s.id !== storeId));
+  }
+
+  async function handleStorePhotoUpload(storeId: string, e: React.ChangeEvent<HTMLInputElement>) {
+    const files = e.target.files;
+    if (!files || !user) return;
+    const store = stores.find((s) => s.id === storeId);
+    if (!store) return;
+
+    const urls: string[] = [...store.store_photos];
+    for (const file of Array.from(files)) {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user}/${storeId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      const { error } = await supabase.storage.from("store-photos").upload(path, file);
+      if (!error) {
+        const { data: { publicUrl } } = supabase.storage.from("store-photos").getPublicUrl(path);
+        urls.push(publicUrl);
+      }
+    }
+    await supabase.from("dealer_stores").update({ store_photos: urls }).eq("id", storeId);
+    setStores((prev) => prev.map((s) => s.id === storeId ? { ...s, store_photos: urls } : s));
+    e.target.value = "";
+  }
+
+  async function removeStorePhoto(storeId: string, index: number) {
+    const store = stores.find((s) => s.id === storeId);
+    if (!store) return;
+    const next = store.store_photos.filter((_, i) => i !== index);
+    await supabase.from("dealer_stores").update({ store_photos: next }).eq("id", storeId);
+    setStores((prev) => prev.map((s) => s.id === storeId ? { ...s, store_photos: next } : s));
+  }
+
+  async function submitVerification(storeId: string) {
+    setSubmittingVerification(storeId);
+    await supabase
+      .from("dealer_stores")
+      .update({
+        verification_status: "pending",
+        verification_submitted_at: new Date().toISOString(),
+        verification_note: null,
+      })
+      .eq("id", storeId);
+    setStores((prev) =>
+      prev.map((s) =>
+        s.id === storeId ? { ...s, verification_status: "pending" as const, verification_submitted_at: new Date().toISOString(), verification_note: null } : s
+      )
+    );
+    setSubmittingVerification(null);
   }
 
   const mapMarkers = useMemo(
@@ -202,6 +268,25 @@ export default function SettingsPage() {
             <Input id="username" className="mt-1.5 h-11 font-mono text-sm" value={profileForm.username} onChange={(e) => updateProfileForm({ username: e.target.value })} placeholder="你的昵称" />
           </div>
           <div>
+            <Label htmlFor="email" className="font-mono text-xs">邮箱</Label>
+            <div className="mt-1.5 flex gap-2">
+              <Input id="email" type="email" className="h-11 flex-1 font-mono text-sm" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="your@email.com" />
+              <Button
+                variant="outline"
+                className="h-11 shrink-0 font-mono text-xs"
+                onClick={handleEmailUpdate}
+                disabled={emailSaving}
+              >
+                {emailSaving ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} /> : "更改"}
+              </Button>
+            </div>
+            {emailMessage && (
+              <p className={`mt-1.5 font-mono text-[11px] ${emailMessage.includes("验证") ? "text-emerald-600" : "text-red-600"}`}>
+                {emailMessage}
+              </p>
+            )}
+          </div>
+          <div>
             <Label htmlFor="phone" className="font-mono text-xs">联系电话</Label>
             <Input id="phone" className="mt-1.5 h-11 font-mono text-sm" value={profileForm.phone} onChange={(e) => updateProfileForm({ phone: e.target.value })} placeholder="联系电话" />
           </div>
@@ -233,19 +318,98 @@ export default function SettingsPage() {
                 <div className="mt-3"><StoreMap markers={mapMarkers} className="h-52 w-full border border-border" /></div>
               )}
               {stores.length > 0 && (
-                <div className="mt-3 space-y-2">
+                <div className="mt-3 space-y-3">
                   {stores.map((store) => (
-                    <div key={store.id} className="flex items-start justify-between border border-border p-3">
-                      <div>
-                        <p className="font-mono text-xs font-medium">{store.name}</p>
-                        <p className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                          <MapPin className="h-3 w-3" strokeWidth={1.5} />{store.address}{store.zipcode && ` · ${store.zipcode}`}
-                        </p>
-                        {store.phone && <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{store.phone}</p>}
+                    <div key={store.id} className="border border-border p-3">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="font-mono text-xs font-medium">{store.name}</p>
+                            {store.verification_status === "verified" && (
+                              <span className="inline-flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-600">
+                                <ShieldCheck className="h-3 w-3" strokeWidth={1.5} />已认证
+                              </span>
+                            )}
+                            {store.verification_status === "pending" && (
+                              <span className="inline-flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-600">
+                                <Clock className="h-3 w-3" strokeWidth={1.5} />审核中
+                              </span>
+                            )}
+                            {store.verification_status === "rejected" && (
+                              <span className="inline-flex items-center gap-0.5 bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-600">
+                                <XCircle className="h-3 w-3" strokeWidth={1.5} />未通过
+                              </span>
+                            )}
+                          </div>
+                          <p className="mt-0.5 flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                            <MapPin className="h-3 w-3" strokeWidth={1.5} />{store.address}{store.zipcode && ` · ${store.zipcode}`}
+                          </p>
+                          {store.phone && <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{store.phone}</p>}
+                        </div>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive" onClick={() => deleteStore(store.id)}>
+                          <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive" onClick={() => deleteStore(store.id)}>
-                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      </Button>
+
+                      {/* Store photos */}
+                      {store.store_photos.length > 0 && (
+                        <div className="mt-2 flex gap-2 overflow-x-auto">
+                          {store.store_photos.map((url, i) => (
+                            <div key={i} className="relative h-16 w-20 shrink-0 overflow-hidden border border-border bg-muted">
+                              <img src={url} alt="" className="h-full w-full object-cover" />
+                              {store.verification_status !== "pending" && store.verification_status !== "verified" && (
+                                <button
+                                  type="button"
+                                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center bg-black/50 text-white hover:bg-black/70"
+                                  onClick={() => removeStorePhoto(store.id, i)}
+                                >
+                                  <X className="h-2.5 w-2.5" strokeWidth={2} />
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Upload photos + Apply verification */}
+                      {store.verification_status !== "verified" && store.verification_status !== "pending" && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <label className="flex cursor-pointer items-center gap-1 border border-dashed border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
+                            <ImagePlus className="h-3 w-3" strokeWidth={1.5} />
+                            上传照片
+                            <input
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="hidden"
+                              onChange={(e) => handleStorePhotoUpload(store.id, e)}
+                            />
+                          </label>
+                          {store.store_photos.length > 0 && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-auto gap-1 px-2 py-1 font-mono text-[11px]"
+                              onClick={() => submitVerification(store.id)}
+                              disabled={submittingVerification === store.id}
+                            >
+                              {submittingVerification === store.id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
+                              ) : (
+                                <ShieldCheck className="h-3 w-3" strokeWidth={1.5} />
+                              )}
+                              申请认证
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Rejection note */}
+                      {store.verification_status === "rejected" && store.verification_note && (
+                        <p className="mt-2 border-l-2 border-red-300 pl-2 font-mono text-[11px] text-red-600">
+                          拒绝原因: {store.verification_note}
+                        </p>
+                      )}
                     </div>
                   ))}
                 </div>

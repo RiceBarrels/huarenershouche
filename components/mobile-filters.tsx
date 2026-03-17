@@ -165,7 +165,14 @@ function getSpecsLabel(filters: Filters): string {
     const items = filters.cylinders.split(",");
     parts.push(items.map((c) => c + "缸").join("/"));
   }
-  if (filters.maxMileage) parts.push(`≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi`);
+  if (filters.exteriorColor) {
+    const items = filters.exteriorColor.split(",");
+    parts.push("外" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+  }
+  if (filters.interiorColor) {
+    const items = filters.interiorColor.split(",");
+    parts.push("内" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+  }
   return parts.length > 0 ? parts.join(" · ") : "不限";
 }
 
@@ -473,7 +480,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
   );
 }
 
-function BrandDrawerContent({
+export function BrandDrawerContent({
   filters,
   onUpdate,
 }: {
@@ -781,12 +788,42 @@ export function MobileFilterDrawer({
         </div>
       </FilterRow>
 
-      {/* Vehicle Specs */}
+      {/* Mileage */}
       <FilterRow
         icon={<Gauge className="h-4 w-4" strokeWidth={1.5} />}
+        label="最高里程"
+        value={filters.maxMileage ? `≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi` : "不限"}
+        active={!!filters.maxMileage}
+      >
+        <div>
+          <p className="font-mono text-xs font-medium">最高里程</p>
+          <p className="mt-1 font-mono text-[11px] text-foreground">
+            {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
+          </p>
+          <Slider
+            className="mt-3"
+            min={0}
+            max={MILEAGE_STOPS.length - 1}
+            step={1}
+            value={[mileageIdx]}
+            onValueChange={([idx]) => {
+              const val = MILEAGE_STOPS[idx];
+              const next = {
+                ...filters,
+                maxMileage: idx === MILEAGE_STOPS.length - 1 ? "" : String(val),
+              };
+              onFilter(next);
+            }}
+          />
+        </div>
+      </FilterRow>
+
+      {/* Vehicle Specs */}
+      <FilterRow
+        icon={<Palette className="h-4 w-4" strokeWidth={1.5} />}
         label="车辆参数"
         value={getSpecsLabel(filters)}
-        active={!!(filters.fuelType || filters.drivetrain || filters.maxMileage)}
+        active={!!(filters.fuelType || filters.drivetrain || filters.exteriorColor || filters.interiorColor)}
       >
         <div className="space-y-5">
           {/* Fuel */}
@@ -801,43 +838,13 @@ export function MobileFilterDrawer({
             <PillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
           </div>
 
-          {/* Mileage */}
-          <div>
-            <p className="font-mono text-xs font-medium">最高里程</p>
-            <p className="mt-1 font-mono text-[11px] text-foreground">
-              {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
-            </p>
-            <Slider
-              className="mt-3"
-              min={0}
-              max={MILEAGE_STOPS.length - 1}
-              step={1}
-              value={[mileageIdx]}
-              onValueChange={([idx]) => {
-                const val = MILEAGE_STOPS[idx];
-                const next = {
-                  ...filters,
-                  maxMileage: idx === MILEAGE_STOPS.length - 1 ? "" : String(val),
-                };
-                onFilter(next);
-              }}
-            />
-          </div>
-        </div>
-      </FilterRow>
-
-      {/* Colors */}
-      <FilterRow
-        icon={<Palette className="h-4 w-4" strokeWidth={1.5} />}
-        label="颜色"
-        value={getColorLabel(filters)}
-        active={!!(filters.exteriorColor || filters.interiorColor)}
-      >
-        <div className="space-y-5">
+          {/* Exterior Color */}
           <div>
             <p className="mb-2 font-mono text-xs font-medium">外观颜色</p>
             <ColorPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
           </div>
+
+          {/* Interior Color */}
           <div>
             <p className="mb-2 font-mono text-xs font-medium">内饰颜色</p>
             <ColorPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />

@@ -33,56 +33,73 @@ export function ConversationList({ userId, initialConvId }: { userId: string; in
   const [activeOtherName, setActiveOtherName] = useState("");
 
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
-        .from("conversations")
-        .select(`
-          *,
-          cars!car_id(id, title_zh, image_url, price),
-          buyer_profile:profiles!buyer_id(username, avatar_url),
-          seller_profile:profiles!seller_id(username, avatar_url)
-        `)
-        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-        .order("last_message_at", { ascending: false });
+    loadConversations();
+  }, [userId, initialConvId]);
 
-      const convs = (data as (DbConversation & { last_message?: string; unread_count?: number })[]) || [];
+  async function loadConversations() {
+    setLoading(true);
+    const { data } = await supabase
+      .from("conversations")
+      .select("*, cars(id, title_zh, image_url, price)")
+      .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+      .order("last_message_at", { ascending: false });
 
-      // Fetch last message and unread count for each conversation
-      for (const conv of convs) {
-        const [lastMsgRes, unreadRes] = await Promise.all([
-          supabase
-            .from("messages")
-            .select("content")
-            .eq("conversation_id", conv.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle(),
-          supabase
-            .from("messages")
-            .select("id", { count: "exact", head: true })
-            .eq("conversation_id", conv.id)
-            .eq("read", false)
-            .neq("sender_id", userId),
-        ]);
-        conv.last_message = lastMsgRes.data?.content || "";
-        conv.unread_count = unreadRes.count || 0;
-      }
+    const convs = (data as (DbConversation & { last_message?: string; unread_count?: number })[]) || [];
 
-      setConversations(convs);
-      setLoading(false);
-
-      // Auto-open conversation from URL param
-      if (initialConvId && !activeOtherName) {
-        const target = convs.find((c) => c.id === initialConvId);
-        if (target) {
-          const isBuyer = target.buyer_id === userId;
-          const otherProfile = isBuyer ? target.seller_profile : target.buyer_profile;
-          setActiveOtherName(otherProfile?.username || "用户");
-        }
+    // Collect all profile IDs and batch-fetch them
+    const profileIds = new Set<string>();
+    for (const conv of convs) {
+      profileIds.add(conv.buyer_id);
+      profileIds.add(conv.seller_id);
+    }
+    const profileMap = new Map<string, { username: string; avatar_url: string | null }>();
+    if (profileIds.size > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .in("id", [...profileIds]);
+      for (const p of profiles || []) {
+        profileMap.set(p.id, { username: p.username, avatar_url: p.avatar_url });
       }
     }
-    load();
-  }, [userId, initialConvId]);
+
+    // Attach profiles + fetch last message and unread count
+    for (const conv of convs) {
+      conv.buyer_profile = profileMap.get(conv.buyer_id) || undefined;
+      conv.seller_profile = profileMap.get(conv.seller_id) || undefined;
+
+      const [lastMsgRes, unreadRes] = await Promise.all([
+        supabase
+          .from("messages")
+          .select("content")
+          .eq("conversation_id", conv.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", conv.id)
+          .eq("read", false)
+          .neq("sender_id", userId),
+      ]);
+      conv.last_message = lastMsgRes.data?.content || "";
+      conv.unread_count = unreadRes.count || 0;
+    }
+
+    setConversations(convs);
+    setLoading(false);
+
+    // Auto-open conversation from URL param
+    if (initialConvId && !activeOtherName) {
+      const target = convs.find((c) => c.id === initialConvId);
+      if (target) {
+        const isBuyer = target.buyer_id === userId;
+        const otherProfile = isBuyer ? target.seller_profile : target.buyer_profile;
+        setActiveOtherName(otherProfile?.username || "用户");
+      }
+    }
+  }
 
   if (activeConversation) {
     return (
@@ -93,42 +110,7 @@ export function ConversationList({ userId, initialConvId }: { userId: string; in
           otherUsername={activeOtherName}
           onBack={() => {
             setActiveConversation(null);
-            // Refresh list to update unread counts
-            setLoading(true);
-            supabase
-              .from("conversations")
-              .select(`
-                *,
-                cars!car_id(id, title_zh, image_url, price),
-                buyer_profile:profiles!buyer_id(username, avatar_url),
-                seller_profile:profiles!seller_id(username, avatar_url)
-              `)
-              .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-              .order("last_message_at", { ascending: false })
-              .then(async ({ data }) => {
-                const convs = (data as (DbConversation & { last_message?: string; unread_count?: number })[]) || [];
-                for (const conv of convs) {
-                  const [lastMsgRes, unreadRes] = await Promise.all([
-                    supabase
-                      .from("messages")
-                      .select("content")
-                      .eq("conversation_id", conv.id)
-                      .order("created_at", { ascending: false })
-                      .limit(1)
-                      .maybeSingle(),
-                    supabase
-                      .from("messages")
-                      .select("id", { count: "exact", head: true })
-                      .eq("conversation_id", conv.id)
-                      .eq("read", false)
-                      .neq("sender_id", userId),
-                  ]);
-                  conv.last_message = lastMsgRes.data?.content || "";
-                  conv.unread_count = unreadRes.count || 0;
-                }
-                setConversations(convs);
-                setLoading(false);
-              });
+            loadConversations();
           }}
         />
       </div>

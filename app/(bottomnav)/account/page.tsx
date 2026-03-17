@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin,
-  FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText,
+  FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText, ShieldCheck,
+  Headset, Handshake,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
@@ -239,6 +240,23 @@ function AccountContent() {
                 onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               />
             )}
+            {profile?.role === "admin" && (
+              <MenuRow
+                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="管理后台"
+                href="/admin"
+              />
+            )}
+            <MenuRow
+              icon={<Headset className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="联系客服"
+              href="/contact"
+            />
+            <MenuRow
+              icon={<Handshake className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="商业合作"
+              href="/business"
+            />
             <MenuRow
               icon={<ScrollText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="用户协议"

@@ -43,6 +43,10 @@ export interface DbProfile {
   location: string | null;
   preferred_language: string;
   account_type: "private" | "dealer";
+  role: "user" | "admin";
+  banned: boolean;
+  banned_at: string | null;
+  banned_reason: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -56,6 +60,21 @@ export interface DbDealerStore {
   lat: number | null;
   lng: number | null;
   phone: string | null;
+  store_photos: string[];
+  verification_status: "unverified" | "pending" | "verified" | "rejected";
+  verification_submitted_at: string | null;
+  verification_reviewed_at: string | null;
+  verification_note: string | null;
+  created_at: string;
+}
+
+export interface DbAdminAction {
+  id: string;
+  admin_id: string;
+  action: string;
+  target_type: "user" | "car" | "store" | "report";
+  target_id: string;
+  detail: string | null;
   created_at: string;
 }
 
