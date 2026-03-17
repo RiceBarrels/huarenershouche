@@ -557,9 +557,29 @@ export function MobileFilterDrawer({
           {/* Price */}
           <div>
             <p className="font-mono text-xs font-medium">价格范围</p>
-            <p className="mt-1 font-mono text-[11px] text-foreground">
-              {formatPriceLabel(PRICE_STOPS[priceMinIdx])} - {formatPriceLabel(PRICE_STOPS[priceMaxIdx])}
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                className="h-9 font-mono text-xs"
+                placeholder="最低价"
+                inputMode="numeric"
+                value={filters.minPrice}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  onFilter({ ...filters, minPrice: v });
+                }}
+              />
+              <span className="font-mono text-xs text-muted-foreground">-</span>
+              <Input
+                className="h-9 font-mono text-xs"
+                placeholder="最高价"
+                inputMode="numeric"
+                value={filters.maxPrice}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "");
+                  onFilter({ ...filters, maxPrice: v });
+                }}
+              />
+            </div>
             <Slider
               className="mt-3"
               min={0}
@@ -582,9 +602,31 @@ export function MobileFilterDrawer({
           {/* Year */}
           <div>
             <p className="font-mono text-xs font-medium">年份范围</p>
-            <p className="mt-1 font-mono text-[11px] text-foreground">
-              {yearMin <= 1999 ? "2000年以前" : yearMin} - {yearMax >= 2026 ? "2026" : yearMax}
-            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <Input
+                className="h-9 font-mono text-xs"
+                placeholder="最早年份"
+                inputMode="numeric"
+                maxLength={4}
+                value={filters.minYear}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  onFilter({ ...filters, minYear: v });
+                }}
+              />
+              <span className="font-mono text-xs text-muted-foreground">-</span>
+              <Input
+                className="h-9 font-mono text-xs"
+                placeholder="最新年份"
+                inputMode="numeric"
+                maxLength={4}
+                value={filters.maxYear}
+                onChange={(e) => {
+                  const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                  onFilter({ ...filters, maxYear: v });
+                }}
+              />
+            </div>
             <Slider
               className="mt-3"
               min={1999}
