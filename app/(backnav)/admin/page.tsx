@@ -152,6 +152,7 @@ export default function AdminPage() {
   async function approveStore(storeId: string) {
     setActionLoading(storeId);
     const { data: { user } } = await supabase.auth.getUser();
+    const store = pendingStores.find((s) => s.id === storeId);
     await supabase
       .from("dealer_stores")
       .update({
@@ -160,6 +161,13 @@ export default function AdminPage() {
         verification_note: null,
       })
       .eq("id", storeId);
+    // Auto-upgrade owner to dealer account
+    if (store) {
+      await supabase
+        .from("profiles")
+        .update({ account_type: "dealer" })
+        .eq("id", store.owner_id);
+    }
     if (user) {
       await supabase.from("admin_actions").insert({
         admin_id: user.id,

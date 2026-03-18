@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar, DbProfile } from "@/lib/types";
 
@@ -66,26 +67,27 @@ function AccountContent() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  useEffect(() => {
-    async function load() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { router.push("/login"); return; }
-      setUser(authUser.id);
+  const loadAccount = useCallback(async () => {
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) { router.push("/login"); return; }
+    setUser(authUser.id);
 
-      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
-      if (profileData) setProfile(profileData as DbProfile);
+    const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
+    if (profileData) setProfile(profileData as DbProfile);
 
-      const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", authUser.id).order("created_at", { ascending: false });
-      setMyCars((cars as DbCar[]) || []);
+    const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", authUser.id).order("created_at", { ascending: false });
+    setMyCars((cars as DbCar[]) || []);
 
-      const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", authUser.id);
-      setFavCount(count || 0);
+    const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", authUser.id);
+    setFavCount(count || 0);
 
-      try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
-      setLoading(false);
-    }
-    load();
+    try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
+    setLoading(false);
   }, [router]);
+
+  useEffect(() => {
+    loadAccount();
+  }, [loadAccount]);
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -111,6 +113,7 @@ function AccountContent() {
   const activeCars = myCars.filter((c) => c.status === "active").length;
 
   return (
+    <PullToRefresh onRefresh={loadAccount}>
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
@@ -273,5 +276,6 @@ function AccountContent() {
       </main>
       <Footer />
     </div>
+    </PullToRefresh>
   );
 }

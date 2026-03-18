@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ConversationList } from "@/components/conversation-list";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 
 export default function MessagesPage() {
   return (
@@ -30,6 +31,7 @@ function MessagesContent() {
   const searchParams = useSearchParams();
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -41,6 +43,10 @@ function MessagesContent() {
       setLoading(false);
     });
   }, [router]);
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   if (loading) {
     return (
@@ -55,6 +61,7 @@ function MessagesContent() {
   }
 
   return (
+    <PullToRefresh onRefresh={handleRefresh}>
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
@@ -63,6 +70,7 @@ function MessagesContent() {
         </h1>
         {user && (
           <ConversationList
+            key={refreshKey}
             userId={user}
             initialConvId={searchParams.get("conv")}
           />
@@ -70,5 +78,6 @@ function MessagesContent() {
       </main>
       <Footer />
     </div>
+    </PullToRefresh>
   );
 }

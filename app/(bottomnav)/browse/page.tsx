@@ -27,6 +27,7 @@ import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { getPriceInsight } from "@/lib/price-insight";
 import { BackToTop } from "@/components/back-to-top";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { CompareBar } from "@/components/compare-bar";
 import {
   Drawer,
@@ -153,25 +154,26 @@ function BrowseContent() {
     setFilters(filtersFromParams(searchParams));
   }, [searchParams]);
 
-  useEffect(() => {
-    async function fetchCars() {
-      const { data } = await supabase
-        .from("cars")
-        .select("*, profiles!seller_id(account_type)")
-        .eq("status", "active")
-        .order("created_at", { ascending: false });
-      const allCars = (data as DbCar[]) || [];
-      setCars(allCars);
-      setLoading(false);
+  async function fetchCars() {
+    const { data } = await supabase
+      .from("cars")
+      .select("*, profiles!seller_id(account_type)")
+      .eq("status", "active")
+      .order("created_at", { ascending: false });
+    const allCars = (data as DbCar[]) || [];
+    setCars(allCars);
+    setLoading(false);
 
-      const recentIds = getRecentlyViewed();
-      if (recentIds.length > 0) {
-        const recent = recentIds
-          .map((id) => allCars.find((c) => c.id === id))
-          .filter(Boolean) as DbCar[];
-        setRecentCars(recent.slice(0, 6));
-      }
+    const recentIds = getRecentlyViewed();
+    if (recentIds.length > 0) {
+      const recent = recentIds
+        .map((id) => allCars.find((c) => c.id === id))
+        .filter(Boolean) as DbCar[];
+      setRecentCars(recent.slice(0, 6));
     }
+  }
+
+  useEffect(() => {
     fetchCars();
 
     // Auto-detect user zipcode on first visit
@@ -401,6 +403,7 @@ function BrowseContent() {
   }, [cars, filters, sort, distances, userCoords]);
 
   return (
+    <PullToRefresh onRefresh={fetchCars}>
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
 
@@ -702,5 +705,6 @@ function BrowseContent() {
       <BackToTop />
       <CompareBar />
     </div>
+    </PullToRefresh>
   );
 }

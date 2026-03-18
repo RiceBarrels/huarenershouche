@@ -209,6 +209,8 @@ export default function SettingsPage() {
     [stores]
   );
 
+  const hasVerifiedStore = stores.some((s) => s.verification_status === "verified");
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
@@ -297,23 +299,35 @@ export default function SettingsPage() {
 
           <div>
             <Label className="font-mono text-xs">账号类型</Label>
-            <div className="mt-2 flex gap-2">
-              <button type="button" onClick={() => updateProfileForm({ account_type: "private" })} className={`flex h-11 flex-1 items-center justify-center gap-1.5 border font-mono text-xs transition-colors ${profileForm.account_type === "private" ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}>
-                个人
-              </button>
-              <button type="button" onClick={() => updateProfileForm({ account_type: "dealer" })} className={`flex h-11 flex-1 items-center justify-center gap-1.5 border font-mono text-xs transition-colors ${profileForm.account_type === "dealer" ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}>
-                <Store className="h-3.5 w-3.5" strokeWidth={1.5} />车行
-              </button>
-            </div>
+            {profileForm.account_type === "dealer" ? (
+              <div className="mt-2 flex h-11 items-center gap-2 border border-foreground bg-foreground px-3 font-mono text-xs text-background">
+                <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />认证车行
+              </div>
+            ) : hasVerifiedStore ? (
+              <div className="mt-2 flex gap-2">
+                <div className="flex h-11 flex-1 items-center justify-center border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
+                <button type="button" onClick={() => updateProfileForm({ account_type: "dealer" })} className="flex h-11 flex-1 items-center justify-center gap-1.5 border border-border font-mono text-xs transition-colors hover:border-foreground/30">
+                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />升级为车行
+                </button>
+              </div>
+            ) : (
+              <div className="mt-2">
+                <div className="flex h-11 items-center justify-center border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+                  添加门店并通过认证后可升级为车行账号
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Dealer stores */}
-          {profileForm.account_type === "dealer" && (
-            <div className="border-t border-border pt-6">
-              <h3 className="flex items-center gap-1.5 font-mono text-sm font-semibold">
-                <Store className="h-4 w-4" strokeWidth={1.5} />我的门店
-              </h3>
-              <p className="mt-1 font-mono text-[11px] text-muted-foreground">添加门店后，发布车辆时可以选择门店地址</p>
+          <div className="border-t border-border pt-6">
+            <h3 className="flex items-center gap-1.5 font-mono text-sm font-semibold">
+              <Store className="h-4 w-4" strokeWidth={1.5} />我的门店
+            </h3>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+              {profileForm.account_type === "dealer" ? "管理您的门店信息" : "添加门店并提交认证，审核通过后可升级为认证车行"}
+            </p>
               {mapMarkers.length > 0 && (
                 <div className="mt-3"><StoreMap markers={mapMarkers} className="h-52 w-full border border-border" /></div>
               )}
@@ -453,8 +467,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
-          )}
-        </div>
+          </div>
         )}
       </main>
       <Footer />

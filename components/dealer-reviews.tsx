@@ -74,7 +74,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
       const [reviewsRes, authRes] = await Promise.all([
         supabase
           .from("dealer_reviews")
-          .select("*, profiles!user_id(username, avatar_url)")
+          .select("*, profiles!dealer_reviews_user_id_profiles_fkey(username, avatar_url)")
           .eq("dealer_id", dealerId)
           .order("created_at", { ascending: false }),
         supabase.auth.getUser(),
@@ -114,7 +114,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
         .from("dealer_reviews")
         .update({ rating, content: content.trim() })
         .eq("id", myReview.id)
-        .select("*, profiles!user_id(username, avatar_url)")
+        .select("*, profiles!dealer_reviews_user_id_profiles_fkey(username, avatar_url)")
         .single();
       if (!error && data) {
         const updated = data as DbDealerReview;
@@ -134,7 +134,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
           rating,
           content: content.trim(),
         })
-        .select("*, profiles!user_id(username, avatar_url)")
+        .select("*, profiles!dealer_reviews_user_id_profiles_fkey(username, avatar_url)")
         .single();
       if (!error && data) {
         const created = data as DbDealerReview;
