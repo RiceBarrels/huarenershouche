@@ -13,11 +13,7 @@ export default function BottomNavLayout({
           height: "env(safe-area-inset-top, 0px)",
         }}
       >
-        <div
-          className="text-white bg-black font-mono text-[11px] px-3 py-1 rounded-full"
-        >
-          车来车网
-        </div>
+        
       </div>
       {children}
       <MobileTabBar />
