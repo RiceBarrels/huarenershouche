@@ -2,6 +2,7 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Image from "next/image";
 
 import { ArrowUpDown, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
 import Link from "next/link";
@@ -456,7 +457,10 @@ function BrowseContent() {
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
           <div>
-            <p className="font-mono text-sm font-semibold">车来车网</p>
+            <div className="flex items-center gap-2">
+              <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+              <p className="font-mono text-sm font-semibold">车来车网</p>
+            </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               北美华人最信赖的二手车交易平台 · 免费发布 · 中文服务
             </p>

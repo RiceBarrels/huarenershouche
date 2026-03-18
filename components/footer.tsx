@@ -1,4 +1,5 @@
-import { Car, Mail, MessageCircle } from "lucide-react";
+import { Mail, MessageCircle } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 const buyLinks = [
@@ -27,7 +28,7 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
-              <Car className="h-5 w-5" strokeWidth={1.5} />
+              <Image src="/logo.png" alt="车来车网" width={24} height={24} className="h-6 w-6 object-contain" />
               <span className="font-mono text-sm font-semibold">车来车网</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">

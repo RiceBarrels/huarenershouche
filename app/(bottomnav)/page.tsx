@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Gauge,
 } from "lucide-react";
+import Image from "next/image";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -253,11 +254,12 @@ export default function Home() {
         </div>
 
         <div className="relative mx-auto w-full max-w-3xl text-center">
-          <h1
-            className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl"
-          >
-            车来车网
-          </h1>
+          <div className="flex items-center justify-center gap-3">
+            <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-14 md:w-14" />
+            <h1 className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl">
+              车来车网
+            </h1>
+          </div>
           <p
             className="mt-3 font-mono text-sm text-white/70 md:text-base"
           >

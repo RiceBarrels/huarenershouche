@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Car, ChevronRight, Loader2, MapPin, Shield, Zap } from "lucide-react";
+import { ChevronRight, Loader2, MapPin, Shield, Zap } from "lucide-react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
@@ -20,7 +21,7 @@ function GoogleIcon({ className }: { className?: string }) {
 
 const SLIDES = [
   {
-    icon: Car,
+    icon: null as any,
     title: "车来车网",
     subtitle: "北美华人最信赖的二手车交易平台",
     description: "免费发布 · 中文沟通 · 覆盖全美",
@@ -137,7 +138,11 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                 return (
                   <>
                     <div className="flex h-20 w-20 items-center justify-center border border-border bg-muted/50">
-                      <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
+                      {Icon ? (
+                        <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
+                      ) : (
+                        <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-12 w-12 object-contain" />
+                      )}
                     </div>
                     <h1 className="mt-8 text-center font-mono text-2xl font-semibold tracking-tight">
                       {slide.title}

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, Car } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -113,7 +114,7 @@ export default function LoginPage() {
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
         <div className="flex flex-col items-center">
-          <Car className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
+          <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-12 w-12 object-contain" />
           <h1 className="mt-4 font-mono text-lg font-semibold tracking-tight">
             登录
           </h1>
