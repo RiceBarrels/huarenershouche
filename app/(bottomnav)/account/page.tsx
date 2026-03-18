@@ -6,8 +6,9 @@ import Link from "next/link";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin,
   FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText, ShieldCheck,
-  Headset, Handshake,
+  Headset, Handshake, UserCircle,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -69,7 +70,7 @@ function AccountContent() {
 
   const loadAccount = useCallback(async () => {
     const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) { router.push("/login"); return; }
+    if (!authUser) { setLoading(false); return; }
     setUser(authUser.id);
 
     const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
@@ -83,7 +84,7 @@ function AccountContent() {
 
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
     setLoading(false);
-  }, [router]);
+  }, []);
 
   useEffect(() => {
     loadAccount();
@@ -107,7 +108,7 @@ function AccountContent() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push("/");
+    router.refresh();
   }
 
   const activeCars = myCars.filter((c) => c.status === "active").length;
@@ -138,55 +139,74 @@ function AccountContent() {
           </>
         ) : (
         <>
-        <div className="flex items-center gap-4 px-2 py-4">
-          <button
-            type="button"
-            className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted"
-            onClick={() => avatarInputRef.current?.click()}
-          >
-            {profile?.avatar_url ? (
-              <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full items-center justify-center font-mono text-lg text-muted-foreground">
-                {profile?.username?.charAt(0)?.toUpperCase() || "?"}
+        {!user ? (
+          <div className="flex items-center gap-4 px-2 py-4">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
+              <UserCircle className="h-8 w-8 text-muted-foreground" strokeWidth={1} />
+            </div>
+            <div className="flex-1">
+              <p className="font-mono text-sm text-muted-foreground">登录后管理车辆、收藏和消息</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Link href="/login">
+                  <Button size="sm" className="h-8 font-mono text-xs">登录</Button>
+                </Link>
+                <Link href="/register">
+                  <Button variant="outline" size="sm" className="h-8 font-mono text-xs">注册</Button>
+                </Link>
               </div>
-            )}
-          </button>
-          <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-          <div className="flex-1">
-            <p className="font-mono text-base font-semibold">
-              {profile?.username || "未设置昵称"}
-            </p>
-            <div className="mt-0.5 flex items-center gap-2">
-              {profile?.account_type === "dealer" ? (
-                <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
-                  <Store className="h-3 w-3" strokeWidth={1.5} />认证车行
-                </Badge>
-              ) : (
-                <Badge variant="outline" className="font-mono text-[10px]">个人</Badge>
-              )}
-              {profile?.location && (
-                <span className="flex items-center gap-0.5 font-mono text-[11px] text-muted-foreground">
-                  <MapPin className="h-3 w-3" strokeWidth={1.5} />{profile.location}
-                </span>
-              )}
             </div>
           </div>
-        </div>
+        ) : (
+          <div className="flex items-center gap-4 px-2 py-4">
+            <button
+              type="button"
+              className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted"
+              onClick={() => avatarInputRef.current?.click()}
+            >
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full items-center justify-center font-mono text-lg text-muted-foreground">
+                  {profile?.username?.charAt(0)?.toUpperCase() || "?"}
+                </div>
+              )}
+            </button>
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+            <div className="flex-1">
+              <p className="font-mono text-base font-semibold">
+                {profile?.username || "未设置昵称"}
+              </p>
+              <div className="mt-0.5 flex items-center gap-2">
+                {profile?.account_type === "dealer" ? (
+                  <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
+                    <Store className="h-3 w-3" strokeWidth={1.5} />认证车行
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="font-mono text-[10px]">个人</Badge>
+                )}
+                {profile?.location && (
+                  <span className="flex items-center gap-0.5 font-mono text-[11px] text-muted-foreground">
+                    <MapPin className="h-3 w-3" strokeWidth={1.5} />{profile.location}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Stats row */}
         <div className="flex border-y border-border">
-          <Link href="/account/listings" className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
+          <Link href={user ? "/account/listings" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
             <span className="font-mono text-lg font-bold">{activeCars}</span>
             <span className="font-mono text-[11px] text-muted-foreground">在售</span>
           </Link>
           <div className="w-px bg-border" />
-          <Link href="/account/listings" className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
+          <Link href={user ? "/account/listings" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
             <span className="font-mono text-lg font-bold">{myCars.length}</span>
             <span className="font-mono text-[11px] text-muted-foreground">发布</span>
           </Link>
           <div className="w-px bg-border" />
-          <Link href="/account/favorites" className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
+          <Link href={user ? "/account/favorites" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
             <span className="font-mono text-lg font-bold">{favCount}</span>
             <span className="font-mono text-[11px] text-muted-foreground">收藏</span>
           </Link>
@@ -201,19 +221,19 @@ function AccountContent() {
             <MenuRow
               icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="我的发布"
-              value={loading ? undefined : `${myCars.length} 辆`}
-              href="/account/listings"
+              value={user ? `${myCars.length} 辆` : undefined}
+              href={user ? "/account/listings" : "/login"}
             />
             <MenuRow
               icon={<Heart className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="我的收藏"
-              value={loading ? undefined : `${favCount} 辆`}
-              href="/account/favorites"
+              value={user ? `${favCount} 辆` : undefined}
+              href={user ? "/account/favorites" : "/login"}
             />
             <MenuRow
               icon={<Plus className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="发布新车"
-              href="/post"
+              href={user ? "/post" : "/login"}
             />
             {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
               <MenuRow
@@ -231,7 +251,7 @@ function AccountContent() {
             <MenuRow
               icon={<Settings className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="账号设置"
-              href="/account/settings"
+              href={user ? "/account/settings" : "/login"}
             />
             {mounted && (
               <MenuRow
@@ -265,12 +285,20 @@ function AccountContent() {
               label="用户协议"
               href="/terms"
             />
-            <MenuRow
-              icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
-              label="退出登录"
-              onClick={handleLogout}
-              destructive
-            />
+            {user ? (
+              <MenuRow
+                icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
+                label="退出登录"
+                onClick={handleLogout}
+                destructive
+              />
+            ) : (
+              <MenuRow
+                icon={<UserCircle className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="登录 / 注册"
+                href="/login"
+              />
+            )}
           </div>
         </div>
       </main>

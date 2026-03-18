@@ -31,7 +31,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     <>
       {/* Dim overlay simulating the "previous page" darkening */}
       <div
-        className="fixed inset-0 z-[999] bg-black pointer-events-none"
+        className="fixed inset-0 z-999 bg-black pointer-events-none shadow-lg"
         style={{
           animation: "dim-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
           paddingTop: "env(safe-area-inset-top, 0px)",

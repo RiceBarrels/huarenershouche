@@ -45,8 +45,8 @@ export function MobileTabBar() {
           const active = tab.match(pathname);
           const isPost = tab.href === "/post";
           const isMessages = tab.label === "消息";
-          // Redirect to login if not logged in for account/messages
-          const href = (!user && (tab.href === "/account" || isMessages))
+          // Redirect to login if not logged in for messages
+          const href = (!user && isMessages)
             ? "/login"
             : tab.href;
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 import { ArrowUpDown, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
 import Link from "next/link";
@@ -122,8 +122,8 @@ function BrowseContent() {
   const searchParams = useSearchParams();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<Filters>(() => filtersFromParams(searchParams));
-  const [sort, setSort] = useState<SortKey>("newest");
+  const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams));
+  const [sort, setSortRaw] = useState<SortKey>(() => (searchParams.get("sort") as SortKey) || "newest");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -132,6 +132,44 @@ function BrowseContent() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
+
+  // Sync filters & sort to URL (replaceState avoids full Next.js re-render)
+  const syncToUrl = useCallback((f: Filters, s: SortKey) => {
+    const params = new URLSearchParams();
+    if (f.keyword) params.set("q", f.keyword);
+    if (f.make) params.set("make", f.make);
+    if (f.minPrice) params.set("minPrice", f.minPrice);
+    if (f.maxPrice) params.set("maxPrice", f.maxPrice);
+    if (f.minYear) params.set("minYear", f.minYear);
+    if (f.maxYear) params.set("maxYear", f.maxYear);
+    if (f.location) params.set("location", f.location);
+    if (f.sellerType) params.set("sellerType", f.sellerType);
+    if (f.fuelType) params.set("fuelType", f.fuelType);
+    if (f.transmission) params.set("transmission", f.transmission);
+    if (f.drivetrain) params.set("drivetrain", f.drivetrain);
+    if (f.maxMileage) params.set("maxMileage", f.maxMileage);
+    if (f.exteriorColor) params.set("exteriorColor", f.exteriorColor);
+    if (f.interiorColor) params.set("interiorColor", f.interiorColor);
+    if (f.cylinders) params.set("cylinders", f.cylinders);
+    if (f.maxDistance) params.set("maxDistance", f.maxDistance);
+    if (s !== "newest") params.set("sort", s);
+    const qs = params.toString();
+    const url = qs ? `/browse?${qs}` : "/browse";
+    window.history.replaceState(window.history.state, "", url);
+  }, []);
+
+  const setFilters = useCallback((next: Filters | ((prev: Filters) => Filters)) => {
+    setFiltersRaw((prev) => {
+      const val = typeof next === "function" ? next(prev) : next;
+      setSortRaw((s) => { syncToUrl(val, s); return s; });
+      return val;
+    });
+  }, [syncToUrl]);
+
+  const setSort = useCallback((next: SortKey) => {
+    setSortRaw(next);
+    setFiltersRaw((f) => { syncToUrl(f, next); return f; });
+  }, [syncToUrl]);
 
   // Load search history on mount
   useEffect(() => {
@@ -149,9 +187,11 @@ function BrowseContent() {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Sync filters when URL params change
+  // Sync filters when URL params change (e.g. from homepage search link)
   useEffect(() => {
-    setFilters(filtersFromParams(searchParams));
+    setFiltersRaw(filtersFromParams(searchParams));
+    const s = (searchParams.get("sort") as SortKey) || "newest";
+    setSortRaw(s);
   }, [searchParams]);
 
   async function fetchCars() {
