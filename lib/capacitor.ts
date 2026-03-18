@@ -128,7 +128,7 @@ export async function signInWithAppleNative(): Promise<{ error?: string }> {
   const { supabase } = await import("@/lib/supabase");
   const { Browser } = await import("@capacitor/browser");
 
-  const redirectTo = "https://cars.ricebarrel.com/auth/callback";
+  const redirectTo = "https://www.clcauto.com/auth/callback";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "apple",
@@ -156,7 +156,7 @@ export async function signInWithGoogleNative(): Promise<{ error?: string }> {
 
   // Redirect to our callback page which extracts tokens and redirects
   // back to the app via custom URL scheme (com.clcauto.app://)
-  const redirectTo = "https://cars.ricebarrel.com/auth/callback";
+  const redirectTo = "https://www.clcauto.com/auth/callback";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: "google",

@@ -19,7 +19,6 @@ const config: CapacitorConfig = {
     cleartext: process.env.NODE_ENV !== "production",
     allowNavigation: [
       "www.clcauto.com",
-      "cars.ricebarrel.com",
       "*.supabase.co",
       "accounts.google.com",
       "appleid.apple.com",

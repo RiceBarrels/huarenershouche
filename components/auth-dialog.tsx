@@ -63,7 +63,7 @@ export function AuthDialog({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `https://cars.ricebarrel.com/`,
+        redirectTo: `https://www.clcauto.com/`,
       },
     });
     if (error) {

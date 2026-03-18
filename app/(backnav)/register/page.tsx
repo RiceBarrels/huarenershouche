@@ -77,7 +77,7 @@ export default function RegisterPage() {
             onClick={async () => {
               const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
               if (isNative()) { await signInWithGoogleNative(); return; }
-              await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: "https://cars.ricebarrel.com/" } });
+              await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: "https://www.clcauto.com/" } });
             }}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24">
@@ -94,7 +94,7 @@ export default function RegisterPage() {
             onClick={async () => {
               const { isNative, signInWithAppleNative } = await import("@/lib/capacitor");
               if (isNative()) { await signInWithAppleNative(); return; }
-              await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: "https://cars.ricebarrel.com/" } });
+              await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: "https://www.clcauto.com/" } });
             }}
           >
             <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">

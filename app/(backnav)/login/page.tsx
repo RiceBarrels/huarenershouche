@@ -72,7 +72,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `https://cars.ricebarrel.com/`,
+        redirectTo: `https://www.clcauto.com/`,
       },
     });
     if (error) {
@@ -98,7 +98,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: `https://cars.ricebarrel.com/`,
+        redirectTo: `https://www.clcauto.com/`,
       },
     });
     if (error) {

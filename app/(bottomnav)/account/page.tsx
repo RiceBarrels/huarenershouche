@@ -108,7 +108,7 @@ function AccountContent() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.refresh();
+    router.push("/account");
   }
 
   const activeCars = myCars.filter((c) => c.status === "active").length;
