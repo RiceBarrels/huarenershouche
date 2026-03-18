@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "huarenershouche",
+      "name": "clcauto",
       "dependencies": {
         "@capacitor/app": "^8.0.1",
         "@capacitor/browser": "^8.0.2",

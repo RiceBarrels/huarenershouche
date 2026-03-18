@@ -155,7 +155,7 @@ export async function signInWithGoogleNative(): Promise<{ error?: string }> {
   const { Browser } = await import("@capacitor/browser");
 
   // Redirect to our callback page which extracts tokens and redirects
-  // back to the app via custom URL scheme (com.huarencars.app://)
+  // back to the app via custom URL scheme (com.clcauto.app://)
   const redirectTo = "https://cars.ricebarrel.com/auth/callback";
 
   const { data, error } = await supabase.auth.signInWithOAuth({
@@ -185,7 +185,7 @@ export async function setupDeepLinkListener(onAuth: () => void) {
   try {
     const { App } = await import("@capacitor/app");
     App.addListener("appUrlOpen", async ({ url }) => {
-      // Handle com.huarencars.app:// deep links
+      // Handle com.clcauto.app:// deep links
       if (!url.includes("auth/callback")) return;
 
       const hashPart = url.split("#")[1];

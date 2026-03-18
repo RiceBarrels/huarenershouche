@@ -97,7 +97,7 @@ async function detectDetailedLocation(): Promise<LocationInfo | null> {
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
-          { headers: { "User-Agent": "HuarenCars/1.0" } }
+          { headers: { "User-Agent": "clcauto/1.0" } }
         );
         if (res.ok) {
           const data = await res.json();

@@ -40,7 +40,7 @@ export default function AuthCallbackPage() {
         setStatus("success");
         // Small delay so user sees "登录成功" briefly
         setTimeout(() => {
-          window.location.href = `com.huarencars.app://auth/callback#${hash}`;
+          window.location.href = `com.clcauto.app://auth/callback#${hash}`;
         }, 500);
         return;
       }

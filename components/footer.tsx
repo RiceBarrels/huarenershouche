@@ -35,7 +35,7 @@ export function Footer() {
             </p>
             <div className="mt-4 flex items-center gap-4">
               <a
-                href="mailto:contact@huarencars.com"
+                href="mailto:contact@clcauto.com"
                 className="text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Email"
               >

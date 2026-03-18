@@ -89,20 +89,20 @@ export default function ContactPage() {
         {/* Contact info */}
         <div className="mt-6 space-y-3">
           <a
-            href="mailto:contact@huarencars.com"
+            href="mailto:contact@clcauto.com"
             className="flex items-center gap-3 border border-border p-3 transition-colors hover:border-foreground/30"
           >
             <Mail className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>
               <p className="text-xs font-medium">邮件联系</p>
-              <p className="text-[11px] text-muted-foreground">contact@huarencars.com</p>
+              <p className="text-[11px] text-muted-foreground">contact@clcauto.com</p>
             </div>
           </a>
           <div className="flex items-center gap-3 border border-border p-3">
             <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>
               <p className="text-xs font-medium">微信客服</p>
-              <p className="text-[11px] text-muted-foreground">huarencars_support</p>
+              <p className="text-[11px] text-muted-foreground">clcauto_support</p>
             </div>
           </div>
           <div className="flex items-center gap-3 border border-border p-3">

@@ -1,4 +1,4 @@
-const KEY = "huarencars_recently_viewed";
+const KEY = "clcauto_recently_viewed";
 const MAX = 12;
 
 export function getRecentlyViewed(): string[] {

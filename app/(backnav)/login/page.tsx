@@ -56,7 +56,7 @@ export default function LoginPage() {
     setError("");
 
     // On native (Capacitor), use in-app browser flow
-    // Flow: Browser.open → Google → /auth/callback → com.huarencars.app:// deep link → appUrlOpen
+    // Flow: Browser.open → Google → /auth/callback → com.clcauto.app:// deep link → appUrlOpen
     const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
     if (isNative()) {
       const result = await signInWithGoogleNative();

@@ -129,7 +129,7 @@ export async function reverseGeocode(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&accept-language=en`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -175,7 +175,7 @@ export async function lookupZip(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&addressdetails=1&limit=1&accept-language=${lang}`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -217,7 +217,7 @@ export async function searchCities(query: string): Promise<GeoResult[]> {
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=us&format=json&addressdetails=1&limit=8&accept-language=en`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return [];
     const data = await res.json();
@@ -297,7 +297,7 @@ export async function detectUserZip(): Promise<string | null> {
     // Fallback: Nominatim
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json&addressdetails=1&accept-language=en`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -334,7 +334,7 @@ export async function geocodeZipToCoords(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&limit=1`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -374,7 +374,7 @@ export async function geocodeCity(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&countrycodes=us&format=json&limit=1`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
@@ -442,7 +442,7 @@ export async function geocodeAddress(
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&addressdetails=1&limit=1&accept-language=en`,
-      { headers: { "User-Agent": "HuarenCars/1.0" } }
+      { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
     const data = await res.json();
