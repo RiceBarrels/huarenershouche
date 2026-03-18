@@ -565,35 +565,6 @@ function BrowseContent() {
               <Button
                 variant="outline"
                 size="sm"
-                className={`gap-1 font-mono text-xs ${filters.make ? "border-foreground" : ""}`}
-              >
-                <Car className="h-3.5 w-3.5" strokeWidth={1.5} />
-                {filters.make ? (filters.make.split(",").length > 1 ? `${MAKES_ZH[filters.make.split(",")[0]] || filters.make.split(",")[0]}等${filters.make.split(",").length}品牌` : MAKES_ZH[filters.make] || filters.make) : "全部品牌"}
-              </Button>
-            </DrawerTrigger>
-            <DrawerContent>
-              <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                <DrawerClose asChild>
-                  <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                    <X className="h-4 w-4" strokeWidth={1.5} />
-                  </button>
-                </DrawerClose>
-                <span className="font-mono text-sm font-semibold">选择品牌</span>
-                <div className="h-8 w-8" />
-              </div>
-              <div className="max-h-[70vh] overflow-y-auto px-4 pb-6">
-                <BrandDrawerContent
-                  filters={filters as any}
-                  onUpdate={(key, value) => setFilters({ ...filters, [key]: value })}
-                />
-              </div>
-            </DrawerContent>
-          </Drawer>
-          <Drawer>
-            <DrawerTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
                 className="gap-1 font-mono text-xs"
               >
                 <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />

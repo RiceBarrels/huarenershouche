@@ -161,12 +161,18 @@ export default function CarDetailPage() {
         .delete()
         .eq("user_id", user)
         .eq("car_id", carId);
-      if (!error) setIsFavorited(false);
+      if (!error) {
+        setIsFavorited(false);
+        setCar((prev) => prev ? { ...prev, favorites_count: Math.max(0, (prev.favorites_count || 0) - 1) } : prev);
+      }
     } else {
       const { error } = await supabase
         .from("favorites")
         .insert({ user_id: user, car_id: carId });
-      if (!error) setIsFavorited(true);
+      if (!error) {
+        setIsFavorited(true);
+        setCar((prev) => prev ? { ...prev, favorites_count: (prev.favorites_count || 0) + 1 } : prev);
+      }
     }
   }
 
@@ -387,6 +393,10 @@ export default function CarDetailPage() {
                 )}
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {car.views_count || 0} 次浏览
+                </span>
+                <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                  <Heart className="h-3 w-3" strokeWidth={1.5} />
+                  {car.favorites_count || 0} 人喜欢
                 </span>
               </div>
             </div>
@@ -802,7 +812,12 @@ export default function CarDetailPage() {
       <BackToTop />
 
       {/* Mobile sticky bottom action bar */}
-      <div className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden">
+      <div 
+        className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+        style={{
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+      >
         <div className="flex-1">
           <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
         </div>

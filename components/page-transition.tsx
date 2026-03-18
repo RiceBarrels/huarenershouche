@@ -43,17 +43,15 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
         className="fixed inset-0 z-999 bg-black pointer-events-none shadow-lg"
         style={{
           animation: "dim-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
-          paddingTop: "env(safe-area-inset-top, 0px)",
           paddingLeft: "env(safe-area-inset-left, 0px)",
           paddingRight: "env(safe-area-inset-right, 0px)",
         }}
       />
       {/* New page sliding in from right */}
       <div
-        className="fixed inset-0 z-1000 overflow-y-auto bg-background"
+        className="fixed inset-0 z-1000 overflow-y-auto bg-background rounded-[48px]"
         style={{
           animation: "ios-push-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
-          paddingTop: "env(safe-area-inset-top, 0px)",
           paddingLeft: "env(safe-area-inset-left, 0px)",
           paddingRight: "env(safe-area-inset-right, 0px)",
         }}

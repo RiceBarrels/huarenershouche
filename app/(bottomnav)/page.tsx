@@ -223,7 +223,7 @@ export default function Home() {
       style={{ marginTop: "calc(-1 * env(safe-area-inset-top, 0px))" }}
     >
       {/* Announcement banner — marquee */}
-      <div className="relative z-50 overflow-hidden bg-foreground font-mono text-[11px] text-background" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+      <div className="relative overflow-hidden bg-foreground font-mono text-[11px] text-background" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
         <div className="flex animate-marquee whitespace-nowrap py-1.5">
           {[0, 1].map((i) => (
             <span key={i} className="mx-8 inline-flex items-center gap-6">

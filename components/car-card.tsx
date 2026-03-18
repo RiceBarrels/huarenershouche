@@ -258,7 +258,13 @@ export function CarCard({
             >
               {car.seller_name}
             </span>
-            <span className="font-mono text-[10px] text-muted-foreground/60">
+            <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground/60">
+              {favCount > 0 && (
+                <span className="flex items-center gap-0.5">
+                  <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
+                  {favCount}
+                </span>
+              )}
               {new Date(car.created_at).toLocaleDateString("zh-CN")}
             </span>
           </div>

@@ -26,7 +26,7 @@ export function PullToRefresh({
   const updateIndicator = useCallback((distance: number) => {
     const el = indicatorRef.current;
     if (!el) return;
-    el.style.height = `${distance}px`;
+    el.style.height = `calc(${distance}px + env(safe-area-inset-top, 0px))`;
     const progress = Math.min(distance / THRESHOLD, 1);
     if (arrowRef.current) {
       arrowRef.current.style.transform = `rotate(${progress * 180}deg)`;

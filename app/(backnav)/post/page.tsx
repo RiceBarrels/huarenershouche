@@ -10,6 +10,14 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
@@ -196,6 +204,7 @@ export default function PostCarPage() {
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   const [hasDraft, setHasDraft] = useState(false);
+  const [draftDialogOpen, setDraftDialogOpen] = useState(false);
 
   const [vinDecoding, setVinDecoding] = useState(false);
   const [vinAutoFilled, setVinAutoFilled] = useState(false);
@@ -235,8 +244,15 @@ export default function PostCarPage() {
 
   const [form, setForm] = useState(defaultForm);
 
-  // Load draft on mount
+  // Check for draft on mount — ask user before restoring
   useEffect(() => {
+    const draft = loadDraft();
+    if (draft && (draft.form?.make || draft.form?.vin || (draft.imageUrls && draft.imageUrls.length > 0))) {
+      setDraftDialogOpen(true);
+    }
+  }, []);
+
+  function restoreDraft() {
     const draft = loadDraft();
     if (draft) {
       setHasDraft(true);
@@ -244,7 +260,13 @@ export default function PostCarPage() {
       setImageUrls(draft.imageUrls || []);
       setFeatures(draft.features || []);
     }
-  }, []);
+    setDraftDialogOpen(false);
+  }
+
+  function discardDraft() {
+    clearDraft();
+    setDraftDialogOpen(false);
+  }
 
   // Auto-save draft on changes (debounced)
   const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1219,6 +1241,36 @@ export default function PostCarPage() {
         )}
       </main>
       <Footer />
+
+      {/* Draft restore dialog */}
+      <Dialog open={draftDialogOpen} onOpenChange={setDraftDialogOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm">发现未完成的草稿</DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              是否继续编辑上次的草稿？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="flex-1 font-mono text-xs"
+              onClick={discardDraft}
+            >
+              重新开始
+            </Button>
+            <Button
+              size="sm"
+              className="flex-1 gap-1.5 font-mono text-xs"
+              onClick={restoreDraft}
+            >
+              <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
+              继续编辑
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
