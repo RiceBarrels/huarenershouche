@@ -4,10 +4,10 @@ import { config as dotenvConfig } from "dotenv";
 // Load .env.local (Capacitor CLI doesn't read Next.js env files)
 dotenvConfig({ path: ".env.local" });
 
-const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://cars.ricebarrel.com/";
+const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://www.clcauto.com/";
 
 const config: CapacitorConfig = {
-  appId: "com.huarencars.app",
+  appId: "com.clcauto.app",
   appName: "车来车网",
   webDir: "public",
   server: {
@@ -18,7 +18,7 @@ const config: CapacitorConfig = {
     iosScheme: "capacitor",
     cleartext: process.env.NODE_ENV !== "production",
     allowNavigation: [
-      "cars.ricebarrel.com",
+      "www.clcauto.com",
       "*.supabase.co",
       "accounts.google.com",
     ],

@@ -124,6 +124,32 @@ export async function openBrowser(url: string) {
 }
 
 /** Native OAuth login — opens in-app browser and handles redirect */
+export async function signInWithAppleNative(): Promise<{ error?: string }> {
+  const { supabase } = await import("@/lib/supabase");
+  const { Browser } = await import("@capacitor/browser");
+
+  const redirectTo = "https://cars.ricebarrel.com/auth/callback";
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "apple",
+    options: {
+      redirectTo,
+      skipBrowserRedirect: true,
+    },
+  });
+
+  if (error || !data.url) {
+    return { error: error?.message || "Failed to get OAuth URL" };
+  }
+
+  await Browser.open({
+    url: data.url,
+    presentationStyle: "popover",
+  });
+
+  return {};
+}
+
 export async function signInWithGoogleNative(): Promise<{ error?: string }> {
   const { supabase } = await import("@/lib/supabase");
   const { Browser } = await import("@capacitor/browser");

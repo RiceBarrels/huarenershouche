@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
@@ -80,6 +81,32 @@ export default function LoginPage() {
     }
   }
 
+  async function handleAppleLogin() {
+    setAppleLoading(true);
+    setError("");
+
+    const { isNative, signInWithAppleNative } = await import("@/lib/capacitor");
+    if (isNative()) {
+      const result = await signInWithAppleNative();
+      if (result.error) {
+        setError(result.error);
+      }
+      setAppleLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "apple",
+      options: {
+        redirectTo: `https://cars.ricebarrel.com/`,
+      },
+    });
+    if (error) {
+      setError(error.message);
+      setAppleLoading(false);
+    }
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
 
@@ -95,8 +122,8 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Google login */}
-        <div className="mt-8">
+        {/* Social login */}
+        <div className="mt-8 space-y-2">
           <Button
             type="button"
             variant="outline"
@@ -110,6 +137,21 @@ export default function LoginPage() {
               <GoogleIcon className="h-4 w-4" />
             )}
             使用 Google 登录
+          </Button>
+          <Button
+            type="button"
+            className="w-full gap-2 bg-black font-mono text-xs text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90"
+            disabled={appleLoading}
+            onClick={handleAppleLogin}
+          >
+            {appleLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+              </svg>
+            )}
+            使用 Apple 登录
           </Button>
         </div>
 
