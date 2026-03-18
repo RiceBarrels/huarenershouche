@@ -175,6 +175,16 @@
   }
 }
 
+/* Previous page slides slightly left during push (like real iOS) */
+@keyframes ios-push-back {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-30%);
+  }
+}
+
 /* iOS-style pop (back) transition */
 @keyframes ios-pop-out {
   from {
@@ -190,6 +200,16 @@
 @keyframes dim-in {
   from { opacity: 0; }
   to { opacity: 0.08; }
+}
+
+/* Hide safe-area pill on devices without a notch/safe area */
+.safe-area-pill-container {
+  display: none;
+}
+@supports (padding-top: env(safe-area-inset-top)) {
+  .safe-area-pill-container {
+    display: flex;
+  }
 }
 
 /* Safe area handling — content extends edge-to-edge, padding in layout wrapper */

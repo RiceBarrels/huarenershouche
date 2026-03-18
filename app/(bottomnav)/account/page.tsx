@@ -119,6 +119,7 @@ function AccountContent() {
     className="flex min-h-screen flex-col bg-background font-mono"
     style={{
       paddingTop: "env(safe-area-inset-top, 0px)",
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
     }}
     >
       <Header />
