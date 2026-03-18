@@ -115,7 +115,12 @@ function AccountContent() {
 
   return (
     <PullToRefresh onRefresh={loadAccount}>
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div 
+    className="flex min-h-screen flex-col bg-background font-mono"
+    style={{
+      paddingTop: "env(safe-area-inset-top, 0px)",
+    }}
+    >
       <Header />
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
         {/* Profile card */}

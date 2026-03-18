@@ -36,6 +36,15 @@ import { BackToTop } from "@/components/back-to-top";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
 import { recordPrice } from "@/lib/price-history";
@@ -71,6 +80,7 @@ export default function CarDetailPage() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [user, setUser] = useState<string | null>(null);
   const [contactVisible, setContactVisible] = useState(false);
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
   const [currentImage, setCurrentImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [similarCars, setSimilarCars] = useState<DbCar[]>([]);
@@ -578,15 +588,30 @@ export default function CarDetailPage() {
               </p>
 
               <div className="mt-4 space-y-2">
-                <Button
-                  className="w-full gap-1.5 font-mono text-xs"
-                  onClick={() => setContactVisible(!contactVisible)}
-                >
-                  <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  {contactVisible
-                    ? car.phone || "未提供电话"
-                    : "查看联系方式"}
-                </Button>
+                {user ? (
+                  <Button
+                    className="w-full gap-1.5 font-mono text-xs"
+                    onClick={() => {
+                      if (contactVisible && car.phone) {
+                        setCallDialogOpen(true);
+                      } else {
+                        setContactVisible(true);
+                      }
+                    }}
+                  >
+                    <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {contactVisible
+                      ? car.phone || "未提供电话"
+                      : "查看联系方式"}
+                  </Button>
+                ) : (
+                  <Link href="/login">
+                    <Button className="w-full gap-1.5 font-mono text-xs">
+                      <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      登录查看联系方式
+                    </Button>
+                  </Link>
+                )}
 
                 {user ? (
                   <>
@@ -812,14 +837,54 @@ export default function CarDetailPage() {
         >
           <Share2 className="h-4 w-4" strokeWidth={1.5} />
         </Button>
-        <Button
-          className="h-10 gap-1.5 font-mono text-xs"
-          onClick={() => setContactVisible(!contactVisible)}
-        >
-          <Phone className="h-4 w-4" strokeWidth={1.5} />
-          {contactVisible ? (car.phone || "无电话") : "联系卖家"}
-        </Button>
+        {user ? (
+          <Button
+            className="h-10 gap-1.5 font-mono text-xs"
+            onClick={() => {
+              if (contactVisible && car.phone) {
+                setCallDialogOpen(true);
+              } else {
+                setContactVisible(true);
+              }
+            }}
+          >
+            <Phone className="h-4 w-4" strokeWidth={1.5} />
+            {contactVisible ? (car.phone || "无电话") : "联系卖家"}
+          </Button>
+        ) : (
+          <Link href="/login">
+            <Button className="h-10 gap-1.5 font-mono text-xs">
+              <Phone className="h-4 w-4" strokeWidth={1.5} />
+              登录联系卖家
+            </Button>
+          </Link>
+        )}
       </div>
+
+      {/* Call dialog */}
+      <Dialog open={callDialogOpen} onOpenChange={setCallDialogOpen}>
+        <DialogContent className="max-w-xs">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm">拨打电话</DialogTitle>
+            <DialogDescription className="font-mono text-xs">
+              是否拨打卖家电话 {car.phone}？
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex-row gap-2">
+            <DialogClose asChild>
+              <Button variant="outline" size="sm" className="flex-1 font-mono text-xs">
+                取消
+              </Button>
+            </DialogClose>
+            <Button size="sm" className="flex-1 gap-1.5 font-mono text-xs" asChild>
+              <a href={`tel:${car.phone}`}>
+                <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
+                拨打
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Image Lightbox */}
       <ImageLightbox

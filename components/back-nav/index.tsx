@@ -38,7 +38,12 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
   }, [router, fallback]);
 
   return (
-    <nav className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-background/95 backdrop-blur-sm px-4 md:hidden">
+    <nav 
+      className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-background/95 backdrop-blur-sm px-4 md:hidden"
+      style={{
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
+    >
       <button
         onClick={handleBack}
         className="flex h-10 w-8 items-center justify-center text-foreground -ml-1"

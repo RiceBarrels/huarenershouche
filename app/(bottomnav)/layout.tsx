@@ -8,6 +8,12 @@ export default function BottomNavLayout({
   return (
     <>
       {children}
+      <div
+        className="pointer-events-none fixed left-0 right-0 bg-gradient-to-t from-background to-transparent"
+        style={{
+          height: "env(safe-area-inset-bottom, 0px)",
+        }}
+      />
       <MobileTabBar />
     </>
   );

@@ -218,11 +218,29 @@ export default function Home() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div
+      className="flex min-h-screen flex-col bg-background font-mono"
+      style={{ marginTop: "calc(-1 * env(safe-area-inset-top, 0px))" }}
+    >
+      {/* Announcement banner — marquee */}
+      <div className="relative z-50 overflow-hidden bg-foreground font-mono text-[11px] text-background" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
+        <div className="flex animate-marquee whitespace-nowrap py-1.5">
+          {[0, 1].map((i) => (
+            <span key={i} className="mx-8 inline-flex items-center gap-6">
+              <span>🚗 北美华人二手车平台正式上线</span>
+              <Link href="/post" className="underline underline-offset-2">免费发布车辆 →</Link>
+              <span>🔒 VIN认证 · 真实车源</span>
+              <span>📍 覆盖全美 · 中文服务</span>
+              <Link href="/browse" className="underline underline-offset-2">立即找车 →</Link>
+            </span>
+          ))}
+        </div>
+      </div>
+
       <Header />
 
       {/* Hero with banner image */}
-      <section className="relative flex flex-col items-center justify-center px-4 pb-12 pt-20 md:pb-20 md:pt-32">
+      <section className="relative flex flex-col items-center justify-center px-4 pb-12 pt-16 md:pb-20 md:pt-32">
         {/* Background image */}
         <div className="absolute inset-0 overflow-hidden">
           <img

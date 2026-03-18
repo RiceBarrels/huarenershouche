@@ -62,7 +62,12 @@ function MessagesContent() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div 
+      className="flex min-h-screen flex-col bg-background font-mono"
+      style={{
+        paddingTop: "env(safe-area-inset-top, 0px)",
+      }}
+    >
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
         <h1 className="hidden font-mono text-lg font-semibold tracking-tight md:block md:mb-4">

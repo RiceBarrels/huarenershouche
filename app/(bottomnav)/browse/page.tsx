@@ -444,7 +444,12 @@ function BrowseContent() {
 
   return (
     <PullToRefresh onRefresh={fetchCars}>
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div 
+    className="flex min-h-screen flex-col bg-background font-mono"
+    style={{
+      paddingTop: "env(safe-area-inset-top, 0px)",
+    }}
+    >
       <Header />
 
       {/* Banner */}

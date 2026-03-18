@@ -464,6 +464,11 @@ export default function PostCarPage() {
     if (!user) return;
     setError("");
 
+    if (!isValidVinFormat(form.vin)) {
+      setError("请输入有效的 17 位 VIN 码");
+      return;
+    }
+
     if (form.make === "Other" && !form.customMake.trim()) {
       setError("请输入品牌名称");
       return;
@@ -517,7 +522,7 @@ export default function PostCarPage() {
         transmission: form.transmission,
         exterior_color: form.exterior_color || null,
         interior_color: form.interior_color || null,
-        vin: form.vin || null,
+        vin: form.vin,
         seller_name: form.seller_name,
         phone: form.phone || null,
         lat: coords?.lat || null,
@@ -655,9 +660,9 @@ export default function PostCarPage() {
 
             {/* VIN Auto-fill */}
             <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">VIN 自动填写</h2>
+              <h2 className="font-mono text-xs font-semibold">VIN 码 <span className="text-destructive">*</span></h2>
               <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                输入 VIN 码可自动填写车辆信息，也可跳过手动填写
+                输入 VIN 码可自动填写车辆信息（必填）
               </p>
               <div className="mt-3 flex gap-2">
                 <Input
@@ -1013,17 +1018,16 @@ export default function PostCarPage() {
               <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
                 <div className="col-span-2 sm:col-span-3">
                   <Label className="font-mono text-[11px] text-muted-foreground">
-                    Address *
+                    Address
                   </Label>
                   <Input
                     className="mt-1 h-9 font-mono text-xs"
-                    placeholder="123 Main St"
+                    placeholder="123 Main St (optional)"
                     value={form.address}
                     onChange={(e) => {
                       update("address", e.target.value);
                       setSelectedStoreId("");
                     }}
-                    required
                   />
                 </div>
                 <div className="col-span-2 sm:col-span-3">
@@ -1039,27 +1043,25 @@ export default function PostCarPage() {
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
-                    City *
+                    City
                   </Label>
                   <Input
                     className="mt-1 h-9 font-mono text-xs"
-                    placeholder="City"
+                    placeholder="City (optional)"
                     value={form.city}
                     onChange={(e) => update("city", e.target.value)}
-                    required
                   />
                 </div>
                 <div>
                   <Label className="font-mono text-[11px] text-muted-foreground">
-                    State *
+                    State
                   </Label>
                   <Input
                     className="mt-1 h-9 font-mono text-xs"
-                    placeholder="CA"
+                    placeholder="CA (optional)"
                     maxLength={2}
                     value={form.state}
                     onChange={(e) => update("state", e.target.value.toUpperCase())}
-                    required
                   />
                 </div>
                 <div>
