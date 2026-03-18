@@ -3,21 +3,30 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 
+// Global flag: after the app hydrates, any new PageTransition mount is a client-side nav
+let appHydrated = false;
+if (typeof window !== "undefined") {
+  // Set after a microtask so the initial hydration mount sees false
+  Promise.resolve().then(() => { appHydrated = true; });
+}
+
 /**
  * iOS-style native push transition.
- * New page slides in from right over the old content, with shadow and dimming.
+ * Animates on every client-side navigation into or within this layout.
+ * Skips animation on hard page loads (direct URL visit / refresh).
  */
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [phase, setPhase] = useState<"idle" | "animating">("idle");
-  const isFirstRender = useRef(true);
+  const prevPath = useRef(pathname);
+  // If appHydrated is true at mount time, this is a client-side nav → animate
+  const [phase, setPhase] = useState<"idle" | "animating">(
+    appHydrated ? "animating" : "idle"
+  );
 
+  // Animate on pathname changes within this layout
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
-    // New page entered — play push animation
+    if (prevPath.current === pathname) return;
+    prevPath.current = pathname;
     setPhase("animating");
     const timer = setTimeout(() => setPhase("idle"), 350);
     return () => clearTimeout(timer);
