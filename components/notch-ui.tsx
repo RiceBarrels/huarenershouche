@@ -26,6 +26,7 @@ export function NotchUI() {
     <div className="flex items-center gap-1 text-white bg-black font-mono text-[11px] px-3 py-1 rounded-full">
       <img src="/logo.png" alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
       车来车网
+      <span className="text-[8px] opacity-50">测试版</span>
     </div>
   );
 }

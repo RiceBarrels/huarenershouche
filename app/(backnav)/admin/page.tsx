@@ -97,7 +97,7 @@ export default function AdminPage() {
     const [storesRes, reportsRes, ticketsRes] = await Promise.all([
       supabase
         .from("dealer_stores")
-        .select("*, profiles:owner_id(username, avatar_url, account_type)")
+        .select("*")
         .eq("verification_status", "pending")
         .order("verification_submitted_at", { ascending: true }),
       supabase
@@ -113,7 +113,23 @@ export default function AdminPage() {
         .limit(50),
     ]);
 
-    setPendingStores((storesRes.data as StoreWithOwner[]) || []);
+    // Manually join profiles for stores (owner_id FK points to auth.users, not profiles)
+    const stores = (storesRes.data || []) as StoreWithOwner[];
+    if (stores.length > 0) {
+      const ownerIds = [...new Set(stores.map((s) => s.owner_id))];
+      const { data: ownerProfiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, account_type")
+        .in("id", ownerIds);
+      if (ownerProfiles) {
+        const profileMap = new Map(ownerProfiles.map((p) => [p.id, p]));
+        stores.forEach((s) => {
+          const p = profileMap.get(s.owner_id);
+          if (p) s.profiles = { username: p.username, avatar_url: p.avatar_url, account_type: p.account_type };
+        });
+      }
+    }
+    setPendingStores(stores);
     setReports((reportsRes.data as Report[]) || []);
     setTickets((ticketsRes.data as Ticket[]) || []);
     setCounts({

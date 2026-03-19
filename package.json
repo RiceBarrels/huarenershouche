@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "cap:sync": "bunx cap sync",
-    "cap:dev": "CAPACITOR_SERVER_URL=http://192.168.1.178:3000 bunx cap sync",
+    "cap:dev": "CAPACITOR_SERVER_URL=http://192.168.1.30:3000 bunx cap sync",
     "cap:ios": "bunx cap sync ios && bunx cap open ios",
     "cap:android": "bunx cap sync android && bunx cap open android"
   },

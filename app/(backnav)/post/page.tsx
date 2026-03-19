@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck } from "lucide-react";
+import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -213,6 +213,11 @@ export default function PostCarPage() {
   const [isDealer, setIsDealer] = useState(false);
   const [dealerStores, setDealerStores] = useState<DbDealerStore[]>([]);
   const [selectedStoreId, setSelectedStoreId] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [fakeCount, setFakeCount] = useState(5);
+  const [fakeGenerating, setFakeGenerating] = useState(false);
+  const [fakeDialogOpen, setFakeDialogOpen] = useState(false);
+  const [fakeResult, setFakeResult] = useState("");
 
   const defaultForm = {
     make: "",
@@ -301,7 +306,7 @@ export default function PostCarPage() {
         // Ensure profile exists
         const { data: profile } = await supabase
           .from("profiles")
-          .select("username, phone, account_type")
+          .select("username, phone, account_type, role")
           .eq("id", data.user.id)
           .maybeSingle();
         if (!profile) {
@@ -319,6 +324,7 @@ export default function PostCarPage() {
         } else {
           const dealer = profile.account_type === "dealer";
           setIsDealer(dealer);
+          if (profile.role === "admin") setIsAdmin(true);
           setForm((f) => ({
             ...f,
             seller_name: profile.username || "",
@@ -481,6 +487,127 @@ export default function PostCarPage() {
     setVinAutoFilled(true);
   }
 
+  // === Admin: generate fake listings ===
+  const FAKE_MODELS: Record<string, { models: string[]; img: string }> = {
+    Toyota: { models: ["Camry", "Corolla", "RAV4", "Highlander", "Tacoma", "Prius", "4Runner"], img: "https://images.unsplash.com/photo-1621007947382-bb3c3994e3fb?w=800" },
+    Honda: { models: ["Civic", "Accord", "CR-V", "HR-V", "Pilot", "Odyssey"], img: "https://images.unsplash.com/photo-1609521263047-f8f205293f24?w=800" },
+    BMW: { models: ["3 Series", "5 Series", "X3", "X5", "X1", "4 Series"], img: "https://images.unsplash.com/photo-1555215695-3004980ad54e?w=800" },
+    "Mercedes-Benz": { models: ["C-Class", "E-Class", "GLC", "GLE", "A-Class", "S-Class"], img: "https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=800" },
+    Tesla: { models: ["Model 3", "Model Y", "Model S", "Model X"], img: "https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=800" },
+    Hyundai: { models: ["Elantra", "Tucson", "Santa Fe", "Sonata", "Kona", "Palisade"], img: "https://images.unsplash.com/photo-1629897048514-3dd7414fe72a?w=800" },
+    Ford: { models: ["F-150", "Mustang", "Explorer", "Escape", "Bronco", "Edge"], img: "https://images.unsplash.com/photo-1551830820-330a71b99659?w=800" },
+    Lexus: { models: ["RX", "ES", "NX", "IS", "GX", "UX"], img: "https://images.unsplash.com/photo-1622200984595-9e1e1e1e1e1e?w=800" },
+    Audi: { models: ["A4", "Q5", "A6", "Q7", "A3", "e-tron"], img: "https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=800" },
+    Mazda: { models: ["CX-5", "Mazda3", "CX-30", "CX-50", "MX-5 Miata"], img: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=800" },
+    Subaru: { models: ["Outback", "Forester", "Crosstrek", "Impreza", "WRX"], img: "https://images.unsplash.com/photo-1626443252351-4f3e2ea27112?w=800" },
+    Kia: { models: ["Sportage", "Telluride", "K5", "Forte", "Seltos", "Sorento"], img: "https://images.unsplash.com/photo-1619682817481-e994891cd1f5?w=800" },
+    Nissan: { models: ["Altima", "Rogue", "Sentra", "Pathfinder", "Frontier"], img: "https://images.unsplash.com/photo-1580273916550-e323be2ae537?w=800" },
+    Chevrolet: { models: ["Silverado", "Equinox", "Malibu", "Traverse", "Camaro", "Tahoe"], img: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800" },
+    Volkswagen: { models: ["Jetta", "Tiguan", "Atlas", "Golf", "ID.4", "Taos"], img: "https://images.unsplash.com/photo-1622200984595-9e1e1e1e1e1e?w=800" },
+  };
+
+  const FAKE_ZIPS = [
+    { zip: "10001", city: "New York", cityZh: "纽约", state: "NY" },
+    { zip: "90001", city: "Los Angeles", cityZh: "洛杉矶", state: "CA" },
+    { zip: "60601", city: "Chicago", cityZh: "芝加哥", state: "IL" },
+    { zip: "77001", city: "Houston", cityZh: "休斯顿", state: "TX" },
+    { zip: "85001", city: "Phoenix", cityZh: "凤凰城", state: "AZ" },
+    { zip: "19101", city: "Philadelphia", cityZh: "费城", state: "PA" },
+    { zip: "78201", city: "San Antonio", cityZh: "圣安东尼奥", state: "TX" },
+    { zip: "92101", city: "San Diego", cityZh: "圣地亚哥", state: "CA" },
+    { zip: "75201", city: "Dallas", cityZh: "达拉斯", state: "TX" },
+    { zip: "95101", city: "San Jose", cityZh: "圣何塞", state: "CA" },
+    { zip: "94102", city: "San Francisco", cityZh: "旧金山", state: "CA" },
+    { zip: "98101", city: "Seattle", cityZh: "西雅图", state: "WA" },
+    { zip: "02101", city: "Boston", cityZh: "波士顿", state: "MA" },
+    { zip: "30301", city: "Atlanta", cityZh: "亚特兰大", state: "GA" },
+    { zip: "33101", city: "Miami", cityZh: "迈阿密", state: "FL" },
+    { zip: "48201", city: "Detroit", cityZh: "底特律", state: "MI" },
+    { zip: "55401", city: "Minneapolis", cityZh: "明尼阿波利斯", state: "MN" },
+    { zip: "20001", city: "Washington", cityZh: "华盛顿", state: "DC" },
+    { zip: "89101", city: "Las Vegas", cityZh: "拉斯维加斯", state: "NV" },
+    { zip: "97201", city: "Portland", cityZh: "波特兰", state: "OR" },
+  ];
+
+  const FAKE_NAMES = ["张先生", "李女士", "王师傅", "赵老板", "刘先生", "陈女士", "杨师傅", "黄老板", "周先生", "吴女士", "Auto Plus", "Car World", "好车行", "信达车行", "华人车行"];
+
+  function randomVin() {
+    const chars = "ABCDEFGHJKLMNPRSTUVWXYZ0123456789";
+    let vin = "";
+    for (let i = 0; i < 17; i++) vin += chars[Math.floor(Math.random() * chars.length)];
+    return vin;
+  }
+
+  function randomPick<T>(arr: T[]): T {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function randomInt(min: number, max: number) {
+    return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+
+  async function handleGenerateFake() {
+    if (!user) return;
+    setFakeGenerating(true);
+    setFakeResult("");
+
+    const makes = Object.keys(FAKE_MODELS);
+    const listings = [];
+
+    for (let i = 0; i < fakeCount; i++) {
+      const make = randomPick(makes);
+      const info = FAKE_MODELS[make];
+      const model = randomPick(info.models);
+      const year = randomInt(2015, 2025);
+      const price = randomInt(8000, 65000);
+      const mileage = randomInt(5000, 150000);
+      const loc = randomPick(FAKE_ZIPS);
+      const fuel = make === "Tesla" ? "纯电" : randomPick(["汽油", "汽油", "汽油", "混动"]);
+      const trans = make === "Tesla" ? "单速(电动车)" : randomPick(["AT 自动", "AT 自动", "CVT 无级", "DCT 双离合"]);
+      const extColor = randomPick(EXTERIOR_COLORS);
+      const intColor = randomPick(INTERIOR_COLORS);
+      const drivetrain = randomPick(["FWD", "AWD", "RWD"]);
+      const makeZh = MAKES_ZH[make] || make;
+
+      listings.push({
+        seller_id: user,
+        title: `${year} ${make} ${model}`,
+        title_zh: `${year} ${makeZh} ${model}`,
+        year,
+        make,
+        model,
+        price,
+        mileage,
+        location: `${loc.city}, ${loc.state} ${loc.zip}`,
+        location_zh: `${loc.cityZh}, ${loc.state}`,
+        image_url: info.img,
+        images: [],
+        fuel_type: fuel,
+        transmission: trans,
+        exterior_color: extColor.value,
+        interior_color: intColor.value,
+        drivetrain,
+        vin: randomVin(),
+        seller_name: randomPick(FAKE_NAMES),
+        phone: `${randomInt(200, 999)}-${randomInt(200, 999)}-${randomInt(1000, 9999)}`,
+        lat: null,
+        lng: null,
+        description_zh: null,
+        features: [],
+        status: "active" as const,
+      });
+    }
+
+    const { error: insertError } = await supabase.from("cars").insert(listings);
+
+    setFakeGenerating(false);
+    if (insertError) {
+      setFakeResult(`失败: ${insertError.message}`);
+    } else {
+      setFakeResult(`成功生成 ${fakeCount} 条假车源`);
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
@@ -596,6 +723,79 @@ export default function PostCarPage() {
             </span>
           )}
         </div>
+
+        {/* Admin: fake listing generator */}
+        {isAdmin && (
+          <div className="mt-6 border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="h-4 w-4 text-yellow-600" strokeWidth={1.5} />
+              <span className="font-mono text-xs font-semibold text-yellow-700 dark:text-yellow-400">管理员工具</span>
+            </div>
+            <p className="mt-2 font-mono text-[11px] text-muted-foreground">
+              批量生成假车源用于测试和展示
+            </p>
+            <div className="mt-3 flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Label className="font-mono text-[11px] text-muted-foreground">数量</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={fakeCount}
+                  onChange={(e) => setFakeCount(Number(e.target.value))}
+                  className="h-8 w-20 font-mono text-xs"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                className="gap-1.5 font-mono text-xs"
+                disabled={fakeGenerating}
+                onClick={() => setFakeDialogOpen(true)}
+              >
+                {fakeGenerating ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                ) : (
+                  <Wand2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                )}
+                批量生成
+              </Button>
+            </div>
+            {fakeResult && (
+              <p className={`mt-2 font-mono text-[11px] ${fakeResult.startsWith("失败") ? "text-destructive" : "text-green-600"}`}>
+                {fakeResult}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Confirm dialog for fake generation */}
+        <Dialog open={fakeDialogOpen} onOpenChange={setFakeDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="font-mono text-sm">确认生成假车源</DialogTitle>
+              <DialogDescription className="font-mono text-xs">
+                将以当前账号生成 {fakeCount} 条假车源，数据随机生成（品牌、价格、里程、地区等）。确认继续？
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2">
+              <Button variant="outline" size="sm" className="font-mono text-xs" onClick={() => setFakeDialogOpen(false)}>
+                取消
+              </Button>
+              <Button
+                size="sm"
+                className="font-mono text-xs"
+                disabled={fakeGenerating}
+                onClick={() => {
+                  setFakeDialogOpen(false);
+                  handleGenerateFake();
+                }}
+              >
+                确认生成
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {!user ? (
           <div className="mt-8 flex flex-col items-center border border-border p-8">

@@ -52,6 +52,7 @@ export function Header() {
           <span className="font-mono text-sm font-semibold tracking-tight">
             车来车网
           </span>
+          <span className="font-mono text-[9px] text-muted-foreground/60">测试版</span>
         </Link>
 
         <nav className="flex items-center gap-6">
