@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
-import { AdUnit } from "@/components/ad-unit";
+import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
 
 import type { DbCar } from "@/lib/types";
@@ -505,6 +505,12 @@ export default function Home() {
               中文服务
             </span>
           </div>
+        </div>
+      </section>
+
+      <section className="px-4 pb-6">
+        <div className="mx-auto max-w-5xl">
+          <AadsUnit />
         </div>
       </section>
 

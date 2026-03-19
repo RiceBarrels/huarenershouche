@@ -40,3 +40,25 @@ export function AdUnit({ slot, format = "auto", className = "" }: AdUnitProps) {
     </div>
   );
 }
+
+export function AadsUnit({ id = "2430993", background = "transparent", className = "" }: { id?: string; background?: string; className?: string }) {
+  return (
+    <div className={`ad-container overflow-hidden ${className}`}>
+      <div style={{ width: "100%", margin: "auto", position: "relative", zIndex: 99998 }}>
+        <iframe
+          data-aa={id}
+          src={`//acceptable.a-ads.com/${id}/?size=Adaptive${background ? `&background_color=${background}` : ""}`}
+          style={{
+            border: 0,
+            padding: 0,
+            width: "70%",
+            height: "auto",
+            overflow: "hidden",
+            display: "block",
+            margin: "auto",
+          }}
+        />
+      </div>
+    </div>
+  );
+}

@@ -7,6 +7,7 @@ import { Heart, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
@@ -96,6 +97,10 @@ export default function FavoritesPage() {
           )}
         </div>
       </main>
+      <div className="mx-auto max-w-4xl px-4 py-6 space-y-4">
+        <AdUnit slot="FAVORITES" format="horizontal" />
+        <AadsUnit id="2430994" background="" />
+      </div>
       <Footer />
     </div>
   );

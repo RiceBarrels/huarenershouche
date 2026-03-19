@@ -30,7 +30,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { AdUnit } from "@/components/ad-unit";
+import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { CarCard } from "@/components/car-card";
 import { CommentSection } from "@/components/comment-section";
 import { BackToTop } from "@/components/back-to-top";
@@ -848,6 +848,9 @@ export default function CarDetailPage() {
             </div>
           </section>
         )}
+        <div className="mt-8">
+          <AadsUnit />
+        </div>
       </main>
       <Footer />
       <BackToTop />

@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
-import { AdUnit } from "@/components/ad-unit";
+import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { SearchFilters, US_STATES } from "@/components/search-filters";
 import { MobileFilterDrawer, BrandDrawerContent } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
@@ -632,8 +632,9 @@ function BrowseContent() {
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6">
         {/* Left sidebar filters — desktop only */}
         <div className="hidden w-[240px] shrink-0 md:block">
-          <div className="sticky top-4">
+          <div className="sticky top-4 space-y-4">
             <SearchFilters onFilter={setFilters} initialFilters={filters} />
+            <AdUnit slot="BROWSE_SIDEBAR" format="rectangle" />
           </div>
         </div>
 
@@ -730,6 +731,10 @@ function BrowseContent() {
         </main>
       </div>
 
+      <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
+        <AdUnit slot="BROWSE_BOTTOM" format="horizontal" />
+        <AadsUnit />
+      </div>
       <Footer />
       <BackToTop />
       <CompareBar />

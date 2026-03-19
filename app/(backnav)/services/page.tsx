@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Header } from "@/components/header";
 
 import { Footer } from "@/components/footer";
+import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { Button } from "@/components/ui/button";
 import {
   Wrench,
@@ -200,7 +201,10 @@ export default function ServicesPage() {
           })}
         </div>
       </main>
-
+      <div className="mx-auto max-w-4xl px-4 py-6 space-y-4">
+        <AdUnit slot="SERVICES" format="horizontal" />
+        <AadsUnit id="2430994" background="" />
+      </div>
       <Footer />
     </div>
   );
