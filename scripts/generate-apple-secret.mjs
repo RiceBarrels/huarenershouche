@@ -13,7 +13,7 @@ import { SignJWT } from "jose";
 
 // === FILL THESE IN ===
 const TEAM_ID = "8493QSQR98";
-const CLIENT_ID = "GLW377AYWC";
+const CLIENT_ID = "com.clcauto.www";
 const KEY_ID = "GLW377AYWC";
 const KEY_PATH = "/Users/muhengfan/Downloads/Apple Auth Key GLW377AYWC.p8";
 // =====================
