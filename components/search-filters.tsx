@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { MAKES, MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
+import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 
 // --- Price breakpoints ---
 const PRICE_STOPS = [
@@ -572,34 +572,60 @@ export function SearchFilters({
 
       {/* Brand */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">品牌</Label>
-        <div className="mt-1 max-h-[160px] overflow-y-auto border border-border">
-          <button
-            type="button"
-            className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-muted font-medium" : ""}`}
-            onClick={() => update("make", "")}
-          >
-            <span>不限</span>
-            {!filters.make && <Check className="h-3 w-3" strokeWidth={2} />}
-          </button>
-          {MAKES.map((make) => {
+        <Label className="font-mono text-[11px] text-muted-foreground">热门品牌</Label>
+        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+          {HOT_MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
+            const selected = isInList(filters.make, make);
             return (
               <button
                 key={make}
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-muted font-medium" : ""}`}
+                className={`flex flex-col items-center gap-1 border p-2 transition-colors ${selected ? "border-foreground bg-muted" : "border-border hover:border-foreground/30"}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                  {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
+                <span className="flex h-6 w-6 items-center justify-center">
+                  {logo ? (
+                    <img src={logo} alt={make} className="h-5 w-5 object-contain" />
+                  ) : null}
                 </span>
-                <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
-                {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0" strokeWidth={2} />}
+                <span className="font-mono text-[10px] leading-tight">{MAKES_ZH[make]}</span>
               </button>
             );
           })}
         </div>
+        <details className="mt-2">
+          <summary className="cursor-pointer font-mono text-[11px] text-muted-foreground hover:text-foreground">
+            全部品牌 →
+          </summary>
+          <div className="mt-1 max-h-[160px] overflow-y-auto border border-border">
+            <button
+              type="button"
+              className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-muted font-medium" : ""}`}
+              onClick={() => update("make", "")}
+            >
+              <span>不限</span>
+              {!filters.make && <Check className="h-3 w-3" strokeWidth={2} />}
+            </button>
+            {MAKES.map((make) => {
+              const logo = getBrandLogoUrl(make);
+              return (
+                <button
+                  key={make}
+                  type="button"
+                  className={`flex w-full items-center gap-2 px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-muted font-medium" : ""}`}
+                  onClick={() => update("make", toggleInList(filters.make, make))}
+                >
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                    {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
+                  </span>
+                  <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
+                  {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0" strokeWidth={2} />}
+                </button>
+              );
+            })}
+          </div>
+        </details>
       </div>
 
       {/* Seller type */}

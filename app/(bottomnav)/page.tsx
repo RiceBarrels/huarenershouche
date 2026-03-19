@@ -417,7 +417,7 @@ export default function Home() {
               </Link>
             </div>
             <div
-              className="grid grid-cols-2 gap-3 md:grid-cols-3"
+              className="grid grid-cols-1 gap-3 md:grid-cols-3"
             >
               {featured.map((car) => (
                 <div key={car.id}>

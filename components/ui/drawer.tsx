@@ -5,6 +5,33 @@ import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
 
+function useKeyboardHeight() {
+  const [height, setHeight] = React.useState(0)
+
+  React.useEffect(() => {
+    let showHandle: { remove: () => void } | undefined
+    let hideHandle: { remove: () => void } | undefined
+
+    import("@capacitor/keyboard")
+      .then(({ Keyboard }) => {
+        Keyboard.addListener("keyboardWillShow", (info) => {
+          setHeight(info.keyboardHeight)
+        }).then((h) => { showHandle = h })
+        Keyboard.addListener("keyboardWillHide", () => {
+          setHeight(0)
+        }).then((h) => { hideHandle = h })
+      })
+      .catch(() => {})
+
+    return () => {
+      showHandle?.remove()
+      hideHandle?.remove()
+    }
+  }, [])
+
+  return height
+}
+
 function triggerHaptic() {
   // Native (Capacitor)
   import("@capacitor/haptics")
@@ -80,6 +107,8 @@ function DrawerContent({
   children,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+  const kbHeight = useKeyboardHeight()
+
   return (
     <DrawerPortal data-slot="drawer-portal">
       <DrawerOverlay />
@@ -93,6 +122,9 @@ function DrawerContent({
       >
         <div className="mx-auto mt-4 hidden h-1 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
+        {kbHeight > 0 && (
+          <div className="shrink-0 transition-[height] duration-200" style={{ height: kbHeight }} />
+        )}
       </DrawerPrimitive.Content>
     </DrawerPortal>
   )

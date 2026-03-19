@@ -568,6 +568,7 @@ export function BrandDrawerContent({
           <button
             type="button"
             className="flex w-full items-center justify-center gap-1 border border-border py-2 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
             onClick={() => setShowAll(true)}
           >
             全部品牌

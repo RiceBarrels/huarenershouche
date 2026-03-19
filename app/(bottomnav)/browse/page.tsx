@@ -707,7 +707,7 @@ function BrowseContent() {
               className="mt-10 border-t border-border pt-6"
             >
               <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
-              <div className="mt-3 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
                 {recentCars.map((car) => (
                   <CarCard
                     key={"recent-" + car.id}
