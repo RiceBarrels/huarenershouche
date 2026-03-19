@@ -8,6 +8,8 @@ export interface DbCar {
   model: string;
   trim: string | null;
   price: number;
+  original_price: number | null;
+  price_updated_at: string | null;
   mileage: number;
   location: string;
   location_zh: string;
@@ -60,6 +62,7 @@ export interface DbDealerStore {
   lat: number | null;
   lng: number | null;
   phone: string | null;
+  wechat: string | null;
   store_photos: string[];
   verification_status: "unverified" | "pending" | "verified" | "rejected";
   verification_submitted_at: string | null;

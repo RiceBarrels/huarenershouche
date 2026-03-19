@@ -450,6 +450,7 @@ export default function AdminPage() {
                         车主: {store.profiles?.username || "未知"} · {store.address}
                       </p>
                       {store.phone && <p className="text-[11px] text-muted-foreground">电话: {store.phone}</p>}
+                      {store.wechat && <p className="text-[11px] text-muted-foreground">微信: {store.wechat}</p>}
                       <p className="text-[11px] text-muted-foreground">
                         提交时间: {store.verification_submitted_at ? new Date(store.verification_submitted_at).toLocaleString("zh-CN") : "-"}
                       </p>

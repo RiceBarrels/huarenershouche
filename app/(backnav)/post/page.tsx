@@ -385,7 +385,7 @@ export default function PostCarPage() {
     if (!user || files.length === 0) return;
     setUploading(true);
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
       const ext = file.name.split(".").pop();
       const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage
@@ -399,11 +399,45 @@ export default function PostCarPage() {
     setUploading(false);
   }
 
-  function handleDrop(e: React.DragEvent) {
+  async function handleDrop(e: React.DragEvent) {
     e.preventDefault();
     setDragging(false);
-    const files = Array.from(e.dataTransfer.files);
-    uploadFiles(files);
+
+    // 1. Dropped files (local)
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    if (files.length > 0) {
+      uploadFiles(files);
+      return;
+    }
+
+    // 2. Dropped image from web page — try to get URL
+    const html = e.dataTransfer.getData("text/html");
+    const uri = e.dataTransfer.getData("text/uri-list") || e.dataTransfer.getData("text/plain");
+
+    let imgUrl = "";
+    if (html) {
+      const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+      if (match) imgUrl = match[1];
+    }
+    if (!imgUrl && uri && /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp|avif|bmp)/i.test(uri)) {
+      imgUrl = uri;
+    }
+
+    if (imgUrl) {
+      // Fetch the image and upload as file
+      setUploading(true);
+      try {
+        const res = await fetch(imgUrl);
+        const blob = await res.blob();
+        const ext = imgUrl.split(".").pop()?.split("?")[0] || "jpg";
+        const file = new File([blob], `web-${Date.now()}.${ext}`, { type: blob.type || "image/jpeg" });
+        await uploadFiles([file]);
+      } catch {
+        // If fetch fails (CORS), add URL directly
+        setImageUrls((prev) => [...prev, imgUrl]);
+        setUploading(false);
+      }
+    }
   }
 
   function removeImage(index: number) {
@@ -814,7 +848,7 @@ export default function PostCarPage() {
             {/* Images */}
             <div>
               <Label className="font-mono text-xs font-semibold">
-                车辆照片
+                车辆照片（支持拖拽上传）
               </Label>
               <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                 第一张将作为封面图，建议上传 5-10 张，支持拖拽上传
@@ -832,11 +866,11 @@ export default function PostCarPage() {
                     key={i}
                     className="group relative h-24 w-32 border border-border bg-muted"
                   >
-                    <img
-                      src={url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(url) ? (
+                      <video src={url} className="h-full w-full object-cover" muted />
+                    ) : (
+                      <img src={url} alt="" className="h-full w-full object-cover" />
+                    )}
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
@@ -864,13 +898,13 @@ export default function PostCarPage() {
                         strokeWidth={1.5}
                       />
                       <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        上传照片
+                        上传图片/视频
                       </span>
                     </>
                   )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/*"
                     multiple
                     className="hidden"
                     onChange={handleImageUpload}

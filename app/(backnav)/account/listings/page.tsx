@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2,
+  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2, Pencil,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -165,6 +165,11 @@ export default function ListingsPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <Link href={`/car/${car.id}/edit`}>
+                      <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]">
+                        <Pencil className="h-3 w-3" strokeWidth={1.5} />编辑
+                      </Button>
+                    </Link>
                     {car.status === "active" && (
                       <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => markSold(car.id)}>
                         <CheckCircle className="h-3 w-3" strokeWidth={1.5} />已售

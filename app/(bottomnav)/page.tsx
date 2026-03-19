@@ -257,7 +257,7 @@ export default function Home() {
           <div className="flex items-center justify-center gap-3">
             <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-14 md:w-14" />
             <h1 className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl">
-              车来车网
+              车来车网<span className="text-xs text-white/50"> 测试版</span>
             </h1>
           </div>
           <p

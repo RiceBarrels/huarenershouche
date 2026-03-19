@@ -25,6 +25,7 @@ import {
   TrendingDown,
   TrendingUp,
   Loader2,
+  Pencil,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -69,6 +70,11 @@ function formatPrice(price: number): string {
 
 function formatMileage(miles: number): string {
   return new Intl.NumberFormat("en-US").format(miles);
+}
+
+const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
+function isVideo(url: string): boolean {
+  return VIDEO_RE.test(url);
 }
 
 export default function CarDetailPage() {
@@ -277,12 +283,22 @@ export default function CarDetailPage() {
               }}
             >
               {allImages.length > 0 ? (
-                <img
-                  src={allImages[currentImage]}
-                  alt={car.title}
-                  className="h-full w-full cursor-zoom-in object-cover"
-                  onClick={() => setLightboxOpen(true)}
-                />
+                isVideo(allImages[currentImage]) ? (
+                  <video
+                    src={allImages[currentImage]}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                    controls
+                    muted
+                    onClick={() => setLightboxOpen(true)}
+                  />
+                ) : (
+                  <img
+                    src={allImages[currentImage]}
+                    alt={car.title}
+                    className="h-full w-full cursor-zoom-in object-cover"
+                    onClick={() => setLightboxOpen(true)}
+                  />
+                )
               ) : (
                 <div className="flex h-full items-center justify-center font-mono text-sm text-muted-foreground">
                   暂无图片
@@ -349,11 +365,11 @@ export default function CarDetailPage() {
                         : "border-border hover:border-foreground/40"
                     }`}
                   >
-                    <img
-                      src={img}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    {isVideo(img) ? (
+                      <video src={img} className="h-full w-full object-cover" muted />
+                    ) : (
+                      <img src={img} alt="" className="h-full w-full object-cover" />
+                    )}
                   </button>
                 ))}
               </div>
@@ -370,10 +386,20 @@ export default function CarDetailPage() {
                 {car.title}
               </p>
 
-              <div className="mt-4 flex items-baseline gap-2">
+              <div className="mt-4 flex flex-wrap items-baseline gap-2">
                 <span className="font-mono text-2xl font-bold">
                   {formatPrice(car.price)}
                 </span>
+                {car.original_price && car.original_price > car.price && (
+                  <span className="px-1.5 py-0.5 font-mono text-xs font-semibold bg-green-500/10 text-green-600">
+                    -{Math.round((1 - car.price / car.original_price) * 100)}%
+                  </span>
+                )}
+                {car.original_price && car.original_price > car.price && (
+                  <span className="font-mono text-sm text-muted-foreground line-through">
+                    {formatPrice(car.original_price)}
+                  </span>
+                )}
                 {watchedPrice !== null && watchedPrice !== car.price && (
                   <span
                     className={`flex items-center gap-0.5 font-mono text-xs font-semibold ${
@@ -649,6 +675,15 @@ export default function CarDetailPage() {
                   </Link>
                 )}
 
+                {user && user === car.seller_id && (
+                  <Link href={`/car/${carId}/edit`}>
+                    <Button variant="outline" className="w-full gap-1.5 font-mono text-xs">
+                      <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      编辑车辆
+                    </Button>
+                  </Link>
+                )}
+
                 {user ? (
                   user !== car.seller_id && (
                     <Button
@@ -819,7 +854,14 @@ export default function CarDetailPage() {
         }}
       >
         <div className="flex-1">
-          <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+          <div className="flex items-baseline gap-1.5">
+            <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+            {car.original_price && car.original_price > car.price && (
+              <span className="px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+                -{Math.round((1 - car.price / car.original_price) * 100)}%
+              </span>
+            )}
+          </div>
         </div>
         <Button
           variant="outline"

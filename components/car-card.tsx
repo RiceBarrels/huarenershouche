@@ -101,11 +101,19 @@ export function CarCard({
       >
         <div className="relative aspect-16/10 overflow-hidden bg-muted">
           {car.image_url ? (
-            <img
-              src={car.image_url}
-              alt={car.title}
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-            />
+            /\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(car.image_url) ? (
+              <video
+                src={car.image_url}
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                muted
+              />
+            ) : (
+              <img
+                src={car.image_url}
+                alt={car.title}
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+              />
+            )
           ) : (
             <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
               暂无图片
@@ -191,6 +199,16 @@ export function CarCard({
             <span className="font-mono text-base font-bold">
               {formatPrice(car.price)}
             </span>
+            {car.original_price && car.original_price > car.price && (
+              <span className="px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+                -{Math.round((1 - car.price / car.original_price) * 100)}%
+              </span>
+            )}
+            {car.original_price && car.original_price > car.price && (
+              <span className="font-mono text-[10px] text-muted-foreground line-through">
+                {formatPrice(car.original_price)}
+              </span>
+            )}
             {priceInsight && (
               <span
                 className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}

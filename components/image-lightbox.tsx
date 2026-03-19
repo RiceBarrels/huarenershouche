@@ -91,19 +91,35 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
             </div>
           </div>
 
-          {/* Image */}
-          <motion.img
-            key={index}
-            src={images[index]}
-            alt=""
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.2 }}
-            className="max-h-[85vh] max-w-[90vw] select-none object-contain"
-            style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
-            onClick={(e) => { e.stopPropagation(); toggleZoom(); }}
-            draggable={false}
-          />
+          {/* Image / Video */}
+          {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(images[index]) ? (
+            <motion.video
+              key={index}
+              src={images[index]}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="max-h-[85vh] max-w-[90vw] select-none object-contain"
+              style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
+              onClick={(e) => { e.stopPropagation(); }}
+              controls
+              autoPlay
+              muted
+            />
+          ) : (
+            <motion.img
+              key={index}
+              src={images[index]}
+              alt=""
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="max-h-[85vh] max-w-[90vw] select-none object-contain"
+              style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
+              onClick={(e) => { e.stopPropagation(); toggleZoom(); }}
+              draggable={false}
+            />
+          )}
 
           {/* Nav arrows */}
           {images.length > 1 && (
@@ -136,7 +152,11 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
                       : "border-white/20 opacity-50 hover:opacity-80"
                   }`}
                 >
-                  <img src={img} alt="" className="h-full w-full object-cover" />
+                  {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(img) ? (
+                    <video src={img} className="h-full w-full object-cover" muted />
+                  ) : (
+                    <img src={img} alt="" className="h-full w-full object-cover" />
+                  )}
                 </button>
               ))}
             </div>

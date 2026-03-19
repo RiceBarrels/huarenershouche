@@ -41,7 +41,7 @@ export default function SettingsPage() {
   const [emailMessage, setEmailMessage] = useState("");
 
   const [stores, setStores] = useState<DbDealerStore[]>([]);
-  const [newStore, setNewStore] = useState({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "" });
+  const [newStore, setNewStore] = useState({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "", wechat: "" });
   const [addingStore, setAddingStore] = useState(false);
   const [submittingVerification, setSubmittingVerification] = useState<string | null>(null);
 
@@ -142,11 +142,11 @@ export default function SettingsPage() {
     const result = await geocodeAddress(fullAddress);
     const { data, error } = await supabase
       .from("dealer_stores")
-      .insert({ owner_id: user, name: newStore.name, address: fullAddress, zipcode: newStore.zipcode || null, phone: newStore.phone || null, lat: result?.lat || null, lng: result?.lng || null })
+      .insert({ owner_id: user, name: newStore.name, address: fullAddress, zipcode: newStore.zipcode || null, phone: newStore.phone || null, wechat: newStore.wechat || null, lat: result?.lat || null, lng: result?.lng || null })
       .select().single();
     if (!error && data) {
       setStores((prev) => [data as DbDealerStore, ...prev]);
-      setNewStore({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "" });
+      setNewStore({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "", wechat: "" });
     }
     setAddingStore(false);
   }
@@ -359,6 +359,7 @@ export default function SettingsPage() {
                             <MapPin className="h-3 w-3" strokeWidth={1.5} />{store.address}{store.zipcode && ` · ${store.zipcode}`}
                           </p>
                           {store.phone && <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">{store.phone}</p>}
+                          {store.wechat && <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">微信: {store.wechat}</p>}
                         </div>
                         <Button variant="ghost" size="sm" className="h-8 w-8 shrink-0 p-0 text-muted-foreground hover:text-destructive" onClick={() => deleteStore(store.id)}>
                           <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -438,6 +439,10 @@ export default function SettingsPage() {
                   <div>
                     <Label className="font-mono text-[11px] text-muted-foreground">门店电话</Label>
                     <Input className="mt-1 h-9 font-mono text-xs" placeholder="(626) 555-0123" value={newStore.phone} onChange={(e) => setNewStore((s) => ({ ...s, phone: e.target.value }))} />
+                  </div>
+                  <div>
+                    <Label className="font-mono text-[11px] text-muted-foreground">微信号</Label>
+                    <Input className="mt-1 h-9 font-mono text-xs" placeholder="WeChat ID" value={newStore.wechat} onChange={(e) => setNewStore((s) => ({ ...s, wechat: e.target.value }))} />
                   </div>
                 </div>
                 <div>
