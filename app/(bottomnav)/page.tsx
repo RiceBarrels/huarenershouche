@@ -509,8 +509,8 @@ export default function Home() {
       </section>
 
       <section className="px-4 pb-6">
-        <div className="mx-auto max-w-5xl">
-          <AadsUnit />
+        <div className="mx-auto max-w-5xl space-y-4">
+          <AadsUnit id="2430994" background="transparent" />
         </div>
       </section>
 

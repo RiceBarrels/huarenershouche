@@ -41,7 +41,7 @@ export function AdUnit({ slot, format = "auto", className = "" }: AdUnitProps) {
   );
 }
 
-export function AadsUnit({ id = "2430993", background = "transparent", className = "" }: { id?: string; background?: string; className?: string }) {
+export function AadsUnit({ id = "2430994", background = "transparent", className = "" }: { id?: string; background?: string; className?: string }) {
   return (
     <div className={`ad-container overflow-hidden ${className}`}>
       <div style={{ width: "100%", margin: "auto", position: "relative", zIndex: 99998 }}>
