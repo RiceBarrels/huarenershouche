@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
+import { AdUnit } from "@/components/ad-unit";
 import { SearchFilters, US_STATES } from "@/components/search-filters";
 import { MobileFilterDrawer, BrandDrawerContent } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
@@ -674,17 +675,25 @@ function BrowseContent() {
             <div
               className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
             >
-              {filtered.map((car) => (
-                <div
-                  key={car.id}
-                >
-                  <CarCard
-                    car={car}
-                    distance={distances.get(car.id)}
-                    priceInsight={getPriceInsight(car, cars)}
-                  />
-                </div>
-              ))}
+              {filtered.flatMap((car, i) => {
+                const items = [
+                  <div key={car.id}>
+                    <CarCard
+                      car={car}
+                      distance={distances.get(car.id)}
+                      priceInsight={getPriceInsight(car, cars)}
+                    />
+                  </div>,
+                ];
+                if (i === 5) {
+                  items.push(
+                    <div key="ad-feed" className="col-span-full">
+                      <AdUnit slot="BROWSE_FEED" format="horizontal" />
+                    </div>
+                  );
+                }
+                return items;
+              })}
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center py-20">
