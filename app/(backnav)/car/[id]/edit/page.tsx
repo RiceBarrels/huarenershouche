@@ -141,7 +141,7 @@ export default function EditCarPage() {
     if (!userId || files.length === 0) return;
     setUploading(true);
     for (const file of files) {
-      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
+      if (!file.type.startsWith("image/")) continue;
       const ext = file.name.split(".").pop();
       const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error } = await supabase.storage.from("car-images").upload(path, file);
@@ -163,7 +163,7 @@ export default function EditCarPage() {
     e.preventDefault();
     setDragging(false);
 
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
     if (files.length > 0) {
       uploadFiles(files);
       return;
@@ -306,11 +306,7 @@ export default function EditCarPage() {
             >
               {imageUrls.map((url, i) => (
                 <div key={url} className="group relative h-20 w-28 border border-border bg-muted">
-                  {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(url) ? (
-                    <video src={url} className="h-full w-full object-cover" muted />
-                  ) : (
-                    <img src={url} alt="" className="h-full w-full object-cover" />
-                  )}
+                  <img src={url} alt="" className="h-full w-full object-cover" />
                   <button
                     type="button"
                     className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
@@ -332,7 +328,7 @@ export default function EditCarPage() {
                     <span className="text-[9px] text-muted-foreground">拖拽或点击</span>
                   </div>
                 )}
-                <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleImageUpload} disabled={uploading} />
+                <input type="file" accept="image/*" multiple className="hidden" onChange={handleImageUpload} disabled={uploading} />
               </label>
             </div>
           </div>

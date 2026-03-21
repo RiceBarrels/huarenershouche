@@ -632,7 +632,7 @@ function BrowseContent() {
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6">
         {/* Left sidebar filters — desktop only */}
         <div className="hidden w-[240px] shrink-0 md:block">
-          <div className="sticky top-4 space-y-4">
+          <div className="sticky top-4 max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto overscroll-contain pr-1">
             <SearchFilters onFilter={setFilters} initialFilters={filters} />
             <AdUnit slot="BROWSE_SIDEBAR" format="rectangle" />
           </div>
@@ -640,20 +640,40 @@ function BrowseContent() {
 
         {/* Main content */}
         <main className="min-w-0 flex-1">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-              >
-                返回搜索
-              </Link>
-              <p className="font-mono text-xs text-muted-foreground">
-                共{" "}
-                <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
-                辆车
-              </p>
-            </div>
+          <div className="mb-4 flex flex-wrap items-center gap-3">
+            <Link
+              href="/"
+              className="font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
+            >
+              返回搜索
+            </Link>
+            <p className="font-mono text-xs text-muted-foreground">
+              共{" "}
+              <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
+              辆车
+            </p>
+            {/* Desktop active filter chips */}
+            {activeFilterChips.length > 0 && (
+              <div className="hidden flex-wrap gap-1.5 md:flex">
+                {activeFilterChips.map((chip, i) => (
+                  <button
+                    key={`${chip.key}-${i}`}
+                    onClick={() => clearFilter(chip.key)}
+                    className="flex items-center gap-1 border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                  >
+                    {chip.label}
+                    <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
+                  </button>
+                ))}
+                <button
+                  onClick={() => setFilters(INITIAL_FILTERS)}
+                  className="flex items-center gap-1 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                >
+                  <X className="h-2.5 w-2.5" strokeWidth={2} />
+                  清空
+                </button>
+              </div>
+            )}
           </div>
 
           {loading ? (

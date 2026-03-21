@@ -385,7 +385,7 @@ export default function PostCarPage() {
     if (!user || files.length === 0) return;
     setUploading(true);
     for (const file of files) {
-      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue;
+      if (!file.type.startsWith("image/")) continue;
       const ext = file.name.split(".").pop();
       const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error } = await supabase.storage
@@ -404,7 +404,7 @@ export default function PostCarPage() {
     setDragging(false);
 
     // 1. Dropped files (local)
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"));
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
     if (files.length > 0) {
       uploadFiles(files);
       return;
@@ -657,6 +657,13 @@ export default function PostCarPage() {
       return;
     }
 
+    // Phone validation: must be at least 10 digits
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (!phoneDigits || phoneDigits.length < 10) {
+      setError("请输入有效的联系电话（至少 10 位数字）");
+      return;
+    }
+
     setLoading(true);
 
     const actualMake = form.make === "Other" ? form.customMake.trim() : form.make;
@@ -866,11 +873,7 @@ export default function PostCarPage() {
                     key={i}
                     className="group relative h-24 w-32 border border-border bg-muted"
                   >
-                    {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(url) ? (
-                      <video src={url} className="h-full w-full object-cover" muted />
-                    ) : (
-                      <img src={url} alt="" className="h-full w-full object-cover" />
-                    )}
+                    <img src={url} alt="" className="h-full w-full object-cover" />
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
@@ -898,13 +901,13 @@ export default function PostCarPage() {
                         strokeWidth={1.5}
                       />
                       <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        上传图片/视频
+                        上传图片
                       </span>
                     </>
                   )}
                   <input
                     type="file"
-                    accept="image/*,video/*"
+                    accept="image/*"
                     multiple
                     className="hidden"
                     onChange={handleImageUpload}

@@ -108,7 +108,12 @@ function AccountContent() {
 
   async function handleLogout() {
     await supabase.auth.signOut();
-    router.push("/account");
+    setUser(null);
+    setProfile(null);
+    setMyCars([]);
+    setFavCount(0);
+    setDraft(null);
+    router.refresh();
   }
 
   const activeCars = myCars.filter((c) => c.status === "active").length;
