@@ -7,7 +7,6 @@ import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { AdUnit, AadsUnit } from "@/components/ad-unit";
 
 import { CarCard } from "@/components/car-card";
 import { DealerReviews } from "@/components/dealer-reviews";
@@ -196,10 +195,6 @@ export default function UserProfilePage() {
           </>
         )}
       </main>
-      <div className="mx-auto max-w-4xl px-4 py-6 space-y-4">
-        <AdUnit slot="USER_PROFILE" format="horizontal" />
-        <AadsUnit id="2430994" background="" />
-      </div>
       <Footer />
     </div>
   );

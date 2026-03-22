@@ -30,7 +30,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { CarCard } from "@/components/car-card";
 import { CommentSection } from "@/components/comment-section";
 import { BackToTop } from "@/components/back-to-top";
@@ -824,11 +823,6 @@ export default function CarDetailPage() {
         {/* Comments */}
         <CommentSection carId={carId} />
 
-        {/* Ad — car detail */}
-        <div className="mt-8">
-          <AdUnit slot="CAR_DETAIL" format="horizontal" />
-        </div>
-
         {/* Similar cars */}
         {similarCars.length > 0 && (
           <section
@@ -842,9 +836,6 @@ export default function CarDetailPage() {
             </div>
           </section>
         )}
-        <div className="mt-8">
-          <AadsUnit />
-        </div>
         {/* Spacer for mobile bottom action bar */}
         <div className="h-16 md:hidden" />
       </main>

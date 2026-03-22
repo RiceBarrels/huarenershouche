@@ -5,7 +5,6 @@ import { Calculator, TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Header } from "@/components/header";
 
 import { Footer } from "@/components/footer";
-import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -419,10 +418,6 @@ export default function ValuationPage() {
           )}
         </div>
       </main>
-      <div className="mx-auto max-w-3xl px-4 py-6 space-y-4">
-        <AdUnit slot="VALUATION" format="horizontal" />
-        <AadsUnit id="2430994" background="" />
-      </div>
       <Footer />
     </div>
   );

@@ -10,7 +10,6 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
-import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { SearchFilters, US_STATES } from "@/components/search-filters";
 import { MobileFilterDrawer, BrandDrawerContent } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
@@ -634,7 +633,6 @@ function BrowseContent() {
         <div className="hidden w-[240px] shrink-0 md:block">
           <div className="sticky top-4 max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto overscroll-contain pr-1">
             <SearchFilters onFilter={setFilters} initialFilters={filters} />
-            <AdUnit slot="BROWSE_SIDEBAR" format="rectangle" />
           </div>
         </div>
 
@@ -706,13 +704,6 @@ function BrowseContent() {
                     />
                   </div>,
                 ];
-                if (i === 5) {
-                  items.push(
-                    <div key="ad-feed" className="col-span-full">
-                      <AdUnit slot="BROWSE_FEED" format="horizontal" />
-                    </div>
-                  );
-                }
                 return items;
               })}
             </div>
@@ -751,10 +742,6 @@ function BrowseContent() {
         </main>
       </div>
 
-      <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
-        <AdUnit slot="BROWSE_BOTTOM" format="horizontal" />
-        <AadsUnit />
-      </div>
       <Footer />
       <BackToTop />
       <CompareBar />

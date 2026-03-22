@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   Star,
-  Flame,
   CarFront,
   CircleAlert,
   FileWarning,
@@ -102,7 +101,7 @@ function RecallCard({ recall }: { recall: RecallItem }) {
 
 function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
   const [expanded, setExpanded] = useState(false);
-  const hasSeverity = complaint.crash || complaint.fire || complaint.injuries > 0 || complaint.deaths > 0;
+  const hasSeverity = complaint.crash || complaint.injuries > 0 || complaint.deaths > 0;
   return (
     <div className="border border-border p-3">
       <button
@@ -121,12 +120,6 @@ function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
               <span className="flex items-center gap-0.5 font-mono text-[10px] font-semibold text-red-500">
                 <CarFront className="h-2.5 w-2.5" strokeWidth={2} />
                 碰撞
-              </span>
-            )}
-            {complaint.fire && (
-              <span className="flex items-center gap-0.5 font-mono text-[10px] font-semibold text-orange-500">
-                <Flame className="h-2.5 w-2.5" strokeWidth={2} />
-                起火
               </span>
             )}
             {complaint.injuries > 0 && (
@@ -218,8 +211,6 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
   if (!data) return null;
 
   const crashComplaints = data.complaints.filter((c) => c.crash);
-  const fireComplaints = data.complaints.filter((c) => c.fire);
-  const injuryComplaints = data.complaints.filter((c) => c.injuries > 0);
 
   return (
     <motion.div
@@ -229,7 +220,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
       className="space-y-4"
     >
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-3">
         <div className="border border-border p-3">
           <div className="flex items-center gap-1.5">
             <FileWarning className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.5} />
@@ -253,15 +244,6 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
           </div>
           <p className={`mt-1 font-mono text-lg font-bold ${crashComplaints.length > 0 ? "text-red-500" : ""}`}>
             {crashComplaints.length}
-          </p>
-        </div>
-        <div className="border border-border p-3">
-          <div className="flex items-center gap-1.5">
-            <Flame className="h-3.5 w-3.5 text-orange-500" strokeWidth={1.5} />
-            <span className="font-mono text-[10px] text-muted-foreground">涉及起火</span>
-          </div>
-          <p className={`mt-1 font-mono text-lg font-bold ${fireComplaints.length > 0 ? "text-orange-500" : ""}`}>
-            {fireComplaints.length}
           </p>
         </div>
       </div>

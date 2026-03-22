@@ -20,6 +20,38 @@ export interface VinResult {
   plantCity: string;
   errorCode: string;
   errorText: string;
+  // Additional fields
+  engineConfig: string;
+  engineKW: string;
+  transmissionSpeeds: string;
+  seats: string;
+  gvwr: string;
+  curbWeight: string;
+  wheelBase: string;
+  bedType: string;
+  cabType: string;
+  // Safety features
+  abs: string;
+  esc: string;
+  tractionControl: string;
+  airbagFront: string;
+  airbagSide: string;
+  airbagCurtain: string;
+  airbagKnee: string;
+  backupCamera: string;
+  blindSpotMon: string;
+  laneDeparture: string;
+  forwardCollision: string;
+  parkAssist: string;
+  adaptiveCruise: string;
+  tpms: string;
+  autoEmergencyBraking: string;
+  // EV fields
+  batteryKWh: string;
+  chargerLevel: string;
+  chargerKW: string;
+  evRange: string;
+  batteryType: string;
 }
 
 export async function decodeVin(vin: string): Promise<VinResult | null> {
@@ -70,6 +102,9 @@ export async function decodeVin(vin: string): Promise<VinResult | null> {
     // If we have no year AND no vehicleType, it truly failed
     if (!year && !vehicleType && !make) return null;
 
+    const v = (key: string, detailKey?: string) =>
+      flat[key] || detail[detailKey || key] || "";
+
     return {
       make,
       model,
@@ -89,6 +124,38 @@ export async function decodeVin(vin: string): Promise<VinResult | null> {
       plantCity: flat.PlantCity || detail["Plant City"] || "",
       errorCode: flat.ErrorCode || detail["Error Code"] || "0",
       errorText: flat.ErrorText || detail["Error Text"] || "",
+      // Additional
+      engineConfig: v("EngineConfiguration", "Engine Configuration"),
+      engineKW: v("EngineKW", "Engine Power (kW)"),
+      transmissionSpeeds: v("TransmissionSpeeds", "Transmission Speeds"),
+      seats: v("Seats", "Number of Seats"),
+      gvwr: v("GVWR", "Gross Vehicle Weight Rating From"),
+      curbWeight: v("CurbWeightLB", "Curb Weight (lbs)"),
+      wheelBase: v("WheelBaseShort", "Wheel Base (inches) From"),
+      bedType: v("BedType", "Bed Type"),
+      cabType: v("CabType", "Cab Type"),
+      // Safety
+      abs: v("ABS", "Anti-lock Braking System (ABS)"),
+      esc: v("ESC", "Electronic Stability Control (ESC)"),
+      tractionControl: v("TractionControl", "Traction Control"),
+      airbagFront: v("AirBagLocFront", "Front Air Bag Locations"),
+      airbagSide: v("AirBagLocSide", "Side Air Bag Locations"),
+      airbagCurtain: v("AirBagLocCurtain", "Curtain Air Bag Locations"),
+      airbagKnee: v("AirBagLocKnee", "Knee Air Bag Locations"),
+      backupCamera: v("RearVisibilitySystem", "Rear Visibility System"),
+      blindSpotMon: v("BlindSpotMon", "Blind Spot Monitoring"),
+      laneDeparture: v("LaneDepartureWarning", "Lane Departure Warning (LDW)"),
+      forwardCollision: v("ForwardCollisionWarning", "Forward Collision Warning (FCW)"),
+      parkAssist: v("ParkAssist", "Park Assist"),
+      adaptiveCruise: v("AdaptiveCruiseControl", "Adaptive Cruise Control (ACC)"),
+      tpms: v("TPMS", "Tire Pressure Monitoring System (TPMS) Type"),
+      autoEmergencyBraking: v("AutomaticEmergencyBraking", "Automatic Emergency Braking (AEB)"),
+      // EV
+      batteryKWh: v("BatteryKWh", "Battery Energy (kWh) From"),
+      chargerLevel: v("ChargerLevel", "Charger Level"),
+      chargerKW: v("ChargerPowerKW", "Charger Power (kW)"),
+      evRange: v("ElectrificationLevel", "Electrification Level"),
+      batteryType: v("BatteryType", "Battery Type"),
     };
   } catch {
     return null;

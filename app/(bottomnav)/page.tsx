@@ -28,7 +28,6 @@ import {
 } from "@/components/ui/select";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { supabase } from "@/lib/supabase";
-import { AdUnit, AadsUnit } from "@/components/ad-unit";
 import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
 
 import type { DbCar } from "@/lib/types";
@@ -469,13 +468,6 @@ export default function Home() {
         </section>
       )}
 
-      {/* Ad — homepage banner */}
-      <section className="px-4 pb-6">
-        <div className="mx-auto max-w-5xl">
-          <AdUnit slot="HOME_BANNER" format="horizontal" />
-        </div>
-      </section>
-
       {/* Features - minimal */}
       <section
         className="border-t border-border px-4 py-8"
@@ -505,12 +497,6 @@ export default function Home() {
               中文服务
             </span>
           </div>
-        </div>
-      </section>
-
-      <section className="px-4 pb-6">
-        <div className="mx-auto max-w-5xl space-y-4">
-          <AadsUnit id="2430994" background="transparent" />
         </div>
       </section>
 
