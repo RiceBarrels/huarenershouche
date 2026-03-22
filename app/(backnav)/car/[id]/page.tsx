@@ -258,17 +258,17 @@ export default function CarDetailPage() {
   ].filter(Boolean) as string[];
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background font-mono">
 
       <Header />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Left: Image + Details */}
           <div>
             {/* Main image with navigation */}
             <div
-              className="relative aspect-16/10 overflow-hidden border border-border bg-muted"
+              className="relative aspect-[16/10] overflow-hidden border border-border bg-muted"
               onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
               onTouchEnd={(e) => {
                 if (touchStart === null) return;
@@ -353,25 +353,19 @@ export default function CarDetailPage() {
               )}
             </div>
 
-            {/* Image thumbnails */}
+            {/* Image dots */}
             {allImages.length > 1 && (
-              <div className="mt-2 flex gap-2 overflow-x-auto">
-                {allImages.map((img, i) => (
+              <div className="mt-2 flex justify-center gap-1.5">
+                {allImages.map((_, i) => (
                   <button
                     key={i}
                     onClick={() => setCurrentImage(i)}
-                    className={`h-16 w-24 shrink-0 border bg-muted transition-colors ${
+                    className={`h-1.5 rounded-full transition-all ${
                       i === currentImage
-                        ? "border-foreground"
-                        : "border-border hover:border-foreground/40"
+                        ? "w-4 bg-foreground"
+                        : "w-1.5 bg-border hover:bg-muted-foreground"
                     }`}
-                  >
-                    {isVideo(img) ? (
-                      <video src={img} className="h-full w-full object-cover" muted />
-                    ) : (
-                      <img src={img} alt="" className="h-full w-full object-cover" />
-                    )}
-                  </button>
+                  />
                 ))}
               </div>
             )}
@@ -851,6 +845,8 @@ export default function CarDetailPage() {
         <div className="mt-8">
           <AadsUnit />
         </div>
+        {/* Spacer for mobile bottom action bar */}
+        <div className="h-16 md:hidden" />
       </main>
       <Footer />
       <BackToTop />

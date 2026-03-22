@@ -99,21 +99,13 @@ export function CarCard({
         transition={{ duration: 0.15, ease: "easeOut" }}
         className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20 active:bg-muted/30"
       >
-        <div className="relative aspect-16/10 overflow-hidden bg-muted">
+        <div className="relative aspect-[16/10] overflow-hidden bg-muted">
           {car.image_url ? (
-            /\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(car.image_url) ? (
-              <video
-                src={car.image_url}
-                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-                muted
-              />
-            ) : (
-              <img
-                src={car.image_url}
-                alt={car.title}
-                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
-              />
-            )
+            <img
+              src={car.image_url}
+              alt={car.title}
+              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+            />
           ) : (
             <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
               暂无图片

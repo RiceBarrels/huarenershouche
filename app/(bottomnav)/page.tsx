@@ -427,7 +427,7 @@ export default function Home() {
                   className="group block border border-border transition-colors hover:border-foreground/20"
                 >
                   {/* Image */}
-                  <div className="aspect-16/10 overflow-hidden bg-muted">
+                  <div className="relative aspect-[16/10] overflow-hidden bg-muted">
                     {car.image_url ? (
                       <img
                         src={car.image_url}
