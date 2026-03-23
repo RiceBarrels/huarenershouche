@@ -217,7 +217,7 @@ function BrowseContent() {
   useEffect(() => {
     fetchCars();
 
-    // Auto-detect user zipcode on first visit
+    // Auto-detect user zipcode for distance calculation only (don't auto-filter)
     if (!userZip) {
       detectUserZip().then((zip) => {
         if (zip) setUserZip(zip);
@@ -225,7 +225,7 @@ function BrowseContent() {
     }
   }, []);
 
-  // Geocode user zipcode for distance calculation + location name + auto-set location
+  // Geocode user zipcode for distance calculation + location label (no auto-filter)
   useEffect(() => {
     if (/^\d{5}$/.test(userZip)) {
       geocodeZipToCoords(userZip).then((coords) => {
@@ -234,19 +234,6 @@ function BrowseContent() {
       lookupZip(userZip).then((geo) => {
         if (!geo) { setZipLabel(""); return; }
         setZipLabel(geo.formatted);
-        // Auto-set location filter from zip
-        const state = US_STATES.find((s) => s.value === geo.stateCode);
-        if (state) {
-          if (state.subRegions) {
-            const cityLower = geo.city.toLowerCase();
-            const sub = state.subRegions.find((sr) =>
-              sr.label.toLowerCase().includes(cityLower) && !sr.value.endsWith("-other")
-            );
-            setFilters((f) => ({ ...f, location: sub ? sub.value : state.value }));
-          } else {
-            setFilters((f) => ({ ...f, location: state.value }));
-          }
-        }
       });
     } else {
       setUserCoords(null);

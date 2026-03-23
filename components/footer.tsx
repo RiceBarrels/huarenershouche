@@ -15,9 +15,9 @@ const sellLinks = [
 ];
 
 const helpLinks = [
-  { label: "关于我们", href: "#" },
-  { label: "使用条款", href: "#" },
-  { label: "隐私政策", href: "#" },
+  { label: "联系我们", href: "/contact" },
+  { label: "使用条款", href: "/terms" },
+  { label: "商家入驻", href: "/business" },
 ];
 
 export function Footer() {
