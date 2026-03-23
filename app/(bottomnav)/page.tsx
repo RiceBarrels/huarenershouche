@@ -162,8 +162,8 @@ function buildUrl(params: Record<string, string>) {
   for (const [k, v] of Object.entries(params)) {
     if (v) sp.set(k, v);
   }
-  const qs = sp.toString();
-  return qs ? `/browse?${qs}` : "/browse";
+  sp.set("showResult", "true");
+  return `/browse?${sp.toString()}`;
 }
 
 function formatPrice(price: number): string {
@@ -232,7 +232,7 @@ export default function Home() {
               <Link href="/post" className="underline underline-offset-2">免费发布车辆 →</Link>
               <span>🔒 VIN认证 · 真实车源</span>
               <span>📍 覆盖全美 · 中文服务</span>
-              <Link href="/browse" className="underline underline-offset-2">立即找车 →</Link>
+              <Link href="/browse?showResult=true" className="underline underline-offset-2">立即找车 →</Link>
             </span>
           ))}
         </div>
@@ -409,7 +409,7 @@ export default function Home() {
             >
               <h2 className="font-mono text-sm font-medium">最新车源</h2>
               <Link
-                href="/browse"
+                href="/browse?showResult=true"
                 className="flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
               >
                 查看全部

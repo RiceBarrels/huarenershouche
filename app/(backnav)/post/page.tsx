@@ -232,7 +232,7 @@ export default function PostCarPage() {
     city: "",
     state: "",
     fuel_type: "汽油",
-    transmission: "AT 自动",
+    transmission: "",
     exterior_color: "",
     interior_color: "",
     drivetrain: "",
@@ -505,19 +505,20 @@ export default function PostCarPage() {
       : bodyLower.includes("wagon") ? "wagon"
       : bodyLower.includes("coupe") || bodyLower.includes("convertible") || bodyLower.includes("roadster") ? "sports" : "";
 
-    setForm((prev) => ({
-      ...prev,
-      make: matchedMake || (result.make ? "Other" : prev.make),
-      customMake: matchedMake ? "" : result.make,
-      model: result.model || prev.model,
-      year: result.year ? String(result.year) : prev.year,
-      trim: result.trim || prev.trim,
-      fuel_type: mappedFuel || prev.fuel_type,
-      transmission: mappedTrans || prev.transmission,
-      drivetrain: mappedDrive || prev.drivetrain,
-      cylinders: result.engineCylinders || prev.cylinders,
-      body_type: mappedBody || prev.body_type,
-    }));
+    setForm((prev) => {
+      const next = { ...prev };
+      if (matchedMake) { next.make = matchedMake; next.customMake = ""; }
+      else if (result.make) { next.make = "Other"; next.customMake = result.make; }
+      if (result.model) next.model = result.model;
+      if (result.year) next.year = String(result.year);
+      if (result.trim) next.trim = result.trim;
+      if (mappedFuel) next.fuel_type = mappedFuel;
+      if (mappedTrans) next.transmission = mappedTrans;
+      if (mappedDrive) next.drivetrain = mappedDrive;
+      if (result.engineCylinders) next.cylinders = result.engineCylinders;
+      if (mappedBody) next.body_type = mappedBody;
+      return next;
+    });
     setVinAutoFilled(true);
   }
 

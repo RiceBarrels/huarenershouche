@@ -121,10 +121,12 @@ export default function BrowsePage() {
 
 function BrowseContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams));
   const [sort, setSortRaw] = useState<SortKey>(() => (searchParams.get("sort") as SortKey) || "newest");
+  const [showResult, setShowResult] = useState(() => searchParams.get("showResult") === "true");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
@@ -154,8 +156,8 @@ function BrowseContent() {
     if (f.cylinders) params.set("cylinders", f.cylinders);
     if (f.maxDistance) params.set("maxDistance", f.maxDistance);
     if (s !== "newest") params.set("sort", s);
-    const qs = params.toString();
-    const url = qs ? `/browse?${qs}` : "/browse";
+    params.set("showResult", "true");
+    const url = `/browse?${params.toString()}`;
     window.history.replaceState(window.history.state, "", url);
   }, []);
 
@@ -193,6 +195,7 @@ function BrowseContent() {
     setFiltersRaw(filtersFromParams(searchParams));
     const s = (searchParams.get("sort") as SortKey) || "newest";
     setSortRaw(s);
+    if (searchParams.get("showResult") === "true") setShowResult(true);
   }, [searchParams]);
 
   async function fetchCars() {
@@ -440,6 +443,115 @@ function BrowseContent() {
     >
       <Header />
 
+      {/* Filter-first screen — shown when no showResult param */}
+      {!showResult && (
+        <div className="flex flex-1 flex-col">
+          <section className="relative flex flex-col items-center justify-center px-4 pb-12 pt-16 md:pb-20 md:pt-24">
+            <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-foreground/[0.04] to-background" />
+            <div className="relative mx-auto w-full max-w-3xl">
+              <h1 className="text-center font-mono text-2xl font-semibold tracking-tight md:text-3xl">找车</h1>
+              <p className="mt-2 text-center font-mono text-sm text-muted-foreground">选择条件，找到你想要的车</p>
+
+              {/* Search form */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setShowResult(true);
+                  syncToUrl(filters, sort);
+                }}
+                className="mt-8 border border-border bg-background shadow-sm"
+              >
+                <div className="flex flex-col md:flex-row">
+                  <div className="border-b border-border md:border-b-0 md:border-r">
+                    <Select value={filters.make || "all"} onValueChange={(v) => setFiltersRaw({ ...filters, make: v === "all" ? "" : v })}>
+                      <SelectTrigger className="h-12 rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-44">
+                        <SelectValue placeholder="品牌" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">全部品牌</SelectItem>
+                        {MAKES_ZH && Object.entries(MAKES_ZH).filter(([k]) => k !== "Other").map(([k, v]) => (
+                          <SelectItem key={k} value={k}>{v} {k}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="relative flex-1 border-b border-border md:border-b-0 md:border-r">
+                    <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+                    <Input
+                      placeholder="搜索车型、关键词..."
+                      className="h-12 rounded-none border-0 pl-11 font-mono text-sm shadow-none focus-visible:ring-0"
+                      value={filters.keyword}
+                      onChange={(e) => setFiltersRaw({ ...filters, keyword: e.target.value })}
+                    />
+                  </div>
+                  <Button type="submit" className="h-12 gap-2 rounded-none px-8 font-mono text-sm">
+                    搜索
+                  </Button>
+                </div>
+              </form>
+
+              {/* Quick filter tags */}
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-1.5">
+                {[
+                  { label: "$15K以下", filter: { maxPrice: "15000" } },
+                  { label: "混动省油", filter: { fuelType: "混动" } },
+                  { label: "纯电车型", filter: { fuelType: "纯电" } },
+                  { label: "低里程", filter: { maxMileage: "30000" } },
+                  { label: "四驱SUV", filter: { drivetrain: "AWD" } },
+                ].map((t) => (
+                  <button
+                    key={t.label}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...INITIAL_FILTERS, ...t.filter };
+                      setFiltersRaw(next);
+                      setShowResult(true);
+                      syncToUrl(next, sort);
+                    }}
+                    className="border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground hover:text-foreground"
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Popular makes */}
+              <div className="mt-4 flex flex-wrap items-center justify-center gap-1.5">
+                {["Toyota", "Honda", "BMW", "Mercedes-Benz", "Tesla", "Lexus", "Audi", "Porsche"].map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => {
+                      const next = { ...INITIAL_FILTERS, make: m };
+                      setFiltersRaw(next);
+                      setShowResult(true);
+                      syncToUrl(next, sort);
+                    }}
+                    className="border border-border bg-muted/50 px-2.5 py-1 font-mono text-[11px] transition-colors hover:border-foreground"
+                  >
+                    {MAKES_ZH[m] || m}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Show recent cars if available */}
+          {recentCars.length > 0 && (
+            <section className="mx-auto w-full max-w-5xl px-4 pb-12">
+              <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                {recentCars.map((car) => (
+                  <CarCard key={"recent-" + car.id} car={car} />
+                ))}
+              </div>
+            </section>
+          )}
+          <Footer />
+        </div>
+      )}
+
+      {showResult && <>
       {/* Banner */}
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
@@ -732,6 +844,7 @@ function BrowseContent() {
       <Footer />
       <BackToTop />
       <CompareBar />
+      </>}
     </div>
     </PullToRefresh>
   );
