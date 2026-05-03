@@ -13,7 +13,7 @@ export default function TermsPage() {
           <section>
             <h2 className="font-mono text-sm font-semibold text-foreground">1. 接受条款</h2>
             <p className="mt-2">
-              欢迎使用车来车网（以下简称"本平台"）。访问或使用本平台即表示您同意受本用户协议约束。如果您不同意这些条款，请勿使用本平台。
+              欢迎使用常来车网（以下简称"本平台"）。访问或使用本平台即表示您同意受本用户协议约束。如果您不同意这些条款，请勿使用本平台。
             </p>
           </section>
 

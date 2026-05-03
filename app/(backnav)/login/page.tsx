@@ -114,12 +114,12 @@ export default function LoginPage() {
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
         <div className="flex flex-col items-center">
-          <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-12 w-12 object-contain" />
+          <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-12 w-12 object-contain" />
           <h1 className="mt-4 font-mono text-lg font-semibold tracking-tight">
             登录
           </h1>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            登录你的车来车网账号
+            登录你的常来车网账号
           </p>
         </div>
 

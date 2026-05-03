@@ -102,7 +102,7 @@ export default function BusinessPage() {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
         <h1 className="text-lg font-semibold">商业合作</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          车来车网面向车行、金融、保险等行业伙伴开放合作
+          常来车网面向车行、金融、保险等行业伙伴开放合作
         </p>
 
         {/* Services */}

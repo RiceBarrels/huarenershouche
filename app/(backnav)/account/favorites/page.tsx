@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { carLink } from "@/lib/static-link";
 import { Heart, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -73,7 +74,7 @@ export default function FavoritesPage() {
           ) : (
             favorites.map((car) => (
               <div key={car.id} className="flex gap-3 border border-border p-3">
-                <Link href={`/car/${car.id}`} className="shrink-0">
+                <Link href={carLink(car.id)} className="shrink-0">
                   <div className="h-20 w-28 bg-muted">
                     {car.image_url ? (
                       <img src={car.image_url} alt="" className="h-full w-full object-cover" />
@@ -84,7 +85,7 @@ export default function FavoritesPage() {
                 </Link>
                 <div className="flex flex-1 flex-col justify-between">
                   <div>
-                    <Link href={`/car/${car.id}`}><h3 className="font-mono text-sm font-semibold hover:underline">{car.title_zh}</h3></Link>
+                    <Link href={carLink(car.id)}><h3 className="font-mono text-sm font-semibold hover:underline">{car.title_zh}</h3></Link>
                     <p className="mt-0.5 font-mono text-xs text-muted-foreground">{formatPrice(car.price)} · {car.location_zh}</p>
                   </div>
                   <Button variant="outline" size="sm" className="h-8 w-fit gap-1 font-mono text-[11px]" onClick={() => removeFavorite(car.id)}>

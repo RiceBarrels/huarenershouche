@@ -3,13 +3,11 @@
 import { usePathname } from "next/navigation";
 import { useEffect, useState, useRef } from "react";
 
-// Global flag: after the app hydrates, any new PageTransition mount is a client-side nav
 let appHydrated = false;
 if (typeof window !== "undefined") {
   Promise.resolve().then(() => { appHydrated = true; });
 }
 
-// Store scroll position before navigation for the frozen background effect
 let _snapshotScrollY = 0;
 if (typeof window !== "undefined") {
   document.addEventListener("click", (e) => {
@@ -20,30 +18,37 @@ if (typeof window !== "undefined") {
   }, { capture: true });
 }
 
-/**
- * iOS-style native push transition.
- * Shows the previous page (frozen) sliding left while the new page slides in from right.
- */
+// BackNav sets this to true before calling router.back()
+let _isBackNavigation = false;
+export function setBackNavigation() { _isBackNavigation = true; }
+
+const DURATION = 350;
+const EASING = "cubic-bezier(0.2, 0.9, 0.3, 1)";
+
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
   const prevChildren = useRef<React.ReactNode>(null);
-  const [phase, setPhase] = useState<"idle" | "animating">(
-    appHydrated ? "animating" : "idle"
+  const [phase, setPhase] = useState<"idle" | "push" | "pop">(
+    appHydrated ? "push" : "idle"
   );
   const snapshotScrollY = useRef(0);
 
-  // Animate on pathname changes within this layout
   useEffect(() => {
     if (prevPath.current === pathname) return;
     prevPath.current = pathname;
     snapshotScrollY.current = _snapshotScrollY;
-    setPhase("animating");
-    const timer = setTimeout(() => setPhase("idle"), 350);
+
+    if (_isBackNavigation) {
+      _isBackNavigation = false;
+      setPhase("pop");
+    } else {
+      setPhase("push");
+    }
+    const timer = setTimeout(() => setPhase("idle"), DURATION);
     return () => clearTimeout(timer);
   }, [pathname]);
 
-  // Keep a ref of the previous children for the background
   useEffect(() => {
     if (phase === "idle") {
       prevChildren.current = children;
@@ -54,38 +59,63 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
+  if (phase === "push") {
+    return (
+      <>
+        {prevChildren.current && (
+          <div
+            className="fixed inset-0 z-[998] overflow-hidden bg-background pointer-events-none"
+            style={{ animation: `ios-push-back ${DURATION}ms ${EASING} both` }}
+          >
+            <div style={{ transform: `translateY(-${snapshotScrollY.current}px)` }}>
+              {prevChildren.current}
+            </div>
+          </div>
+        )}
+        <div
+          className="fixed inset-0 z-[999] bg-black pointer-events-none"
+          style={{ animation: `dim-in ${DURATION}ms ${EASING} both` }}
+        />
+        <div
+          className="fixed inset-0 z-[1000] overflow-y-auto bg-background"
+          style={{ animation: `ios-push-in ${DURATION}ms ${EASING} both` }}
+          onAnimationEnd={() => setPhase("idle")}
+        >
+          {children}
+        </div>
+      </>
+    );
+  }
+
+  // phase === "pop": back navigation
   return (
     <>
-      {/* Previous page frozen in background, sliding slightly left */}
+      {/* Destination page (new children) slides in from left behind */}
+      <div
+        className="fixed inset-0 z-[998] overflow-y-auto bg-background"
+        style={{ animation: `ios-pop-reveal ${DURATION}ms ${EASING} both` }}
+      >
+        {children}
+      </div>
+      {/* Dim overlay fading out */}
+      <div
+        className="fixed inset-0 z-[999] bg-black pointer-events-none"
+        style={{ animation: `dim-out ${DURATION}ms ${EASING} both` }}
+      />
+      {/* Previous page (old children) slides out to right */}
       {prevChildren.current && (
         <div
-          className="fixed inset-0 z-998 overflow-hidden bg-background pointer-events-none"
+          className="fixed inset-0 z-[1000] overflow-hidden bg-background pointer-events-none"
           style={{
-            animation: "ios-push-back 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
+            animation: `ios-pop-out ${DURATION}ms ${EASING} both`,
           }}
+          onAnimationEnd={() => setPhase("idle")}
         >
           <div style={{ transform: `translateY(-${snapshotScrollY.current}px)` }}>
             {prevChildren.current}
           </div>
         </div>
       )}
-      {/* Dim overlay */}
-      <div
-        className="fixed inset-0 z-999 bg-black pointer-events-none"
-        style={{
-          animation: "dim-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
-        }}
-      />
-      {/* New page sliding in from right */}
-      <div
-        className="fixed inset-0 z-1000 overflow-y-auto bg-background"
-        style={{
-          animation: "ios-push-in 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both",
-        }}
-        onAnimationEnd={() => setPhase("idle")}
-      >
-        {children}
-      </div>
     </>
   );
 }

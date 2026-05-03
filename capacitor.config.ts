@@ -8,8 +8,8 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://www.clcauto.com/"
 
 const config: CapacitorConfig = {
   appId: "com.clcauto.app",
-  appName: "车来车网",
-  webDir: "public",
+  appName: "常来车网",
+  webDir: "out",
   server: {
     // In production, load from deployed URL (supports SSR + dynamic routes)
     // In dev, load from local dev server
@@ -17,6 +17,8 @@ const config: CapacitorConfig = {
     androidScheme: "https",
     iosScheme: "capacitor",
     cleartext: process.env.NODE_ENV !== "production",
+    // When remote URL fails to load (no network), show local fallback page
+    errorPath: "index.html",
     allowNavigation: [
       "www.clcauto.com",
       "*.supabase.co",

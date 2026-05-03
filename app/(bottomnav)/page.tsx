@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { carLink } from "@/lib/static-link";
 
 import {
   Search,
@@ -17,6 +18,10 @@ import {
 import Image from "next/image";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { PriceDroppedCars } from "@/components/price-dropped-cars";
+import { TrendingSearches } from "@/components/trending-searches";
+import { RegionBrandEntry } from "@/components/region-brand-entry";
+import { TrustReviews } from "@/components/trust-reviews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -255,9 +260,9 @@ export default function Home() {
 
         <div className="relative mx-auto w-full max-w-3xl text-center">
           <div className="flex items-center justify-center gap-3">
-            <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-14 md:w-14" />
+            <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-14 md:w-14" />
             <h1 className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl">
-              车来车网<span className="text-xs text-white/50"> 测试版</span>
+              常来车网<span className="text-xs text-white/50"> 测试版</span>
             </h1>
           </div>
           <p
@@ -422,7 +427,7 @@ export default function Home() {
               {featured.map((car) => (
                 <div key={car.id}>
                 <Link
-                  href={`/car/${car.id}`}
+                  href={carLink(car.id)}
                   className="group block border border-border transition-colors hover:border-foreground/20"
                 >
                   {/* Image */}
@@ -468,34 +473,165 @@ export default function Home() {
         </section>
       )}
 
-      {/* Features - minimal */}
-      <section
-        className="border-t border-border px-4 py-8"
-      >
-        <div className="mx-auto flex max-w-2xl justify-around">
-          <div className="flex items-center gap-2">
-            <Shield className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-            <span className="font-mono text-[11px] text-muted-foreground">
-              可靠车源
-            </span>
+      {/* Price drops */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <PriceDroppedCars />
+        </div>
+      </section>
+
+      {/* Trending searches */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <TrendingSearches />
+        </div>
+      </section>
+
+      {/* Region entry */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <RegionBrandEntry />
+        </div>
+      </section>
+
+      {/* Community & QA entry */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="font-mono text-sm font-medium">车友社区</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <MapPin className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-            <span className="font-mono text-[11px] text-muted-foreground">
-              覆盖全美
-            </span>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Link href="/community" className="border border-border p-4 transition-colors hover:border-foreground/20">
+              <p className="font-mono text-xs font-semibold">车友圈</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">车评、晒车、交流</p>
+            </Link>
+            <Link href="/qa" className="border border-border p-4 transition-colors hover:border-foreground/20">
+              <p className="font-mono text-xs font-semibold">问答</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">购车、保险、过户</p>
+            </Link>
+            <Link href="/guide/buying" className="border border-border p-4 transition-colors hover:border-foreground/20">
+              <p className="font-mono text-xs font-semibold">购车指南</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">检查、谈价、防骗</p>
+            </Link>
+            <Link href="/guide/loan" className="border border-border p-4 transition-colors hover:border-foreground/20">
+              <p className="font-mono text-xs font-semibold">贷款预审</p>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">在线比价、秒批</p>
+            </Link>
           </div>
-          <div className="flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-            <span className="font-mono text-[11px] text-muted-foreground">
-              价格透明
-            </span>
+        </div>
+      </section>
+
+      {/* Trust reviews */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <TrustReviews />
+        </div>
+      </section>
+
+      {/* Why choose us */}
+      <section className="border-t border-border px-4 py-12">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="text-center font-mono text-lg font-semibold">为什么选择常来车网</h2>
+          <p className="mt-2 text-center font-mono text-xs text-muted-foreground">专为北美华人打造的二手车交易平台</p>
+          <div className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+            <div className="border border-border p-4">
+              <Shield className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              <h3 className="mt-3 font-mono text-sm font-semibold">VIN 认证</h3>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                每辆车通过 NHTSA 官方数据库验证，查看召回记录、安全评级和投诉历史
+              </p>
+            </div>
+            <div className="border border-border p-4">
+              <DollarSign className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              <h3 className="mt-3 font-mono text-sm font-semibold">价格透明</h3>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                市场价格分析，降价监控提醒，帮你判断车辆定价是否合理
+              </p>
+            </div>
+            <div className="border border-border p-4">
+              <Zap className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              <h3 className="mt-3 font-mono text-sm font-semibold">全中文服务</h3>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                中文搜索、中文沟通、中文客服，消除语言障碍，买车更安心
+              </p>
+            </div>
+            <div className="border border-border p-4">
+              <MapPin className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+              <h3 className="mt-3 font-mono text-sm font-semibold">覆盖全美</h3>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                纽约、洛杉矶、旧金山、芝加哥等华人聚集城市，按距离找到身边的车
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Zap className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-            <span className="font-mono text-[11px] text-muted-foreground">
-              中文服务
-            </span>
+        </div>
+      </section>
+
+      {/* How it works */}
+      <section className="border-t border-border bg-muted/30 px-4 py-12">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="text-center font-mono text-lg font-semibold">买车三步走</h2>
+          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-3">
+            <div className="text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center border border-border bg-background font-mono text-lg font-bold">1</div>
+              <h3 className="mt-4 font-mono text-sm font-semibold">搜索筛选</h3>
+              <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                按品牌、价格、里程、地区等条件，快速找到心仪的车辆
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center border border-border bg-background font-mono text-lg font-bold">2</div>
+              <h3 className="mt-4 font-mono text-sm font-semibold">查看详情</h3>
+              <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                VIN 认证、安全召回查询、车辆配置一目了然，做出明智决定
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center border border-border bg-background font-mono text-lg font-bold">3</div>
+              <h3 className="mt-4 font-mono text-sm font-semibold">联系卖家</h3>
+              <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                在线私信或电话联系，中文沟通无障碍，约看车、谈价格
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* For sellers */}
+      <section className="border-t border-border px-4 py-12">
+        <div className="mx-auto flex max-w-3xl flex-col items-center text-center">
+          <h2 className="font-mono text-lg font-semibold">想卖车？</h2>
+          <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
+            免费发布车辆信息，精准触达北美华人买家。个人卖家和车行都可以使用。
+          </p>
+          <div className="mt-6 flex gap-3">
+            <Link href="/post">
+              <Button className="gap-1.5 font-mono text-xs">
+                免费发布车辆
+              </Button>
+            </Link>
+            <Link href="/business">
+              <Button variant="outline" className="gap-1.5 font-mono text-xs">
+                车行入驻
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Stats */}
+      <section className="border-t border-border bg-muted/30 px-4 py-10">
+        <div className="mx-auto grid max-w-3xl grid-cols-3 gap-4 text-center">
+          <div>
+            <p className="font-mono text-2xl font-bold">{featured.length > 0 ? `${featured.length}+` : "—"}</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">在售车辆</p>
+          </div>
+          <div>
+            <p className="font-mono text-2xl font-bold">50+</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">覆盖州</p>
+          </div>
+          <div>
+            <p className="font-mono text-2xl font-bold">100%</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground">免费使用</p>
           </div>
         </div>
       </section>

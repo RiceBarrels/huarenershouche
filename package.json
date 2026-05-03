@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:static": "bun scripts/build-static.ts",
     "start": "next start",
     "lint": "eslint",
     "cap:sync": "bunx cap sync",

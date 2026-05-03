@@ -22,7 +22,7 @@ function GoogleIcon({ className }: { className?: string }) {
 const SLIDES = [
   {
     icon: null as any,
-    title: "车来车网",
+    title: "常来车网",
     subtitle: "北美华人最信赖的二手车交易平台",
     description: "免费发布 · 中文沟通 · 覆盖全美",
   },
@@ -141,7 +141,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                       {Icon ? (
                         <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
                       ) : (
-                        <Image src="/logo.png" alt="车来车网" width={48} height={48} className="h-12 w-12 object-contain" />
+                        <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-12 w-12 object-contain" />
                       )}
                     </div>
                     <h1 className="mt-8 text-center font-mono text-2xl font-semibold tracking-tight">

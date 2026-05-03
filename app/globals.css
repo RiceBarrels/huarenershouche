@@ -202,6 +202,21 @@
   to { opacity: 0.08; }
 }
 
+@keyframes dim-out {
+  from { opacity: 0.08; }
+  to { opacity: 0; }
+}
+
+/* Back: previous page slides in from left (-30% → 0) */
+@keyframes ios-pop-reveal {
+  from {
+    transform: translateX(-30%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
 /* Hide safe-area pill on devices without a notch/safe area */
 .safe-area-pill-container {
   display: none;

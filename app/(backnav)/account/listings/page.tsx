@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { carLink, carEditLink } from "@/lib/static-link";
 import {
   Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2, Pencil,
 } from "lucide-react";
@@ -143,7 +144,7 @@ export default function ListingsPage() {
           ) : (
             myCars.map((car) => (
               <div key={car.id} className="flex gap-3 border border-border p-3">
-                <Link href={`/car/${car.id}`} className="shrink-0">
+                <Link href={carLink(car.id)} className="shrink-0">
                   <div className="h-20 w-28 bg-muted">
                     {car.image_url ? (
                       <img src={car.image_url} alt="" className="h-full w-full object-cover" />
@@ -155,7 +156,7 @@ export default function ListingsPage() {
                 <div className="flex flex-1 flex-col justify-between">
                   <div>
                     <div className="flex items-center gap-2">
-                      <Link href={`/car/${car.id}`}><h3 className="font-mono text-sm font-semibold hover:underline">{car.title_zh}</h3></Link>
+                      <Link href={carLink(car.id)}><h3 className="font-mono text-sm font-semibold hover:underline">{car.title_zh}</h3></Link>
                       <Badge variant={STATUS_MAP[car.status]?.variant || "outline"} className="font-mono text-[10px]">
                         {STATUS_MAP[car.status]?.label || car.status}
                       </Badge>
@@ -165,7 +166,7 @@ export default function ListingsPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link href={`/car/${car.id}/edit`}>
+                    <Link href={carEditLink(car.id)}>
                       <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]">
                         <Pencil className="h-3 w-3" strokeWidth={1.5} />编辑
                       </Button>

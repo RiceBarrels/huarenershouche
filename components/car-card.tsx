@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { carLink } from "@/lib/static-link";
 import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
@@ -92,7 +93,7 @@ export function CarCard({
   }, [car.id]);
 
   return (
-    <Link href={`/car/${car.id}`}>
+    <Link href={carLink(car.id)}>
       <motion.article
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}

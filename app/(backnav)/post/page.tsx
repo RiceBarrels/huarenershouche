@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2 } from "lucide-react";
+import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -22,6 +22,7 @@ import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
+import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -245,9 +246,12 @@ export default function PostCarPage() {
     seller_name: "",
     phone: "",
     description_zh: "",
+    carfax_url: "",
   };
 
   const [form, setForm] = useState(defaultForm);
+  const [carfaxLoading, setCarfaxLoading] = useState(false);
+  const [carfaxSummary, setCarfaxSummary] = useState<CarfaxSummary | null>(null);
 
   // Check for draft on mount — ask user before restoring
   useEffect(() => {
@@ -648,6 +652,11 @@ export default function PostCarPage() {
     if (!user) return;
     setError("");
 
+    if (imageUrls.length === 0) {
+      setError("请至少上传一张车辆照片");
+      return;
+    }
+
     if (!isValidVinFormat(form.vin)) {
       setError("请输入有效的 17 位 VIN 码");
       return;
@@ -719,6 +728,8 @@ export default function PostCarPage() {
         lat: coords?.lat || null,
         lng: coords?.lng || null,
         description_zh: form.description_zh || null,
+        carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
+        carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
         features,
         status: "active",
       })
@@ -856,10 +867,10 @@ export default function PostCarPage() {
             {/* Images */}
             <div>
               <Label className="font-mono text-xs font-semibold">
-                车辆照片（支持拖拽上传）
+                车辆照片 <span className="text-destructive">*</span>
               </Label>
               <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                第一张将作为封面图，建议上传 5-10 张，支持拖拽上传
+                至少上传一张照片，第一张将作为封面图，建议 5-10 张
               </p>
               <div
                 className={`mt-2 flex flex-wrap gap-2 rounded p-2 transition-colors ${
@@ -959,6 +970,72 @@ export default function PostCarPage() {
                 <p className="mt-1 font-mono text-[11px] text-green-600 dark:text-green-400">
                   已根据 VIN 自动填写车辆信息，请核实并补充其余内容
                 </p>
+              )}
+            </div>
+
+            {/* Carfax link */}
+            <div className="border-t border-border pt-6">
+              <h2 className="font-mono text-xs font-semibold">Carfax 报告</h2>
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                粘贴 Carfax 链接，系统将自动获取报告摘要
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  className="h-9 flex-1 font-mono text-xs"
+                  placeholder="https://www.carfax.com/vehicle/..."
+                  value={form.carfax_url}
+                  onChange={(e) => {
+                    update("carfax_url", e.target.value);
+                    setCarfaxSummary(null);
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 font-mono text-[11px]"
+                  disabled={carfaxLoading || !form.carfax_url.trim()}
+                  onClick={async () => {
+                    const url = normalizeCarfaxUrl(form.carfax_url);
+                    if (!isCarfaxUrl(url)) {
+                      setError("请输入有效的 Carfax 链接");
+                      return;
+                    }
+                    setCarfaxLoading(true);
+                    setError("");
+                    const result = await fetchCarfaxSummary(url);
+                    setCarfaxLoading(false);
+                    if (result) {
+                      setCarfaxSummary(result);
+                    } else {
+                      setCarfaxSummary({ title: "Carfax Report", owners: null, accidents: null, serviceRecords: null });
+                    }
+                  }}
+                >
+                  {carfaxLoading ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                  ) : (
+                    <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  )}
+                  获取报告
+                </Button>
+              </div>
+              {carfaxSummary && (
+                <div className="mt-2 flex items-center gap-2 border border-border bg-muted/30 px-3 py-2">
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                  <span className="flex-1 font-mono text-[11px]">
+                    {formatCarfaxSummary(carfaxSummary)}
+                  </span>
+                  <a
+                    href={normalizeCarfaxUrl(form.carfax_url)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                  >
+                    <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
+                    Carfax
+                  </a>
+                </div>
               )}
             </div>
 

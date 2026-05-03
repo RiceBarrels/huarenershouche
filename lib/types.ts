@@ -27,6 +27,8 @@ export interface DbCar {
   description_zh: string | null;
   seller_name: string;
   phone: string | null;
+  carfax_url: string | null;
+  carfax_summary: string | null;
   features: string[];
   status: "active" | "sold" | "pending" | "removed";
   views_count: number;
@@ -121,5 +123,78 @@ export interface DbDealerReview {
   content: string;
   created_at: string;
   // Joined
+  profiles?: { username: string; avatar_url: string | null };
+}
+
+export interface DbCommunityPost {
+  id: string;
+  user_id: string;
+  type: "review" | "showoff" | "discussion";
+  title: string;
+  content: string;
+  images: string[];
+  car_id: string | null;
+  make: string | null;
+  model: string | null;
+  year: number | null;
+  tags: string[];
+  likes_count: number;
+  comments_count: number;
+  status: "active" | "hidden" | "removed";
+  created_at: string;
+  updated_at: string;
+  profiles?: { username: string; avatar_url: string | null };
+}
+
+export interface DbPostComment {
+  id: string;
+  post_id: string;
+  user_id: string;
+  parent_id: string | null;
+  content: string;
+  likes_count: number;
+  created_at: string;
+  profiles?: { username: string; avatar_url: string | null };
+}
+
+export interface DbQaQuestion {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
+  category: "buying" | "selling" | "loan" | "insurance" | "dmv" | "maintenance" | "general";
+  tags: string[];
+  answers_count: number;
+  views_count: number;
+  is_resolved: boolean;
+  accepted_answer_id: string | null;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  profiles?: { username: string; avatar_url: string | null };
+}
+
+export interface DbQaAnswer {
+  id: string;
+  question_id: string;
+  user_id: string;
+  content: string;
+  likes_count: number;
+  is_accepted: boolean;
+  created_at: string;
+  profiles?: { username: string; avatar_url: string | null };
+}
+
+export interface DbPlatformReview {
+  id: string;
+  user_id: string;
+  rating: number;
+  content: string;
+  transaction_type: "buy" | "sell" | null;
+  car_make: string | null;
+  car_model: string | null;
+  is_featured: boolean;
+  status: string;
+  created_at: string;
   profiles?: { username: string; avatar_url: string | null };
 }

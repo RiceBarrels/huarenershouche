@@ -558,7 +558,7 @@ function BrowseContent() {
           <div>
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-              <p className="font-mono text-sm font-semibold">车来车网</p>
+              <p className="font-mono text-sm font-semibold">常来车网</p>
             </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               北美华人最信赖的二手车交易平台 · 免费发布 · 中文服务
