@@ -227,16 +227,6 @@ export default function CommunityDetailPage() {
           <p className="font-mono text-sm text-muted-foreground">
             帖子不存在或已被删除
           </p>
-          <Link href="/community">
-            <Button
-              variant="outline"
-              size="sm"
-              className="mt-4 gap-1.5 font-mono text-xs"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
-              返回社区
-            </Button>
-          </Link>
         </main>
         <Footer />
       </div>
@@ -247,14 +237,6 @@ export default function CommunityDetailPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
-        {/* Back link */}
-        <Link
-          href="/community"
-          className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
-          返回社区
-        </Link>
 
         {/* Author row */}
         <div className="mt-4 flex items-center gap-2">

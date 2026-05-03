@@ -4,7 +4,7 @@ import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Plus, Heart, Camera, Loader2, Store, MapPin,
+  Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
   FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText, ShieldCheck,
   Headset, Handshake, UserCircle,
 } from "lucide-react";
@@ -240,6 +240,11 @@ function AccountContent() {
               label="我的收藏"
               value={user ? `${favCount} 辆` : undefined}
               href={user ? "/account/favorites" : "/login"}
+            />
+            <MenuRow
+              icon={<MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="消息"
+              href={user ? "/messages" : "/login"}
             />
             <MenuRow
               icon={<Plus className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}

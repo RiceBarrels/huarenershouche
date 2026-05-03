@@ -2,38 +2,26 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { Search, Plus, User, MessageSquare, Home } from "lucide-react";
+import { Search, Plus, User, Users, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { User as SupaUser } from "@supabase/supabase-js";
 
 const TABS = [
   { href: "/", icon: Home, label: "首页", match: (p: string) => p === "/" },
   { href: "/browse", icon: Search, label: "买车", match: (p: string) => p === "/browse" },
   { href: "/post", icon: Plus, label: "发布", match: (p: string) => p === "/post" },
-  { href: "/messages", icon: MessageSquare, label: "消息", match: (p: string) => p === "/messages" },
-  { href: "/account", icon: User, label: "我的", match: (p: string) => p === "/account" },
+  { href: "/community", icon: Users, label: "社区", match: (p: string) => p.startsWith("/community") || p.startsWith("/qa") },
+  { href: "/account", icon: User, label: "我的", match: (p: string) => p === "/account" || p === "/messages" },
 ];
 
 export function MobileTabBar() {
   const pathname = usePathname();
-  const [user, setUser] = useState<SupaUser | null>(null);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const [user, setUser] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-      if (data.user) {
-        supabase.rpc("get_unread_count").then(({ data: count }) => setUnreadCount(count || 0));
-      }
-    });
+    supabase.auth.getUser().then(({ data }) => setUser(!!data.user));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        supabase.rpc("get_unread_count").then(({ data: count }) => setUnreadCount(count || 0));
-      } else {
-        setUnreadCount(0);
-      }
+      setUser(!!session?.user);
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -44,11 +32,7 @@ export function MobileTabBar() {
         {TABS.map((tab) => {
           const active = tab.match(pathname);
           const isPost = tab.href === "/post";
-          const isMessages = tab.label === "消息";
-          // Redirect to login if not logged in for messages
-          const href = (!user && isMessages)
-            ? "/login"
-            : tab.href;
+          const href = tab.href;
 
           return (
             <Link
@@ -67,14 +51,7 @@ export function MobileTabBar() {
                   <Plus className="h-5 w-5" strokeWidth={2} />
                 </span>
               ) : (
-                <>
-                  <tab.icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
-                  {isMessages && unreadCount > 0 && (
-                    <span className="absolute right-1/2 top-1 ml-3 flex h-4 min-w-4 translate-x-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[9px] font-bold text-white">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </span>
-                  )}
-                </>
+                <tab.icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
               )}
               <span className={`font-mono text-[10px] ${isPost ? "mt-0.5" : ""}`}>
                 {tab.label}

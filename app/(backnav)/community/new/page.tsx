@@ -188,13 +188,6 @@ export default function NewPostPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
-        <Link
-          href="/community"
-          className="inline-flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ChevronLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
-          返回社区
-        </Link>
 
         <h1 className="mt-4 font-mono text-sm font-semibold tracking-tight">
           发帖

@@ -26,7 +26,7 @@ function timeAgo(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
-export function ConversationList({ userId, initialConvId }: { userId: string; initialConvId?: string | null }) {
+export function ConversationList({ userId, initialConvId, initialOtherUserId }: { userId: string; initialConvId?: string | null; initialOtherUserId?: string | null }) {
   const [conversations, setConversations] = useState<(DbConversation & { last_message?: string; unread_count?: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeConversation, setActiveConversation] = useState<string | null>(initialConvId || null);
@@ -34,7 +34,7 @@ export function ConversationList({ userId, initialConvId }: { userId: string; in
 
   useEffect(() => {
     loadConversations();
-  }, [userId, initialConvId]);
+  }, [userId, initialConvId, initialOtherUserId]);
 
   async function loadConversations() {
     setLoading(true);
@@ -94,6 +94,20 @@ export function ConversationList({ userId, initialConvId }: { userId: string; in
     if (initialConvId && !activeOtherName) {
       const target = convs.find((c) => c.id === initialConvId);
       if (target) {
+        const isBuyer = target.buyer_id === userId;
+        const otherProfile = isBuyer ? target.seller_profile : target.buyer_profile;
+        setActiveOtherName(otherProfile?.username || "用户");
+      }
+    }
+
+    // Auto-open conversation by other user ID
+    if (initialOtherUserId && !activeConversation) {
+      const target = convs.find((c) =>
+        (c.buyer_id === initialOtherUserId && c.seller_id === userId) ||
+        (c.seller_id === initialOtherUserId && c.buyer_id === userId)
+      );
+      if (target) {
+        setActiveConversation(target.id);
         const isBuyer = target.buyer_id === userId;
         const otherProfile = isBuyer ? target.seller_profile : target.buyer_profile;
         setActiveOtherName(otherProfile?.username || "用户");

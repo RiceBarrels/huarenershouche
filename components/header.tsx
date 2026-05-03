@@ -48,7 +48,7 @@ export function Header() {
     <header className="sticky top-0 z-50 hidden border-b border-border bg-background/95 backdrop-blur-sm md:block">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="常来车网" width={24} height={24} className="h-6 w-6 object-contain" />
+          <Image src="/logo.png" alt="常来车网" width={24} height={24} className="h-6 w-6" />
           <span className="font-mono text-sm font-semibold tracking-tight">
             常来车网
           </span>
@@ -61,12 +61,6 @@ export function Header() {
             className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             买车
-          </Link>
-          <Link
-            href="/post"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            卖车
           </Link>
           <Link
             href="/valuation"
