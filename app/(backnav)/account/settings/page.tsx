@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { NotificationSettings } from "@/components/notification-settings";
 import type { DbProfile, DbDealerStore } from "@/lib/types";
 
 const StoreMap = dynamic(
@@ -472,6 +473,14 @@ export default function SettingsPage() {
                 </Button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Notification settings */}
+        {!loading && (
+          <div className="mt-6">
+            <h2 className="mb-3 font-mono text-sm font-semibold">通知设置</h2>
+            <NotificationSettings />
           </div>
         )}
       </main>

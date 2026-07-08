@@ -13,6 +13,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCachedData } from "@/lib/use-cached-data";
 import { MAKES_ZH } from "@/lib/mock-data";
 import type { DbCar } from "@/lib/types";
 
@@ -42,40 +43,41 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
 export default function ListingsPage() {
   const router = useRouter();
   const [user, setUser] = useState<string | null>(null);
-  const [myCars, setMyCars] = useState<DbCar[]>([]);
   const [draft, setDraft] = useState<PostDraft | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { router.push("/login"); return; }
-      setUser(authUser.id);
-
-      const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", authUser.id).order("created_at", { ascending: false });
-      setMyCars((cars as DbCar[]) || []);
-
-      try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
-      setLoading(false);
-    }
-    load();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) { router.push("/login"); return; }
+      setUser(data.user.id);
+    });
+    try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
   }, [router]);
+
+  const { data: myCarsData, loading, mutate } = useCachedData<DbCar[]>(
+    user ? `account_cars_${user}` : null,
+    async () => {
+      const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", user!).order("created_at", { ascending: false });
+      return (cars as DbCar[]) || [];
+    },
+    [user],
+  );
+  const myCars = myCarsData || [];
 
   async function toggleStatus(carId: string, currentStatus: string) {
     const newStatus = currentStatus === "active" ? "removed" : "active";
     await supabase.from("cars").update({ status: newStatus }).eq("id", carId);
-    setMyCars((prev) => prev.map((c) => (c.id === carId ? { ...c, status: newStatus as DbCar["status"] } : c)));
+    mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, status: newStatus as DbCar["status"] } : c)));
   }
 
   async function markSold(carId: string) {
     await supabase.from("cars").update({ status: "sold" }).eq("id", carId);
-    setMyCars((prev) => prev.map((c) => (c.id === carId ? { ...c, status: "sold" } : c)));
+    mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, status: "sold" } : c)));
   }
 
   async function deleteCar(carId: string) {
     if (!confirm("确定要删除这辆车吗？此操作不可恢复。")) return;
     await supabase.from("cars").delete().eq("id", carId);
-    setMyCars((prev) => prev.filter((c) => c.id !== carId));
+    mutate((prev) => (prev || []).filter((c) => c.id !== carId));
   }
 
   return (

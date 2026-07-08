@@ -3,8 +3,9 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2, ExternalLink } from "lucide-react";
+import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2, ExternalLink, Video } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -200,6 +201,8 @@ export default function PostCarPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoUploading, setVideoUploading] = useState(false);
   const [featureInput, setFeatureInput] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
   const [error, setError] = useState("");
@@ -387,20 +390,46 @@ export default function PostCarPage() {
 
   async function uploadFiles(files: File[]) {
     if (!user || files.length === 0) return;
-    setUploading(true);
-    for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
-      const ext = file.name.split(".").pop();
-      const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+    const images = files.filter(isImageFile);
+    const videos = files.filter(isVideoFile);
+
+    if (images.length > 0) {
+      setUploading(true);
+      for (const file of images) {
+        const compressed = await compressImage(file);
+        const ext = compressed.name.split(".").pop() || "webp";
+        const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        const { error } = await supabase.storage
+          .from("car-images")
+          .upload(path, compressed);
+        if (!error) {
+          const { data: { publicUrl } } = supabase.storage.from("car-images").getPublicUrl(path);
+          setImageUrls((prev) => [...prev, publicUrl]);
+        }
+      }
+      setUploading(false);
+    }
+
+    if (videos.length > 0 && !videoUrl) {
+      const video = videos[0];
+      const validation = await validateVideo(video);
+      if (!validation.valid) {
+        setError(validation.error || "视频格式不支持");
+        return;
+      }
+      setVideoUploading(true);
+      const ext = video.name.split(".").pop() || "mp4";
+      const path = `${user}/${Date.now()}-video.${ext}`;
       const { error } = await supabase.storage
         .from("car-images")
-        .upload(path, file);
+        .upload(path, video);
       if (!error) {
         const { data: { publicUrl } } = supabase.storage.from("car-images").getPublicUrl(path);
-        setImageUrls((prev) => [...prev, publicUrl]);
+        setVideoUrl(publicUrl);
       }
+      setVideoUploading(false);
     }
-    setUploading(false);
   }
 
   async function handleDrop(e: React.DragEvent) {
@@ -408,7 +437,7 @@ export default function PostCarPage() {
     setDragging(false);
 
     // 1. Dropped files (local)
-    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    const files = Array.from(e.dataTransfer.files).filter((f) => isImageFile(f) || isVideoFile(f));
     if (files.length > 0) {
       uploadFiles(files);
       return;
@@ -717,9 +746,11 @@ export default function PostCarPage() {
         location: locationEn,
         location_zh: locationZh,
         image_url: imageUrls[0] || null,
-        images: imageUrls.slice(1),
+        // 视频追加在 images 末尾，详情页按扩展名识别视频
+        images: [...imageUrls.slice(1), ...(videoUrl ? [videoUrl] : [])],
         fuel_type: form.fuel_type,
         transmission: form.transmission,
+        drivetrain: form.drivetrain || null,
         exterior_color: form.exterior_color || null,
         interior_color: form.interior_color || null,
         vin: form.vin,
@@ -919,7 +950,7 @@ export default function PostCarPage() {
                   )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,video/mp4,video/quicktime,video/webm"
                     multiple
                     className="hidden"
                     onChange={handleImageUpload}
@@ -927,6 +958,30 @@ export default function PostCarPage() {
                   />
                 </label>
               </div>
+
+              {/* Video preview */}
+              {videoUrl && (
+                <div className="relative mt-3 overflow-hidden border border-border">
+                  <video src={videoUrl} controls className="h-32 w-full object-cover" />
+                  <button
+                    type="button"
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1"
+                    onClick={() => setVideoUrl(null)}
+                  >
+                    <X className="h-3 w-3 text-white" strokeWidth={2} />
+                  </button>
+                </div>
+              )}
+              {videoUploading && (
+                <div className="mt-2 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />上传视频中...
+                </div>
+              )}
+              {!videoUrl && !videoUploading && (
+                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                  支持上传 1 个短视频（≤30秒，≤50MB）
+                </p>
+              )}
             </div>
 
             {/* VIN Auto-fill */}

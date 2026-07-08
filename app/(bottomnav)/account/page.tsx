@@ -6,7 +6,7 @@ import Link from "next/link";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
   FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText, ShieldCheck,
-  Headset, Handshake, UserCircle,
+  Headset, Handshake, UserCircle, BarChart3,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
@@ -16,6 +16,7 @@ import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCachedData } from "@/lib/use-cached-data";
 import type { DbCar, DbProfile } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -57,38 +58,63 @@ function AccountContent() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState<string | null>(null);
-  const [profile, setProfile] = useState<DbProfile | null>(null);
-  const [myCars, setMyCars] = useState<DbCar[]>([]);
-  const [favCount, setFavCount] = useState(0);
+  // undefined = 鉴权中，null = 未登录
+  const [user, setUser] = useState<string | null | undefined>(undefined);
   const [draft, setDraft] = useState<PostDraft | null>(null);
-  const [loading, setLoading] = useState(true);
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { setMounted(true); }, []);
 
-  const loadAccount = useCallback(async () => {
-    const { data: { user: authUser } } = await supabase.auth.getUser();
-    if (!authUser) { setLoading(false); return; }
-    setUser(authUser.id);
-
-    const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authUser.id).maybeSingle();
-    if (profileData) setProfile(profileData as DbProfile);
-
-    const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", authUser.id).order("created_at", { ascending: false });
-    setMyCars((cars as DbCar[]) || []);
-
-    const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", authUser.id);
-    setFavCount(count || 0);
-
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user?.id ?? null);
+    });
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
-    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    loadAccount();
-  }, [loadAccount]);
+  const { data: profile, loading: profileLoading, mutate: mutateProfile } = useCachedData<DbProfile | null>(
+    user ? `account_profile_${user}` : null,
+    async () => {
+      const { data } = await supabase.from("profiles").select("*").eq("id", user!).maybeSingle();
+      return (data as DbProfile) || null;
+    },
+    [user],
+  );
+
+  const { data: myCars, loading: carsLoading, mutate: mutateCars } = useCachedData<DbCar[]>(
+    user ? `account_cars_${user}` : null,
+    async () => {
+      const { data } = await supabase.from("cars").select("*").eq("seller_id", user!).order("created_at", { ascending: false });
+      return (data as DbCar[]) || [];
+    },
+    [user],
+  );
+
+  const { data: favCount, loading: favLoading, mutate: mutateFavCount } = useCachedData<number>(
+    user ? `account_favcount_${user}` : null,
+    async () => {
+      const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", user!);
+      return count || 0;
+    },
+    [user],
+  );
+
+  const loading =
+    user === undefined || (user !== null && profileLoading && carsLoading);
+
+  // 下拉刷新：真正重新拉取，而不是原样回写缓存
+  const loadAccount = useCallback(async () => {
+    if (!user) return;
+    const [profileRes, carsRes, favRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", user).maybeSingle(),
+      supabase.from("cars").select("*").eq("seller_id", user).order("created_at", { ascending: false }),
+      supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", user),
+    ]);
+    if (profileRes.data !== undefined) mutateProfile((profileRes.data as DbProfile) || null);
+    if (carsRes.data) mutateCars(carsRes.data as DbCar[]);
+    if (favRes.count !== null) mutateFavCount(favRes.count || 0);
+  }, [user, mutateProfile, mutateCars, mutateFavCount]);
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -100,7 +126,7 @@ function AccountContent() {
     if (!error) {
       const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(path);
       await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", user);
-      setProfile((prev) => prev ? { ...prev, avatar_url: publicUrl } : prev);
+      mutateProfile((prev) => prev ? { ...prev, avatar_url: publicUrl } : prev);
     }
     setAvatarUploading(false);
     if (avatarInputRef.current) avatarInputRef.current.value = "";
@@ -109,14 +135,11 @@ function AccountContent() {
   async function handleLogout() {
     await supabase.auth.signOut();
     setUser(null);
-    setProfile(null);
-    setMyCars([]);
-    setFavCount(0);
     setDraft(null);
     router.refresh();
   }
 
-  const activeCars = myCars.filter((c) => c.status === "active").length;
+  const activeCars = (myCars || []).filter((c) => c.status === "active").length;
 
   return (
     <PullToRefresh onRefresh={loadAccount}>
@@ -213,12 +236,12 @@ function AccountContent() {
           </Link>
           <div className="w-px bg-border" />
           <Link href={user ? "/account/listings" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
-            <span className="font-mono text-lg font-bold">{myCars.length}</span>
+            <span className="font-mono text-lg font-bold">{(myCars || []).length}</span>
             <span className="font-mono text-[11px] text-muted-foreground">发布</span>
           </Link>
           <div className="w-px bg-border" />
           <Link href={user ? "/account/favorites" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
-            <span className="font-mono text-lg font-bold">{favCount}</span>
+            <span className="font-mono text-lg font-bold">{favCount || 0}</span>
             <span className="font-mono text-[11px] text-muted-foreground">收藏</span>
           </Link>
         </div>
@@ -232,13 +255,18 @@ function AccountContent() {
             <MenuRow
               icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="我的发布"
-              value={user ? `${myCars.length} 辆` : undefined}
+              value={user ? `${(myCars || []).length} 辆` : undefined}
               href={user ? "/account/listings" : "/login"}
+            />
+            <MenuRow
+              icon={<BarChart3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="数据面板"
+              href={user ? "/account/dashboard" : "/login"}
             />
             <MenuRow
               icon={<Heart className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="我的收藏"
-              value={user ? `${favCount} 辆` : undefined}
+              value={user ? `${favCount || 0} 辆` : undefined}
               href={user ? "/account/favorites" : "/login"}
             />
             <MenuRow

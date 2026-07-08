@@ -104,7 +104,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} 常来车网 CheCarNet. All rights reserved.
+            &copy; {new Date().getFullYear()} 常来车网 CLCAuto. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <Link href="/terms" className="transition-colors hover:text-foreground">

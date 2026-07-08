@@ -5,6 +5,7 @@ import { CapacitorProvider } from "@/components/capacitor-provider";
 import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
+import { RealtimeNotifications } from "@/components/realtime-notifications";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -67,6 +68,7 @@ export default function RootLayout({
               </div>
               {children}
               <InitHaptic/>
+              <RealtimeNotifications />
             </CapacitorProvider>
           </div>
         </ThemeProvider>

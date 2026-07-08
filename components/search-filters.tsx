@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
+import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 
 // --- Price breakpoints ---
 const PRICE_STOPS = [
@@ -198,15 +199,23 @@ const DRIVETRAIN_OPTIONS = [
   { value: "4WD", label: "四驱 4WD" },
 ];
 
-const CYLINDER_OPTIONS = [
-  { value: "3", label: "3缸" },
-  { value: "4", label: "4缸" },
-  { value: "5", label: "5缸" },
-  { value: "6", label: "6缸" },
-  { value: "8", label: "8缸" },
-  { value: "10", label: "10缸" },
-  { value: "12", label: "12缸" },
+// 车况与保障开关（更多条件）
+export const CONDITION_TOGGLES: {
+  key: "noAccident" | "oneOwner" | "hasCarfax" | "hasVideo" | "hasPrice";
+  label: string;
+}[] = [
+  { key: "noAccident", label: "无事故" },
+  { key: "oneOwner", label: "一手车主" },
+  { key: "hasCarfax", label: "有Carfax报告" },
+  { key: "hasVideo", label: "带视频" },
+  { key: "hasPrice", label: "排除电议" },
 ];
+
+// 带数量的动态选项（车型 / 车辆配置），由 browse 页统计车源后传入
+export interface CountOption {
+  name: string;
+  count: number;
+}
 
 const COLOR_OPTIONS = [
   { value: "白", label: "白色", color: "#ffffff" },
@@ -234,9 +243,22 @@ const INTERIOR_COLOR_OPTIONS = [
   { value: "蓝", label: "蓝色", color: "#2563eb" },
 ];
 
+// 月供预算预设（全站口径：0 首付 / 6.5% APR / 60 期）
+export const PAYMENT_PRESETS = ["200", "300", "400", "500", "700"];
+
+// 上架时间选项（单选）
+export const LISTED_WITHIN_OPTIONS = [
+  { value: "", label: "不限" },
+  { value: "1", label: "24小时内" },
+  { value: "3", label: "3天内" },
+  { value: "7", label: "7天内" },
+  { value: "30", label: "30天内" },
+];
+
 export interface Filters {
   keyword: string;
   make: string;
+  model: string;
   minPrice: string;
   maxPrice: string;
   minYear: string;
@@ -249,13 +271,24 @@ export interface Filters {
   maxMileage: string;
   exteriorColor: string;
   interiorColor: string;
-  cylinders: string;
+  features: string;
   maxDistance: string;
+  bodyStyle: string;
+  maxPayment: string;
+  dealRating: string;
+  priceDropped: string;
+  listedWithin: string;
+  noAccident: string;
+  oneOwner: string;
+  hasCarfax: string;
+  hasVideo: string;
+  hasPrice: string;
 }
 
 export const INITIAL_FILTERS: Filters = {
   keyword: "",
   make: "",
+  model: "",
   minPrice: "",
   maxPrice: "",
   minYear: "",
@@ -268,8 +301,18 @@ export const INITIAL_FILTERS: Filters = {
   maxMileage: "",
   exteriorColor: "",
   interiorColor: "",
-  cylinders: "",
+  features: "",
   maxDistance: "",
+  bodyStyle: "",
+  maxPayment: "",
+  dealRating: "",
+  priceDropped: "",
+  listedWithin: "",
+  noAccident: "",
+  oneOwner: "",
+  hasCarfax: "",
+  hasVideo: "",
+  hasPrice: "",
 };
 
 // --- Multi-select helpers ---
@@ -289,16 +332,42 @@ function isInList(list: string, value: string): boolean {
   return list.split(",").includes(value);
 }
 
+// 大小写不敏感 + trim 的多选切换（车型名可能来自 URL，大小写不定）
+export function toggleInListCI(current: string, value: string): string {
+  const items = current ? current.split(",").filter(Boolean) : [];
+  const idx = items.findIndex(
+    (v) => v.trim().toLowerCase() === value.trim().toLowerCase()
+  );
+  if (idx >= 0) {
+    items.splice(idx, 1);
+  } else {
+    items.push(value);
+  }
+  return items.join(",");
+}
+
+export function isInListCI(list: string, value: string): boolean {
+  if (!list) return false;
+  return list
+    .split(",")
+    .some((v) => v.trim().toLowerCase() === value.trim().toLowerCase());
+}
+
 // --- Compact pill select for desktop sidebar ---
 function SidebarPillSelect({
   options,
   value,
   onChange,
+  insensitive,
 }: {
-  options: { value: string; label: string; color?: string }[];
+  options: { value: string; label: string; color?: string; count?: number }[];
   value: string;
   onChange: (v: string) => void;
+  /** 大小写不敏感匹配（车型名） */
+  insensitive?: boolean;
 }) {
+  const selected = (v: string) => (insensitive ? isInListCI(value, v) : isInList(value, v));
+  const toggle = (v: string) => (insensitive ? toggleInListCI(value, v) : toggleInList(value, v));
   return (
     <div className="mt-1 flex flex-wrap gap-1">
       <button
@@ -312,8 +381,8 @@ function SidebarPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
-          onClick={() => onChange(toggleInList(value, opt.value))}
+          className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${selected(opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          onClick={() => onChange(toggle(opt.value))}
         >
           {opt.color && (
             <span
@@ -322,6 +391,7 @@ function SidebarPillSelect({
             />
           )}
           {opt.label}
+          {opt.count !== undefined && <span className="opacity-60">{opt.count}</span>}
         </button>
       ))}
     </div>
@@ -331,9 +401,15 @@ function SidebarPillSelect({
 export function SearchFilters({
   onFilter,
   initialFilters,
+  modelOptions,
+  featureOptions,
 }: {
   onFilter: (filters: Filters) => void;
   initialFilters?: Filters;
+  /** 车型选项（仅单品牌选中时非空），browse 页统计传入 */
+  modelOptions?: CountOption[];
+  /** 车辆配置标签选项（带数量），browse 页统计传入 */
+  featureOptions?: CountOption[];
 }) {
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -367,10 +443,9 @@ export function SearchFilters({
 
   function update(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
-    // Clear transmission and cylinders when switching to electric
+    // Clear transmission when switching to electric
     if (key === "fuelType" && value === "纯电") {
       next.transmission = "";
-      next.cylinders = "";
     }
     setFilters(next);
     onFilter(next);
@@ -624,6 +699,29 @@ export function SearchFilters({
         </div>
       </div>
 
+      {/* Model — only shown when exactly one make is selected */}
+      {modelOptions && modelOptions.length > 0 && (
+        <div>
+          <Label className="font-mono text-[11px] text-muted-foreground">车型</Label>
+          <SidebarPillSelect
+            options={modelOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
+            value={filters.model}
+            onChange={(v) => update("model", v)}
+            insensitive
+          />
+        </div>
+      )}
+
+      {/* Body style */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">车身类型</Label>
+        <SidebarPillSelect
+          options={BODY_STYLE_OPTIONS}
+          value={filters.bodyStyle}
+          onChange={(v) => update("bodyStyle", v)}
+        />
+      </div>
+
       {/* Seller type */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">卖家类型</Label>
@@ -687,6 +785,43 @@ export function SearchFilters({
         />
       </div>
 
+      {/* Monthly payment budget */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">月供预算</Label>
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            className={`border px-2 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+            onClick={() => update("maxPayment", "")}
+          >
+            不限
+          </button>
+          {PAYMENT_PRESETS.map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              onClick={() => update("maxPayment", v)}
+            >
+              ≤${v}/月
+            </button>
+          ))}
+        </div>
+        <Input
+          className="mt-1.5 h-8 font-mono text-[11px]"
+          placeholder="自定义月供 ($/月)"
+          inputMode="numeric"
+          value={filters.maxPayment}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "");
+            update("maxPayment", val);
+          }}
+        />
+        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+          按 0 首付 / 6.5% APR / 60 期估算
+        </p>
+      </div>
+
       {/* Year slider + input */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">年份范围</Label>
@@ -743,6 +878,14 @@ export function SearchFilters({
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </div>
 
+      {/* Transmission — hidden when exclusively electric */}
+      {!isElectric && (
+        <div>
+          <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
+          <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
+        </div>
+      )}
+
       {/* Drivetrain */}
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">驱动方式</Label>
@@ -783,6 +926,66 @@ export function SearchFilters({
       <div>
         <Label className="font-mono text-[11px] text-muted-foreground">内饰颜色</Label>
         <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
+      </div>
+
+      {/* Features — top tags with counts, AND semantics */}
+      {featureOptions && featureOptions.length > 0 && (
+        <div>
+          <Label className="font-mono text-[11px] text-muted-foreground">车辆配置</Label>
+          <SidebarPillSelect
+            options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
+            value={filters.features}
+            onChange={(v) => update("features", v)}
+          />
+          <p className="mt-1 font-mono text-[10px] text-muted-foreground">需同时满足所选配置</p>
+        </div>
+      )}
+
+      {/* More conditions */}
+      <div>
+        <Label className="font-mono text-[11px] text-muted-foreground">更多条件</Label>
+        <div className="mt-1 space-y-1">
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+            onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
+          >
+            <span>只看好价</span>
+            {filters.dealRating === "good" && <Check className="h-3 w-3" strokeWidth={2} />}
+          </button>
+          <button
+            type="button"
+            className={`flex w-full items-center justify-between border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+            onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
+          >
+            <span>只看降价</span>
+            {filters.priceDropped === "true" && <Check className="h-3 w-3" strokeWidth={2} />}
+          </button>
+          {CONDITION_TOGGLES.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              className={`flex w-full items-center justify-between border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+              onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
+            >
+              <span>{t.label}</span>
+              {filters[t.key] === "true" && <Check className="h-3 w-3" strokeWidth={2} />}
+            </button>
+          ))}
+        </div>
+        <Label className="mt-3 block font-mono text-[11px] text-muted-foreground">上架时间</Label>
+        <div className="mt-1 flex flex-wrap gap-1.5">
+          {LISTED_WITHIN_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`border px-2 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              onClick={() => update("listedWithin", opt.value)}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
     </aside>
   );

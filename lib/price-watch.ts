@@ -32,6 +32,14 @@ export function isWatching(carId: string): boolean {
   return getWatchList().some((w) => w.carId === carId);
 }
 
+/** 通知过降价后更新价格快照，避免每次打开都重复提醒同一次降价 */
+export function updateWatchedPrice(carId: string, newPrice: number): void {
+  const list = getWatchList().map((w) =>
+    w.carId === carId ? { ...w, price: newPrice } : w
+  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
 export function getWatchedPrice(carId: string): number | null {
   const item = getWatchList().find((w) => w.carId === carId);
   return item ? item.price : null;

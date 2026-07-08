@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteParams } from "@/lib/use-route-params";
 import Link from "next/link";
@@ -58,6 +58,9 @@ import { VinCheck } from "@/components/vin-check";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VehicleHistoryPanel } from "@/components/vehicle-history";
 import { LoanCalculator } from "@/components/loan-calculator";
+import { MarketPosition } from "@/components/market-position";
+import { ModelReviews } from "@/components/model-reviews";
+import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
@@ -92,6 +95,7 @@ export default function CarDetailPage() {
   const [currentImage, setCurrentImage] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [similarCars, setSimilarCars] = useState<DbCar[]>([]);
+  const [makePool, setMakePool] = useState<DbCar[]>([]);
   const [copied, setCopied] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
@@ -115,18 +119,44 @@ export default function CarDetailPage() {
         addRecentlyViewed(carId);
         recordPrice(carId, data.title, data.price);
 
-        // Load similar cars (same make, different id)
-        const { data: similar } = await supabase
+        // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
+        const { data: pool } = await supabase
+          .from("cars")
+          .select("id, make, model, year, price, mileage, status")
+          .eq("status", "active")
+          .eq("make", data.make)
+          .limit(150);
+        setMakePool((pool as DbCar[]) || []);
+
+        // 相似车：优先同 make+model（±2 年）按上架时间新到旧，
+        // 不足 4 台补同 make 按 |价差| 从小到大，再不足补 ±30% 价格区间
+        const { data: sameMake } = await supabase
           .from("cars")
           .select("*")
           .eq("status", "active")
           .eq("make", data.make)
           .neq("id", carId)
-          .limit(4);
-        if (similar && similar.length > 0) {
-          setSimilarCars(similar as DbCar[]);
-        } else {
-          // Fallback: similar price range ±30%
+          .order("created_at", { ascending: false })
+          .limit(24);
+        const sameMakeCars = (sameMake as DbCar[]) || [];
+        const modelKey = (data.model || "").toLowerCase().trim();
+        const tier1 = modelKey
+          ? sameMakeCars.filter(
+              (c) =>
+                (c.model || "").toLowerCase().trim() === modelKey &&
+                Math.abs(c.year - data.year) <= 2
+            )
+          : [];
+        // 电议车（price=0）按价差排序会把最便宜的车排最前，改按年份接近度
+        const tier2 = sameMakeCars
+          .filter((c) => !tier1.some((t) => t.id === c.id))
+          .sort((a, b) =>
+            data.price > 0
+              ? Math.abs(a.price - data.price) - Math.abs(b.price - data.price)
+              : Math.abs(a.year - data.year) - Math.abs(b.year - data.year)
+          );
+        let picked = [...tier1, ...tier2].slice(0, 4);
+        if (picked.length < 4 && data.price > 0) {
           const { data: priceSimilar } = await supabase
             .from("cars")
             .select("*")
@@ -134,9 +164,13 @@ export default function CarDetailPage() {
             .neq("id", carId)
             .gte("price", data.price * 0.7)
             .lte("price", data.price * 1.3)
-            .limit(4);
-          setSimilarCars((priceSimilar as DbCar[]) || []);
+            .limit(8);
+          const extra = ((priceSimilar as DbCar[]) || []).filter(
+            (c) => !picked.some((p) => p.id === c.id)
+          );
+          picked = [...picked, ...extra].slice(0, 4);
         }
+        setSimilarCars(picked);
       }
 
       // Check price watch
@@ -160,6 +194,16 @@ export default function CarDetailPage() {
     }
     load();
   }, [carId]);
+
+  // 市场比价：与同品牌车源池对比（里程修正后的同类均价）
+  const insight = useMemo(
+    () => (car ? getPriceInsight(car, makePool) : null),
+    [car, makePool]
+  );
+  const comparables = useMemo(
+    () => (car ? findComparables(car, makePool).cars : []),
+    [car, makePool]
+  );
 
   async function toggleFavorite() {
     if (!user) return;
@@ -424,6 +468,13 @@ export default function CarDetailPage() {
                 <span className="font-mono text-2xl font-bold">
                   {formatPrice(car.price)}
                 </span>
+                {insight && (
+                  <span
+                    className={`px-1.5 py-0.5 font-mono text-xs font-semibold ${insight.className}`}
+                  >
+                    {insight.label}
+                  </span>
+                )}
                 {car.original_price && car.original_price > car.price && (
                   <span className="px-1.5 py-0.5 font-mono text-xs font-semibold bg-green-500/10 text-green-600">
                     -{Math.round((1 - car.price / car.original_price) * 100)}%
@@ -462,6 +513,9 @@ export default function CarDetailPage() {
             </div>
 
             <PriceHistoryChart carId={carId} />
+
+            {/* 市场价位:min—avg—max 价位条 + 当前车价 marker */}
+            <MarketPosition car={car} comparables={comparables} insight={insight} />
 
             <Separator className="my-6" />
 
@@ -878,6 +932,9 @@ export default function CarDetailPage() {
             </div>
           </div>
         </div>
+        {/* 车主口碑:社区车评 */}
+        <ModelReviews make={car.make} model={car.model} />
+
         {/* Comments */}
         <CommentSection carId={carId} />
 
@@ -889,7 +946,11 @@ export default function CarDetailPage() {
             <h2 className="font-mono text-sm font-semibold">相似车辆推荐</h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {similarCars.map((c) => (
-                <CarCard key={c.id} car={c} />
+                <CarCard
+                  key={c.id}
+                  car={c}
+                  priceInsight={getPriceInsight(c, makePool)}
+                />
               ))}
             </div>
           </section>
@@ -910,6 +971,13 @@ export default function CarDetailPage() {
         <div className="flex-1">
           <div className="flex items-baseline gap-1.5">
             <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+            {insight && (
+              <span
+                className={`px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
+              >
+                {insight.label}
+              </span>
+            )}
             {car.original_price && car.original_price > car.price && (
               <span className="px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
                 -{Math.round((1 - car.price / car.original_price) * 100)}%

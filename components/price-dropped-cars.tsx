@@ -23,19 +23,20 @@ export function PriceDroppedCars() {
   useEffect(() => {
     async function load() {
       try {
+        // 多取一些再过滤,避免"先 limit 后过滤"漏掉真正降价的车
         const { data } = await supabase
           .from("cars")
           .select("*")
           .eq("status", "active")
           .not("original_price", "is", null)
           .order("price_updated_at", { ascending: false })
-          .limit(6);
+          .limit(24);
         if (data) {
           // Filter client-side: price < original_price
           const dropped = (data as DbCar[]).filter(
             (c) => c.original_price !== null && c.price < c.original_price
           );
-          setCars(dropped);
+          setCars(dropped.slice(0, 6));
         }
       } catch (err) {
         console.error("Failed to load price-dropped cars:", err);
@@ -89,6 +90,9 @@ export function PriceDroppedCars() {
               const discountPct = car.original_price
                 ? Math.round((1 - car.price / car.original_price) * 100)
                 : 0;
+              const dropAmount = car.original_price
+                ? car.original_price - car.price
+                : 0;
 
               return (
                 <Link
@@ -111,10 +115,17 @@ export function PriceDroppedCars() {
                         </span>
                       </div>
                     )}
-                    {/* Discount badge */}
-                    {discountPct > 0 && (
-                      <div className="absolute left-2 top-2 bg-green-600 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
-                        -{discountPct}%
+                    {/* Discount badges */}
+                    {dropAmount > 0 && (
+                      <div className="absolute left-2 top-2 flex items-center gap-1">
+                        {discountPct > 0 && (
+                          <span className="bg-green-600 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                            -{discountPct}%
+                          </span>
+                        )}
+                        <span className="bg-background/90 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-green-600 dark:text-green-400">
+                          -{formatPrice(dropAmount)}
+                        </span>
                       </div>
                     )}
                   </div>

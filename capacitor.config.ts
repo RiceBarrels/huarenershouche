@@ -12,11 +12,11 @@ const config: CapacitorConfig = {
   webDir: "out",
   server: {
     // In production, load from deployed URL (supports SSR + dynamic routes)
-    // In dev, load from local dev server
-    ...(serverUrl ? { url: serverUrl } : {}),
+    // // In dev, load from local dev server
+    // ...(serverUrl ? { url: serverUrl } : {}),
     androidScheme: "https",
     iosScheme: "capacitor",
-    cleartext: process.env.NODE_ENV !== "production",
+    // cleartext: process.env.NODE_ENV !== "production",
     // When remote URL fails to load (no network), show local fallback page
     errorPath: "index.html",
     allowNavigation: [

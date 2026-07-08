@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "rea
 import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 
-import { ArrowUpDown, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
+import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -26,7 +26,10 @@ import { MAKES_ZH } from "@/lib/mock-data";
 import { detectUserZip, geocodeZipToCoords, haversineDistance, lookupZip } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
-import { getPriceInsight } from "@/lib/price-insight";
+import { getPriceInsight, type PriceInsight } from "@/lib/price-insight";
+import { classifyBodyStyle, bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
+import { paymentToPrice } from "@/lib/format";
+import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT, carHasVideo } from "@/lib/saved-searches";
 import { BackToTop } from "@/components/back-to-top";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { CompareBar } from "@/components/compare-bar";
@@ -44,6 +47,7 @@ import type { DbCar } from "@/lib/types";
 interface Filters {
   keyword: string;
   make: string;
+  model: string;
   minPrice: string;
   maxPrice: string;
   minYear: string;
@@ -56,13 +60,24 @@ interface Filters {
   maxMileage: string;
   exteriorColor: string;
   interiorColor: string;
-  cylinders: string;
+  features: string;
   maxDistance: string;
+  bodyStyle: string;
+  maxPayment: string;
+  dealRating: string;
+  priceDropped: string;
+  listedWithin: string;
+  noAccident: string;
+  oneOwner: string;
+  hasCarfax: string;
+  hasVideo: string;
+  hasPrice: string;
 }
 
 const INITIAL_FILTERS: Filters = {
   keyword: "",
   make: "",
+  model: "",
   minPrice: "",
   maxPrice: "",
   minYear: "",
@@ -75,8 +90,18 @@ const INITIAL_FILTERS: Filters = {
   maxMileage: "",
   exteriorColor: "",
   interiorColor: "",
-  cylinders: "",
+  features: "",
   maxDistance: "",
+  bodyStyle: "",
+  maxPayment: "",
+  dealRating: "",
+  priceDropped: "",
+  listedWithin: "",
+  noAccident: "",
+  oneOwner: "",
+  hasCarfax: "",
+  hasVideo: "",
+  hasPrice: "",
 };
 
 type SortKey = "newest" | "price-asc" | "price-desc" | "mileage" | "year" | "distance";
@@ -92,8 +117,9 @@ const SORT_OPTIONS: { value: SortKey; label: string }[] = [
 
 function filtersFromParams(sp: URLSearchParams): Filters {
   return {
-    keyword: sp.get("q") || "",
+    keyword: sp.get("q") || sp.get("keyword") || "",
     make: sp.get("make") || "",
+    model: sp.get("model") || "",
     minPrice: sp.get("minPrice") || "",
     maxPrice: sp.get("maxPrice") || "",
     minYear: sp.get("minYear") || "",
@@ -106,8 +132,18 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     maxMileage: sp.get("maxMileage") || "",
     exteriorColor: sp.get("exteriorColor") || "",
     interiorColor: sp.get("interiorColor") || "",
-    cylinders: sp.get("cylinders") || "",
+    features: sp.get("features") || "",
     maxDistance: sp.get("maxDistance") || "",
+    bodyStyle: sp.get("bodyStyle") || "",
+    maxPayment: sp.get("maxPayment") || "",
+    dealRating: sp.get("dealRating") || "",
+    priceDropped: sp.get("priceDropped") || "",
+    listedWithin: sp.get("listedWithin") || "",
+    noAccident: sp.get("noAccident") || "",
+    oneOwner: sp.get("oneOwner") || "",
+    hasCarfax: sp.get("hasCarfax") || "",
+    hasVideo: sp.get("hasVideo") || "",
+    hasPrice: sp.get("hasPrice") || "",
   };
 }
 
@@ -124,6 +160,8 @@ function BrowseContent() {
   const router = useRouter();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
+  // 数据拉取时间，作为"上架时间"筛选的基准（避免在渲染期直接调用 Date.now）
+  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams));
   const [sort, setSortRaw] = useState<SortKey>(() => (searchParams.get("sort") as SortKey) || "newest");
   const [showResult, setShowResult] = useState(() => searchParams.get("showResult") === "true");
@@ -141,6 +179,7 @@ function BrowseContent() {
     const params = new URLSearchParams();
     if (f.keyword) params.set("q", f.keyword);
     if (f.make) params.set("make", f.make);
+    if (f.model) params.set("model", f.model);
     if (f.minPrice) params.set("minPrice", f.minPrice);
     if (f.maxPrice) params.set("maxPrice", f.maxPrice);
     if (f.minYear) params.set("minYear", f.minYear);
@@ -153,8 +192,18 @@ function BrowseContent() {
     if (f.maxMileage) params.set("maxMileage", f.maxMileage);
     if (f.exteriorColor) params.set("exteriorColor", f.exteriorColor);
     if (f.interiorColor) params.set("interiorColor", f.interiorColor);
-    if (f.cylinders) params.set("cylinders", f.cylinders);
+    if (f.features) params.set("features", f.features);
     if (f.maxDistance) params.set("maxDistance", f.maxDistance);
+    if (f.bodyStyle) params.set("bodyStyle", f.bodyStyle);
+    if (f.maxPayment) params.set("maxPayment", f.maxPayment);
+    if (f.dealRating) params.set("dealRating", f.dealRating);
+    if (f.priceDropped) params.set("priceDropped", f.priceDropped);
+    if (f.listedWithin) params.set("listedWithin", f.listedWithin);
+    if (f.noAccident) params.set("noAccident", f.noAccident);
+    if (f.oneOwner) params.set("oneOwner", f.oneOwner);
+    if (f.hasCarfax) params.set("hasCarfax", f.hasCarfax);
+    if (f.hasVideo) params.set("hasVideo", f.hasVideo);
+    if (f.hasPrice) params.set("hasPrice", f.hasPrice);
     if (s !== "newest") params.set("sort", s);
     params.set("showResult", "true");
     const url = `/browse?${params.toString()}`;
@@ -163,7 +212,9 @@ function BrowseContent() {
 
   const setFilters = useCallback((next: Filters | ((prev: Filters) => Filters)) => {
     setFiltersRaw((prev) => {
-      const val = typeof next === "function" ? next(prev) : next;
+      let val = typeof next === "function" ? next(prev) : next;
+      // 品牌变化时清空已选车型（车型依附于单一品牌）
+      if (val.make !== prev.make && val.model) val = { ...val, model: "" };
       setSortRaw((s) => { syncToUrl(val, s); return s; });
       return val;
     });
@@ -206,6 +257,7 @@ function BrowseContent() {
       .order("created_at", { ascending: false });
     const allCars = (data as DbCar[]) || [];
     setCars(allCars);
+    setFetchedAt(Date.now());
     setLoading(false);
 
     const recentIds = getRecentlyViewed();
@@ -255,6 +307,68 @@ function BrowseContent() {
     return map;
   }, [cars, userCoords]);
 
+  // 价格评级：以完整未过滤的车源列表为对比基准，建一张 carId -> insight 的表
+  // （筛选与卡片渲染复用，避免在 filter 循环里反复线性扫全表）
+  const insightMap = useMemo(() => {
+    const map = new Map<string, PriceInsight | null>();
+    for (const car of cars) {
+      map.set(car.id, getPriceInsight(car, cars));
+    }
+    return map;
+  }, [cars]);
+
+  // 车型选项：仅当恰好选中 1 个品牌时，统计该品牌下各车型及数量（按数量降序）
+  const modelOptions = useMemo(() => {
+    const makes = filters.make.split(",").map((m) => m.trim()).filter(Boolean);
+    if (makes.length !== 1) return [];
+    const make = makes[0];
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const car of cars) {
+      if (car.make !== make) continue;
+      const name = (car.model || "").trim();
+      if (!name) continue;
+      const key = name.toLowerCase();
+      const entry = counts.get(key);
+      if (entry) entry.count += 1;
+      else counts.set(key, { name, count: 1 });
+    }
+    return [...counts.values()].sort((a, b) => b.count - a.count);
+  }, [cars, filters.make]);
+
+  // 车辆配置选项：统计全部车源 features 标签出现次数，取前 12
+  const featureOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const car of cars) {
+      for (const f of car.features || []) {
+        const tag = f.trim();
+        if (!tag) continue;
+        counts.set(tag, (counts.get(tag) || 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 12);
+  }, [cars]);
+
+  // 保存搜索：当前筛选条件（去掉空值），与 localStorage 中的已存搜索比对
+  const savedSearchParams = useMemo(() => {
+    const rec: Record<string, string> = {};
+    for (const [k, v] of Object.entries(filters)) {
+      if (v) rec[k] = v;
+    }
+    return rec;
+  }, [filters]);
+  const hasActiveFilters = Object.keys(savedSearchParams).length > 0;
+  const [searchSaved, setSearchSaved] = useState(false);
+
+  useEffect(() => {
+    const update = () => setSearchSaved(isSearchSaved(savedSearchParams));
+    update();
+    window.addEventListener(SAVED_SEARCHES_EVENT, update);
+    return () => window.removeEventListener(SAVED_SEARCHES_EVENT, update);
+  }, [savedSearchParams]);
+
   function clearFilter(key: string) {
     const next = { ...filters };
     if (key === "price") {
@@ -263,6 +377,16 @@ function BrowseContent() {
     } else if (key === "year") {
       next.minYear = "";
       next.maxYear = "";
+    } else if (key.includes(":")) {
+      // 单独移除多选筛选中的某个值（bodyStyle/model/transmission/features 等）
+      const idx = key.indexOf(":");
+      const field = key.slice(0, idx);
+      const value = key.slice(idx + 1);
+      const rec = next as Record<string, string>;
+      rec[field] = (rec[field] || "")
+        .split(",")
+        .filter((v) => v && v !== value)
+        .join(",");
     } else {
       (next as Record<string, string>)[key] = "";
     }
@@ -275,6 +399,11 @@ function BrowseContent() {
     if (filters.make) {
       for (const m of filters.make.split(",")) {
         chips.push({ key: "make", label: MAKES_ZH[m] || m });
+      }
+    }
+    if (filters.model) {
+      for (const v of filters.model.split(",")) {
+        if (v.trim()) chips.push({ key: `model:${v}`, label: v.trim() });
       }
     }
     if (filters.location) chips.push({ key: "location", label: filters.location });
@@ -294,6 +423,11 @@ function BrowseContent() {
         chips.push({ key: "fuelType", label: v });
       }
     }
+    if (filters.transmission) {
+      for (const v of filters.transmission.split(",")) {
+        if (v) chips.push({ key: `transmission:${v}`, label: v });
+      }
+    }
     if (filters.drivetrain) {
       for (const v of filters.drivetrain.split(",")) {
         chips.push({ key: "drivetrain", label: v });
@@ -311,6 +445,32 @@ function BrowseContent() {
       }
     }
     if (filters.maxDistance) chips.push({ key: "maxDistance", label: `≤${filters.maxDistance}mi` });
+    if (filters.bodyStyle) {
+      for (const v of filters.bodyStyle.split(",")) {
+        if (v) chips.push({ key: `bodyStyle:${v}`, label: bodyStyleLabel(v as BodyStyle) });
+      }
+    }
+    if (filters.maxPayment) chips.push({ key: "maxPayment", label: `月供≤$${filters.maxPayment}` });
+    if (filters.dealRating) {
+      chips.push({ key: "dealRating", label: filters.dealRating === "great" ? "只看超值好价" : "只看好价" });
+    }
+    if (filters.priceDropped === "true") chips.push({ key: "priceDropped", label: "已降价" });
+    if (filters.listedWithin) {
+      chips.push({
+        key: "listedWithin",
+        label: filters.listedWithin === "1" ? "24小时内上架" : `${filters.listedWithin}天内上架`,
+      });
+    }
+    if (filters.features) {
+      for (const v of filters.features.split(",")) {
+        if (v) chips.push({ key: `features:${v}`, label: v });
+      }
+    }
+    if (filters.noAccident === "true") chips.push({ key: "noAccident", label: "无事故" });
+    if (filters.oneOwner === "true") chips.push({ key: "oneOwner", label: "一手车主" });
+    if (filters.hasCarfax === "true") chips.push({ key: "hasCarfax", label: "有Carfax" });
+    if (filters.hasVideo === "true") chips.push({ key: "hasVideo", label: "带视频" });
+    if (filters.hasPrice === "true") chips.push({ key: "hasPrice", label: "排除电议" });
     return chips;
   }, [filters]);
 
@@ -328,6 +488,13 @@ function BrowseContent() {
       return filterVal.split(",").some((c) => carVal.includes(c));
     }
 
+    // 预计算：月供预算换算的价格上限 / 上架时间截止点（避免在循环里重复算）
+    const paymentPriceCap = filters.maxPayment ? paymentToPrice(Number(filters.maxPayment)) : null;
+    const listedCutoff =
+      filters.listedWithin && fetchedAt
+        ? fetchedAt - Number(filters.listedWithin) * 24 * 60 * 60 * 1000
+        : null;
+
     // Filter without location first to check fallback
     function applyNonLocationFilters(car: DbCar): boolean {
       if (filters.keyword) {
@@ -337,6 +504,13 @@ function BrowseContent() {
         if (!enText.includes(kw) && match(zhText, kw) === null) return false;
       }
       if (filters.make && !matchesMulti(filters.make, car.make)) return false;
+      if (filters.model) {
+        const models = filters.model
+          .split(",")
+          .map((m) => m.trim().toLowerCase())
+          .filter(Boolean);
+        if (models.length > 0 && (!car.model || !models.includes(car.model.trim().toLowerCase()))) return false;
+      }
       if (filters.minPrice && car.price < Number(filters.minPrice)) return false;
       if (filters.maxPrice && car.price > Number(filters.maxPrice)) return false;
       if (filters.minYear && car.year < Number(filters.minYear)) return false;
@@ -348,6 +522,39 @@ function BrowseContent() {
       if (filters.maxMileage && car.mileage > Number(filters.maxMileage)) return false;
       if (filters.exteriorColor && !matchesColorMulti(filters.exteriorColor, car.exterior_color)) return false;
       if (filters.interiorColor && !matchesColorMulti(filters.interiorColor, car.interior_color)) return false;
+      if (filters.bodyStyle) {
+        const style = classifyBodyStyle(car);
+        if (!style || !filters.bodyStyle.split(",").includes(style)) return false;
+      }
+      if (paymentPriceCap !== null) {
+        // 电议（price<=0）的车无法估算月供，排除
+        if (car.price <= 0 || car.price > paymentPriceCap) return false;
+      }
+      if (filters.dealRating) {
+        const insight = insightMap.get(car.id);
+        if (!insight) return false;
+        if (filters.dealRating === "great" && insight.level !== "great") return false;
+        if (filters.dealRating === "good" && insight.level !== "great" && insight.level !== "good") return false;
+      }
+      if (filters.priceDropped === "true") {
+        if (!car.original_price || car.original_price <= car.price) return false;
+      }
+      if (listedCutoff !== null) {
+        if (new Date(car.created_at).getTime() < listedCutoff) return false;
+      }
+      if (filters.features) {
+        // AND 语义：车辆需包含全部所选配置
+        const wanted = filters.features.split(",").filter(Boolean);
+        const has = car.features || [];
+        if (!wanted.every((f) => has.includes(f))) return false;
+      }
+      if (filters.noAccident === "true" && !car.carfax_summary?.includes("无事故")) return false;
+      if (filters.oneOwner === "true") {
+        if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
+      }
+      if (filters.hasCarfax === "true" && !car.carfax_url) return false;
+      if (filters.hasVideo === "true" && !carHasVideo(car)) return false;
+      if (filters.hasPrice === "true" && car.price <= 0) return false;
       return true;
     }
 
@@ -431,7 +638,7 @@ function BrowseContent() {
         );
     }
     return sorted;
-  }, [cars, filters, sort, distances, userCoords]);
+  }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt]);
 
   return (
     <PullToRefresh onRefresh={fetchCars}>
@@ -463,7 +670,7 @@ function BrowseContent() {
               >
                 <div className="flex flex-col md:flex-row">
                   <div className="border-b border-border md:border-b-0 md:border-r">
-                    <Select value={filters.make || "all"} onValueChange={(v) => setFiltersRaw({ ...filters, make: v === "all" ? "" : v })}>
+                    <Select value={filters.make || "all"} onValueChange={(v) => setFiltersRaw({ ...filters, make: v === "all" ? "" : v, model: "" })}>
                       <SelectTrigger className="h-12 rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-44">
                         <SelectValue placeholder="品牌" />
                       </SelectTrigger>
@@ -540,7 +747,7 @@ function BrowseContent() {
           {recentCars.length > 0 && (
             <section className="mx-auto w-full max-w-5xl px-4 pb-12">
               <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {recentCars.map((car) => (
                   <CarCard key={"recent-" + car.id} car={car} />
                 ))}
@@ -659,6 +866,8 @@ function BrowseContent() {
                   filters={filters}
                   onFilter={setFilters}
                   activeCount={activeFilterChips.length}
+                  modelOptions={modelOptions}
+                  featureOptions={featureOptions}
                 />
               </div>
             </DrawerContent>
@@ -731,7 +940,12 @@ function BrowseContent() {
         {/* Left sidebar filters — desktop only */}
         <div className="hidden w-[240px] shrink-0 md:block">
           <div className="sticky top-4 max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto overscroll-contain pr-1">
-            <SearchFilters onFilter={setFilters} initialFilters={filters} />
+            <SearchFilters
+              onFilter={setFilters}
+              initialFilters={filters}
+              modelOptions={modelOptions}
+              featureOptions={featureOptions}
+            />
           </div>
         </div>
 
@@ -749,6 +963,26 @@ function BrowseContent() {
               <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
               辆车
             </p>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (!searchSaved) saveSearch(savedSearchParams);
+                }}
+                disabled={searchSaved}
+                className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                  searchSaved
+                    ? "border-border bg-muted text-muted-foreground"
+                    : "border-border hover:border-foreground hover:text-foreground"
+                }`}
+              >
+                <Bookmark
+                  className={`h-3 w-3 ${searchSaved ? "fill-current" : ""}`}
+                  strokeWidth={1.5}
+                />
+                {searchSaved ? "已保存" : "保存搜索"}
+              </button>
+            )}
             {/* Desktop active filter chips */}
             {activeFilterChips.length > 0 && (
               <div className="hidden flex-wrap gap-1.5 md:flex">
@@ -799,7 +1033,7 @@ function BrowseContent() {
                     <CarCard
                       car={car}
                       distance={distances.get(car.id)}
-                      priceInsight={getPriceInsight(car, cars)}
+                      priceInsight={insightMap.get(car.id) ?? null}
                     />
                   </div>,
                 ];

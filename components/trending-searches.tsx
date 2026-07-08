@@ -14,13 +14,13 @@ interface MakeCount {
 
 const QUICK_FILTERS: { label: string; params: string }[] = [
   { label: "$15K以下", params: "maxPrice=15000" },
-  { label: "$15K-30K", params: "minPrice=15000&maxPrice=30000" },
+  { label: "月供$300内", params: "maxPayment=300" },
   { label: "低里程<3万", params: "maxMileage=30000" },
   { label: "混动省油", params: "fuelType=混动" },
-  { label: "纯电", params: "fuelType=纯电" },
+  { label: "无事故", params: "noAccident=true" },
   { label: "四驱SUV", params: "drivetrain=AWD" },
-  { label: "7座", params: "seats=7" },
-  { label: "一手车主", params: "ownerCount=1" },
+  { label: "只看好价", params: "dealRating=good" },
+  { label: "3天内新上架", params: "listedWithin=3" },
 ];
 
 export function TrendingSearches() {

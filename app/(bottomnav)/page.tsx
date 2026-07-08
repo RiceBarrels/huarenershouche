@@ -14,6 +14,8 @@ import {
   Zap,
   ChevronRight,
   Gauge,
+  Car,
+  Calculator,
 } from "lucide-react";
 import Image from "next/image";
 import { Header } from "@/components/header";
@@ -24,6 +26,8 @@ import { RegionBrandEntry } from "@/components/region-brand-entry";
 import { TrustReviews } from "@/components/trust-reviews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { hasUserHistory, rankCars } from "@/lib/recommendations";
+import { getRecentlyViewed } from "@/lib/recently-viewed";
 import {
   Select,
   SelectContent,
@@ -32,11 +36,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
+import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
 
 import type { DbCar } from "@/lib/types";
-import type { GeoResult } from "@/lib/geocode";
+import { Badge } from "@/components/ui/badge";
 
 // Map city names to Chinese region names, with NYC borough detection
 const CITY_ZH_MAP: Record<string, string> = {
@@ -160,7 +166,92 @@ const QUICK_TAGS: { label: string; params: Record<string, string> }[] = [
   { label: "纯电车型", params: { fuelType: "纯电" } },
   { label: "低里程", params: { maxMileage: "30000" } },
   { label: "四驱SUV", params: { drivetrain: "AWD" } },
+  { label: "无事故", params: { noAccident: "true" } },
+  { label: "一手车主", params: { oneOwner: "true" } },
 ];
+
+const PRICE_RANGES: { value: string; label: string; min?: number; max?: number }[] = [
+  { value: "any", label: "不限" },
+  { value: "under-10k", label: "$10K以下", max: 10000 },
+  { value: "10k-20k", label: "$10K-20K", min: 10000, max: 20000 },
+  { value: "20k-30k", label: "$20K-30K", min: 20000, max: 30000 },
+  { value: "30k-50k", label: "$30K-50K", min: 30000, max: 50000 },
+  { value: "over-50k", label: "$50K以上", min: 50000 },
+];
+
+const PAYMENT_PRESETS = [200, 300, 400, 500];
+
+// 简洁单色车型剪影(线条风格,配合 currentColor 使用)
+// 统一画布 64x32,车轮固定在 (17,25)/(47,25),各类型只画车身轮廓差异
+const BODY_SILHOUETTES: Record<BodyStyle, string[]> = {
+  sedan: [
+    "M3 25V22.2C3 20.6 4.1 19.3 5.7 19L14 17.4L20 11.6C21 10.7 22.2 10.2 23.6 10.2H33.5C34.9 10.2 36.1 10.7 37.1 11.6L43.3 17.4L55.4 19.2C57 19.5 58 20.7 58 22.3V25",
+    "M3 25H13.5M20.5 25H43.5M50.5 25H58",
+  ],
+  suv: [
+    "M4 25V18.6C4 17.2 4.9 16.2 6.3 15.9L11.5 15L17 8.9C17.8 8 19 7.5 20.2 7.5H42.5C43.8 7.5 45 8.1 45.8 9.1L50.7 15L57.6 16.1C59 16.4 60 17.5 60 18.9V25",
+    "M4 25H13.5M20.5 25H43.5M50.5 25H60",
+  ],
+  truck: [
+    "M4 25V18.8C4 17.6 4.8 16.7 6 16.4L9.5 15.7L14.2 9.4C15 8.4 16.1 7.9 17.4 7.9H25.6C26.9 7.9 27.9 8.9 27.9 10.2V15.6H57.4C58.8 15.6 60 16.7 60 18.1V25",
+    "M4 25H13.5M20.5 25H43.5M50.5 25H60",
+  ],
+  coupe: [
+    "M3 25V22.6C3 21 4 19.8 5.6 19.4L13.8 17.7L21.5 11.9C22.8 11 24.3 10.5 25.9 10.5H30.5C32.4 10.5 34.2 11.1 35.8 12.1L44 17.2L56 19.1C57.7 19.4 58.5 20.5 58.5 22V25",
+    "M3 25H13.5M20.5 25H43.5M50.5 25H58.5",
+  ],
+  minivan: [
+    "M4 25V18.3C4 17.6 4.3 16.9 4.8 16.4L13 9.2C14 8.4 15.2 8 16.5 8H53.5C55.7 8 57.5 9.8 57.5 12V25",
+    "M4 25H13.5M20.5 25H43.5M50.5 25H57.5",
+  ],
+  hatchback: [
+    "M5 25V21.8C5 20.3 6 19.1 7.5 18.8L14.5 17.4L20.3 11.7C21.2 10.8 22.4 10.3 23.7 10.3H38.5C39.8 10.3 41 10.9 41.8 11.9L50.6 19.6C52.4 20.3 53.5 21.3 53.5 22.8V25",
+    "M5 25H13.5M20.5 25H43.5M50.5 25H53.5",
+  ],
+  wagon: [
+    "M3 25V22C3 20.5 4 19.3 5.5 19L13.6 17.4L19.6 11.5C20.5 10.6 21.8 10.1 23.1 10.1H45.8C47 10.1 48.1 10.6 48.9 11.5L53.6 16.7L57.2 17.7C58.9 18.2 60 19.4 60 21V25",
+    "M3 25H13.5M20.5 25H43.5M50.5 25H60",
+  ],
+  convertible: [
+    "M3 25V21.5C3 20 4.1 18.9 5.6 18.6L14.5 17.2H53C56.5 17.2 58.5 18.6 58.5 21.4V25",
+    "M25.5 17.2L29.5 11H31.5",
+    "M40 17.2V13.8M47 17.2V13.8",
+    "M3 25H13.5M20.5 25H43.5M50.5 25H58.5",
+  ],
+  van: [
+    "M5 25V13.5C5 10.5 6.8 8.5 10 8.5H52C56.5 8.5 59 11 59 15V25",
+    "M5 25H13.5M20.5 25H43.5M50.5 25H59",
+  ],
+};
+
+function BodyStyleSilhouette({
+  style,
+  className,
+}: {
+  style: BodyStyle;
+  className?: string;
+}) {
+  const paths = BODY_SILHOUETTES[style];
+  if (!paths) return null;
+  return (
+    <svg
+      viewBox="0 0 64 32"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      aria-hidden="true"
+    >
+      {paths.map((d, i) => (
+        <path key={i} d={d} />
+      ))}
+      <circle cx="17" cy="25" r="3.5" />
+      <circle cx="47" cy="25" r="3.5" />
+    </svg>
+  );
+}
 
 function buildUrl(params: Record<string, string>) {
   const sp = new URLSearchParams();
@@ -187,20 +278,46 @@ export default function Home() {
   const router = useRouter();
   const [keyword, setKeyword] = useState("");
   const [make, setMake] = useState("");
+  const [priceRange, setPriceRange] = useState("");
   const [zip, setZip] = useState("");
   const [featured, setFeatured] = useState<DbCar[]>([]);
+  const [recommended, setRecommended] = useState<DbCar[]>([]);
+  const [showRecommended, setShowRecommended] = useState(false);
   const [userLocation, setUserLocation] = useState<LocationInfo | null>(null);
   const [locationLoading, setLocationLoading] = useState(true);
+  const [monthlyBudget, setMonthlyBudget] = useState("400");
+
+  const monthlyBudgetNum = parseInt(monthlyBudget, 10) || 0;
+  const budgetPrice = monthlyBudgetNum > 0 ? paymentToPrice(monthlyBudgetNum) : 0;
 
   useEffect(() => {
+    const hasHistory = hasUserHistory();
+    setShowRecommended(hasHistory);
+
     supabase
       .from("cars")
       .select("*")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(6)
-      .then(({ data }) => {
-        if (data) setFeatured(data as DbCar[]);
+      .limit(hasHistory ? 30 : 6)
+      .then(async ({ data }) => {
+        if (!data) return;
+        const cars = data as DbCar[];
+        setFeatured(cars.slice(0, 6));
+
+        if (hasHistory) {
+          const recentIds = getRecentlyViewed();
+          if (recentIds.length > 0) {
+            const { data: viewedData } = await supabase
+              .from("cars")
+              .select("*")
+              .in("id", recentIds.slice(0, 10));
+            const viewedCars = (viewedData || []) as DbCar[];
+            const excludeIds = new Set(recentIds);
+            const ranked = rankCars(cars, viewedCars, excludeIds);
+            setRecommended(ranked.slice(0, 6));
+          }
+        }
       });
 
     // Auto-detect user location with detailed region info
@@ -219,6 +336,9 @@ export default function Home() {
     const params: Record<string, string> = {};
     if (keyword) params.q = keyword;
     if (make && make !== "all") params.make = make;
+    const range = PRICE_RANGES.find((r) => r.value === priceRange);
+    if (range?.min) params.minPrice = String(range.min);
+    if (range?.max) params.maxPrice = String(range.max);
     if (zip) params.zip = zip;
     router.push(buildUrl(params));
   }
@@ -260,9 +380,13 @@ export default function Home() {
 
         <div className="relative mx-auto w-full max-w-3xl text-center">
           <div className="flex items-center justify-center gap-3">
-            <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-14 md:w-14" />
-            <h1 className="font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl">
-              常来车网<span className="text-xs text-white/50"> 测试版</span>
+            <Image src="/logo.png" alt="常来车网" width={64} height={64} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-16 md:w-16" />
+            <h1 className="flex font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl gap-2">
+              <div className="flex justify-center items-center flex-col gap-1">
+                <span>常来车网</span>
+                <Badge className="">CLCAuto.com</Badge>
+              </div>
+              <Badge variant="secondary">测试版</Badge>
             </h1>
           </div>
           <p
@@ -318,23 +442,39 @@ export default function Home() {
             }}
             className="mt-8 overflow-hidden border border-white/10 bg-background shadow-lg rounded-xl"
           >
-            {/* Row: Make | Keyword | ZIP | Search */}
+            {/* Row: Make + Price | Keyword | ZIP | Search */}
             <div className="flex flex-col md:flex-row">
-              {/* Make dropdown */}
-              <div className="border-b border-border md:border-b-0 md:border-r">
-                <Select value={make} onValueChange={setMake}>
-                  <SelectTrigger className="h-12 rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-44">
-                    <SelectValue placeholder="品牌" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">全部品牌</SelectItem>
-                    {MAKES.filter((m) => m !== "Other").map((m) => (
-                      <SelectItem key={m} value={m}>
-                        {MAKES_ZH[m]} {m}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Make + Price dropdowns (side by side on mobile) */}
+              <div className="flex border-b border-border md:border-b-0">
+                <div className="w-1/2 border-r border-border md:w-auto">
+                  <Select value={make} onValueChange={setMake}>
+                    <SelectTrigger className="h-12 w-full rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-36">
+                      <SelectValue placeholder="品牌" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部品牌</SelectItem>
+                      {MAKES.filter((m) => m !== "Other").map((m) => (
+                        <SelectItem key={m} value={m}>
+                          {MAKES_ZH[m]} {m}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-1/2 md:w-auto md:border-r md:border-border">
+                  <Select value={priceRange} onValueChange={setPriceRange}>
+                    <SelectTrigger className="h-12 w-full rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-32">
+                      <SelectValue placeholder="价格" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRICE_RANGES.map((r) => (
+                        <SelectItem key={r.value} value={r.value}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               {/* Keyword input */}
@@ -404,6 +544,62 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Recommended for you */}
+      {showRecommended && recommended.length > 0 && (
+        <section className="px-4 pb-8">
+          <div className="mx-auto max-w-5xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-mono text-sm font-medium">为你推荐</h2>
+              <Link
+                href="/browse?showResult=true"
+                className="flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                查看更多
+                <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+              {recommended.map((car) => (
+                <div key={car.id}>
+                  <Link
+                    href={carLink(car.id)}
+                    className="group block border border-border transition-colors hover:border-foreground/20"
+                  >
+                    <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+                      {car.image_url ? (
+                        <img
+                          src={car.image_url}
+                          alt={car.title_zh}
+                          className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center">
+                          <span className="font-mono text-xs text-muted-foreground">暂无图片</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-2.5">
+                      <p className="truncate font-mono text-xs font-medium">{car.title_zh}</p>
+                      <p className="mt-1 font-mono text-sm font-semibold text-foreground">{formatPrice(car.price)}</p>
+                      <div className="mt-1.5 flex items-center gap-3 text-muted-foreground">
+                        <span className="flex items-center gap-1 font-mono text-[10px]">
+                          <Gauge className="h-3 w-3" strokeWidth={1.5} />
+                          {formatMileage(car.mileage)}
+                        </span>
+                        <span className="flex items-center gap-1 font-mono text-[10px]">
+                          <MapPin className="h-3 w-3" strokeWidth={1.5} />
+                          {car.location_zh}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Featured listings */}
       {featured.length > 0 && (
@@ -477,6 +673,91 @@ export default function Home() {
       <section className="border-t border-border px-4 py-8">
         <div className="mx-auto max-w-5xl">
           <PriceDroppedCars />
+        </div>
+      </section>
+
+      {/* Browse by body style */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-4 flex items-center gap-2">
+            <Car className="h-4 w-4" strokeWidth={1.5} />
+            <h2 className="font-mono text-sm font-medium">按车身类型找车</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-4 md:overflow-visible">
+            {BODY_STYLE_OPTIONS.slice(0, 8).map((opt) => (
+              <Link
+                key={opt.value}
+                href={`/browse?bodyStyle=${opt.value}&showResult=true`}
+                className="group flex w-32 shrink-0 flex-col items-center border border-border bg-card px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/50 md:w-auto"
+              >
+                <BodyStyleSilhouette
+                  style={opt.value}
+                  className="h-9 w-[72px] text-muted-foreground transition-colors group-hover:text-foreground"
+                />
+                <span className="mt-1 font-mono text-sm font-medium">{opt.label}</span>
+                <span className="mt-0.5 font-mono text-[10px] text-muted-foreground">{opt.labelEn}</span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Shop by monthly payment */}
+      <section className="border-t border-border px-4 py-8">
+        <div className="mx-auto max-w-5xl">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4" strokeWidth={1.5} />
+              <h2 className="font-mono text-sm font-medium">月供预算购车</h2>
+            </div>
+            <span className="font-mono text-[10px] text-muted-foreground">
+              估算口径:0 首付 / {(LOAN_ASSUMPTION.apr * 100).toFixed(1)}% APR / {LOAN_ASSUMPTION.months} 期
+            </span>
+          </div>
+          <div className="flex flex-col gap-3 border border-border bg-card p-3 md:flex-row md:items-center">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {PAYMENT_PRESETS.map((p) => (
+                <Link
+                  key={p}
+                  href={`/browse?maxPayment=${p}&showResult=true`}
+                  className="border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                >
+                  ${p}/月
+                </Link>
+              ))}
+            </div>
+            <div className="hidden h-6 w-px shrink-0 bg-border md:block" />
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              <div className="relative">
+                <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-muted-foreground">$</span>
+                <Input
+                  value={monthlyBudget}
+                  onChange={(e) => setMonthlyBudget(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                  inputMode="numeric"
+                  placeholder="月供"
+                  className="h-8 w-28 pl-6 pr-9 font-mono text-xs"
+                />
+                <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 font-mono text-[10px] text-muted-foreground">/月</span>
+              </div>
+              <span className="font-mono text-[11px] text-muted-foreground">
+                {budgetPrice > 0 ? (
+                  <>
+                    约可购 <span className="font-semibold text-foreground">{formatPrice(budgetPrice)}</span> 以内车型
+                  </>
+                ) : (
+                  "输入月供,估算可购车价"
+                )}
+              </span>
+              <Button
+                size="sm"
+                className="h-8 font-mono text-xs"
+                disabled={budgetPrice <= 0}
+                onClick={() => router.push(`/browse?maxPayment=${monthlyBudgetNum}&showResult=true`)}
+              >
+                按此预算看车
+              </Button>
+            </div>
+          </div>
         </div>
       </section>
 

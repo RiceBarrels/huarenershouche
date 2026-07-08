@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Plus, Scale } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getCompareIds, clearCompare } from "@/lib/compare";
+import { getCompareIds, addToCompare, removeFromCompare } from "@/lib/compare";
 import { Header } from "@/components/header";
 
 import { Footer } from "@/components/footer";
@@ -23,6 +23,28 @@ function formatPrice(price: number): string {
 
 function formatMileage(miles: number): string {
   return new Intl.NumberFormat("en-US").format(miles);
+}
+
+// 把当前对比车辆同步到 URL(?ids=,可分享/刷新不丢)和 compare store(底部 CompareBar 一致)
+function syncCompareState(next: (DbCar | null)[]) {
+  const ids = next.filter((c): c is DbCar => Boolean(c)).map((c) => c.id);
+
+  const params = new URLSearchParams(window.location.search);
+  if (ids.length > 0) params.set("ids", ids.join(","));
+  else params.delete("ids");
+  const qs = params.toString();
+  window.history.replaceState(
+    null,
+    "",
+    qs ? `${window.location.pathname}?${qs}` : window.location.pathname
+  );
+
+  for (const id of getCompareIds()) {
+    if (!ids.includes(id)) removeFromCompare(id);
+  }
+  for (const id of ids) {
+    if (!getCompareIds().includes(id)) addToCompare(id);
+  }
 }
 
 const COMPARE_FIELDS: { key: keyof DbCar | "make_zh" | "account_type"; label: string }[] = [
@@ -53,18 +75,25 @@ export default function ComparePage() {
         .select("*, profiles!seller_id(account_type)")
         .eq("status", "active")
         .order("created_at", { ascending: false });
-      const all = (data as DbCar[]) || [];
+      // 查询失败时不要往下走：否则会把 URL 里的 ids 和对比栏选择当作失效车清空
+      if (!data) return;
+      const all = data as DbCar[];
       setAllCars(all);
 
-      // Pre-fill from compare bar selections
-      const compareIds = getCompareIds();
-      if (compareIds.length > 0) {
-        const prefilled = compareIds
-          .map((id) => all.find((c) => c.id === id) || null)
+      // 优先从 URL ?ids= 恢复(可分享链接);URL 没有再读对比栏选择
+      const urlIds = (new URLSearchParams(window.location.search).get("ids") || "")
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const ids = Array.from(new Set(urlIds.length > 0 ? urlIds : getCompareIds()));
+      if (ids.length > 0) {
+        const prefilled: (DbCar | null)[] = ids
+          .map((id) => all.find((c) => c.id === id))
+          .filter((c): c is DbCar => Boolean(c))
           .slice(0, 3);
         while (prefilled.length < 3) prefilled.push(null);
         setCars(prefilled);
-        clearCompare();
+        syncCompareState(prefilled);
       }
     }
     fetchCars();
@@ -87,6 +116,7 @@ export default function ComparePage() {
     const next = [...cars];
     next[activeSlot] = car;
     setCars(next);
+    syncCompareState(next);
     setActiveSlot(null);
     setSearchQuery("");
   }
@@ -95,6 +125,7 @@ export default function ComparePage() {
     const next = [...cars];
     next[index] = null;
     setCars(next);
+    syncCompareState(next);
   }
 
   function getCellValue(car: DbCar, key: string): string {

@@ -15,7 +15,7 @@ const TERM_OPTIONS = [36, 48, 60, 72] as const;
 export function LoanCalculator({ price }: LoanCalculatorProps) {
   const [downPaymentPct, setDownPaymentPct] = useState(20);
   const [loanTerm, setLoanTerm] = useState<number>(60);
-  const [interestRate, setInterestRate] = useState(15);
+  const [interestRate, setInterestRate] = useState(7.9);
 
   const downPayment = useMemo(
     () => Math.round(price * (downPaymentPct / 100)),

@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { carLink } from "@/lib/static-link";
-import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check } from "lucide-react";
+import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
+import { estimateMonthlyPayment, timeAgo } from "@/lib/format";
+import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -19,14 +21,13 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-function estimateMonthly(price: number): string {
-  // Default: 0 down, 6.5% APR, 60 months
-  const principal = price;
-  const monthlyRate = 0.065 / 12;
-  const months = 60;
-  const payment = (principal * monthlyRate * Math.pow(1 + monthlyRate, months)) /
-    (Math.pow(1 + monthlyRate, months) - 1);
-  return `~$${Math.round(payment)}/月`;
+function daysListed(car: DbCar): number {
+  return (Date.now() - new Date(car.created_at).getTime()) / 86400000;
+}
+
+function isHotListing(car: DbCar): boolean {
+  const days = Math.max(1, daysListed(car));
+  return (car.views_count || 0) / days >= 30 || (car.favorites_count || 0) >= 5;
 }
 
 function formatMileage(miles: number): string {
@@ -76,7 +77,7 @@ export function CarCard({
 }: {
   car: DbCar;
   distance?: number;
-  priceInsight?: { label: string; className: string } | null;
+  priceInsight?: PriceInsight | null;
 }) {
   const [liked, setLiked] = useState(false);
   const [favCount, setFavCount] = useState(car.favorites_count || 0);
@@ -112,7 +113,7 @@ export function CarCard({
               暂无图片
             </div>
           )}
-          <div className="absolute left-2 top-2 flex gap-1">
+          <div className="absolute left-2 right-20 top-2 flex flex-wrap gap-1">
             {car.profiles?.account_type === "dealer" ? (
               <Badge
                 variant="secondary"
@@ -137,6 +138,29 @@ export function CarCard({
                 {formatDistance(distance)}
               </Badge>
             )}
+            {daysListed(car) < 1 ? (
+              <Badge
+                variant="outline"
+                className="bg-background/80 font-mono text-[10px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400"
+              >
+                今日新上
+              </Badge>
+            ) : daysListed(car) <= 3 ? (
+              <Badge
+                variant="outline"
+                className="bg-background/80 font-mono text-[10px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400"
+              >
+                新上架
+              </Badge>
+            ) : isHotListing(car) ? (
+              <Badge
+                variant="outline"
+                className="gap-0.5 bg-background/80 font-mono text-[10px] font-medium text-orange-600 backdrop-blur-sm"
+              >
+                <Flame className="h-2.5 w-2.5" strokeWidth={1.5} />
+                热门
+              </Badge>
+            ) : null}
           </div>
           {/* Action buttons */}
           <div className="absolute right-2 top-2 flex items-center gap-1">
@@ -209,10 +233,23 @@ export function CarCard({
                 {priceInsight.label}
               </span>
             )}
-            <span className="font-mono text-[10px] text-muted-foreground">
-              分期 {estimateMonthly(car.price)}
-            </span>
+            {car.price > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                分期 ~${estimateMonthlyPayment(car.price)}/月
+              </span>
+            )}
           </div>
+
+          {priceInsight &&
+            (priceInsight.level === "great" || priceInsight.level === "good") &&
+            priceInsight.delta >= 300 && (
+              <p className="mt-1 font-mono text-[10px] text-green-600">
+                比同类均价低 {formatPrice(priceInsight.delta)}
+                <span className="text-muted-foreground">
+                  {" "}· {priceInsight.sampleSize} 台同类对比
+                </span>
+              </p>
+            )}
 
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
             <div className="flex items-center gap-1.5">
@@ -276,7 +313,7 @@ export function CarCard({
                   {favCount}
                 </span>
               )}
-              {new Date(car.created_at).toLocaleDateString("zh-CN")}
+              {timeAgo(car.created_at)}上架
             </span>
           </div>
         </div>
