@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { carLink } from "@/lib/static-link";
-import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame } from "lucide-react";
+import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame, User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
@@ -297,13 +297,20 @@ export function CarCard({
 
           <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
             <span
-              className="font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
                 window.location.href = `/user/${car.seller_id}`;
               }}
             >
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                {car.profiles?.avatar_url ? (
+                  <img src={car.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <User className="h-2.5 w-2.5" strokeWidth={1.5} />
+                )}
+              </span>
               {car.seller_name}
             </span>
             <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground/60">

@@ -1,8 +1,13 @@
 "use client";
 
-import { Star } from "lucide-react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Star, Loader2, Pencil, Trash2, User } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
+import type { DbPlatformReview } from "@/lib/types";
 
-interface Review {
+interface SeedReview {
   id: string;
   rating: number;
   content: string;
@@ -11,7 +16,7 @@ interface Review {
   date: string; // ISO date of the review
 }
 
-const SAMPLE_REVIEWS: Review[] = [
+const SEED_REVIEWS: SeedReview[] = [
   {
     id: "r1",
     rating: 5,
@@ -78,9 +83,16 @@ function formatTimeAgo(iso: string): string {
   return `${Math.floor(days / 365)} 年前`;
 }
 
-function getAverageRating(): string {
-  const sum = SAMPLE_REVIEWS.reduce((acc, r) => acc + r.rating, 0);
-  return (sum / SAMPLE_REVIEWS.length).toFixed(1);
+// 统一渲染用的评价条目（种子数据 + 数据库真实评价）
+interface DisplayReview {
+  id: string;
+  rating: number;
+  content: string;
+  reviewer: string;
+  avatarUrl: string | null;
+  transactionType: "购车" | "卖车";
+  date: string;
+  isOwn: boolean;
 }
 
 function StarRating({ rating }: { rating: number }) {
@@ -101,17 +113,154 @@ function StarRating({ rating }: { rating: number }) {
   );
 }
 
+function StarPicker({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  return (
+    <div className="flex items-center gap-1">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <button key={i} type="button" onClick={() => onChange(i)}>
+          <Star
+            className={`h-5 w-5 transition-colors ${
+              i <= value ? "fill-amber-500 text-amber-500" : "text-muted-foreground/30 hover:text-amber-500"
+            }`}
+            strokeWidth={1.5}
+          />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function TrustReviews() {
-  const avgRating = getAverageRating();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [dbReviews, setDbReviews] = useState<DbPlatformReview[]>([]);
+  const [formOpen, setFormOpen] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [content, setContent] = useState("");
+  const [transactionType, setTransactionType] = useState<"购车" | "卖车">("购车");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    supabase
+      .from("platform_reviews")
+      .select("*, profiles!user_id(username, avatar_url)")
+      .order("created_at", { ascending: false })
+      .limit(30)
+      .then(({ data }) => setDbReviews((data as DbPlatformReview[]) || []));
+  }, []);
+
+  const ownReview = dbReviews.find((r) => r.user_id === userId);
+
+  const reviews: DisplayReview[] = [
+    ...dbReviews.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      content: r.content,
+      reviewer: r.profiles?.username || "用户",
+      avatarUrl: r.profiles?.avatar_url ?? null,
+      transactionType: (r.transaction_type === "sell" ? "卖车" : "购车") as "购车" | "卖车",
+      date: r.created_at,
+      isOwn: r.user_id === userId,
+    })),
+    ...SEED_REVIEWS.map((r) => ({
+      id: r.id,
+      rating: r.rating,
+      content: r.content,
+      reviewer: r.reviewer,
+      avatarUrl: null,
+      transactionType: r.transactionType,
+      date: r.date,
+      isOwn: false,
+    })),
+  ];
+
+  const avgRating = (
+    reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length
+  ).toFixed(1);
+
+  function openForm() {
+    if (ownReview) {
+      setRating(ownReview.rating);
+      setContent(ownReview.content);
+      setTransactionType(ownReview.transaction_type === "sell" ? "卖车" : "购车");
+    }
+    setError("");
+    setFormOpen(true);
+  }
+
+  async function handleSubmit() {
+    if (!userId || content.trim().length < 10) return;
+    setSending(true);
+    setError("");
+    const payload = {
+      user_id: userId,
+      rating,
+      content: content.trim(),
+      transaction_type: transactionType === "卖车" ? "sell" : "buy",
+    };
+    const { error: err } = ownReview
+      ? await supabase.from("platform_reviews").update(payload).eq("id", ownReview.id)
+      : await supabase.from("platform_reviews").insert(payload);
+    if (err) {
+      setError("提交失败，请稍后再试");
+    } else {
+      const { data } = await supabase
+        .from("platform_reviews")
+        .select("*, profiles!user_id(username, avatar_url)")
+        .order("created_at", { ascending: false })
+        .limit(30);
+      setDbReviews((data as DbPlatformReview[]) || []);
+      setFormOpen(false);
+      setContent("");
+      setRating(5);
+    }
+    setSending(false);
+  }
+
+  async function handleDelete() {
+    if (!ownReview) return;
+    await supabase.from("platform_reviews").delete().eq("id", ownReview.id);
+    setDbReviews((prev) => prev.filter((r) => r.id !== ownReview.id));
+    setFormOpen(false);
+    setContent("");
+    setRating(5);
+  }
 
   return (
     <section className="px-4 pb-10">
       <div className="mx-auto max-w-5xl">
         {/* Section header */}
         <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Star className="h-4 w-4" strokeWidth={1.5} />
-            <h2 className="font-mono text-sm font-medium">用户评价</h2>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Star className="h-4 w-4" strokeWidth={1.5} />
+              <h2 className="font-mono text-sm font-medium">用户评价</h2>
+            </div>
+            {userId ? (
+              <button
+                type="button"
+                onClick={() => (formOpen ? setFormOpen(false) : openForm())}
+                className="flex items-center gap-1 border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <Pencil className="h-2.5 w-2.5" strokeWidth={1.5} />
+                {ownReview ? "修改我的评价" : "写评价"}
+              </button>
+            ) : (
+              <Link
+                href="/login"
+                className="border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                登录后写评价
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-1.5">
             <div className="flex items-center gap-0.5">
@@ -133,12 +282,72 @@ export function TrustReviews() {
           </div>
         </div>
 
+        {/* Write review form */}
+        {formOpen && userId && (
+          <div className="mb-4 border border-border bg-card p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <StarPicker value={rating} onChange={setRating} />
+              <div className="flex gap-1.5">
+                {(["购车", "卖车"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                      transactionType === t
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border hover:bg-muted"
+                    }`}
+                    onClick={() => setTransactionType(t)}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <textarea
+              className="mt-3 w-full resize-none border border-border bg-background px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+              placeholder="分享你在平台买车/卖车的真实体验（至少 10 个字）..."
+              rows={3}
+              maxLength={500}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+            />
+            <div className="mt-2 flex items-center justify-between">
+              <span className="font-mono text-[10px] text-muted-foreground">
+                {error || `${content.trim().length}/500`}
+              </span>
+              <div className="flex items-center gap-2">
+                {ownReview && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 gap-1 font-mono text-[11px] text-muted-foreground hover:text-destructive"
+                    onClick={handleDelete}
+                  >
+                    <Trash2 className="h-3 w-3" strokeWidth={1.5} />
+                    删除
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  className="h-7 font-mono text-[11px]"
+                  disabled={content.trim().length < 10 || sending}
+                  onClick={handleSubmit}
+                >
+                  {sending && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />}
+                  {ownReview ? "更新评价" : "提交评价"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Review cards — horizontal scroll on mobile, grid on desktop */}
         <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible">
-          {SAMPLE_REVIEWS.map((review) => (
+          {reviews.map((review) => (
             <div
               key={review.id}
-              className="w-[260px] shrink-0 border border-border bg-card p-4 md:w-auto"
+              className={`w-[260px] shrink-0 border bg-card p-4 md:w-auto ${review.isOwn ? "border-foreground/40" : "border-border"}`}
             >
               {/* Rating */}
               <StarRating rating={review.rating} />
@@ -151,6 +360,13 @@ export function TrustReviews() {
               {/* Reviewer info */}
               <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
                 <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                    {review.avatarUrl ? (
+                      <img src={review.avatarUrl} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <User className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
+                    )}
+                  </span>
                   <span className="font-mono text-xs font-medium">
                     {review.reviewer}
                   </span>

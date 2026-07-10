@@ -36,7 +36,7 @@ export interface DbCar {
   created_at: string;
   updated_at: string;
   // Joined from profiles
-  profiles?: { account_type: "private" | "dealer" };
+  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null };
 }
 
 export interface DbProfile {

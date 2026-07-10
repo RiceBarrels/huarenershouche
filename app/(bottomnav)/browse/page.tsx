@@ -252,7 +252,7 @@ function BrowseContent() {
   async function fetchCars() {
     const { data } = await supabase
       .from("cars")
-      .select("*, profiles!seller_id(account_type)")
+      .select("*, profiles!seller_id(account_type, avatar_url)")
       .eq("status", "active")
       .order("created_at", { ascending: false });
     const allCars = (data as DbCar[]) || [];

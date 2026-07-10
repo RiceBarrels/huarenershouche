@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Loader2,
   Pencil,
+  User,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
@@ -105,7 +106,7 @@ export default function CarDetailPage() {
     async function load() {
       const { data } = await supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type)")
+        .select("*, profiles!seller_id(account_type, avatar_url)")
         .eq("id", carId)
         .single();
       setCar(data as DbCar);
@@ -703,11 +704,11 @@ export default function CarDetailPage() {
                 href={userLink(car.seller_id)}
                 className="mt-3 flex items-center gap-3 py-2 transition-colors"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-                  {car.profiles?.account_type === "dealer" ? (
-                    <MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                  {car.profiles?.avatar_url ? (
+                    <img src={car.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
                   ) : (
-                    <Eye className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                    <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                   )}
                 </div>
                 <div>

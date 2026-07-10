@@ -296,7 +296,7 @@ export default function Home() {
 
     supabase
       .from("cars")
-      .select("*")
+      .select("*, profiles!seller_id(account_type, avatar_url)")
       .eq("status", "active")
       .order("created_at", { ascending: false })
       .limit(hasHistory ? 30 : 6)
@@ -380,7 +380,7 @@ export default function Home() {
 
         <div className="relative mx-auto w-full max-w-3xl text-center">
           <div className="flex items-center justify-center gap-3">
-            <Image src="/logo.png" alt="常来车网" width={64} height={64} className="h-10 w-10 object-contain drop-shadow-md brightness-0 invert md:h-16 md:w-16" />
+            <Image src="/logo.png" alt="常来车网" width={64} height={64} className="h-10 w-10 object-contain drop-shadow-md md:h-16 md:w-16" />
             <h1 className="flex font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl gap-2">
               <div className="flex justify-center items-center flex-col gap-1">
                 <span>常来车网</span>
