@@ -17,7 +17,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 5,
     content:
       "在这里找到了一辆低里程的丰田凯美瑞，价格比Carvana便宜两千多。卖家是华人车行，沟通很顺畅，整个交易过程很放心。",
-    reviewer: "湾区凯美瑞车主",
+    reviewer: "kevinz626",
     transactionType: "购车",
     date: "2026-07-06",
   },
@@ -26,7 +26,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 5,
     content:
       "发布车辆后第二天就有人来看车，一周内就卖掉了。中文平台确实方便，不用在Craigslist上跟人来回解释。",
-    reviewer: "法拉盛卖家Leo",
+    reviewer: "老周",
     transactionType: "卖车",
     date: "2026-07-01",
   },
@@ -35,7 +35,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 4,
     content:
       "VIN查询功能很实用，买车前查到了一条未公开的召回记录，避免了不少麻烦。整体体验不错。",
-    reviewer: "达拉斯打工人",
+    reviewer: "Ethan L.",
     transactionType: "购车",
     date: "2026-06-24",
   },
@@ -44,7 +44,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 5,
     content:
       "从纽约搬到加州，在这个平台上找到了一辆合适的二手车。按距离筛选很方便，卖家就在附近。",
-    reviewer: "LA新移民小陈",
+    reviewer: "xy_2019",
     transactionType: "购车",
     date: "2026-06-17",
   },
@@ -53,7 +53,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 4,
     content:
       "车行入驻后生意明显好了，不少客户都是通过平台找过来的。免费发布很良心，希望能加个微信推送功能。",
-    reviewer: "西雅图车行老板",
+    reviewer: "SunriseAuto",
     transactionType: "卖车",
     date: "2026-06-05",
   },
@@ -62,7 +62,7 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 5,
     content:
       "第一次在美国买车，全中文界面让我安心很多。降价提醒帮我省了$1,500，非常推荐给刚来美国的朋友。",
-    reviewer: "波士顿留学生",
+    reviewer: "yuchen_w",
     transactionType: "购车",
     date: "2026-05-28",
   },
