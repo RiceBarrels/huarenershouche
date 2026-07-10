@@ -8,7 +8,7 @@ interface Review {
   content: string;
   reviewer: string;
   transactionType: "购车" | "卖车";
-  timeAgo: string;
+  date: string; // ISO date of the review
 }
 
 const SAMPLE_REVIEWS: Review[] = [
@@ -17,56 +17,66 @@ const SAMPLE_REVIEWS: Review[] = [
     rating: 5,
     content:
       "在这里找到了一辆低里程的丰田凯美瑞，价格比Carvana便宜两千多。卖家是华人车行，沟通很顺畅，整个交易过程很放心。",
-    reviewer: "张*生",
+    reviewer: "湾区凯美瑞车主",
     transactionType: "购车",
-    timeAgo: "3 天前",
+    date: "2026-07-06",
   },
   {
     id: "r2",
     rating: 5,
     content:
       "发布车辆后第二天就有人来看车，一周内就卖掉了。中文平台确实方便，不用在Craigslist上跟人来回解释。",
-    reviewer: "李*华",
+    reviewer: "法拉盛卖家Leo",
     transactionType: "卖车",
-    timeAgo: "1 周前",
+    date: "2026-07-01",
   },
   {
     id: "r3",
     rating: 4,
     content:
       "VIN查询功能很实用，买车前查到了一条未公开的召回记录，避免了不少麻烦。整体体验不错。",
-    reviewer: "王*明",
+    reviewer: "达拉斯打工人",
     transactionType: "购车",
-    timeAgo: "2 周前",
+    date: "2026-06-24",
   },
   {
     id: "r4",
     rating: 5,
     content:
       "从纽约搬到加州，在这个平台上找到了一辆合适的二手车。按距离筛选很方便，卖家就在附近。",
-    reviewer: "陈*萍",
+    reviewer: "LA新移民小陈",
     transactionType: "购车",
-    timeAgo: "3 周前",
+    date: "2026-06-17",
   },
   {
     id: "r5",
     rating: 4,
     content:
       "车行入驻后生意明显好了，不少客户都是通过平台找过来的。免费发布很良心，希望能加个微信推送功能。",
-    reviewer: "赵*东",
+    reviewer: "西雅图车行老板",
     transactionType: "卖车",
-    timeAgo: "1 个月前",
+    date: "2026-06-05",
   },
   {
     id: "r6",
     rating: 5,
     content:
       "第一次在美国买车，全中文界面让我安心很多。降价提醒帮我省了$1,500，非常推荐给刚来美国的朋友。",
-    reviewer: "刘*文",
+    reviewer: "波士顿留学生",
     transactionType: "购车",
-    timeAgo: "1 个月前",
+    date: "2026-05-28",
   },
 ];
+
+function formatTimeAgo(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (days <= 0) return "今天";
+  if (days === 1) return "昨天";
+  if (days < 7) return `${days} 天前`;
+  if (days < 30) return `${Math.floor(days / 7)} 周前`;
+  if (days < 365) return `${Math.floor(days / 30)} 个月前`;
+  return `${Math.floor(days / 365)} 年前`;
+}
 
 function getAverageRating(): string {
   const sum = SAMPLE_REVIEWS.reduce((acc, r) => acc + r.rating, 0);
@@ -148,8 +158,11 @@ export function TrustReviews() {
                     {review.transactionType}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] text-muted-foreground">
-                  {review.timeAgo}
+                <span
+                  className="font-mono text-[10px] text-muted-foreground"
+                  suppressHydrationWarning
+                >
+                  {formatTimeAgo(review.date)}
                 </span>
               </div>
             </div>

@@ -185,15 +185,14 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
 
   if (!loaded && !loading) {
     return (
-      <Button
-        variant="outline"
-        size="sm"
-        className="gap-1.5 font-mono text-[11px]"
+      <button
+        type="button"
+        className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
         onClick={handleLoad}
       >
         <Search className="h-3 w-3" strokeWidth={1.5} />
-        查询事故与召回记录
-      </Button>
+        查询该车型的 NHTSA 召回与安全评级（针对车型年款，非本车记录）
+      </button>
     );
   }
 

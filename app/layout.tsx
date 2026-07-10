@@ -6,6 +6,7 @@ import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
+import { Analytics } from "@vercel/analytics/next";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -69,6 +70,7 @@ export default function RootLayout({
               {children}
               <InitHaptic/>
               <RealtimeNotifications />
+              <Analytics />
             </CapacitorProvider>
           </div>
         </ThemeProvider>

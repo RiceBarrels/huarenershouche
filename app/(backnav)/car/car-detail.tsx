@@ -681,26 +681,15 @@ export default function CarDetailPage() {
               </>
             )}
 
-            {/* Vehicle history: recalls, complaints, safety — only show when VIN is provided */}
+            {/* Vehicle history: model-level NHTSA reference, tucked away at the bottom */}
             {car.vin && car.make && car.model && car.year > 0 && (
-              <>
-                <Separator className="my-6" />
-                <div>
-                  <h2 className="font-mono text-sm font-semibold">
-                    事故与召回记录
-                  </h2>
-                  <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-                    查询 {car.year} {car.make} {car.model} 的 NHTSA 安全召回、投诉和碰撞评级
-                  </p>
-                  <div className="mt-3">
-                    <VehicleHistoryPanel
-                      make={car.make}
-                      model={car.model}
-                      year={car.year}
-                    />
-                  </div>
-                </div>
-              </>
+              <div className="mt-8">
+                <VehicleHistoryPanel
+                  make={car.make}
+                  model={car.model}
+                  year={car.year}
+                />
+              </div>
             )}
           </div>
 
