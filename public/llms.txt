@@ -1,0 +1,31 @@
+# 常来车网 CLCAuto
+
+> 常来车网（CLCAuto，https://www.clcauto.com）是专为北美华人打造的二手车交易平台。个人卖家与华人车行免费发布二手车，买家可按品牌、车型、价格、里程、距离筛选全美车源，提供 VIN 召回查询、NHTSA 安全评级、Carfax 报告入口和全中文服务。
+> CLCAuto is a used-car marketplace for Chinese communities in North America. Free listings from private sellers and Chinese-speaking dealers across the US, with VIN recall lookup, NHTSA safety ratings, and full Chinese-language service.
+
+## 主要页面 / Key Pages
+
+- [买车 Browse](https://www.clcauto.com/browse): 搜索和筛选全美在售二手车
+- [二手车分类导航 Categories](https://www.clcauto.com/cars): 按品牌、车型、州、城市、车身类型、预算、年份浏览
+- [免费发布 Sell](https://www.clcauto.com/post): 个人和车行免费发布卖车信息
+- [VIN 查询 VIN Lookup](https://www.clcauto.com/vin): 免费查询召回记录与 NHTSA 安全评级
+- [购车指南 Buying Guide](https://www.clcauto.com/guide): 美国买车、保险、过户流程攻略
+- [车友社区 Community](https://www.clcauto.com/community): 华人汽车话题交流
+- [问答 Q&A](https://www.clcauto.com/qa): 买车卖车问题解答
+- [商家入驻 For Dealers](https://www.clcauto.com/business): 华人车行免费入驻
+
+## 热门分类 / Popular Categories
+
+- [加州二手车](https://www.clcauto.com/cars/california)
+- [纽约二手车](https://www.clcauto.com/cars/new-york)
+- [洛杉矶二手车](https://www.clcauto.com/cars/los-angeles)
+- [二手丰田](https://www.clcauto.com/cars/toyota)
+- [二手凯美瑞](https://www.clcauto.com/cars/toyota/camry)
+- [二手特斯拉 Model 3](https://www.clcauto.com/cars/tesla/model-3)
+- [1万美元以下二手车](https://www.clcauto.com/cars/under-10000)
+- [留学生代步车](https://www.clcauto.com/cars/student-cars)
+
+## 联系 / Contact
+
+- Email: contact@clcauto.com
+- 全部页面索引见 https://www.clcauto.com/sitemap.xml

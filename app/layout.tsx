@@ -30,11 +30,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "常来车网 - 北美华人二手车交易平台",
+    default: "常来车网 CLCAuto - 北美华人二手车交易平台 | 买车卖车·免费发布·中文服务",
     template: "%s | 常来车网",
   },
   description:
-    "北美华人最信赖的二手车交易平台。覆盖洛杉矶、旧金山、纽约等主要华人社区，提供中文服务，让买卖车更简单。",
+    "常来车网是北美华人最信赖的二手车买卖平台：覆盖洛杉矶、旧金山、纽约、西雅图、达拉斯等华人社区，个人与华人车行直售二手车，支持按品牌、价格、里程、距离筛选，免费发布卖车信息，提供 VIN 召回查询、Carfax 报告和全中文服务，让买车卖车更简单放心。",
   keywords: [
     "北美华人二手车",
     "美国二手车",
@@ -51,9 +51,9 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     siteName: "常来车网",
-    title: "常来车网 - 北美华人二手车交易平台",
+    title: "常来车网 CLCAuto - 北美华人二手车交易平台",
     description:
-      "北美华人最信赖的二手车交易平台。覆盖洛杉矶、旧金山、纽约等主要华人社区，提供中文服务，让买卖车更简单。",
+      "北美华人二手车买卖平台：覆盖洛杉矶、旧金山、纽约等华人社区，个人与车行直售，免费发布，VIN 召回查询，全中文服务。",
   },
   alternates: {
     canonical: "/",
@@ -62,6 +62,41 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+};
+
+// Organization + WebSite 结构化数据（identity schema，站点级一次输出）
+const JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: "常来车网",
+      alternateName: "CLCAuto",
+      url: SITE_URL,
+      logo: `${SITE_URL}/logo.png`,
+      description:
+        "北美华人二手车交易平台，覆盖全美华人社区，提供中文买车卖车服务。",
+      email: "contact@clcauto.com",
+      areaServed: "US",
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      name: "常来车网",
+      url: SITE_URL,
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      inLanguage: "zh-CN",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${SITE_URL}/browse?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -76,6 +111,10 @@ export default function RootLayout({
           async
           src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3873099216150179"
           crossOrigin="anonymous"
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD) }}
         />
       </head>
       <body

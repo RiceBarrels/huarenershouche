@@ -371,7 +371,7 @@ export default function Home() {
         <div className="absolute inset-0 overflow-hidden">
           <img
             src="/hero-banner.jpg"
-            alt=""
+            alt="北美华人二手车交易平台常来车网"
             className="h-full w-full object-cover object-center"
           />
           <div className="absolute inset-0 bg-black/50" />
@@ -382,8 +382,9 @@ export default function Home() {
           <div className="flex items-center justify-center gap-3">
             <Image src="/logo.png" alt="常来车网" width={64} height={64} className="h-10 w-10 object-contain drop-shadow-md md:h-16 md:w-16" />
             <h1 className="flex font-mono text-3xl font-semibold tracking-tight text-white drop-shadow-md md:text-5xl gap-2">
+              <span className="sr-only">常来车网 - 北美华人二手车交易平台，买车卖车免费发布</span>
               <div className="flex justify-center items-center flex-col gap-1">
-                <span>常来车网</span>
+                <span aria-hidden="true">常来车网</span>
                 <Badge className="">CLCAuto.com</Badge>
               </div>
               <Badge variant="secondary">测试版</Badge>
@@ -913,6 +914,40 @@ export default function Home() {
           <div>
             <p className="font-mono text-2xl font-bold">100%</p>
             <p className="mt-1 font-mono text-[11px] text-muted-foreground">免费使用</p>
+          </div>
+        </div>
+      </section>
+
+      {/* About / SEO content */}
+      <section className="border-t border-border px-4 py-12">
+        <div className="mx-auto max-w-3xl">
+          <h2 className="font-mono text-lg font-semibold">关于常来车网</h2>
+          <div className="mt-4 space-y-3 font-mono text-xs leading-relaxed text-muted-foreground">
+            <p>
+              常来车网（CLCAuto）是专为北美华人打造的二手车交易平台。无论你在
+              <Link href="/cars/los-angeles" className="underline underline-offset-2 hover:text-foreground">洛杉矶</Link>、
+              <Link href="/cars/san-francisco" className="underline underline-offset-2 hover:text-foreground">旧金山</Link>、
+              <Link href="/cars/new-york-city" className="underline underline-offset-2 hover:text-foreground">纽约</Link>、
+              <Link href="/cars/seattle" className="underline underline-offset-2 hover:text-foreground">西雅图</Link>还是
+              <Link href="/cars/dallas" className="underline underline-offset-2 hover:text-foreground">达拉斯</Link>，
+              都可以在这里找到同城华人车行和个人卖家直售的二手车源，按品牌、车型、价格、里程和距离精确筛选，全程中文沟通。
+            </p>
+            <p>
+              买二手车最怕信息不透明。常来车网为每辆车提供免费的 VIN 召回记录查询和 NHTSA
+              安全评级，部分车源附带 Carfax 车史报告；价格分析功能会将车源与全站同款车型对比，标出高于或低于市场价的车，帮你避开坑、砍好价。热门车型如
+              <Link href="/cars/toyota/camry" className="underline underline-offset-2 hover:text-foreground">丰田凯美瑞</Link>、
+              <Link href="/cars/honda/civic" className="underline underline-offset-2 hover:text-foreground">本田思域</Link>、
+              <Link href="/cars/toyota/rav4" className="underline underline-offset-2 hover:text-foreground">RAV4</Link>、
+              <Link href="/cars/tesla/model-3" className="underline underline-offset-2 hover:text-foreground">特斯拉 Model 3</Link>
+              都有专属页面，可以直接对比同款车源。
+            </p>
+            <p>
+              卖车同样简单：个人卖家和华人车行都可以免费发布车辆信息，触达全美华人买家，没有中间商抽成。刚来美国的留学生和新移民可以查看
+              <Link href="/cars/student-cars" className="underline underline-offset-2 hover:text-foreground">留学生代步车专区</Link>和
+              <Link href="/guide" className="underline underline-offset-2 hover:text-foreground">购车指南</Link>，
+              了解美国买车、保险、过户的完整流程。更多分类请访问
+              <Link href="/cars" className="underline underline-offset-2 hover:text-foreground">二手车分类导航</Link>。
+            </p>
           </div>
         </div>
       </section>
