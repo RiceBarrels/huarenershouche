@@ -1,5 +1,4 @@
 import { MobileTabBar } from "@/components/bottom-nav";
-import { NotchUI } from "@/components/notch-ui";
 
 export default function BottomNavLayout({
   children,
@@ -8,7 +7,10 @@ export default function BottomNavLayout({
 }) {
   return (
     <>
-      {children}
+      {/* Reserve space for the fixed mobile tab bar (incl. safe area) */}
+      <div className="pb-[calc(4.5rem+env(safe-area-inset-bottom,0px))] md:pb-0">
+        {children}
+      </div>
       <MobileTabBar />
     </>
   );
