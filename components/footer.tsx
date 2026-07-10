@@ -1,7 +1,7 @@
 import { Mail, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, HOT_STATE_ABBRS } from "@/lib/seo-pages";
+import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, SEO_MODELS, HOT_STATE_ABBRS } from "@/lib/seo-pages";
 import { HOT_MAKES, MAKES_ZH } from "@/lib/mock-data";
 
 const buyLinks = [
@@ -11,12 +11,21 @@ const buyLinks = [
   { label: "二手车分类导航", href: "/cars" },
 ];
 
+const HOT_MODEL_NAMES = ["Camry", "Corolla", "Civic", "Accord", "CR-V", "RAV4", "Model 3", "Model Y", "3 Series", "X5"];
+
 const seoLinkRows: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: "热门品牌",
     links: HOT_MAKES.map((m) => ({
       label: `${MAKES_ZH[m] || m}二手车`,
       href: `/cars/${makeSlug(m)}`,
+    })),
+  },
+  {
+    title: "热门车型",
+    links: SEO_MODELS.filter((m) => HOT_MODEL_NAMES.includes(m.name)).map((m) => ({
+      label: `二手${m.zh || m.name}`,
+      href: `/cars/${makeSlug(m.make)}/${makeSlug(m.name)}`,
     })),
   },
   {

@@ -126,11 +126,258 @@ export const SEO_FUELS = [
   { slug: "gas", value: "汽油", zh: "汽油车", en: "Gas" },
 ];
 
+// ── 热门车型（品牌 → 常见二手车型，zh 为华人常用叫法）──
+export interface SeoModel {
+  make: string;
+  name: string; // 数据库 model 字段的常见写法
+  zh?: string;
+}
+
+export const SEO_MODELS: SeoModel[] = [
+  // Toyota
+  { make: "Toyota", name: "Camry", zh: "凯美瑞" },
+  { make: "Toyota", name: "Corolla", zh: "卡罗拉" },
+  { make: "Toyota", name: "RAV4" },
+  { make: "Toyota", name: "Highlander", zh: "汉兰达" },
+  { make: "Toyota", name: "Sienna", zh: "塞纳" },
+  { make: "Toyota", name: "Tacoma" },
+  { make: "Toyota", name: "Tundra" },
+  { make: "Toyota", name: "Prius", zh: "普锐斯" },
+  { make: "Toyota", name: "4Runner" },
+  { make: "Toyota", name: "Land Cruiser", zh: "兰德酷路泽" },
+  { make: "Toyota", name: "Avalon", zh: "亚洲龙" },
+  { make: "Toyota", name: "Corolla Cross" },
+  { make: "Toyota", name: "Venza", zh: "威飒" },
+  // Honda
+  { make: "Honda", name: "Civic", zh: "思域" },
+  { make: "Honda", name: "Accord", zh: "雅阁" },
+  { make: "Honda", name: "CR-V" },
+  { make: "Honda", name: "HR-V" },
+  { make: "Honda", name: "Pilot" },
+  { make: "Honda", name: "Odyssey", zh: "奥德赛" },
+  { make: "Honda", name: "Fit", zh: "飞度" },
+  { make: "Honda", name: "Ridgeline" },
+  { make: "Honda", name: "Passport" },
+  // Nissan
+  { make: "Nissan", name: "Altima", zh: "天籁" },
+  { make: "Nissan", name: "Sentra", zh: "轩逸" },
+  { make: "Nissan", name: "Rogue", zh: "奇骏" },
+  { make: "Nissan", name: "Murano", zh: "楼兰" },
+  { make: "Nissan", name: "Pathfinder", zh: "探路者" },
+  { make: "Nissan", name: "Maxima" },
+  { make: "Nissan", name: "Kicks" },
+  { make: "Nissan", name: "Frontier" },
+  { make: "Nissan", name: "Leaf", zh: "聆风" },
+  { make: "Nissan", name: "Versa" },
+  // Hyundai
+  { make: "Hyundai", name: "Elantra", zh: "伊兰特" },
+  { make: "Hyundai", name: "Sonata", zh: "索纳塔" },
+  { make: "Hyundai", name: "Tucson", zh: "途胜" },
+  { make: "Hyundai", name: "Santa Fe", zh: "胜达" },
+  { make: "Hyundai", name: "Kona" },
+  { make: "Hyundai", name: "Palisade" },
+  { make: "Hyundai", name: "Ioniq 5" },
+  { make: "Hyundai", name: "Accent" },
+  // Kia
+  { make: "Kia", name: "Forte" },
+  { make: "Kia", name: "K5" },
+  { make: "Kia", name: "Optima" },
+  { make: "Kia", name: "Sportage", zh: "狮跑" },
+  { make: "Kia", name: "Sorento", zh: "索兰托" },
+  { make: "Kia", name: "Telluride" },
+  { make: "Kia", name: "Soul" },
+  { make: "Kia", name: "Seltos" },
+  { make: "Kia", name: "Carnival", zh: "嘉华" },
+  { make: "Kia", name: "Niro" },
+  // Mazda
+  { make: "Mazda", name: "Mazda3", zh: "昂克赛拉" },
+  { make: "Mazda", name: "Mazda6", zh: "阿特兹" },
+  { make: "Mazda", name: "CX-5" },
+  { make: "Mazda", name: "CX-30" },
+  { make: "Mazda", name: "CX-9" },
+  { make: "Mazda", name: "CX-50" },
+  { make: "Mazda", name: "MX-5 Miata" },
+  // Subaru
+  { make: "Subaru", name: "Outback", zh: "傲虎" },
+  { make: "Subaru", name: "Forester", zh: "森林人" },
+  { make: "Subaru", name: "Crosstrek" },
+  { make: "Subaru", name: "Impreza", zh: "翼豹" },
+  { make: "Subaru", name: "Legacy", zh: "力狮" },
+  { make: "Subaru", name: "Ascent" },
+  { make: "Subaru", name: "WRX" },
+  { make: "Subaru", name: "BRZ" },
+  // Volkswagen
+  { make: "Volkswagen", name: "Jetta", zh: "捷达" },
+  { make: "Volkswagen", name: "Passat", zh: "帕萨特" },
+  { make: "Volkswagen", name: "Tiguan", zh: "途观" },
+  { make: "Volkswagen", name: "Atlas", zh: "途昂" },
+  { make: "Volkswagen", name: "Golf", zh: "高尔夫" },
+  { make: "Volkswagen", name: "Taos" },
+  { make: "Volkswagen", name: "GTI" },
+  { make: "Volkswagen", name: "ID.4" },
+  // BMW
+  { make: "BMW", name: "3 Series", zh: "3系" },
+  { make: "BMW", name: "5 Series", zh: "5系" },
+  { make: "BMW", name: "7 Series", zh: "7系" },
+  { make: "BMW", name: "4 Series", zh: "4系" },
+  { make: "BMW", name: "2 Series", zh: "2系" },
+  { make: "BMW", name: "X1" },
+  { make: "BMW", name: "X3" },
+  { make: "BMW", name: "X5" },
+  { make: "BMW", name: "X7" },
+  { make: "BMW", name: "M3" },
+  { make: "BMW", name: "M4" },
+  { make: "BMW", name: "i4" },
+  { make: "BMW", name: "iX" },
+  // Mercedes-Benz
+  { make: "Mercedes-Benz", name: "C-Class", zh: "C级" },
+  { make: "Mercedes-Benz", name: "E-Class", zh: "E级" },
+  { make: "Mercedes-Benz", name: "S-Class", zh: "S级" },
+  { make: "Mercedes-Benz", name: "A-Class", zh: "A级" },
+  { make: "Mercedes-Benz", name: "CLA" },
+  { make: "Mercedes-Benz", name: "GLA" },
+  { make: "Mercedes-Benz", name: "GLB" },
+  { make: "Mercedes-Benz", name: "GLC" },
+  { make: "Mercedes-Benz", name: "GLE" },
+  { make: "Mercedes-Benz", name: "GLS" },
+  { make: "Mercedes-Benz", name: "G-Class", zh: "大G" },
+  // Audi
+  { make: "Audi", name: "A3" },
+  { make: "Audi", name: "A4" },
+  { make: "Audi", name: "A5" },
+  { make: "Audi", name: "A6" },
+  { make: "Audi", name: "A7" },
+  { make: "Audi", name: "Q3" },
+  { make: "Audi", name: "Q5" },
+  { make: "Audi", name: "Q7" },
+  { make: "Audi", name: "Q8" },
+  { make: "Audi", name: "e-tron" },
+  // Lexus
+  { make: "Lexus", name: "ES" },
+  { make: "Lexus", name: "RX" },
+  { make: "Lexus", name: "NX" },
+  { make: "Lexus", name: "IS" },
+  { make: "Lexus", name: "GX" },
+  { make: "Lexus", name: "LX" },
+  { make: "Lexus", name: "UX" },
+  { make: "Lexus", name: "LS" },
+  // Tesla
+  { make: "Tesla", name: "Model 3" },
+  { make: "Tesla", name: "Model Y" },
+  { make: "Tesla", name: "Model S" },
+  { make: "Tesla", name: "Model X" },
+  { make: "Tesla", name: "Cybertruck", zh: "赛博皮卡" },
+  // Acura
+  { make: "Acura", name: "MDX" },
+  { make: "Acura", name: "RDX" },
+  { make: "Acura", name: "TLX" },
+  { make: "Acura", name: "Integra" },
+  // Infiniti
+  { make: "Infiniti", name: "Q50" },
+  { make: "Infiniti", name: "QX60" },
+  { make: "Infiniti", name: "QX50" },
+  { make: "Infiniti", name: "QX80" },
+  // Ford
+  { make: "Ford", name: "F-150" },
+  { make: "Ford", name: "Mustang", zh: "野马" },
+  { make: "Ford", name: "Explorer", zh: "探险者" },
+  { make: "Ford", name: "Escape" },
+  { make: "Ford", name: "Edge", zh: "锐界" },
+  { make: "Ford", name: "Bronco" },
+  { make: "Ford", name: "Ranger" },
+  { make: "Ford", name: "Focus", zh: "福克斯" },
+  { make: "Ford", name: "Fusion" },
+  { make: "Ford", name: "Expedition" },
+  { make: "Ford", name: "Maverick" },
+  // Chevrolet
+  { make: "Chevrolet", name: "Silverado" },
+  { make: "Chevrolet", name: "Equinox", zh: "探界者" },
+  { make: "Chevrolet", name: "Malibu", zh: "迈锐宝" },
+  { make: "Chevrolet", name: "Tahoe", zh: "太浩" },
+  { make: "Chevrolet", name: "Traverse" },
+  { make: "Chevrolet", name: "Camaro", zh: "科迈罗" },
+  { make: "Chevrolet", name: "Suburban" },
+  { make: "Chevrolet", name: "Bolt" },
+  { make: "Chevrolet", name: "Corvette", zh: "科尔维特" },
+  { make: "Chevrolet", name: "Colorado" },
+  // Jeep
+  { make: "Jeep", name: "Wrangler", zh: "牧马人" },
+  { make: "Jeep", name: "Grand Cherokee", zh: "大切诺基" },
+  { make: "Jeep", name: "Cherokee", zh: "自由光" },
+  { make: "Jeep", name: "Compass", zh: "指南者" },
+  { make: "Jeep", name: "Gladiator" },
+  { make: "Jeep", name: "Renegade" },
+  // Ram
+  { make: "Ram", name: "1500" },
+  { make: "Ram", name: "2500" },
+  // GMC
+  { make: "GMC", name: "Sierra" },
+  { make: "GMC", name: "Yukon" },
+  { make: "GMC", name: "Acadia" },
+  { make: "GMC", name: "Terrain" },
+  // Dodge
+  { make: "Dodge", name: "Charger" },
+  { make: "Dodge", name: "Challenger" },
+  { make: "Dodge", name: "Durango" },
+  // Chrysler
+  { make: "Chrysler", name: "Pacifica" },
+  { make: "Chrysler", name: "300" },
+  // Buick
+  { make: "Buick", name: "Encore", zh: "昂科拉" },
+  { make: "Buick", name: "Enclave", zh: "昂科旗" },
+  { make: "Buick", name: "Envision", zh: "昂科威" },
+  // Cadillac
+  { make: "Cadillac", name: "Escalade", zh: "凯雷德" },
+  { make: "Cadillac", name: "XT5" },
+  { make: "Cadillac", name: "XT4" },
+  { make: "Cadillac", name: "CT5" },
+  // Volvo
+  { make: "Volvo", name: "XC90" },
+  { make: "Volvo", name: "XC60" },
+  { make: "Volvo", name: "XC40" },
+  { make: "Volvo", name: "S60" },
+  { make: "Volvo", name: "S90" },
+  // Porsche
+  { make: "Porsche", name: "911" },
+  { make: "Porsche", name: "Cayenne", zh: "卡宴" },
+  { make: "Porsche", name: "Macan" },
+  { make: "Porsche", name: "Panamera", zh: "帕拉梅拉" },
+  { make: "Porsche", name: "Taycan" },
+  { make: "Porsche", name: "718" },
+  // Land Rover
+  { make: "Land Rover", name: "Range Rover", zh: "揽胜" },
+  { make: "Land Rover", name: "Range Rover Sport", zh: "揽胜运动版" },
+  { make: "Land Rover", name: "Discovery", zh: "发现" },
+  { make: "Land Rover", name: "Defender", zh: "卫士" },
+  { make: "Land Rover", name: "Range Rover Evoque", zh: "揽胜极光" },
+  // Genesis
+  { make: "Genesis", name: "G70" },
+  { make: "Genesis", name: "G80" },
+  { make: "Genesis", name: "GV70" },
+  { make: "Genesis", name: "GV80" },
+  // Others
+  { make: "Mini", name: "Cooper" },
+  { make: "Mitsubishi", name: "Outlander", zh: "欧蓝德" },
+  { make: "Lincoln", name: "Navigator", zh: "领航员" },
+  { make: "Lincoln", name: "Aviator", zh: "飞行家" },
+  { make: "Lincoln", name: "Corsair", zh: "冒险家" },
+  { make: "Lincoln", name: "Nautilus", zh: "航海家" },
+  { make: "Rivian", name: "R1T" },
+  { make: "Rivian", name: "R1S" },
+  { make: "Polestar", name: "Polestar 2" },
+  { make: "Lucid", name: "Air" },
+];
+
+// 车型页在这些州做组合页（华人最多的 6 个州）
+export const MODEL_STATE_ABBRS = ["CA", "NY", "TX", "FL", "WA", "NJ"];
+
 // ── 页面定义 ──
 
 /** SeoCarList（客户端）用来过滤车源的条件 */
 export interface SeoListFilter {
   make?: string;
+  /** 精确匹配 car.model（忽略大小写） */
+  model?: string;
   /** 匹配 car.location 结尾 ", XX" 的州缩写 */
   stateAbbr?: string;
   /** 匹配 car.location / location_zh 包含任一关键词（小写） */
@@ -141,6 +388,7 @@ export interface SeoListFilter {
   maxPrice?: number;
   minYear?: number;
   maxYear?: number;
+  maxMileage?: number;
 }
 
 export type SeoPageKind =
@@ -151,7 +399,15 @@ export type SeoPageKind =
   | "body"
   | "price"
   | "year"
-  | "fuel";
+  | "fuel"
+  | "model"
+  | "model-state"
+  | "make-price"
+  | "make-year"
+  | "body-state"
+  | "price-state"
+  | "fuel-state"
+  | "theme";
 
 export interface SeoPageDef {
   /** /cars/ 下的路径，可含一层子路径，如 "toyota" 或 "toyota/california" */
@@ -309,22 +565,213 @@ function fuelPage(f: { slug: string; value: string; zh: string; en: string }): S
   };
 }
 
+function modelZhName(m: SeoModel): string {
+  return m.zh ? `${MAKES_ZH[m.make] || m.make}${m.zh}` : `${MAKES_ZH[m.make] || m.make} ${m.name}`;
+}
+
+function modelPage(m: SeoModel): SeoPageDef {
+  const zhFull = modelZhName(m);
+  return {
+    slug: `${makeSlug(m.make)}/${makeSlug(m.name)}`,
+    kind: "model",
+    label: m.zh || m.name,
+    title: `二手${zhFull} - ${m.make} ${m.name} 华人车源 | ${SITE_NAME}`,
+    description: `${SITE_NAME}二手${zhFull}专区：北美华人车行与个人直售 ${m.make} ${m.name}，按年份、里程、价格、所在州筛选，支持 VIN 召回查询和 Carfax 报告，中文沟通。`,
+    h1: `二手${zhFull} ${m.name}`,
+    intro: [
+      `选购二手${zhFull}（${m.make} ${m.name}），${SITE_NAME}汇集全美华人卖家的真实车源。同款车重点比年份、里程和车况，页面可直接查 VIN 召回记录，与卖家中文沟通更放心。`,
+    ],
+    browseParams: { make: m.make, model: m.name },
+    listFilter: { make: m.make, model: m.name },
+  };
+}
+
+function modelStatePage(m: SeoModel, s: SeoState): SeoPageDef {
+  const zhFull = modelZhName(m);
+  return {
+    slug: `${makeSlug(m.make)}/${makeSlug(m.name)}/${s.slug}`,
+    kind: "model-state",
+    label: `${s.zh}${m.zh || m.name}`,
+    title: `${s.zh}二手${zhFull} - ${s.en} ${m.make} ${m.name} 车源 | ${SITE_NAME}`,
+    description: `${s.zh}（${s.en}）二手${zhFull}车源：本地华人直售 ${m.make} ${m.name}，按里程、年份、价格筛选，中文服务，看车方便。`,
+    h1: `${s.zh}二手${zhFull}`,
+    intro: [
+      `在${s.zh}找二手${zhFull}？这里汇集 ${s.en} 本地华人发布的 ${m.make} ${m.name}，按距离筛选附近车源，约看车更方便。`,
+    ],
+    browseParams: { make: m.make, model: m.name, location: s.abbr },
+    listFilter: { make: m.make, model: m.name, stateAbbr: s.abbr },
+  };
+}
+
+function makePricePage(make: string, max: number): SeoPageDef {
+  const zh = MAKES_ZH[make] || make;
+  return {
+    slug: `${makeSlug(make)}/under-${max}`,
+    kind: "make-price",
+    label: `$${max.toLocaleString()}以下${zh}`,
+    title: `${max.toLocaleString()}美元以下二手${zh} - 便宜${zh}二手车 | ${SITE_NAME}`,
+    description: `预算 $${max.toLocaleString()} 以内的二手${zh}（${make}）车源：北美华人直售，价格实惠，按里程、年份、所在州筛选，中文服务。`,
+    h1: `$${max.toLocaleString()} 以下二手${zh}`,
+    intro: [
+      `预算 $${max.toLocaleString()} 以内也能买到合适的${zh}。多为个人直售，没有车行加价，买前查 VIN 召回记录、比里程和车况，放心下手。`,
+    ],
+    browseParams: { make, maxPrice: String(max) },
+    listFilter: { make, maxPrice: max },
+  };
+}
+
+function makeYearPage(make: string, year: number): SeoPageDef {
+  const zh = MAKES_ZH[make] || make;
+  return {
+    slug: `${makeSlug(make)}/${year}`,
+    kind: "make-year",
+    label: `${year}年${zh}`,
+    title: `${year}年二手${zh} - ${year}款 ${make} 车源 | ${SITE_NAME}`,
+    description: `${year} 年款二手${zh}（${make}）：北美华人车行与个人直售，按车型、里程、价格、所在州筛选，中文服务。`,
+    h1: `${year} 年款二手${zh}`,
+    intro: [
+      `浏览 ${year} 年款的二手${zh}车源。同年份的车重点比里程和保养记录，善用筛选快速锁定车况更好的那一辆。`,
+    ],
+    browseParams: { make, minYear: String(year), maxYear: String(year) },
+    listFilter: { make, minYear: year, maxYear: year },
+  };
+}
+
+function bodyStatePage(b: { value: string; label: string; labelEn: string }, s: SeoState): SeoPageDef {
+  return {
+    slug: `${b.value}/${s.slug}`,
+    kind: "body-state",
+    label: `${s.zh}${b.label}`,
+    title: `${s.zh}二手${b.label} - ${s.en} 华人${b.labelEn}车源 | ${SITE_NAME}`,
+    description: `${s.zh}（${s.en}）二手${b.label}车源：本地华人车行与个人直售，按品牌、价格、里程筛选 ${b.labelEn}，中文服务。`,
+    h1: `${s.zh}二手${b.label}`,
+    intro: [
+      `在${s.zh}买二手${b.label}，${SITE_NAME}帮你找到本地华人卖家的 ${b.labelEn} 车源，按距离、价格、品牌筛选，中文看车沟通无障碍。`,
+    ],
+    browseParams: { bodyStyle: b.value, location: s.abbr },
+    listFilter: { bodyStyle: b.value, stateAbbr: s.abbr },
+  };
+}
+
+function priceStatePage(max: number, s: SeoState): SeoPageDef {
+  return {
+    slug: `under-${max}/${s.slug}`,
+    kind: "price-state",
+    label: `${s.zh}$${max.toLocaleString()}以下`,
+    title: `${s.zh} ${max.toLocaleString()}美元以下二手车 - ${s.en} 便宜二手车 | ${SITE_NAME}`,
+    description: `${s.zh}（${s.en}）$${max.toLocaleString()} 以下二手车源：本地华人个人直售为主，价格实惠，适合留学生和新移民代步，中文服务。`,
+    h1: `${s.zh} $${max.toLocaleString()} 以下二手车`,
+    intro: [
+      `在${s.zh}用 $${max.toLocaleString()} 以内的预算买车，个人直售没有车行加价。买前查 VIN 召回记录、看里程和车况描述，选台靠谱的代步车。`,
+    ],
+    browseParams: { maxPrice: String(max), location: s.abbr },
+    listFilter: { maxPrice: max, stateAbbr: s.abbr },
+  };
+}
+
+function fuelStatePage(f: { slug: string; value: string; zh: string; en: string }, s: SeoState): SeoPageDef {
+  return {
+    slug: `${f.slug}/${s.slug}`,
+    kind: "fuel-state",
+    label: `${s.zh}${f.zh}`,
+    title: `${s.zh}二手${f.zh} - ${s.en} ${f.en} 车源 | ${SITE_NAME}`,
+    description: `${s.zh}（${s.en}）二手${f.zh}车源（${f.en}）：本地华人直售，按品牌、价格、里程筛选，中文服务。`,
+    h1: `${s.zh}二手${f.zh}`,
+    intro: [
+      `在${s.zh}找二手${f.zh}，${SITE_NAME}汇集 ${s.en} 本地华人卖家的${f.zh}车源，中文沟通，看车方便。`,
+    ],
+    browseParams: { fuelType: f.value, location: s.abbr },
+    listFilter: { fuelType: f.value, stateAbbr: s.abbr },
+  };
+}
+
+const THEME_PAGES: SeoPageDef[] = [
+  {
+    slug: "low-mileage",
+    kind: "theme",
+    label: "低里程二手车",
+    title: `低里程二手车 - 5万英里以内准新车 | ${SITE_NAME}`,
+    description: `北美华人低里程二手车专区：5 万英里以内的准新车源，车况更好、剩余寿命更长，按品牌、价格、所在州筛选，中文服务。`,
+    h1: "低里程二手车（5 万英里以内）",
+    intro: [
+      `里程是二手车最直观的硬指标。${SITE_NAME}低里程专区只收录 5 万英里以内的车源，配合 VIN 召回查询和 Carfax 报告，买台接近新车的二手车。`,
+    ],
+    browseParams: { maxMileage: "50000" },
+    listFilter: { maxMileage: 50000 },
+  },
+  {
+    slug: "student-cars",
+    kind: "theme",
+    label: "留学生代步车",
+    title: `留学生买车 - 1.2万美元以内代步车推荐 | ${SITE_NAME}`,
+    description: `留学生在美国买车专区：$12,000 以内的靠谱代步车源，个人直售价格实惠，全中文沟通，附购车流程与过户指南。`,
+    h1: "留学生代步车（$12,000 以内）",
+    intro: [
+      `刚来美国的留学生买车，预算通常在一万美元上下。${SITE_NAME}为你筛出 $12,000 以内的代步车源，全中文沟通看车、砍价、过户，不用担心语言问题。买前记得查 VIN 召回记录，配合购车指南了解保险和过户流程。`,
+    ],
+    browseParams: { maxPrice: "12000" },
+    listFilter: { maxPrice: 12000 },
+  },
+  {
+    slug: "family-suv",
+    kind: "theme",
+    label: "家用7座SUV",
+    title: `二手7座SUV - 家用大空间SUV推荐 | ${SITE_NAME}`,
+    description: `北美华人家用 SUV 专区：汉兰达、Pilot、Telluride 等适合家庭的大空间 SUV 车源，按价格、里程、所在州筛选，中文服务。`,
+    h1: "家用 SUV 二手车",
+    intro: [
+      `一家人出行，空间和可靠性最重要。${SITE_NAME}家用 SUV 专区汇集汉兰达、本田 Pilot、起亚 Telluride 等口碑车型的二手车源，中文沟通看车更放心。`,
+    ],
+    browseParams: { bodyStyle: "suv" },
+    listFilter: { bodyStyle: "suv" },
+  },
+];
+
 // ── 汇总 ──
 
 function buildAll(): SeoPageDef[] {
-  const pages: SeoPageDef[] = [];
-  for (const m of SELLABLE_MAKES) pages.push(makePage(m));
-  for (const s of SEO_STATES) pages.push(statePage(s));
-  for (const c of SEO_CITIES) pages.push(cityPage(c));
+  const map = new Map<string, SeoPageDef>();
+  const add = (p: SeoPageDef) => {
+    if (!map.has(p.slug)) map.set(p.slug, p);
+  };
+
+  for (const m of SELLABLE_MAKES) add(makePage(m));
+  for (const s of SEO_STATES) add(statePage(s));
+  for (const c of SEO_CITIES) add(cityPage(c));
   const hotStates = SEO_STATES.filter((s) => HOT_STATE_ABBRS.includes(s.abbr));
   for (const m of SELLABLE_MAKES) {
-    for (const s of hotStates) pages.push(makeStatePage(m, s));
+    for (const s of hotStates) add(makeStatePage(m, s));
   }
-  for (const b of BODY_STYLE_OPTIONS) pages.push(bodyPage(b));
-  for (const p of SEO_PRICE_PAGES) pages.push(pricePage(p));
-  for (const y of SEO_YEARS) pages.push(yearPage(y));
-  for (const f of SEO_FUELS) pages.push(fuelPage(f));
-  return pages;
+  for (const b of BODY_STYLE_OPTIONS) add(bodyPage(b));
+  for (const p of SEO_PRICE_PAGES) add(pricePage(p));
+  for (const y of SEO_YEARS) add(yearPage(y));
+  for (const f of SEO_FUELS) add(fuelPage(f));
+
+  // 车型页 + 车型×州
+  const modelStates = SEO_STATES.filter((s) => MODEL_STATE_ABBRS.includes(s.abbr));
+  for (const m of SEO_MODELS) {
+    add(modelPage(m));
+    for (const s of modelStates) add(modelStatePage(m, s));
+  }
+  // 品牌×预算 / 品牌×年份（热门品牌）
+  for (const make of HOT_MAKES) {
+    for (const p of SEO_PRICE_PAGES) add(makePricePage(make, p));
+    for (const y of SEO_YEARS.filter((y) => y >= 2015)) add(makeYearPage(make, y));
+  }
+  // 车身类型×州 / 预算×州 / 燃油×州
+  for (const b of BODY_STYLE_OPTIONS) {
+    for (const s of hotStates) add(bodyStatePage(b, s));
+  }
+  for (const p of SEO_PRICE_PAGES) {
+    for (const s of hotStates) add(priceStatePage(p, s));
+  }
+  for (const f of SEO_FUELS) {
+    for (const s of hotStates) add(fuelStatePage(f, s));
+  }
+  // 主题页
+  for (const t of THEME_PAGES) add(t);
+
+  return [...map.values()];
 }
 
 export const SEO_PAGES: SeoPageDef[] = buildAll();
@@ -386,6 +833,28 @@ export function getRelatedPages(def: SeoPageDef): { title: string; pages: SeoPag
         .map((s) => pageMap.get(s.slug))
         .filter((p) => p && p.slug !== def.slug) as SeoPageDef[],
     });
+  } else if (def.kind === "model" || def.kind === "model-state") {
+    const [mSlug, modelSlugPart] = def.slug.split("/");
+    const modelStates = SEO_STATES.filter((s) => MODEL_STATE_ABBRS.includes(s.abbr));
+    // 该车型在各州
+    groups.push({
+      title: "该车型各州车源",
+      pages: modelStates
+        .map((s) => pageMap.get(`${mSlug}/${modelSlugPart}/${s.slug}`))
+        .filter((p) => p && p.slug !== def.slug) as SeoPageDef[],
+    });
+    // 同品牌其他车型
+    const make = SEO_MODELS.find((m) => makeSlug(m.make) === mSlug)?.make;
+    if (make) {
+      groups.push({
+        title: `${MAKES_ZH[make] || make}其他车型`,
+        pages: SEO_MODELS.filter((m) => m.make === make)
+          .map((m) => pageMap.get(`${makeSlug(m.make)}/${makeSlug(m.name)}`))
+          .filter((p) => p && p.slug !== `${mSlug}/${modelSlugPart}`) as SeoPageDef[],
+      });
+      const makeDef = pageMap.get(mSlug);
+      if (makeDef) groups.push({ title: "品牌专区", pages: [makeDef] });
+    }
   } else if (def.kind === "make-state") {
     const [mSlug, sSlug] = def.slug.split("/");
     groups.push({

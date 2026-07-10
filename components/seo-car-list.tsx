@@ -47,7 +47,9 @@ export function SeoCarList({
         .order("created_at", { ascending: false })
         .limit(200);
       if (filter.make) query = query.eq("make", filter.make);
+      if (filter.model) query = query.ilike("model", filter.model);
       if (filter.fuelType) query = query.eq("fuel_type", filter.fuelType);
+      if (filter.maxMileage) query = query.lte("mileage", filter.maxMileage);
       if (filter.minPrice) query = query.gte("price", filter.minPrice);
       if (filter.maxPrice) query = query.lte("price", filter.maxPrice).gt("price", 0);
       if (filter.minYear) query = query.gte("year", filter.minYear);

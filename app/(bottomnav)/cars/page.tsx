@@ -21,12 +21,14 @@ export const metadata: Metadata = {
 
 const SECTIONS: { title: string; kind: SeoPageKind }[] = [
   { title: "热门品牌", kind: "make" },
+  { title: "热门车型", kind: "model" },
   { title: "按州找车", kind: "state" },
   { title: "热门城市", kind: "city" },
   { title: "车身类型", kind: "body" },
   { title: "按预算", kind: "price" },
   { title: "按年份", kind: "year" },
   { title: "新能源与燃油", kind: "fuel" },
+  { title: "精选专题", kind: "theme" },
 ];
 
 export default function CarsHubPage() {
