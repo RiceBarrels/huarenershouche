@@ -63,12 +63,6 @@ export function Header() {
             买车
           </Link>
           <Link
-            href="/valuation"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            估价
-          </Link>
-          <Link
             href="/guide"
             className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >

@@ -10,7 +10,6 @@ const buyLinks = [
 
 const sellLinks = [
   { label: "免费发布", href: "/post" },
-  { label: "车辆估价", href: "/valuation" },
   { label: "我的车辆", href: "/account" },
 ];
 
