@@ -1,11 +1,44 @@
 import { Mail, MessageCircle } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, HOT_STATE_ABBRS } from "@/lib/seo-pages";
+import { HOT_MAKES, MAKES_ZH } from "@/lib/mock-data";
 
 const buyLinks = [
   { label: "搜索车辆", href: "/browse" },
   { label: "车辆对比", href: "/compare" },
   { label: "购车指南", href: "/guide" },
+  { label: "二手车分类导航", href: "/cars" },
+];
+
+const seoLinkRows: { title: string; links: { label: string; href: string }[] }[] = [
+  {
+    title: "热门品牌",
+    links: HOT_MAKES.map((m) => ({
+      label: `${MAKES_ZH[m] || m}二手车`,
+      href: `/cars/${makeSlug(m)}`,
+    })),
+  },
+  {
+    title: "热门城市",
+    links: SEO_CITIES.slice(0, 10).map((c) => ({
+      label: `${c.zh}二手车`,
+      href: `/cars/${c.slug}`,
+    })),
+  },
+  {
+    title: "热门地区",
+    links: SEO_STATES.filter((s) => HOT_STATE_ABBRS.includes(s.abbr))
+      .slice(0, 8)
+      .map((s) => ({ label: `${s.zh}二手车`, href: `/cars/${s.slug}` })),
+  },
+  {
+    title: "按预算",
+    links: SEO_PRICE_PAGES.map((n) => ({
+      label: `$${n / 1000}k以下二手车`,
+      href: `/cars/under-${n}`,
+    })),
+  },
 ];
 
 const sellLinks = [
@@ -97,6 +130,29 @@ export function Footer() {
                 </li>
               ))}
             </ul>
+          </div>
+        </div>
+
+        {/* SEO internal links */}
+        <div className="mt-10 border-t border-border pt-6">
+          <h4 className="font-mono text-xs font-semibold">热门搜索</h4>
+          <div className="mt-3 space-y-2">
+            {seoLinkRows.map((row) => (
+              <div key={row.title} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <span className="font-mono text-[11px] text-muted-foreground/60">{row.title}</span>
+                {row.links.map((link, i) => (
+                  <span key={link.href} className="inline-flex items-baseline gap-x-2">
+                    {i > 0 && <span className="text-[11px] text-border">·</span>}
+                    <Link
+                      href={link.href}
+                      className="font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      {link.label}
+                    </Link>
+                  </span>
+                ))}
+              </div>
+            ))}
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
 import { Analytics } from "@vercel/analytics/next";
+import { SITE_URL } from "@/lib/seo-pages";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,9 +28,40 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "常来车网 - 北美华人二手车交易平台",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "常来车网 - 北美华人二手车交易平台",
+    template: "%s | 常来车网",
+  },
   description:
     "北美华人最信赖的二手车交易平台。覆盖洛杉矶、旧金山、纽约等主要华人社区，提供中文服务，让买卖车更简单。",
+  keywords: [
+    "北美华人二手车",
+    "美国二手车",
+    "华人买车",
+    "华人卖车",
+    "中文二手车平台",
+    "华人车行",
+    "留学生买车",
+    "used car chinese",
+    "chinese used car marketplace",
+    "常来车网",
+  ],
+  openGraph: {
+    type: "website",
+    locale: "zh_CN",
+    siteName: "常来车网",
+    title: "常来车网 - 北美华人二手车交易平台",
+    description:
+      "北美华人最信赖的二手车交易平台。覆盖洛杉矶、旧金山、纽约等主要华人社区，提供中文服务，让买卖车更简单。",
+  },
+  alternates: {
+    canonical: "/",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
