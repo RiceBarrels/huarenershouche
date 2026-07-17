@@ -165,6 +165,9 @@ function BrowseContent() {
   const [fetchedAt, setFetchedAt] = useState<number | null>(null);
   const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams));
   const [sort, setSortRaw] = useState<SortKey>(() => (searchParams.get("sort") as SortKey) || "newest");
+  // 无限滚动:增量渲染结果(数据已全量在内存,只分批挂 DOM)
+  const [visibleCount, setVisibleCount] = useState(24);
+  const resultsSentinelRef = useRef<HTMLDivElement>(null);
   const [showResult, setShowResult] = useState(() => searchParams.get("showResult") === "true");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
@@ -641,6 +644,27 @@ function BrowseContent() {
     return sorted;
   }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt]);
 
+  // 筛选/排序变化时回到第一批
+  useEffect(() => {
+    setVisibleCount(24);
+  }, [filters, sort]);
+
+  // 触底加载下一批
+  useEffect(() => {
+    const el = resultsSentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          setVisibleCount((c) => (c < filtered.length ? c + 24 : c));
+        }
+      },
+      { rootMargin: "800px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [filtered.length]);
+
   return (
     <PullToRefresh onRefresh={fetchCars}>
     <div 
@@ -1047,10 +1071,11 @@ function BrowseContent() {
               ))}
             </div>
           ) : filtered.length > 0 ? (
+            <>
             <div
               className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
             >
-              {filtered.flatMap((car, i) => {
+              {filtered.slice(0, visibleCount).flatMap((car, i) => {
                 const items = [
                   <Reveal key={car.id}>
                     <CarCard
@@ -1063,6 +1088,14 @@ function BrowseContent() {
                 return items;
               })}
             </div>
+            {/* 无限滚动哨兵 */}
+            <div ref={resultsSentinelRef} className="h-px" aria-hidden="true" />
+            {visibleCount < filtered.length && (
+              <p className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
+                Showing {Math.min(visibleCount, filtered.length)} / {filtered.length}
+              </p>
+            )}
+            </>
           ) : (
             <div className="flex flex-col items-center border border-dashed border-border px-6 py-16">
               <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />

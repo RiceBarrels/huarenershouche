@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Heart,
+  Loader2,
   MessageSquare,
   Plus,
   MapPin,
@@ -60,6 +61,19 @@ type FeedItem =
 // 每隔几张帖子插一张附近车源卡(小红书插卡形式)
 const CAR_EVERY = 6;
 const FIRST_CAR_AT = 2;
+
+// 无限滚动每页条数
+const PAGE_SIZE = 20;
+
+// Fisher-Yates 洗牌:每次刷新 feed 顺序都不同
+function shuffleArray<T>(arr: T[]): T[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 export default function CommunityFeedPage() {
   const router = useRouter();
@@ -142,7 +156,81 @@ export default function CommunityFeedPage() {
     }
   }
 
+  // 无限滚动状态
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 浏览模式的随机顺序(每次刷新重新洗牌,会话内稳定)
+  const orderIdsRef = useRef<string[]>([]);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+
+  function markTableError(error: { message: string; code?: string }) {
+    if (
+      error.message.includes("does not exist") ||
+      error.message.includes("relation") ||
+      error.code === "42P01"
+    ) {
+      setTableError(true);
+    }
+  }
+
+  // 按 id 列表取整帖,并保持洗牌顺序
+  async function fetchPostsByIds(ids: string[]): Promise<DbCommunityPost[]> {
+    if (ids.length === 0) return [];
+    const { data, error } = await supabase
+      .from("community_posts")
+      .select("*, profiles!user_id(username, avatar_url)")
+      .in("id", ids);
+    if (error) {
+      markTableError(error);
+      return [];
+    }
+    const byId = new Map((data as DbCommunityPost[]).map((p) => [p.id, p]));
+    return ids.map((id) => byId.get(id)).filter(Boolean) as DbCommunityPost[];
+  }
+
+  // 浏览模式初始化:拉全部 id → 洗牌 → 取第一页
   useEffect(() => {
+    if (searching) return;
+    let cancelled = false;
+    setLoading(true);
+    setPosts([]);
+    setHasMore(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from("community_posts")
+          .select("id")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(1000);
+        if (cancelled) return;
+        if (error) {
+          markTableError(error);
+          setPosts([]);
+          return;
+        }
+        const ids = shuffleArray((data || []).map((r) => r.id as string));
+        orderIdsRef.current = ids;
+        const first = await fetchPostsByIds(ids.slice(0, PAGE_SIZE));
+        if (cancelled) return;
+        setPosts(first);
+        setHasMore(ids.length > PAGE_SIZE);
+      } catch (err) {
+        console.error("Failed to load community posts:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searching]);
+
+  // 搜索模式:按时间排序 + 关键词/类型过滤,分页
+  useEffect(() => {
+    if (!searching) return;
+    let cancelled = false;
     setLoading(true);
     const kw = keyword.trim();
     const timer = setTimeout(async () => {
@@ -152,32 +240,78 @@ export default function CommunityFeedPage() {
           .select("*, profiles!user_id(username, avatar_url)")
           .eq("status", "active")
           .order("created_at", { ascending: false })
-          .limit(30);
-
-        if (searchOpen && searchType) query = query.eq("type", searchType);
-        if (searchOpen && kw) query = query.or(`title.ilike.%${kw}%,content.ilike.%${kw}%`);
-
+          .range(0, PAGE_SIZE - 1);
+        if (searchType) query = query.eq("type", searchType);
+        if (kw) query = query.or(`title.ilike.%${kw}%,content.ilike.%${kw}%`);
         const { data, error } = await query;
+        if (cancelled) return;
         if (error) {
-          if (
-            error.message.includes("does not exist") ||
-            error.message.includes("relation") ||
-            error.code === "42P01"
-          ) {
-            setTableError(true);
-          }
+          markTableError(error);
           setPosts([]);
         } else {
-          setPosts((data as DbCommunityPost[]) || []);
+          const rows = (data as DbCommunityPost[]) || [];
+          setPosts(rows);
+          setHasMore(rows.length === PAGE_SIZE);
         }
       } catch (err) {
-        console.error("Failed to load community posts:", err);
+        console.error("Failed to search community posts:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }, kw ? 300 : 0);
-    return () => clearTimeout(timer);
-  }, [keyword, searchType, searchOpen]);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [keyword, searchType, searching]);
+
+  // 加载下一页
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loading || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      if (searching) {
+        const kw = keyword.trim();
+        let query = supabase
+          .from("community_posts")
+          .select("*, profiles!user_id(username, avatar_url)")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .range(posts.length, posts.length + PAGE_SIZE - 1);
+        if (searchType) query = query.eq("type", searchType);
+        if (kw) query = query.or(`title.ilike.%${kw}%,content.ilike.%${kw}%`);
+        const { data, error } = await query;
+        if (!error) {
+          const rows = (data as DbCommunityPost[]) || [];
+          setPosts((prev) => [...prev, ...rows]);
+          setHasMore(rows.length === PAGE_SIZE);
+        }
+      } else {
+        const ids = orderIdsRef.current;
+        const slice = ids.slice(posts.length, posts.length + PAGE_SIZE);
+        const rows = await fetchPostsByIds(slice);
+        setPosts((prev) => [...prev, ...rows]);
+        setHasMore(posts.length + slice.length < ids.length);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadingMore, loading, hasMore, searching, keyword, searchType, posts.length]);
+
+  // 触底哨兵
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: "600px 0px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   // 附近车源:定位成功按距离排序,失败则取最新
   useEffect(() => {
@@ -364,6 +498,19 @@ export default function CommunityFeedPage() {
               );
             })}
           </div>
+        )}
+
+        {/* 无限滚动哨兵 + 状态 */}
+        <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+        {loadingMore && (
+          <div className="flex justify-center py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
+          </div>
+        )}
+        {!hasMore && !loading && posts.length > 0 && (
+          <p className="py-8 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/40">
+            — End · 已经到底了 —
+          </p>
         )}
       </main>
       <Footer />
