@@ -11,11 +11,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CountUp } from "@/components/count-up";
 import { useCachedData } from "@/lib/use-cached-data";
 import type { DbCar, DbProfile } from "@/lib/types";
 
@@ -27,7 +29,7 @@ interface PostDraft {
   features: string[];
 }
 
-// Mobile menu row
+// Menu row — flat 1px-bordered list item
 function MenuRow({
   icon, label, value, href, onClick, destructive,
 }: {
@@ -39,15 +41,47 @@ function MenuRow({
   destructive?: boolean;
 }) {
   const inner = (
-    <div className={`flex items-center gap-3 px-4 py-3.5 transition-colors active:bg-muted ${destructive ? "text-destructive" : ""}`}>
-      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">{icon}</span>
+    <div className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50 active:bg-muted ${destructive ? "text-destructive" : ""}`}>
+      <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
       <span className="flex-1 font-mono text-sm">{label}</span>
-      {value && <span className="font-mono text-xs text-muted-foreground">{value}</span>}
+      {value && <span className="font-mono text-xs tabular-nums text-muted-foreground">{value}</span>}
       <ChevronRight className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
     </div>
   );
   if (href) return <Link href={href}>{inner}</Link>;
   return <button type="button" className="w-full text-left" onClick={onClick}>{inner}</button>;
+}
+
+// Uppercase micro-label group title above a 1px rule
+function GroupTitle({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 px-1">
+      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <div className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
+// Stat cell for the data strip
+function StatCell({
+  href, value, label, brand, animate,
+}: {
+  href: string;
+  value: number;
+  label: string;
+  brand?: boolean;
+  animate: boolean;
+}) {
+  return (
+    <Link href={href} className="flex flex-col items-center justify-center gap-1 py-3.5 transition-colors hover:bg-muted/50 active:bg-muted">
+      {animate ? (
+        <CountUp value={value} className={`font-mono text-xl font-semibold tabular-nums ${brand ? "text-brand" : ""}`} />
+      ) : (
+        <span className={`font-mono text-xl font-semibold tabular-nums ${brand ? "text-brand" : ""}`}>{value}</span>
+      )}
+      <span className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">{label}</span>
+    </Link>
+  );
 }
 
 export default function AccountPage() {
@@ -140,10 +174,11 @@ function AccountContent() {
   }
 
   const activeCars = (myCars || []).filter((c) => c.status === "active").length;
+  const joinedYear = profile?.created_at ? new Date(profile.created_at).getFullYear() : null;
 
   return (
     <PullToRefresh onRefresh={loadAccount}>
-    <div 
+    <div
     className="flex min-h-screen flex-col bg-background font-mono"
     style={{
       paddingTop: "env(safe-area-inset-top, 0px)",
@@ -151,204 +186,201 @@ function AccountContent() {
     }}
     >
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
-        {/* Profile card */}
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:max-w-5xl md:px-6 md:py-8">
+        {/* Header band: profile + data strip */}
         {loading ? (
-          <>
-          <div className="flex items-center gap-4 px-2 py-4">
-            <Skeleton className="h-16 w-16 rounded-full" />
-            <div className="flex-1 space-y-2">
-              <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          </div>
-          <div className="flex border-y border-border">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex flex-1 flex-col items-center gap-1 py-3">
-                <Skeleton className="h-5 w-8" />
-                <Skeleton className="h-3 w-6" />
+          <div className="border border-border md:flex md:items-stretch">
+            <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6">
+              <Skeleton className="h-16 w-16" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-3 w-20" />
               </div>
-            ))}
-          </div>
-          </>
-        ) : (
-        <>
-        {!user ? (
-          <div className="flex items-center gap-4 px-2 py-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-border bg-muted">
-              <UserCircle className="h-8 w-8 text-muted-foreground" strokeWidth={1} />
             </div>
-            <div className="flex-1">
-              <p className="font-mono text-sm text-muted-foreground">登录后管理车辆、收藏和消息</p>
-              <div className="mt-2 flex items-center gap-2">
+            <div className="grid grid-cols-3 divide-x divide-border border-t border-border md:w-80 md:border-l md:border-t-0 lg:w-96">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex flex-col items-center gap-1.5 py-3.5">
+                  <Skeleton className="h-6 w-8" />
+                  <Skeleton className="h-3 w-8" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+        <div className="border border-border md:flex md:items-stretch">
+          {!user ? (
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center md:flex-1">
+              <div className="flex h-14 w-14 items-center justify-center border border-border bg-muted">
+                <UserCircle className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
+              </div>
+              <p className="mt-4 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">未登录 / Guest</p>
+              <p className="mt-2 font-mono text-sm">登录后管理车辆、收藏和消息</p>
+              <div className="mt-5 flex items-center justify-center gap-2">
                 <Link href="/login">
-                  <Button size="sm" className="h-8 font-mono text-xs">登录</Button>
+                  <Button size="sm" className="h-9 px-6 font-mono text-xs">登录</Button>
                 </Link>
                 <Link href="/register">
-                  <Button variant="outline" size="sm" className="h-8 font-mono text-xs">注册</Button>
+                  <Button variant="outline" size="sm" className="h-9 px-6 font-mono text-xs">注册</Button>
                 </Link>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-4 px-2 py-4">
-            <button
-              type="button"
-              className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted"
-              onClick={() => avatarInputRef.current?.click()}
-            >
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center font-mono text-lg text-muted-foreground">
-                  {profile?.username?.charAt(0)?.toUpperCase() || "?"}
-                </div>
-              )}
-            </button>
-            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-            <div className="flex-1">
-              <p className="font-mono text-base font-semibold">
-                {profile?.username || "未设置昵称"}
-              </p>
-              <div className="mt-0.5 flex items-center gap-2">
-                {profile?.account_type === "dealer" ? (
-                  <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
-                    <Store className="h-3 w-3" strokeWidth={1.5} />认证车行
-                  </Badge>
+          ) : (
+            <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6 md:py-5">
+              <button
+                type="button"
+                className="group relative h-16 w-16 shrink-0 overflow-hidden border border-border bg-muted"
+                onClick={() => avatarInputRef.current?.click()}
+                aria-label="更换头像"
+              >
+                <img src={avatarUrl(profile?.avatar_url, user)} alt="" className="h-full w-full object-cover" />
+                {avatarUploading ? (
+                  <span className="absolute inset-0 flex items-center justify-center bg-background/70">
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+                  </span>
                 ) : (
-                  <Badge variant="outline" className="font-mono text-[10px]">个人</Badge>
-                )}
-                {profile?.location && (
-                  <span className="flex items-center gap-0.5 font-mono text-[11px] text-muted-foreground">
-                    <MapPin className="h-3 w-3" strokeWidth={1.5} />{profile.location}
+                  <span className="absolute inset-0 hidden items-center justify-center bg-background/70 group-hover:flex">
+                    <Camera className="h-4 w-4" strokeWidth={1.5} />
                   </span>
                 )}
+              </button>
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="truncate font-mono text-base font-semibold tracking-tight">
+                    {profile?.username || "未设置昵称"}
+                  </p>
+                  {profile?.account_type === "dealer" ? (
+                    <Badge variant="secondary" className="shrink-0 gap-1 font-mono text-[10px]">
+                      <Store className="h-3 w-3" strokeWidth={1.5} />认证车行
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">个人</Badge>
+                  )}
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  {joinedYear && <span>Since {joinedYear}</span>}
+                  {profile?.location && (
+                    <span className="flex items-center gap-1 normal-case tracking-normal">
+                      <MapPin className="h-3 w-3" strokeWidth={1.5} />{profile.location}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Stats row */}
-        <div className="flex border-y border-border">
-          <Link href={user ? "/account/listings" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
-            <span className="font-mono text-lg font-bold">{activeCars}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">在售</span>
-          </Link>
-          <div className="w-px bg-border" />
-          <Link href={user ? "/account/listings" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
-            <span className="font-mono text-lg font-bold">{(myCars || []).length}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">发布</span>
-          </Link>
-          <div className="w-px bg-border" />
-          <Link href={user ? "/account/favorites" : "/login"} className="flex flex-1 flex-col items-center gap-0.5 py-3 transition-colors active:bg-muted">
-            <span className="font-mono text-lg font-bold">{favCount || 0}</span>
-            <span className="font-mono text-[11px] text-muted-foreground">收藏</span>
-          </Link>
+          {/* Data strip */}
+          <div className="grid grid-cols-3 divide-x divide-border border-t border-border md:w-80 md:border-l md:border-t-0 lg:w-96">
+            <StatCell href={user ? "/account/listings" : "/login"} value={activeCars} label="在售" brand animate={!!user} />
+            <StatCell href={user ? "/account/listings" : "/login"} value={(myCars || []).length} label="发布" animate={!!user} />
+            <StatCell href={user ? "/account/favorites" : "/login"} value={favCount || 0} label="收藏" animate={!!user} />
+          </div>
         </div>
-        </>
         )}
 
         {/* Menu sections */}
-        <div className="mt-4">
-          <p className="px-4 font-mono text-[11px] font-medium text-muted-foreground">车辆管理</p>
-          <div className="mt-1">
-            <MenuRow
-              icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="我的发布"
-              value={user ? `${(myCars || []).length} 辆` : undefined}
-              href={user ? "/account/listings" : "/login"}
-            />
-            <MenuRow
-              icon={<BarChart3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="数据面板"
-              href={user ? "/account/dashboard" : "/login"}
-            />
-            <MenuRow
-              icon={<Heart className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="我的收藏"
-              value={user ? `${favCount || 0} 辆` : undefined}
-              href={user ? "/account/favorites" : "/login"}
-            />
-            <MenuRow
-              icon={<MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="消息"
-              href={user ? "/messages" : "/login"}
-            />
-            <MenuRow
-              icon={<Plus className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="发布新车"
-              href={user ? "/post" : "/login"}
-            />
-            {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
+        <div className="mt-6 space-y-6 md:grid md:grid-cols-2 md:items-start md:gap-8 md:space-y-0">
+          <div>
+            <GroupTitle label="车辆管理" />
+            <div className="mt-2 divide-y divide-border border border-border">
               <MenuRow
-                icon={<FileText className="h-4 w-4 text-amber-500" strokeWidth={1.5} />}
-                label="继续编辑草稿"
-                href="/post"
+                icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="我的发布"
+                value={user ? `${(myCars || []).length} 辆` : undefined}
+                href={user ? "/account/listings" : "/login"}
               />
-            )}
+              <MenuRow
+                icon={<BarChart3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="数据面板"
+                href={user ? "/account/dashboard" : "/login"}
+              />
+              <MenuRow
+                icon={<Heart className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="我的收藏"
+                value={user ? `${favCount || 0} 辆` : undefined}
+                href={user ? "/account/favorites" : "/login"}
+              />
+              <MenuRow
+                icon={<MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="消息"
+                href={user ? "/messages" : "/login"}
+              />
+              <MenuRow
+                icon={<Plus className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="发布新车"
+                href={user ? "/post" : "/login"}
+              />
+              {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
+                <MenuRow
+                  icon={<FileText className="h-4 w-4 text-amber-500" strokeWidth={1.5} />}
+                  label="继续编辑草稿"
+                  href="/post"
+                />
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="mt-4">
-          <p className="px-4 font-mono text-[11px] font-medium text-muted-foreground">账号</p>
-          <div className="mt-1">
-            <MenuRow
-              icon={<Settings className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="账号设置"
-              href={user ? "/account/settings" : "/login"}
-            />
-            {mounted && (
+          <div>
+            <GroupTitle label="账号" />
+            <div className="mt-2 divide-y divide-border border border-border">
               <MenuRow
-                icon={theme === "dark"
-                  ? <Sun className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                  : <Moon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                }
-                label={theme === "dark" ? "浅色模式" : "深色模式"}
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                icon={<Settings className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="账号设置"
+                href={user ? "/account/settings" : "/login"}
               />
-            )}
-            {profile?.role === "admin" && (
+              {mounted && (
+                <MenuRow
+                  icon={theme === "dark"
+                    ? <Sun className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                    : <Moon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  }
+                  label={theme === "dark" ? "浅色模式" : "深色模式"}
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                />
+              )}
+              {profile?.role === "admin" && (
+                <MenuRow
+                  icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                  label="管理后台"
+                  href="/admin"
+                />
+              )}
               <MenuRow
-                icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="管理后台"
-                href="/admin"
+                icon={<Headset className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="联系客服"
+                href="/contact"
               />
-            )}
-            <MenuRow
-              icon={<Headset className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="联系客服"
-              href="/contact"
-            />
-            <MenuRow
-              icon={<Store className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="车行入驻"
-              value={profile?.account_type === "dealer" ? "已认证" : undefined}
-              href={user ? "/dealer-apply" : "/login"}
-            />
-            <MenuRow
-              icon={<Handshake className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="商业合作"
-              href="/business"
-            />
-            <MenuRow
-              icon={<ScrollText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-              label="用户协议"
-              href="/terms"
-            />
-            {user ? (
               <MenuRow
-                icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
-                label="退出登录"
-                onClick={handleLogout}
-                destructive
+                icon={<Store className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="车行入驻"
+                value={profile?.account_type === "dealer" ? "已认证" : undefined}
+                href={user ? "/dealer-apply" : "/login"}
               />
-            ) : (
               <MenuRow
-                icon={<UserCircle className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="登录 / 注册"
-                href="/login"
+                icon={<Handshake className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="商业合作"
+                href="/business"
               />
-            )}
+              <MenuRow
+                icon={<ScrollText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                label="用户协议"
+                href="/terms"
+              />
+              {user ? (
+                <MenuRow
+                  icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
+                  label="退出登录"
+                  onClick={handleLogout}
+                  destructive
+                />
+              ) : (
+                <MenuRow
+                  icon={<UserCircle className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+                  label="登录 / 注册"
+                  href="/login"
+                />
+              )}
+            </div>
           </div>
         </div>
       </main>

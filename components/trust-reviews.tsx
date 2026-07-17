@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Star, Loader2, Pencil, Trash2, User } from "lucide-react";
+import { Star, Loader2, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
 import type { DbPlatformReview } from "@/lib/types";
 
@@ -361,11 +362,11 @@ export function TrustReviews() {
               <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
                 <div className="flex items-center gap-2">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
-                    {review.avatarUrl ? (
-                      <img src={review.avatarUrl} alt="" className="h-full w-full object-cover" />
-                    ) : (
-                      <User className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-                    )}
+                    <img
+                      src={avatarUrl(review.avatarUrl, review.reviewer)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   </span>
                   <span className="font-mono text-xs font-medium">
                     {review.reviewer}

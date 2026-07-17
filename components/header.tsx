@@ -4,19 +4,42 @@ import { LogOut, User, Plus, Moon, Sun, MessageSquare } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import type { User as SupaUser } from "@supabase/supabase-js";
+
+const NAV_LINKS = [
+  { href: "/browse", label: "买车" },
+  { href: "/guide", label: "资讯" },
+  { href: "/compare", label: "对比" },
+  { href: "/vin", label: "VIN认证" },
+  { href: "/community", label: "社区" },
+  { href: "/qa", label: "问答" },
+  { href: "/services", label: "服务" },
+];
 
 export function Header() {
   const [user, setUser] = useState<SupaUser | null>(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8);
+    const raf = requestAnimationFrame(onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", onScroll);
+    };
   }, []);
 
   useEffect(() => {
@@ -45,59 +68,40 @@ export function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 hidden border-b border-border bg-background/95 backdrop-blur-sm md:block">
+    <header
+      className={`sticky top-0 z-50 hidden border-b transition-[background-color,border-color,backdrop-filter] duration-200 md:block ${
+        scrolled
+          ? "border-border bg-background/85 backdrop-blur-md"
+          : "border-transparent bg-background"
+      }`}
+    >
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="常来车网" width={24} height={24} className="h-6 w-6" />
           <span className="font-mono text-sm font-semibold tracking-tight">
             常来车网
+            <span className="animate-cursor-blink text-brand">_</span>
           </span>
-          <span className="font-mono text-[9px] text-muted-foreground/60">测试版</span>
+          <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
         </Link>
 
         <nav className="flex items-center gap-6">
-          <Link
-            href="/browse"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            买车
-          </Link>
-          <Link
-            href="/guide"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            资讯
-          </Link>
-          <Link
-            href="/compare"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            对比
-          </Link>
-          <Link
-            href="/vin"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            VIN认证
-          </Link>
-          <Link
-            href="/community"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            社区
-          </Link>
-          <Link
-            href="/qa"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            问答
-          </Link>
-          <Link
-            href="/services"
-            className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            服务
-          </Link>
+          {NAV_LINKS.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(link.href + "/");
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`relative py-1 font-mono text-xs tracking-widest transition-colors hover:text-foreground ${
+                  active
+                    ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
         </nav>
 
         <div className="flex items-center gap-3">

@@ -10,6 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
+import { Reveal } from "@/components/reveal";
 import { SearchFilters, US_STATES } from "@/components/search-filters";
 import { MobileFilterDrawer, BrandDrawerContent } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
@@ -779,8 +780,8 @@ function BrowseContent() {
         </div>
       </div>
 
-      {/* Mobile: search bar + filter button */}
-      <div className="border-b border-border px-4 py-3 md:hidden">
+      {/* Mobile: search bar + filter button — sticky */}
+      <div className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
         <div className="flex items-center gap-2">
           <div ref={searchWrapperRef} className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
@@ -936,7 +937,7 @@ function BrowseContent() {
         )}
       </div>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem]">
         {/* Left sidebar filters — desktop only */}
         <div className="hidden w-[240px] shrink-0 md:block">
           <div className="sticky top-4 max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto overscroll-contain pr-1">
@@ -951,41 +952,63 @@ function BrowseContent() {
 
         {/* Main content */}
         <main className="min-w-0 flex-1">
-          <div className="mb-4 flex flex-wrap items-center gap-3">
-            <Link
-              href="/"
-              className="font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-            >
-              返回搜索
-            </Link>
-            <p className="font-mono text-xs text-muted-foreground">
-              共{" "}
-              <span className="font-semibold text-foreground">{filtered.length}</span>{" "}
-              辆车
-            </p>
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (!searchSaved) saveSearch(savedSearchParams);
-                }}
-                disabled={searchSaved}
-                className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
-                  searchSaved
-                    ? "border-border bg-muted text-muted-foreground"
-                    : "border-border hover:border-foreground hover:text-foreground"
-                }`}
+          {/* Results toolbar — sticky under header on desktop */}
+          <div className="mb-4 md:sticky md:top-14 md:z-20 md:-mx-1 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href="/"
+                className="font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
               >
-                <Bookmark
-                  className={`h-3 w-3 ${searchSaved ? "fill-current" : ""}`}
-                  strokeWidth={1.5}
-                />
-                {searchSaved ? "已保存" : "保存搜索"}
-              </button>
-            )}
+                返回搜索
+              </Link>
+              <p className="flex items-baseline gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
+                <span>Results:</span>
+                <span className="font-semibold tracking-normal text-foreground">
+                  共 {filtered.length} 辆
+                </span>
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!searchSaved) saveSearch(savedSearchParams);
+                  }}
+                  disabled={searchSaved}
+                  className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                    searchSaved
+                      ? "border-border bg-muted text-muted-foreground"
+                      : "border-border hover:border-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Bookmark
+                    className={`h-3 w-3 ${searchSaved ? "fill-current" : ""}`}
+                    strokeWidth={1.5}
+                  />
+                  {searchSaved ? "已保存" : "保存搜索"}
+                </button>
+              )}
+              {/* Desktop sort */}
+              <div className="ml-auto hidden items-center gap-2 md:flex">
+                <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Sort
+                </span>
+                <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+                  <SelectTrigger className="h-8 w-[130px] font-mono text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value} className="font-mono text-xs">
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             {/* Desktop active filter chips */}
             {activeFilterChips.length > 0 && (
-              <div className="hidden flex-wrap gap-1.5 md:flex">
+              <div className="mt-2 hidden flex-wrap gap-1.5 md:flex">
                 {activeFilterChips.map((chip, i) => (
                   <button
                     key={`${chip.key}-${i}`}
@@ -1008,7 +1031,7 @@ function BrowseContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="border border-border">
                   <Skeleton className="aspect-[16/10] w-full" />
@@ -1025,34 +1048,60 @@ function BrowseContent() {
             </div>
           ) : filtered.length > 0 ? (
             <div
-              className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4"
             >
               {filtered.flatMap((car, i) => {
                 const items = [
-                  <div key={car.id}>
+                  <Reveal key={car.id}>
                     <CarCard
                       car={car}
                       distance={distances.get(car.id)}
                       priceInsight={insightMap.get(car.id) ?? null}
                     />
-                  </div>,
+                  </Reveal>,
                 ];
                 return items;
               })}
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center py-20">
-              <p className="font-mono text-sm text-muted-foreground">
+            <div className="flex flex-col items-center border border-dashed border-border px-6 py-16">
+              <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
+              <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                No Results
+              </p>
+              <p className="mt-1 font-mono text-sm text-muted-foreground">
                 没有找到符合条件的车辆
               </p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 font-mono text-xs"
-                onClick={() => setFilters(INITIAL_FILTERS)}
-              >
-                清除所有筛选
-              </Button>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="font-mono text-xs"
+                  onClick={() => setFilters(INITIAL_FILTERS)}
+                >
+                  清除所有筛选
+                </Button>
+                {filters.maxPrice && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-mono text-xs text-muted-foreground"
+                    onClick={() => setFilters({ ...filters, maxPrice: "" })}
+                  >
+                    去掉价格上限
+                  </Button>
+                )}
+                {filters.maxDistance && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="font-mono text-xs text-muted-foreground"
+                    onClick={() => setFilters({ ...filters, maxDistance: "" })}
+                  >
+                    扩大搜索范围
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

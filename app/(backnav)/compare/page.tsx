@@ -168,6 +168,12 @@ export default function ComparePage() {
       <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         <div className="mb-6">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Compare
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
           <h1 className="font-mono text-xl font-semibold tracking-tight">
             车辆对比
           </h1>

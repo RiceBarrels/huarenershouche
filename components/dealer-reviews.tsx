@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Star, Loader2, User } from "lucide-react";
+import { Star, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { DbDealerReview } from "@/lib/types";
@@ -287,15 +288,11 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
               <div key={review.id} className="border border-border p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-muted">
-                    {review.profiles?.avatar_url ? (
-                      <img
-                        src={review.profiles.avatar_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <User className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                    )}
+                    <img
+                      src={avatarUrl(review.profiles?.avatar_url, review.profiles?.username)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">

@@ -82,6 +82,12 @@ export default function VinPage() {
       <Header />
 
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            VIN Decoder
+          </span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
         <h1 className="font-mono text-xl font-semibold tracking-tight">
           VIN 车辆认证
         </h1>

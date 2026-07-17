@@ -106,6 +106,12 @@ export default function GuidePage() {
 
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+        <div className="mb-3 flex items-center gap-3">
+          <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            Guide
+          </span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5" strokeWidth={1.5} />
           <h1 className="font-mono text-lg font-semibold tracking-tight">

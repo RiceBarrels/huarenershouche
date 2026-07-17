@@ -24,6 +24,13 @@ const POST_TYPES = [
   { key: "discussion", label: "讨论" },
 ] as const;
 
+const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
+const MAX_VIDEO_MB = 100;
+
+function isVideoUrl(url: string): boolean {
+  return VIDEO_RE.test(url);
+}
+
 export default function NewPostPage() {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
@@ -52,7 +59,13 @@ export default function NewPostPage() {
     if (!userId || files.length === 0) return;
     setUploading(true);
     for (const file of files) {
-      if (!file.type.startsWith("image/")) continue;
+      const isImage = file.type.startsWith("image/");
+      const isVideo = file.type.startsWith("video/");
+      if (!isImage && !isVideo) continue;
+      if (isVideo && file.size > MAX_VIDEO_MB * 1024 * 1024) {
+        setError(`视频不能超过 ${MAX_VIDEO_MB}MB`);
+        continue;
+      }
       const ext = file.name.split(".").pop();
       const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
       const { error: uploadError } = await supabase.storage
@@ -78,8 +91,8 @@ export default function NewPostPage() {
     e.preventDefault();
     setDragging(false);
 
-    const files = Array.from(e.dataTransfer.files).filter((f) =>
-      f.type.startsWith("image/")
+    const files = Array.from(e.dataTransfer.files).filter(
+      (f) => f.type.startsWith("image/") || f.type.startsWith("video/")
     );
     if (files.length > 0) {
       uploadFiles(files);
@@ -262,11 +275,11 @@ export default function NewPostPage() {
               />
             </div>
 
-            {/* Images */}
+            {/* Images / videos */}
             <div>
-              <Label className="font-mono text-xs font-semibold">图片</Label>
+              <Label className="font-mono text-xs font-semibold">图片 / 视频</Label>
               <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                支持拖拽上传，最多 9 张
+                支持拖拽上传，最多 9 个，视频不超过 {MAX_VIDEO_MB}MB
               </p>
               <div
                 className={`mt-2 flex flex-wrap gap-2 p-2 transition-colors ${
@@ -284,11 +297,21 @@ export default function NewPostPage() {
                     key={i}
                     className="group relative h-20 w-24 border border-border bg-muted"
                   >
-                    <img
-                      src={url}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
+                    {isVideoUrl(url) ? (
+                      <video
+                        src={url}
+                        muted
+                        playsInline
+                        preload="metadata"
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <img
+                        src={url}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
+                    )}
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
@@ -318,7 +341,7 @@ export default function NewPostPage() {
                     )}
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/*,video/*"
                       multiple
                       className="hidden"
                       onChange={handleImageUpload}

@@ -70,9 +70,17 @@ function MessagesContent() {
     >
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
-        <h1 className="hidden font-mono text-lg font-semibold tracking-tight md:block md:mb-4">
-          消息
-        </h1>
+        <div className="hidden md:mb-4 md:block">
+          <div className="flex items-center gap-3">
+            <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+              Messages
+            </span>
+            <span className="h-px flex-1 bg-border" aria-hidden="true" />
+          </div>
+          <h1 className="mt-2 font-mono text-lg font-semibold tracking-tight">
+            消息
+          </h1>
+        </div>
         {user && (
           <ConversationList
             key={refreshKey}

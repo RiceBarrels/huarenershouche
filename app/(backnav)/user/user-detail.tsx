@@ -2,17 +2,22 @@
 
 import { useEffect, useState } from "react";
 import { useRouteParams } from "@/lib/use-route-params";
-import { User, Calendar, Car, MapPin, Store, Star, Loader2 } from "lucide-react";
+import { Calendar, Car, MapPin, Store, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
+import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 
 import { CarCard } from "@/components/car-card";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbCar } from "@/lib/types";
+import type { DbCar, DbCommunityPost } from "@/lib/types";
+import { Heart, MessageSquare, Play } from "lucide-react";
+
+const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 
 interface SellerProfile {
   id: string;
@@ -28,12 +33,13 @@ export default function UserProfilePage() {
   const userId = params.id as string;
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [cars, setCars] = useState<DbCar[]>([]);
+  const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [avgRating, setAvgRating] = useState<{ avg: number; count: number } | null>(null);
 
   useEffect(() => {
     async function fetchData() {
-      const [profileRes, carsRes, reviewsRes] = await Promise.all([
+      const [profileRes, carsRes, reviewsRes, postsRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, username, avatar_url, location, account_type, created_at")
@@ -49,9 +55,17 @@ export default function UserProfilePage() {
           .from("dealer_reviews")
           .select("rating")
           .eq("dealer_id", userId),
+        supabase
+          .from("community_posts")
+          .select("*")
+          .eq("user_id", userId)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(12),
       ]);
       setProfile(profileRes.data as SellerProfile | null);
       setCars((carsRes.data as DbCar[]) || []);
+      setPosts((postsRes.data as DbCommunityPost[]) || []);
 
       const reviewData = (reviewsRes.data as { rating: number }[]) || [];
       if (reviewData.length > 0) {
@@ -77,6 +91,7 @@ export default function UserProfilePage() {
       <Header />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+        <DesktopBack fallback="/" />
         <h2 className="font-mono text-sm font-semibold">卖家主页</h2>
         {loading ? (
           <div className="mt-4">
@@ -119,15 +134,11 @@ export default function UserProfilePage() {
             {/* Profile header */}
             <div className="flex items-start gap-4 border-b border-border pb-6">
               <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-border bg-muted">
-                {profile.avatar_url ? (
-                  <img
-                    src={profile.avatar_url}
-                    alt={profile.username}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <User className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
-                )}
+                <img
+                  src={avatarUrl(profile.avatar_url, profile.username)}
+                  alt={profile.username}
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
@@ -187,6 +198,66 @@ export default function UserProfilePage() {
                 </p>
               )}
             </div>
+
+            {/* Community posts */}
+            {posts.length > 0 && (
+              <div className="mt-8 border-t border-border pt-6">
+                <h2 className="font-mono text-sm font-semibold">
+                  社区帖子 ({posts.length})
+                </h2>
+                <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                  {posts.map((post) => {
+                    const cover = post.images?.[0];
+                    return (
+                      <Link
+                        key={post.id}
+                        href={`/community/${post.id}`}
+                        className="block border border-border bg-card transition-colors hover:border-foreground/30"
+                      >
+                        {cover && (
+                          <div className="relative">
+                            {VIDEO_RE.test(cover) ? (
+                              <>
+                                <video
+                                  src={cover}
+                                  muted
+                                  playsInline
+                                  preload="metadata"
+                                  className="aspect-[4/3] w-full object-cover"
+                                />
+                                <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                                  <span className="flex h-7 w-7 items-center justify-center border border-border bg-background/80">
+                                    <Play className="ml-0.5 h-3 w-3" strokeWidth={1.5} />
+                                  </span>
+                                </span>
+                              </>
+                            ) : (
+                              <img
+                                src={cover}
+                                alt=""
+                                className="aspect-[4/3] w-full object-cover"
+                                loading="lazy"
+                              />
+                            )}
+                          </div>
+                        )}
+                        <div className="p-2.5">
+                          <p className="line-clamp-2 font-mono text-xs font-medium leading-snug">
+                            {post.title}
+                          </p>
+                          <p className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+                            <Heart className="h-3 w-3" strokeWidth={1.5} />
+                            {post.likes_count || 0}
+                            <MessageSquare className="ml-2 h-3 w-3" strokeWidth={1.5} />
+                            {post.comments_count || 0}
+                          </p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {/* Dealer reviews */}
             {profile.account_type === "dealer" && (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Loader2, KeyRound, CheckCircle } from "lucide-react";
+import { motion } from "framer-motion";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 
@@ -86,10 +87,19 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
-
+    <div className="relative flex min-h-screen flex-col bg-background font-mono">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 bg-grid [mask-image:linear-gradient(to_bottom,black,60%,transparent)]"
+      />
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.97 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.25 }}
+          className="border border-border bg-background p-6"
+        >
         {step === "email" && (
           <>
             <div className="flex flex-col items-center">
@@ -269,6 +279,7 @@ export default function ForgotPasswordPage() {
             </Link>
           </p>
         )}
+        </motion.div>
       </main>
       <Footer />
     </div>

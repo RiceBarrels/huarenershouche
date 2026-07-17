@@ -7,6 +7,7 @@ import {
   Plus, Trash2, Camera, Loader2, Store, MapPin, ImagePlus, ShieldCheck, Clock, XCircle, X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { geocodeAddress } from "@/lib/geocode";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -250,11 +251,7 @@ export default function SettingsPage() {
               onClick={() => avatarInputRef.current?.click()}
               disabled={avatarUploading}
             >
-              {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">无</div>
-              )}
+              <img src={avatarUrl(profile?.avatar_url, user)} alt="" className="h-full w-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
                 {avatarUploading ? <Loader2 className="h-5 w-5 animate-spin text-white" strokeWidth={1.5} /> : <Camera className="h-5 w-5 text-white" strokeWidth={1.5} />}
               </div>

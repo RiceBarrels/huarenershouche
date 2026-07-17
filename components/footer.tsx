@@ -64,9 +64,16 @@ const helpLinks = [
 
 export function Footer() {
   return (
-    <footer className="hidden border-t border-border bg-card md:block">
-      <div className="mx-auto max-w-7xl px-4 py-10">
-        <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+    <footer className="hidden overflow-hidden border-t border-border bg-card md:block">
+      <div className="mx-auto max-w-7xl px-4 py-12">
+        {/* Watermark wordmark */}
+        <div className="select-none pb-10">
+          <p className="font-mono text-5xl font-bold leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl">
+            常来车网 / CLCAUTO
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-8 border-t border-border pt-10 md:grid-cols-4">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
@@ -82,10 +89,10 @@ export function Footer() {
                 className="text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Email"
               >
-                <Mail className="h-4 w-4" />
+                <Mail className="h-4 w-4" strokeWidth={1.5} />
               </a>
               <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <MessageCircle className="h-4 w-4" />
+                <MessageCircle className="h-4 w-4" strokeWidth={1.5} />
                 微信客服
               </span>
             </div>
@@ -93,8 +100,8 @@ export function Footer() {
 
           {/* Buy */}
           <div>
-            <h4 className="text-sm font-semibold">买车</h4>
-            <ul className="mt-3 space-y-2">
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">买车 / Buy</h4>
+            <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {buyLinks.map((link) => (
                 <li key={link.href + link.label}>
                   <Link
@@ -110,8 +117,8 @@ export function Footer() {
 
           {/* Sell */}
           <div>
-            <h4 className="text-sm font-semibold">卖车</h4>
-            <ul className="mt-3 space-y-2">
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">卖车 / Sell</h4>
+            <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {sellLinks.map((link) => (
                 <li key={link.href + link.label}>
                   <Link
@@ -127,8 +134,8 @@ export function Footer() {
 
           {/* Help */}
           <div>
-            <h4 className="text-sm font-semibold">帮助与支持</h4>
-            <ul className="mt-3 space-y-2">
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">帮助 / Support</h4>
+            <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {helpLinks.map((link) => (
                 <li key={link.href + link.label}>
                   <Link
@@ -145,7 +152,7 @@ export function Footer() {
 
         {/* SEO internal links */}
         <div className="mt-10 border-t border-border pt-6">
-          <h4 className="font-mono text-xs font-semibold">热门搜索</h4>
+          <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">热门搜索 / Popular</h4>
           <div className="mt-3 space-y-2">
             {seoLinkRows.map((row) => (
               <div key={row.title} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

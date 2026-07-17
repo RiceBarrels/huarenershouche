@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare, User } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { ChatThread } from "@/components/chat-thread";
 import type { DbConversation } from "@/lib/types";
 
@@ -169,11 +170,11 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
           >
             {/* Avatar */}
             <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-muted">
-              {otherProfile?.avatar_url ? (
-                <img src={otherProfile.avatar_url} alt="" className="h-full w-full object-cover" />
-              ) : (
-                <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-              )}
+              <img
+                src={avatarUrl(otherProfile?.avatar_url, otherProfile?.username)}
+                alt=""
+                className="h-full w-full object-cover"
+              />
             </div>
 
             {/* Content */}

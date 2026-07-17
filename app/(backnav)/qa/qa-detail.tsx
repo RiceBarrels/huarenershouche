@@ -6,7 +6,6 @@ import {
   Heart,
   MessageSquare,
   CheckCircle,
-  User,
   Send,
   Loader2,
   ChevronLeft,
@@ -16,6 +15,7 @@ import {
 } from "lucide-react";
 import { useRouteParams } from "@/lib/use-route-params";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
@@ -308,18 +308,11 @@ export default function QaDetailPage() {
           <div className="mt-2 flex items-center gap-3">
             <div className="flex items-center gap-1.5">
               <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-border bg-muted">
-                {question.profiles?.avatar_url ? (
-                  <img
-                    src={question.profiles.avatar_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <User
-                    className="h-3 w-3 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                )}
+                <img
+                  src={avatarUrl(question.profiles?.avatar_url, question.profiles?.username)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               </div>
               <span className="font-mono text-xs">
                 {question.profiles?.username || "匿名"}
@@ -354,7 +347,8 @@ export default function QaDetailPage() {
           </div>
         </div>
 
-        {/* Answers */}
+        {/* Answers — no scroll reveal: interactive content must never start
+            hidden (Safari IntersectionObserver can fail on tall sections) */}
         <section className="mt-8 border-t border-border pt-6">
           <h2 className="font-mono text-sm font-semibold">
             {answers.length} 个回答
@@ -394,18 +388,11 @@ export default function QaDetailPage() {
                   {/* Answer author */}
                   <div className="flex items-center gap-2">
                     <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-border bg-muted">
-                      {answer.profiles?.avatar_url ? (
-                        <img
-                          src={answer.profiles.avatar_url}
-                          alt=""
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <User
-                          className="h-3.5 w-3.5 text-muted-foreground"
-                          strokeWidth={1.5}
-                        />
-                      )}
+                      <img
+                        src={avatarUrl(answer.profiles?.avatar_url, answer.profiles?.username)}
+                        alt=""
+                        className="h-full w-full object-cover"
+                      />
                     </div>
                     <span className="font-mono text-xs font-medium">
                       {answer.profiles?.username || "匿名"}

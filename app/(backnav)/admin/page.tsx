@@ -8,6 +8,7 @@ import {
   Headset, Handshake,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
@@ -528,11 +529,7 @@ export default function AdminPage() {
                   <div key={u.id} className={`flex items-center justify-between border p-3 ${u.banned ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-border"}`}>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        {u.avatar_url ? (
-                          <img src={u.avatar_url} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
-                        ) : (
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] text-muted-foreground">无</div>
-                        )}
+                        <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="truncate text-xs font-medium">{u.username || "未设置"}</p>

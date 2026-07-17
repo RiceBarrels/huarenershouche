@@ -6,7 +6,6 @@ import Link from "next/link";
 import {
   Heart,
   MessageSquare,
-  User,
   Send,
   Loader2,
   Trash2,
@@ -15,12 +14,15 @@ import {
 } from "lucide-react";
 import { useRouteParams } from "@/lib/use-route-params";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
+import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { timeAgo } from "@/lib/format";
+import { userLink } from "@/lib/static-link";
 import type { DbCommunityPost, DbPostComment } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -34,6 +36,8 @@ const TYPE_COLORS: Record<string, string> = {
   showoff: "bg-orange-500/10 text-orange-600 border-orange-500/20",
   discussion: "bg-green-500/10 text-green-600 border-green-500/20",
 };
+
+const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 
 export default function CommunityDetailPage() {
   const { id: postId } = useRouteParams<{ id: string }>();
@@ -138,19 +142,23 @@ export default function CommunityDetailPage() {
     if (!userId || !postId) return;
 
     if (liked) {
-      await supabase
+      const { error } = await supabase
         .from("post_likes")
         .delete()
         .eq("post_id", postId)
         .eq("user_id", userId);
-      setLiked(false);
-      setLikeCount((c) => Math.max(0, c - 1));
+      if (!error) {
+        setLiked(false);
+        setLikeCount((c) => Math.max(0, c - 1));
+      }
     } else {
-      await supabase
+      const { error } = await supabase
         .from("post_likes")
         .insert({ post_id: postId, user_id: userId });
-      setLiked(true);
-      setLikeCount((c) => c + 1);
+      if (!error) {
+        setLiked(true);
+        setLikeCount((c) => c + 1);
+      }
     }
   }
 
@@ -237,26 +245,27 @@ export default function CommunityDetailPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
+        <DesktopBack fallback="/community" />
 
-        {/* Author row */}
+        {/* Author row — links to profile */}
         <div className="mt-4 flex items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-muted">
-            {post.profiles?.avatar_url ? (
-              <img
-                src={post.profiles.avatar_url}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <span className="font-mono text-xs font-medium text-muted-foreground">
-                {(post.profiles?.username || "?")[0].toUpperCase()}
-              </span>
-            )}
-          </div>
+          <Link
+            href={userLink(post.user_id)}
+            className="flex h-9 w-9 shrink-0 items-center justify-center border border-border bg-muted transition-opacity hover:opacity-70"
+          >
+            <img
+              src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </Link>
           <div>
-            <span className="font-mono text-xs font-medium">
+            <Link
+              href={userLink(post.user_id)}
+              className="font-mono text-xs font-medium transition-colors hover:text-muted-foreground"
+            >
               {post.profiles?.username || "匿名"}
-            </span>
+            </Link>
             <div className="flex items-center gap-2">
               <span className="font-mono text-[10px] text-muted-foreground">
                 {timeAgo(post.created_at)}
@@ -308,17 +317,27 @@ export default function CommunityDetailPage() {
           {post.content}
         </div>
 
-        {/* Images */}
+        {/* Images / videos */}
         {post.images && post.images.length > 0 && (
           <div className="mt-4 space-y-2">
             {post.images.map((img, i) => (
               <div key={i} className="border border-border">
-                <img
-                  src={img}
-                  alt=""
-                  className="w-full object-contain"
-                  loading="lazy"
-                />
+                {VIDEO_RE.test(img) ? (
+                  <video
+                    src={img}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    className="w-full"
+                  />
+                ) : (
+                  <img
+                    src={img}
+                    alt=""
+                    className="w-full object-contain"
+                    loading="lazy"
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -348,7 +367,9 @@ export default function CommunityDetailPage() {
           </span>
         </div>
 
-        {/* Comments section */}
+        {/* Comments section — no scroll reveal: interactive content must never
+            start hidden (Safari IntersectionObserver can fail to fire on tall
+            sections / after the iOS page-transition remount) */}
         <section className="mt-6 border-t border-border pt-6">
           <h2 className="font-mono text-sm font-semibold">
             评论 ({comments.length})
@@ -412,25 +433,24 @@ export default function CommunityDetailPage() {
             ) : (
               comments.map((comment) => (
                 <div key={comment.id} className="flex gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-muted">
-                    {comment.profiles?.avatar_url ? (
-                      <img
-                        src={comment.profiles.avatar_url}
-                        alt=""
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <User
-                        className="h-3.5 w-3.5 text-muted-foreground"
-                        strokeWidth={1.5}
-                      />
-                    )}
-                  </div>
+                  <Link
+                    href={userLink(comment.user_id)}
+                    className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-muted transition-opacity hover:opacity-70"
+                  >
+                    <img
+                      src={avatarUrl(comment.profiles?.avatar_url, comment.profiles?.username)}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs font-medium">
+                      <Link
+                        href={userLink(comment.user_id)}
+                        className="font-mono text-xs font-medium transition-colors hover:text-muted-foreground"
+                      >
                         {comment.profiles?.username || "匿名"}
-                      </span>
+                      </Link>
                       <span className="font-mono text-[10px] text-muted-foreground">
                         {timeAgo(comment.created_at)}
                       </span>

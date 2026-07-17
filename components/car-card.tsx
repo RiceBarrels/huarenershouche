@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { carLink } from "@/lib/static-link";
-import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame, User } from "lucide-react";
+import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame } from "lucide-react";
+import { avatarUrl } from "@/lib/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
@@ -99,14 +100,14 @@ export function CarCard({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/20 active:bg-muted/30"
+        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/30 active:bg-muted/30"
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-muted">
           {car.image_url ? (
             <img
               src={car.image_url}
               alt={car.title}
-              className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
             />
           ) : (
             <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
@@ -305,11 +306,11 @@ export function CarCard({
               }}
             >
               <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
-                {car.profiles?.avatar_url ? (
-                  <img src={car.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
-                ) : (
-                  <User className="h-2.5 w-2.5" strokeWidth={1.5} />
-                )}
+                <img
+                  src={avatarUrl(car.profiles?.avatar_url, car.seller_name)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               </span>
               {car.seller_name}
             </span>

@@ -1,0 +1,521 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Heart,
+  MessageSquare,
+  Plus,
+  MapPin,
+  Play,
+  Search,
+  X,
+  ImageIcon,
+} from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import { Skeleton } from "@/components/ui/skeleton";
+import { carLink, userLink } from "@/lib/static-link";
+import {
+  detectUserZip,
+  geocodeZipToCoords,
+  haversineDistance,
+  formatDistance,
+} from "@/lib/geocode";
+import type { DbCar, DbCommunityPost } from "@/lib/types";
+
+const TYPE_LABELS: Record<string, string> = {
+  review: "车评",
+  showoff: "晒车",
+  discussion: "讨论",
+};
+
+const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
+function isVideoUrl(url: string): boolean {
+  return VIDEO_RE.test(url);
+}
+
+const SEARCH_TYPE_CHIPS = [
+  { key: "", label: "全部" },
+  { key: "review", label: "车评" },
+  { key: "showoff", label: "晒车" },
+  { key: "discussion", label: "讨论" },
+] as const;
+
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+type FeedItem =
+  | { kind: "post"; post: DbCommunityPost }
+  | { kind: "car"; car: DbCar; distance?: number };
+
+// 每隔几张帖子插一张附近车源卡(小红书插卡形式)
+const CAR_EVERY = 6;
+const FIRST_CAR_AT = 2;
+
+export default function CommunityFeedPage() {
+  const router = useRouter();
+  const [posts, setPosts] = useState<DbCommunityPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [tableError, setTableError] = useState(false);
+  const [nearbyCars, setNearbyCars] = useState<{ car: DbCar; distance?: number }[]>([]);
+
+  // 搜索:默认不显示任何分类;只有搜索时才出现类型筛选
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [keyword, setKeyword] = useState("");
+  const [searchType, setSearchType] = useState("");
+  const searching = searchOpen && (keyword.trim() !== "" || searchType !== "");
+
+  // 点赞:当前用户 + 已赞集合
+  const [userId, setUserId] = useState<string | null>(null);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // 拉取当前用户对可见帖子的点赞状态
+  useEffect(() => {
+    if (!userId || posts.length === 0) return;
+    supabase
+      .from("post_likes")
+      .select("post_id")
+      .eq("user_id", userId)
+      .in("post_id", posts.map((p) => p.id))
+      .then(({ data }) => {
+        if (data) setLikedIds(new Set(data.map((r) => r.post_id as string)));
+      });
+  }, [userId, posts]);
+
+  async function toggleLike(post: DbCommunityPost) {
+    if (!userId) {
+      router.push("/login");
+      return;
+    }
+    const wasLiked = likedIds.has(post.id);
+    // 乐观更新
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (wasLiked) next.delete(post.id);
+      else next.add(post.id);
+      return next;
+    });
+    setPosts((prev) =>
+      prev.map((p) =>
+        p.id === post.id
+          ? { ...p, likes_count: Math.max(0, (p.likes_count || 0) + (wasLiked ? -1 : 1)) }
+          : p
+      )
+    );
+    const { error } = wasLiked
+      ? await supabase.from("post_likes").delete().eq("post_id", post.id).eq("user_id", userId)
+      : await supabase.from("post_likes").insert({ post_id: post.id, user_id: userId });
+    if (error) {
+      // 失败回滚
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (wasLiked) next.add(post.id);
+        else next.delete(post.id);
+        return next;
+      });
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === post.id
+            ? { ...p, likes_count: Math.max(0, (p.likes_count || 0) + (wasLiked ? 1 : -1)) }
+            : p
+        )
+      );
+    }
+  }
+
+  useEffect(() => {
+    setLoading(true);
+    const kw = keyword.trim();
+    const timer = setTimeout(async () => {
+      try {
+        let query = supabase
+          .from("community_posts")
+          .select("*, profiles!user_id(username, avatar_url)")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(30);
+
+        if (searchOpen && searchType) query = query.eq("type", searchType);
+        if (searchOpen && kw) query = query.or(`title.ilike.%${kw}%,content.ilike.%${kw}%`);
+
+        const { data, error } = await query;
+        if (error) {
+          if (
+            error.message.includes("does not exist") ||
+            error.message.includes("relation") ||
+            error.code === "42P01"
+          ) {
+            setTableError(true);
+          }
+          setPosts([]);
+        } else {
+          setPosts((data as DbCommunityPost[]) || []);
+        }
+      } catch (err) {
+        console.error("Failed to load community posts:", err);
+      } finally {
+        setLoading(false);
+      }
+    }, kw ? 300 : 0);
+    return () => clearTimeout(timer);
+  }, [keyword, searchType, searchOpen]);
+
+  // 附近车源:定位成功按距离排序,失败则取最新
+  useEffect(() => {
+    async function loadCars() {
+      const { data } = await supabase
+        .from("cars")
+        .select("*")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(24);
+      const cars = (data as DbCar[]) || [];
+      if (cars.length === 0) return;
+
+      try {
+        const zip = await detectUserZip();
+        if (zip) {
+          const coords = await geocodeZipToCoords(zip);
+          if (coords) {
+            const withDist = cars
+              .filter((c) => c.lat != null && c.lng != null)
+              .map((car) => ({
+                car,
+                distance: haversineDistance(coords.lat, coords.lng, car.lat!, car.lng!),
+              }))
+              .sort((a, b) => a.distance - b.distance);
+            if (withDist.length > 0) {
+              setNearbyCars(withDist.slice(0, 4));
+              return;
+            }
+          }
+        }
+      } catch {
+        /* fall through to latest */
+      }
+      setNearbyCars(cars.slice(0, 4).map((car) => ({ car })));
+    }
+    loadCars().catch(() => {});
+  }, []);
+
+  // 帖子 + 穿插车源合成瀑布流(搜索时不插车源卡)
+  const feed = useMemo<FeedItem[]>(() => {
+    const items: FeedItem[] = posts.map((post) => ({ kind: "post", post }));
+    if (!searching) {
+      nearbyCars.forEach((entry, i) => {
+        const at = FIRST_CAR_AT + i * CAR_EVERY;
+        if (at <= items.length) {
+          items.splice(at, 0, { kind: "car", ...entry });
+        }
+      });
+    }
+    return items;
+  }, [posts, nearbyCars, searching]);
+
+  return (
+    <div className="flex min-h-screen flex-col bg-background font-mono">
+      <Header />
+      <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-4 md:px-4 md:py-6 xl:max-w-6xl">
+        {/* Top bar — title + search (sticky) */}
+        <div className="sticky top-0 z-30 -mx-3 bg-background/90 px-3 pb-3 pt-1 backdrop-blur-md md:top-14 md:-mx-4 md:px-4">
+          {searchOpen ? (
+            <div>
+              <div className="flex items-center gap-2 border border-border bg-background px-3">
+                <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                <input
+                  autoFocus
+                  value={keyword}
+                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="搜索帖子..."
+                  className="h-10 w-full bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchOpen(false);
+                    setKeyword("");
+                    setSearchType("");
+                  }}
+                  className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="关闭搜索"
+                >
+                  <X className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+              </div>
+              {/* 类型筛选只在搜索时出现 */}
+              <div className="mt-2 flex items-center gap-1.5">
+                {SEARCH_TYPE_CHIPS.map((chip) => (
+                  <button
+                    key={chip.key}
+                    onClick={() => setSearchType(chip.key)}
+                    className={`border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                      searchType === chip.key
+                        ? "border-foreground bg-foreground text-background"
+                        : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                  Community
+                </span>
+                <h1 className="font-mono text-base font-semibold tracking-tight">社区</h1>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setSearchOpen(true)}
+                  className="flex h-9 w-9 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                  aria-label="搜索帖子"
+                >
+                  <Search className="h-4 w-4" strokeWidth={1.5} />
+                </button>
+                <Link
+                  href="/community/new"
+                  className="hidden h-9 items-center gap-1 border border-border px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground md:flex"
+                >
+                  <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  发帖
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Content */}
+        {loading ? (
+          <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="mb-3 break-inside-avoid border border-border">
+                <Skeleton className={i % 2 ? "h-40 w-full" : "h-56 w-full"} />
+                <div className="p-2.5">
+                  <Skeleton className="h-3 w-3/4" />
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <Skeleton className="h-4 w-4" />
+                    <Skeleton className="h-2.5 w-16" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : tableError ? (
+          <div className="mt-12 flex flex-col items-center py-12">
+            <ImageIcon className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
+            <p className="mt-3 font-mono text-sm text-muted-foreground">社区即将上线</p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
+              敬请期待，社区功能正在建设中
+            </p>
+          </div>
+        ) : feed.length === 0 ? (
+          <div className="mt-12 flex flex-col items-center py-12">
+            <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
+            <p className="mt-3 font-mono text-sm text-muted-foreground">
+              {searching ? "没有找到相关帖子" : "暂无帖子"}
+            </p>
+            <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
+              {searching ? "换个关键词试试" : "成为第一个发帖的人吧"}
+            </p>
+          </div>
+        ) : (
+          /* 小红书式瀑布流:CSS columns 双列(桌面 3-4 列) */
+          <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
+            {feed.map((item, index) => {
+              const card =
+                item.kind === "post" ? (
+                  <PostCard
+                    post={item.post}
+                    liked={likedIds.has(item.post.id)}
+                    onLike={() => toggleLike(item.post)}
+                  />
+                ) : (
+                  <CarFeedCard car={item.car} distance={item.distance} />
+                );
+              const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
+              // 信息流内容直出,不做滚动浮入(必须立即可见)
+              return (
+                <div key={key} className="mb-3 break-inside-avoid">
+                  {card}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </main>
+      <Footer />
+
+      {/* Floating post button (mobile) */}
+      <Link
+        href="/community/new"
+        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
+      >
+        <Plus className="h-5 w-5" strokeWidth={1.5} />
+      </Link>
+    </div>
+  );
+}
+
+function PostCard({
+  post,
+  liked,
+  onLike,
+}: {
+  post: DbCommunityPost;
+  liked: boolean;
+  onLike: () => void;
+}) {
+  const router = useRouter();
+  const cover = post.images?.[0];
+  return (
+    <Link
+      href={`/community/${post.id}`}
+      className="block border border-border bg-card transition-colors hover:border-foreground/30"
+    >
+      {cover ? (
+        <div className="relative">
+          {isVideoUrl(cover) ? (
+            <>
+              <video
+                src={cover}
+                muted
+                playsInline
+                preload="metadata"
+                className="aspect-[3/4] w-full object-cover"
+              />
+              <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <span className="flex h-9 w-9 items-center justify-center border border-border bg-background/80 backdrop-blur-sm">
+                  <Play className="ml-0.5 h-4 w-4 text-foreground" strokeWidth={1.5} />
+                </span>
+              </span>
+            </>
+          ) : (
+            <img src={cover} alt="" className="w-full object-cover" loading="lazy" />
+          )}
+          <span className="absolute left-1.5 top-1.5 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
+            {TYPE_LABELS[post.type] || post.type}
+          </span>
+          {post.images && post.images.length > 1 && (
+            <span className="absolute right-1.5 top-1.5 bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
+              +{post.images.length - 1}
+            </span>
+          )}
+        </div>
+      ) : null}
+      <div className="p-2.5">
+        {!cover && (
+          <span className="mb-1.5 inline-block border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+            {TYPE_LABELS[post.type] || post.type}
+          </span>
+        )}
+        <h3 className="line-clamp-2 font-mono text-xs font-medium leading-snug">
+          {post.title}
+        </h3>
+        {!cover && (
+          <p className="mt-1 line-clamp-4 font-mono text-[11px] leading-relaxed text-muted-foreground">
+            {post.content}
+          </p>
+        )}
+        {/* Author + likes (XHS style) — author clicks through to profile */}
+        <div className="mt-2 flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              router.push(userLink(post.user_id));
+            }}
+            className="flex min-w-0 items-center gap-1.5 transition-opacity hover:opacity-70"
+          >
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted">
+              <img src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)} alt="" className="h-full w-full object-cover" />
+            </span>
+            <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+              {post.profiles?.username || "匿名"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onLike();
+            }}
+            aria-label={liked ? "取消点赞" : "点赞"}
+            className={`ml-auto flex shrink-0 items-center gap-0.5 font-mono text-[10px] transition-colors ${
+              liked ? "text-red-500" : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Heart className={`h-3 w-3 ${liked ? "fill-current" : ""}`} strokeWidth={1.5} />
+            {post.likes_count || 0}
+          </button>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function CarFeedCard({ car, distance }: { car: DbCar; distance?: number }) {
+  return (
+    <Link
+      href={carLink(car.id)}
+      className="block border border-border bg-card transition-colors hover:border-foreground/30"
+    >
+      <div className="relative">
+        {car.image_url ? (
+          <img
+            src={car.image_url}
+            alt={car.title_zh}
+            className="aspect-[4/3] w-full object-cover"
+            loading="lazy"
+          />
+        ) : (
+          <div className="flex aspect-[4/3] w-full items-center justify-center bg-muted">
+            <span className="font-mono text-[10px] text-muted-foreground">暂无图片</span>
+          </div>
+        )}
+        <span className="absolute left-1.5 top-1.5 bg-primary px-1.5 py-0.5 font-mono text-[9px] font-medium text-primary-foreground">
+          附近车源
+        </span>
+      </div>
+      <div className="p-2.5">
+        <h3 className="line-clamp-1 font-mono text-xs font-medium leading-snug">
+          {car.title_zh}
+        </h3>
+        <p className="mt-1 font-mono text-sm font-semibold tabular-nums">
+          {car.price > 0 ? formatPrice(car.price) : "电议"}
+        </p>
+        <div className="mt-1.5 flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+          <MapPin className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+          <span className="truncate">{car.location_zh}</span>
+          {distance != null && (
+            <span className="ml-auto shrink-0 text-brand">{formatDistance(distance)}</span>
+          )}
+        </div>
+      </div>
+    </Link>
+  );
+}

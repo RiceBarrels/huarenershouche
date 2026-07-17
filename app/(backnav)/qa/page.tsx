@@ -93,7 +93,13 @@ export default function QaBoardPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
-        <h1 className="font-mono text-sm font-semibold tracking-tight">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            Q&amp;A
+          </span>
+          <span className="h-px flex-1 bg-border" aria-hidden="true" />
+        </div>
+        <h1 className="mt-2 font-mono text-sm font-semibold tracking-tight">
           问答
         </h1>
         <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
@@ -165,7 +171,8 @@ export default function QaBoardPage() {
           </div>
         ) : (
           <div className="mt-4 space-y-2">
-            {questions.map((q) => (
+            {questions.map((q) => {
+              const card = (
               <Link
                 key={q.id}
                 href={`/qa/${q.id}`}
@@ -230,7 +237,10 @@ export default function QaBoardPage() {
                   </span>
                 </div>
               </Link>
-            ))}
+              );
+              // 列表内容直出,不做滚动浮入(必须立即可见)
+              return card;
+            })}
           </div>
         )}
       </main>

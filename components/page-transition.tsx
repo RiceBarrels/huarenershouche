@@ -25,6 +25,11 @@ export function setBackNavigation() { _isBackNavigation = true; }
 const DURATION = 350;
 const EASING = "cubic-bezier(0.2, 0.9, 0.3, 1)";
 
+// Inline keyframe animations can't be disabled from CSS, so gate in JS
+const prefersReducedMotion =
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export function PageTransition({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const prevPath = useRef(pathname);
@@ -55,7 +60,7 @@ export function PageTransition({ children }: { children: React.ReactNode }) {
     }
   }, [phase, children]);
 
-  if (phase === "idle") {
+  if (prefersReducedMotion || phase === "idle") {
     return <>{children}</>;
   }
 

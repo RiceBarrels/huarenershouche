@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
@@ -121,6 +122,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
+          <MotionProvider>
           <div
             vaul-drawer-wrapper=""
             className="min-h-dvh bg-background"
@@ -144,6 +146,7 @@ export default function RootLayout({
               <Analytics />
             </CapacitorProvider>
           </div>
+          </MotionProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { User, Trash2, Send, Loader2 } from "lucide-react";
+import { Trash2, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import type { DbComment } from "@/lib/types";
@@ -159,15 +160,11 @@ export function CommentSection({ carId }: { carId: string }) {
           comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center border border-border bg-muted">
-                {comment.profiles?.avatar_url ? (
-                  <img
-                    src={comment.profiles.avatar_url}
-                    alt=""
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <User className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                )}
+                <img
+                  src={avatarUrl(comment.profiles?.avatar_url, comment.profiles?.username)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">

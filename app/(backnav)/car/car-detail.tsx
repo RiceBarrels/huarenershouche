@@ -28,10 +28,13 @@ import {
   TrendingUp,
   Loader2,
   Pencil,
-  User,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
+import { Reveal } from "@/components/reveal";
+import { DesktopBack } from "@/components/desktop-back";
+import { ScrollProgress } from "@/components/scroll-progress";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { CommentSection } from "@/components/comment-section";
@@ -307,7 +310,9 @@ export default function CarDetailPage() {
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background font-mono">
 
       <Header />
+      <ScrollProgress />
       <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
+        <DesktopBack fallback="/browse" />
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Left: Image + Details */}
@@ -520,100 +525,104 @@ export default function CarDetailPage() {
 
             <Separator className="my-6" />
 
-            {/* Specs grid */}
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <Calendar
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    年份
-                  </span>
+            {/* Specs data sheet */}
+            <Reveal>
+              <div className="grid grid-cols-2 border-l border-t border-border sm:grid-cols-3">
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <Calendar
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      年份
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {car.year}
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {car.year}
-                </p>
-              </div>
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <Gauge
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    里程
-                  </span>
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <Gauge
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      里程
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {formatMileage(car.mileage)} mi
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {formatMileage(car.mileage)} mi
-                </p>
-              </div>
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <Fuel
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    燃油
-                  </span>
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <Fuel
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      燃油
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {car.fuel_type}
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {car.fuel_type}
-                </p>
-              </div>
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <Settings
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    变速箱
-                  </span>
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <Settings
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      变速箱
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {car.transmission}
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {car.transmission}
-                </p>
-              </div>
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <Palette
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    外观颜色
-                  </span>
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <Palette
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      外观颜色
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {car.exterior_color || "—"}
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {car.exterior_color || "—"}
-                </p>
-              </div>
-              <div className="border border-border p-3">
-                <div className="flex items-center gap-1.5">
-                  <MapPin
-                    className="h-3.5 w-3.5 text-muted-foreground"
-                    strokeWidth={1.5}
-                  />
-                  <span className="font-mono text-[11px] text-muted-foreground">
-                    所在地
-                  </span>
+                <div className="border-b border-r border-border p-3">
+                  <div className="flex items-center gap-1.5">
+                    <MapPin
+                      className="h-3.5 w-3.5 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                    <span className="font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      所在地
+                    </span>
+                  </div>
+                  <p className="mt-1 font-mono text-sm font-medium">
+                    {car.location_zh}
+                  </p>
                 </div>
-                <p className="mt-1 font-mono text-sm font-medium">
-                  {car.location_zh}
-                </p>
               </div>
-            </div>
+            </Reveal>
 
             {/* Features */}
             {car.features && car.features.length > 0 && (
-              <>
+              <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="font-mono text-sm font-semibold">车辆配置</h2>
+                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    车辆配置
+                  </h2>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {car.features.map((f) => (
                       <Badge
@@ -626,28 +635,32 @@ export default function CarDetailPage() {
                     ))}
                   </div>
                 </div>
-              </>
+              </Reveal>
             )}
 
             {/* Description */}
             {car.description_zh && (
-              <>
+              <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="font-mono text-sm font-semibold">车辆描述</h2>
+                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    车辆描述
+                  </h2>
                   <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
                     {car.description_zh}
                   </p>
                 </div>
-              </>
+              </Reveal>
             )}
 
             {car.vin && (
-              <>
+              <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="font-mono text-sm font-semibold">VIN 认证</h2>
-                  <p className="mt-1 font-mono text-sm text-muted-foreground">
+                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    VIN 认证
+                  </h2>
+                  <p className="mt-2 font-mono text-sm text-muted-foreground">
                     {car.vin}
                   </p>
                   <VinCheck
@@ -655,17 +668,19 @@ export default function CarDetailPage() {
                     car={{ make: car.make, year: car.year, model: car.model }}
                   />
                 </div>
-              </>
+              </Reveal>
             )}
 
             {/* Carfax report */}
             {car.carfax_url && (
-              <>
+              <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="font-mono text-sm font-semibold">Carfax 报告</h2>
+                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    Carfax 报告
+                  </h2>
                   {car.carfax_summary && (
-                    <p className="mt-1 font-mono text-sm text-muted-foreground">
+                    <p className="mt-2 font-mono text-sm text-muted-foreground">
                       {car.carfax_summary}
                     </p>
                   )}
@@ -679,18 +694,18 @@ export default function CarDetailPage() {
                     在 Carfax 查看完整报告
                   </a>
                 </div>
-              </>
+              </Reveal>
             )}
 
             {/* Vehicle history: model-level NHTSA reference, tucked away at the bottom */}
             {car.vin && car.make && car.model && car.year > 0 && (
-              <div className="mt-8">
+              <Reveal className="mt-8">
                 <VehicleHistoryPanel
                   make={car.make}
                   model={car.model}
                   year={car.year}
                 />
-              </div>
+              </Reveal>
             )}
           </div>
 
@@ -705,11 +720,7 @@ export default function CarDetailPage() {
                 className="mt-3 flex items-center gap-3 py-2 transition-colors"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
-                  {car.profiles?.avatar_url ? (
-                    <img src={car.profiles.avatar_url} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <User className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                  )}
+                  <img src={avatarUrl(car.profiles?.avatar_url, car.seller_name)} alt="" className="h-full w-full object-cover" />
                 </div>
                 <div>
                   <p className="font-mono text-sm font-medium underline-offset-2 hover:underline">
@@ -925,7 +936,8 @@ export default function CarDetailPage() {
         {/* 车主口碑:社区车评 */}
         <ModelReviews make={car.make} model={car.model} />
 
-        {/* Comments */}
+        {/* Comments — no scroll reveal: interactive content must never start
+            hidden (Safari IntersectionObserver can fail on tall sections) */}
         <CommentSection carId={carId} />
 
         {/* Similar cars */}
@@ -933,14 +945,17 @@ export default function CarDetailPage() {
           <section
             className="mt-10 border-t border-border pt-6"
           >
-            <h2 className="font-mono text-sm font-semibold">相似车辆推荐</h2>
+            <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              相似车辆推荐
+            </h2>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {similarCars.map((c) => (
-                <CarCard
-                  key={c.id}
-                  car={c}
-                  priceInsight={getPriceInsight(c, makePool)}
-                />
+                <Reveal key={c.id}>
+                  <CarCard
+                    car={c}
+                    priceInsight={getPriceInsight(c, makePool)}
+                  />
+                </Reveal>
               ))}
             </div>
           </section>

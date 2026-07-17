@@ -539,7 +539,7 @@ export function SearchFilters({
 
       {/* Location — state / zipcode + distance in one block */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">位置</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">位置</Label>
         {!expandedState ? (
           <>
             <div className="mt-1 max-h-[200px] overflow-y-auto border border-border">
@@ -633,7 +633,7 @@ export function SearchFilters({
 
       {/* Brand */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">热门品牌</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">热门品牌</Label>
         <div className="mt-1.5 grid grid-cols-3 gap-1.5">
           {HOT_MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
@@ -655,7 +655,7 @@ export function SearchFilters({
             );
           })}
         </div>
-        <Label className="mt-3 font-mono text-[11px] text-muted-foreground">全部品牌</Label>
+        <Label className="mt-3 border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">全部品牌</Label>
         <div className="mt-1 max-h-[280px] overflow-y-auto border border-border">
           <button
             type="button"
@@ -688,7 +688,7 @@ export function SearchFilters({
       {/* Model — only shown when exactly one make is selected */}
       {modelOptions && modelOptions.length > 0 && (
         <div>
-          <Label className="font-mono text-[11px] text-muted-foreground">车型</Label>
+          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车型</Label>
           <SidebarPillSelect
             options={modelOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.model}
@@ -700,7 +700,7 @@ export function SearchFilters({
 
       {/* Body style */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">车身类型</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车身类型</Label>
         <SidebarPillSelect
           options={BODY_STYLE_OPTIONS}
           value={filters.bodyStyle}
@@ -710,7 +710,7 @@ export function SearchFilters({
 
       {/* Seller type */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">卖家类型</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">卖家类型</Label>
         <SidebarPillSelect
           options={[
             { value: "dealer", label: "车行" },
@@ -723,7 +723,7 @@ export function SearchFilters({
 
       {/* Price slider + input */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">价格范围</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">价格范围</Label>
         <div className="mt-1.5 flex items-center gap-1.5">
           <Input
             className="h-8 font-mono text-[11px]"
@@ -773,7 +773,7 @@ export function SearchFilters({
 
       {/* Monthly payment budget */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">月供预算</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">月供预算</Label>
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -810,7 +810,7 @@ export function SearchFilters({
 
       {/* Year slider + input */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">年份范围</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">年份范围</Label>
         <div className="mt-1.5 flex items-center gap-1.5">
           <Input
             className="h-8 font-mono text-[11px]"
@@ -860,27 +860,27 @@ export function SearchFilters({
 
       {/* Fuel type */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">燃油类型</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">燃油类型</Label>
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </div>
 
       {/* Transmission — hidden when exclusively electric */}
       {!isElectric && (
         <div>
-          <Label className="font-mono text-[11px] text-muted-foreground">变速箱</Label>
+          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">变速箱</Label>
           <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
         </div>
       )}
 
       {/* Drivetrain */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">驱动方式</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">驱动方式</Label>
         <SidebarPillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
       </div>
 
       {/* Mileage slider with breakpoints */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">最高里程</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">最高里程</Label>
         <p className="mt-1 font-mono text-[11px] text-foreground">
           {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
         </p>
@@ -904,20 +904,20 @@ export function SearchFilters({
 
       {/* Exterior color */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">外观颜色</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">外观颜色</Label>
         <SidebarPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
       </div>
 
       {/* Interior color */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">内饰颜色</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">内饰颜色</Label>
         <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
       </div>
 
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
         <div>
-          <Label className="font-mono text-[11px] text-muted-foreground">车辆配置</Label>
+          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车辆配置</Label>
           <SidebarPillSelect
             options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.features}
@@ -929,7 +929,7 @@ export function SearchFilters({
 
       {/* More conditions */}
       <div>
-        <Label className="font-mono text-[11px] text-muted-foreground">更多条件</Label>
+        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">更多条件</Label>
         <div className="mt-1 space-y-1">
           <button
             type="button"
@@ -959,7 +959,7 @@ export function SearchFilters({
             </button>
           ))}
         </div>
-        <Label className="mt-3 block font-mono text-[11px] text-muted-foreground">上架时间</Label>
+        <Label className="mt-3 block border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">上架时间</Label>
         <div className="mt-1 flex flex-wrap gap-1.5">
           {LISTED_WITHIN_OPTIONS.map((opt) => (
             <button

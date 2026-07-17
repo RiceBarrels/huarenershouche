@@ -93,6 +93,12 @@ export default function ServicesPage() {
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-8">
         <div className="mb-8">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Services
+            </span>
+            <span className="h-px flex-1 bg-border" />
+          </div>
           <h1 className="font-mono text-lg font-semibold tracking-tight">
             附近服务
           </h1>
