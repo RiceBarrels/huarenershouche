@@ -75,6 +75,32 @@ function shuffleArray<T>(arr: T[]): T[] {
   return a;
 }
 
+// 封面宽高比:按 id 确定性选择,布局稳定又有错落感
+const COVER_RATIOS = ["aspect-[3/4]", "aspect-square", "aspect-[4/3]"] as const;
+function coverRatio(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return COVER_RATIOS[Math.abs(h) % COVER_RATIOS.length];
+}
+
+// 响应式列数:2 / md 3 / xl 4(与原 columns-2 md:columns-3 xl:columns-4 一致)
+function useColumnCount(): number {
+  const [count, setCount] = useState(2);
+  useEffect(() => {
+    const mdQuery = window.matchMedia("(min-width: 768px)");
+    const xlQuery = window.matchMedia("(min-width: 1280px)");
+    const update = () => setCount(xlQuery.matches ? 4 : mdQuery.matches ? 3 : 2);
+    update();
+    mdQuery.addEventListener("change", update);
+    xlQuery.addEventListener("change", update);
+    return () => {
+      mdQuery.removeEventListener("change", update);
+      xlQuery.removeEventListener("change", update);
+    };
+  }, []);
+  return count;
+}
+
 export default function CommunityFeedPage() {
   const router = useRouter();
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
@@ -365,6 +391,15 @@ export default function CommunityFeedPage() {
     return items;
   }, [posts, nearbyCars, searching]);
 
+  // 显式列分发(round-robin):追加新内容只往列尾加,已有卡片永不换位
+  // (CSS columns 会在每次追加时全量重排,导致滚动跳动)
+  const columnCount = useColumnCount();
+  const feedColumns = useMemo<FeedItem[][]>(() => {
+    const cols: FeedItem[][] = Array.from({ length: columnCount }, () => []);
+    feed.forEach((item, i) => cols[i % columnCount].push(item));
+    return cols;
+  }, [feed, columnCount]);
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
@@ -476,27 +511,30 @@ export default function CommunityFeedPage() {
             </p>
           </div>
         ) : (
-          /* 小红书式瀑布流:CSS columns 双列(桌面 3-4 列) */
-          <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
-            {feed.map((item, index) => {
-              const card =
-                item.kind === "post" ? (
-                  <PostCard
-                    post={item.post}
-                    liked={likedIds.has(item.post.id)}
-                    onLike={() => toggleLike(item.post)}
-                  />
-                ) : (
-                  <CarFeedCard car={item.car} distance={item.distance} />
-                );
-              const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
-              // 信息流内容直出,不做滚动浮入(必须立即可见)
-              return (
-                <div key={key} className="mb-3 break-inside-avoid">
-                  {card}
-                </div>
-              );
-            })}
+          /* 小红书式瀑布流:显式列分发,追加不重排 */
+          <div className="flex items-start gap-3">
+            {feedColumns.map((col, colIdx) => (
+              <div key={colIdx} className="min-w-0 flex-1">
+                {col.map((item) => {
+                  const card =
+                    item.kind === "post" ? (
+                      <PostCard
+                        post={item.post}
+                        liked={likedIds.has(item.post.id)}
+                        onLike={() => toggleLike(item.post)}
+                      />
+                    ) : (
+                      <CarFeedCard car={item.car} distance={item.distance} />
+                    );
+                  const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
+                  return (
+                    <div key={key} className="mb-3">
+                      {card}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         )}
 
@@ -560,7 +598,13 @@ function PostCard({
               </span>
             </>
           ) : (
-            <img src={cover} alt="" className="w-full object-cover" loading="lazy" />
+            /* 固定宽高比(按 id 确定):图片加载完成不会撑开布局 */
+            <img
+              src={cover}
+              alt=""
+              className={`${coverRatio(post.id)} w-full bg-muted object-cover`}
+              loading="lazy"
+            />
           )}
           <span className="absolute left-1.5 top-1.5 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
             {TYPE_LABELS[post.type] || post.type}
