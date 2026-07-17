@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { Header } from "@/components/header";
+import { DesktopBack } from "@/components/desktop-back";
 
 const SERVICES = [
   {
@@ -99,10 +102,16 @@ export default function BusinessPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <Header />
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
+        <DesktopBack />
         <h1 className="text-lg font-semibold">商业合作</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          常来车网面向车行、金融、保险等行业伙伴开放合作
+          常来车网面向车行、金融、保险等行业伙伴开放合作。车行入驻请前往
+          <Link href="/dealer-apply" className="underline underline-offset-2 hover:text-foreground">
+            车行入驻申请
+          </Link>
+          。
         </p>
 
         {/* Services */}

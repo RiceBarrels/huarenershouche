@@ -320,6 +320,12 @@ function AccountContent() {
               href="/contact"
             />
             <MenuRow
+              icon={<Store className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              label="车行入驻"
+              value={profile?.account_type === "dealer" ? "已认证" : undefined}
+              href={user ? "/dealer-apply" : "/login"}
+            />
+            <MenuRow
               icon={<Handshake className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
               label="商业合作"
               href="/business"

@@ -8,6 +8,8 @@ import {
   Headset, Handshake,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Header } from "@/components/header";
+import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -404,7 +406,9 @@ export default function AdminPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
-      <div className="mx-auto w-full max-w-2xl px-4 py-4">
+      <Header />
+      <div className="mx-auto w-full max-w-2xl px-4 py-4 md:py-8">
+        <DesktopBack />
         <h1 className="flex items-center gap-2 text-lg font-semibold">
           <ShieldCheck className="h-5 w-5" strokeWidth={1.5} />
           管理后台

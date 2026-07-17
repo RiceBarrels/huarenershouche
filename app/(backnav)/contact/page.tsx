@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { Header } from "@/components/header";
+import { DesktopBack } from "@/components/desktop-back";
 
 const FAQ = [
   { q: "如何发布车辆？", a: "登录后点击底部「发布」按钮，填写车辆信息即可免费发布。支持 VIN 自动识别车辆信息。" },
@@ -80,7 +82,9 @@ export default function ContactPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <Header />
+      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
+        <DesktopBack />
         <h1 className="text-lg font-semibold">联系客服</h1>
         <p className="mt-1 text-xs text-muted-foreground">
           有任何问题或建议，欢迎联系我们

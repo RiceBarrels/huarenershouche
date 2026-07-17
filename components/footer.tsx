@@ -52,13 +52,14 @@ const seoLinkRows: { title: string; links: { label: string; href: string }[] }[]
 
 const sellLinks = [
   { label: "免费发布", href: "/post" },
+  { label: "车行入驻", href: "/dealer-apply" },
   { label: "我的车辆", href: "/account" },
 ];
 
 const helpLinks = [
   { label: "联系我们", href: "/contact" },
   { label: "使用条款", href: "/terms" },
-  { label: "商家入驻", href: "/business" },
+  { label: "商业合作", href: "/business" },
 ];
 
 export function Footer() {
