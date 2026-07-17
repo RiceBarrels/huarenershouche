@@ -42,8 +42,10 @@ import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
 import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
 
-import type { DbCar } from "@/lib/types";
+import type { DbCar, DbCommunityPost } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
+import { Heart } from "lucide-react";
+import { avatarUrl } from "@/lib/avatar";
 
 // Map city names to Chinese region names, with NYC borough detection
 const CITY_ZH_MAP: Record<string, string> = {
@@ -284,6 +286,7 @@ export default function Home() {
   const [locationLoading, setLocationLoading] = useState(true);
   const [monthlyBudget, setMonthlyBudget] = useState("400");
   const [carCount, setCarCount] = useState<number | null>(null);
+  const [communityPosts, setCommunityPosts] = useState<DbCommunityPost[]>([]);
 
   // Subtle parallax on the hero grid backdrop
   const prefersReduced = useReducedMotion();
@@ -328,6 +331,20 @@ export default function Home() {
       .select("id", { count: "exact", head: true })
       .eq("status", "active")
       .then(({ count }) => setCarCount(count ?? 0));
+
+    // 社区热帖入口:优先带图的最新帖
+    supabase
+      .from("community_posts")
+      .select("*, profiles!user_id(username, avatar_url)")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(12)
+      .then(({ data }) => {
+        const rows = (data as DbCommunityPost[]) || [];
+        const withImg = rows.filter((p) => p.images && p.images.length > 0);
+        const withoutImg = rows.filter((p) => !p.images || p.images.length === 0);
+        setCommunityPosts([...withImg, ...withoutImg].slice(0, 4));
+      });
 
     // Auto-detect user location with detailed region info
     detectDetailedLocation()
@@ -740,8 +757,59 @@ export default function Home() {
       <section className="border-t border-border px-4 py-10">
         <div className="mx-auto max-w-5xl xl:max-w-6xl">
           <Reveal>
-            <SectionHeader index="05" label="Community" title="车友社区" className="mb-6" />
+            <SectionHeader
+              index="05"
+              label="Community"
+              title="车友社区"
+              action={{ href: "/community", label: "进入社区" }}
+              className="mb-6"
+            />
           </Reveal>
+
+          {/* 最新社区帖子 */}
+          {communityPosts.length > 0 && (
+            <RevealGroup className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {communityPosts.map((post) => (
+                <RevealItem key={post.id}>
+                  <Link
+                    href={`/community/${post.id}`}
+                    className="block h-full border border-border bg-card transition-colors hover:border-foreground/30"
+                  >
+                    {post.images?.[0] && (
+                      <img
+                        src={post.images[0]}
+                        alt=""
+                        className="aspect-[4/3] w-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                    <div className="p-2.5">
+                      <p className="line-clamp-2 font-mono text-xs font-medium leading-snug">
+                        {post.title}
+                      </p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted">
+                          <img
+                            src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
+                        </span>
+                        <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+                          {post.profiles?.username || "匿名"}
+                        </span>
+                        <span className="ml-auto flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-muted-foreground">
+                          <Heart className="h-3 w-3" strokeWidth={1.5} />
+                          {post.likes_count || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                </RevealItem>
+              ))}
+            </RevealGroup>
+          )}
+
           <RevealGroup className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { href: "/community", title: "车友圈", desc: "车评、晒车、交流" },
