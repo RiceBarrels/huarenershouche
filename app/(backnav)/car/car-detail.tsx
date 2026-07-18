@@ -28,6 +28,7 @@ import {
   TrendingUp,
   Loader2,
   Pencil,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
@@ -103,13 +104,15 @@ export default function CarDetailPage() {
   const [copied, setCopied] = useState(false);
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
+  const [renewing, setRenewing] = useState(false);
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url)")
+        .select("*, profiles!seller_id(account_type, avatar_url, is_system)")
         .eq("id", carId)
         .single();
       setCar(data as DbCar);
@@ -122,6 +125,19 @@ export default function CarDetailPage() {
         });
         addRecentlyViewed(carId);
         recordPrice(carId, data.title, data.price);
+
+        // 车行卖家：取门店地址，卖家信息里展示并可点击打开地图
+        if (data.profiles?.account_type === "dealer") {
+          supabase
+            .from("dealer_stores")
+            .select("address, lat, lng")
+            .eq("owner_id", data.seller_id)
+            .limit(1)
+            .maybeSingle()
+            .then(({ data: store }) => {
+              if (store?.address) setStoreAddress(store);
+            });
+        }
 
         // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
         const { data: pool } = await supabase
@@ -639,7 +655,7 @@ export default function CarDetailPage() {
             )}
 
             {/* Description */}
-            {car.description_zh && (
+            {(car.description_zh || car.description) && (
               <Reveal>
                 <Separator className="my-6" />
                 <div>
@@ -647,7 +663,7 @@ export default function CarDetailPage() {
                     车辆描述
                   </h2>
                   <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
-                    {car.description_zh}
+                    {car.description_zh || car.description}
                   </p>
                 </div>
               </Reveal>
@@ -731,10 +747,35 @@ export default function CarDetailPage() {
                   </p>
                 </div>
               </Link>
-              <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                <MapPin className="h-3 w-3" strokeWidth={1.5} />
-                {car.location}
-              </p>
+              {!storeAddress && (
+                <p className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <MapPin className="h-3 w-3" strokeWidth={1.5} />
+                  {car.location}
+                </p>
+              )}
+
+              {storeAddress && (
+                <a
+                  href={
+                    storeAddress.lat != null && storeAddress.lng != null
+                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}&center=${storeAddress.lat},${storeAddress.lng}`
+                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-1.5 flex items-start gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                >
+                  <MapPin className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
+                  <span>{storeAddress.address}</span>
+                  <ExternalLink className="mt-0.5 h-2.5 w-2.5 shrink-0" strokeWidth={1.5} />
+                </a>
+              )}
+
+              {car.profiles?.is_system && (
+                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
+                  合作车行车源，请致电联系
+                </p>
+              )}
 
               <div className="mt-4 space-y-2">
                 {user ? (
@@ -797,47 +838,74 @@ export default function CarDetailPage() {
                   </Link>
                 )}
 
-                {user ? (
-                  user !== car.seller_id && (
-                    <Button
-                      variant="outline"
-                      className="w-full gap-1.5 font-mono text-xs"
-                      onClick={async () => {
-                        // Ensure conversation exists, then navigate
-                        const { data: existing } = await supabase
-                          .from("conversations")
-                          .select("id")
-                          .eq("car_id", carId)
-                          .eq("buyer_id", user)
-                          .eq("seller_id", car.seller_id)
-                          .maybeSingle();
-                        if (!existing) {
-                          await supabase
-                            .from("conversations")
-                            .insert({
-                              car_id: carId,
-                              buyer_id: user,
-                              seller_id: car.seller_id,
-                            });
-                        }
-                        router.push(`/messages/${car.seller_id}`);
-                      }}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      发消息给卖家
-                    </Button>
-                  )
-                ) : (
-                  <Link href="/login">
-                    <Button
-                      variant="outline"
-                      className="w-full gap-1.5 font-mono text-xs"
-                    >
-                      <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      登录后私信
-                    </Button>
-                  </Link>
+                {user && user === car.seller_id && car.status === "removed" && (
+                  <Button
+                    className="w-full gap-1.5 font-mono text-xs"
+                    disabled={renewing}
+                    onClick={async () => {
+                      setRenewing(true);
+                      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+                      const { error } = await supabase
+                        .from("cars")
+                        .update({ status: "active", expires_at: expiresAt })
+                        .eq("id", carId);
+                      setRenewing(false);
+                      if (!error) {
+                        setCar((prev) => (prev ? { ...prev, status: "active", expires_at: expiresAt } : prev));
+                      }
+                    }}
+                  >
+                    {renewing ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    )}
+                    {car.expires_at && new Date(car.expires_at).getTime() < Date.now() ? "续期并重新上架" : "重新上架"}
+                  </Button>
                 )}
+
+                {!car.profiles?.is_system &&
+                  (user ? (
+                    user !== car.seller_id && (
+                      <Button
+                        variant="outline"
+                        className="w-full gap-1.5 font-mono text-xs"
+                        onClick={async () => {
+                          // Ensure conversation exists, then navigate
+                          const { data: existing } = await supabase
+                            .from("conversations")
+                            .select("id")
+                            .eq("car_id", carId)
+                            .eq("buyer_id", user)
+                            .eq("seller_id", car.seller_id)
+                            .maybeSingle();
+                          if (!existing) {
+                            await supabase
+                              .from("conversations")
+                              .insert({
+                                car_id: carId,
+                                buyer_id: user,
+                                seller_id: car.seller_id,
+                              });
+                          }
+                          router.push(`/messages/${car.seller_id}`);
+                        }}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        发消息给卖家
+                      </Button>
+                    )
+                  ) : (
+                    <Link href="/login">
+                      <Button
+                        variant="outline"
+                        className="w-full gap-1.5 font-mono text-xs"
+                      >
+                        <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        登录后私信
+                      </Button>
+                    </Link>
+                  ))}
 
                 <Button
                   variant="outline"

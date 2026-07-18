@@ -35,8 +35,14 @@ export interface DbCar {
   favorites_count: number;
   created_at: string;
   updated_at: string;
+  expires_at: string | null;
+  // Syndicated listing source tracking (null for user-posted cars)
+  source_id: string | null;
+  source_listing_id: string | null;
+  source_url: string | null;
+  last_seen_at: string | null;
   // Joined from profiles
-  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null };
+  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null; is_system?: boolean };
 }
 
 export interface DbProfile {
@@ -51,8 +57,29 @@ export interface DbProfile {
   banned: boolean;
   banned_at: string | null;
   banned_reason: string | null;
+  is_system: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface DbListingSource {
+  id: string;
+  key: string;
+  name: string;
+  base_url: string;
+  enabled: boolean;
+  system_account_id: string;
+  last_sync_at: string | null;
+  last_sync_status: "success" | "partial" | "error" | "running" | null;
+  last_sync_detail: {
+    found?: number;
+    inserted?: number;
+    updated?: number;
+    delisted?: number;
+    errors?: string[];
+    duration_ms?: number;
+  } | null;
+  created_at: string;
 }
 
 export interface DbDealerStore {

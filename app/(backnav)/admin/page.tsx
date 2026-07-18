@@ -2,21 +2,44 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ShieldCheck, Users, Car, Flag, Store, Ban, Eye, Trash2, Check, X,
   Loader2, ChevronRight, AlertTriangle, Clock, XCircle, MessageSquare,
-  Headset, Handshake,
+  Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { carEditLink, adminUserLink } from "@/lib/static-link";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbProfile, DbCar, DbDealerStore } from "@/lib/types";
+import type { DbProfile, DbCar, DbDealerStore, DbListingSource } from "@/lib/types";
 
-type Tab = "verifications" | "users" | "cars" | "reports" | "tickets";
+type Tab = "verifications" | "users" | "cars" | "reports" | "tickets" | "sources";
+
+interface SyncResult {
+  key: string;
+  status: "success" | "partial" | "error" | "skipped";
+  found: number;
+  inserted: number;
+  updated: number;
+  delisted: number;
+  errors: string[];
+  duration_ms: number;
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  return new Date(iso).toLocaleString("zh-CN");
+}
 
 interface Report {
   id: string;
@@ -59,6 +82,12 @@ export default function AdminPage() {
   const [cars, setCars] = useState<DbCar[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [sources, setSources] = useState<DbListingSource[]>([]);
+  const [sourcesLoaded, setSourcesLoaded] = useState(false);
+  const [sourceCounts, setSourceCounts] = useState<Record<string, number>>({});
+  const [syncingKey, setSyncingKey] = useState<string | null>(null);
+  const [syncResults, setSyncResults] = useState<Record<string, { ok: boolean; text: string }>>({});
+  const [expandedErrors, setExpandedErrors] = useState<Record<string, boolean>>({});
 
   // Search
   const [userSearch, setUserSearch] = useState("");
@@ -160,10 +189,34 @@ export default function AdminPage() {
     setCars((data as DbCar[]) || []);
   }
 
+  async function loadSources() {
+    const { data } = await supabase
+      .from("listing_sources")
+      .select("*")
+      .order("created_at", { ascending: true });
+    const list = (data as DbListingSource[]) || [];
+    setSources(list);
+    setSourcesLoaded(true);
+    if (list.length > 0) {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        list.map(async (s) => {
+          const { count } = await supabase
+            .from("cars")
+            .select("*", { count: "exact", head: true })
+            .eq("source_id", s.id);
+          counts[s.id] = count || 0;
+        })
+      );
+      setSourceCounts(counts);
+    }
+  }
+
   async function handleTabChange(t: Tab) {
     setTab(t);
     if (t === "users" && users.length === 0) await loadUsers();
     if (t === "cars" && cars.length === 0) await loadCars();
+    if (t === "sources" && !sourcesLoaded) await loadSources();
   }
 
   // === Admin Actions ===
@@ -294,8 +347,29 @@ export default function AdminPage() {
 
   async function restoreCar(carId: string) {
     setActionLoading(carId);
-    await supabase.from("cars").update({ status: "active" }).eq("id", carId);
-    setCars((prev) => prev.map((c) => c.id === carId ? { ...c, status: "active" as const } : c));
+    // 重新上架同时续期 30 天
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    await supabase.from("cars").update({ status: "active", expires_at: expiresAt }).eq("id", carId);
+    setCars((prev) => prev.map((c) => c.id === carId ? { ...c, status: "active" as const, expires_at: expiresAt } : c));
+    setActionLoading(null);
+  }
+
+  async function deleteCarPermanent(carId: string) {
+    if (!confirm("永久删除这辆车？此操作不可恢复。")) return;
+    setActionLoading(carId);
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("cars").delete().eq("id", carId);
+    if (error) { alert(`删除失败: ${error.message}`); setActionLoading(null); return; }
+    if (user) {
+      await supabase.from("admin_actions").insert({
+        admin_id: user.id,
+        action: "delete_car",
+        target_type: "car",
+        target_id: carId,
+        detail: null,
+      });
+    }
+    setCars((prev) => prev.filter((c) => c.id !== carId));
     setActionLoading(null);
   }
 
@@ -364,6 +438,69 @@ export default function AdminPage() {
     setActionLoading(null);
   }
 
+  async function toggleSource(sourceId: string, enabled: boolean) {
+    setActionLoading(sourceId);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase.from("listing_sources").update({ enabled }).eq("id", sourceId);
+    if (user) {
+      await supabase.from("admin_actions").insert({
+        admin_id: user.id,
+        action: "toggle_source",
+        target_type: "source",
+        target_id: sourceId,
+        detail: enabled ? "enabled" : "disabled",
+      });
+    }
+    setSources((prev) => prev.map((s) => s.id === sourceId ? { ...s, enabled } : s));
+    setActionLoading(null);
+  }
+
+  async function syncSource(source: DbListingSource) {
+    setSyncingKey(source.key);
+    setSyncResults((prev) => {
+      const next = { ...prev };
+      delete next[source.id];
+      return next;
+    });
+    try {
+      const token = (await supabase.auth.getSession()).data.session?.access_token;
+      if (!token) throw new Error("未登录或会话已过期");
+      // 同步约 65 辆车需 1-2 分钟，fetch 会长时间挂起
+      const res = await fetch("/api/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ key: source.key, force: true }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || `同步失败 (HTTP ${res.status})`);
+      const results = (json.results || []) as SyncResult[];
+      const r = results.find((x) => x.key === source.key) || results[0];
+      if (!r) throw new Error("同步未返回结果");
+      const text = r.status === "skipped"
+        ? "已跳过（数据源未启用或正在同步）"
+        : `新增 ${r.inserted ?? 0} · 更新 ${r.updated ?? 0} · 下架 ${r.delisted ?? 0}${r.errors?.length ? ` · 错误 ${r.errors.length}` : ""}`;
+      setSyncResults((prev) => ({ ...prev, [source.id]: { ok: r.status !== "error", text } }));
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from("admin_actions").insert({
+          admin_id: user.id,
+          action: "sync_source",
+          target_type: "source",
+          target_id: source.id,
+          detail: `${r.status}: ${text}`,
+        });
+      }
+    } catch (e) {
+      setSyncResults((prev) => ({
+        ...prev,
+        [source.id]: { ok: false, text: e instanceof Error ? e.message : "同步失败" },
+      }));
+    } finally {
+      setSyncingKey(null);
+      await loadSources();
+    }
+  }
+
   // === Filtered lists ===
 
   const filteredUsers = userSearch
@@ -372,6 +509,9 @@ export default function AdminPage() {
         u.id.includes(userSearch)
       )
     : users;
+
+  const carExpired = (car: DbCar) =>
+    car.status === "removed" && !!car.expires_at && new Date(car.expires_at).getTime() < Date.now();
 
   const filteredCars = carSearch
     ? cars.filter((c) =>
@@ -403,6 +543,7 @@ export default function AdminPage() {
     { key: "cars", label: "车辆", icon: <Car className="h-3.5 w-3.5" strokeWidth={1.5} /> },
     { key: "reports", label: "举报", icon: <Flag className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.reports },
     { key: "tickets", label: "工单", icon: <Headset className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.tickets },
+    { key: "sources", label: "数据源", icon: <DatabaseZap className="h-3.5 w-3.5" strokeWidth={1.5} /> },
   ];
 
   return (
@@ -528,11 +669,11 @@ export default function AdminPage() {
                 filteredUsers.map((u) => (
                   <div key={u.id} className={`flex items-center justify-between border p-3 ${u.banned ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-border"}`}>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <Link href={adminUserLink(u.id)} className="flex items-center gap-2 hover:opacity-80">
                         <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <p className="truncate text-xs font-medium">{u.username || "未设置"}</p>
+                            <p className="truncate text-xs font-medium hover:underline">{u.username || "未设置"}</p>
                             {u.account_type === "dealer" && (
                               <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px]">车行</span>
                             )}
@@ -547,12 +688,22 @@ export default function AdminPage() {
                             {u.id.slice(0, 8)}... · {u.location || "未知地区"} · {new Date(u.created_at).toLocaleDateString("zh-CN")}
                           </p>
                         </div>
-                      </div>
+                      </Link>
                       {u.banned && u.banned_reason && (
                         <p className="mt-1 text-[10px] text-red-600">封禁原因: {u.banned_reason}</p>
                       )}
                     </div>
                     <div className="ml-2 flex shrink-0 gap-1">
+                      <Link href={adminUserLink(u.id)}>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                        >
+                          <Settings2 className="h-3 w-3" strokeWidth={1.5} />
+                          管理
+                        </Button>
+                      </Link>
                       {u.role === "admin" ? (
                         <Button
                           size="sm"
@@ -640,10 +791,11 @@ export default function AdminPage() {
                         <span className={`shrink-0 px-1 py-0.5 text-[10px] ${
                           car.status === "active" ? "bg-emerald-500/10 text-emerald-600"
                             : car.status === "sold" ? "bg-blue-500/10 text-blue-600"
+                            : carExpired(car) ? "bg-orange-500/10 text-orange-600"
                             : car.status === "removed" ? "bg-red-500/10 text-red-600"
                             : "bg-amber-500/10 text-amber-600"
                         }`}>
-                          {car.status === "active" ? "在售" : car.status === "sold" ? "已售" : car.status === "removed" ? "已下架" : "待审"}
+                          {car.status === "active" ? "在售" : car.status === "sold" ? "已售" : carExpired(car) ? "已过期" : car.status === "removed" ? "已下架" : "待审"}
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
@@ -656,18 +808,29 @@ export default function AdminPage() {
                         variant="ghost"
                         className="h-7 w-7 p-0"
                         onClick={() => window.open(`/car/${car.id}`, "_blank")}
+                        title="查看"
                       >
                         <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0"
+                        onClick={() => window.open(carEditLink(car.id), "_blank")}
+                        title="编辑"
+                      >
+                        <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
                       </Button>
                       {car.status === "active" ? (
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                          className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700"
                           onClick={() => removeCar(car.id)}
                           disabled={actionLoading === car.id}
+                          title="下架"
                         >
-                          {actionLoading === car.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                          {actionLoading === car.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3.5 w-3.5" strokeWidth={1.5} />}
                         </Button>
                       ) : car.status === "removed" ? (
                         <Button
@@ -676,10 +839,21 @@ export default function AdminPage() {
                           className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
                           onClick={() => restoreCar(car.id)}
                           disabled={actionLoading === car.id}
+                          title="重新上架"
                         >
                           {actionLoading === car.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3.5 w-3.5" strokeWidth={2} />}
                         </Button>
                       ) : null}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                        onClick={() => deleteCarPermanent(car.id)}
+                        disabled={actionLoading === car.id}
+                        title="永久删除"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      </Button>
                     </div>
                   </div>
                 ))
@@ -827,6 +1001,145 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* === Sources Tab === */}
+        {tab === "sources" && (
+          <div className="mt-4 space-y-3">
+            {!sourcesLoaded ? (
+              <div className="flex justify-center py-12">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              </div>
+            ) : sources.length === 0 ? (
+              <p className="py-12 text-center text-xs text-muted-foreground">暂无数据源</p>
+            ) : (
+              sources.map((s) => {
+                const d = s.last_sync_detail;
+                const syncing = syncingKey === s.key;
+                const result = syncResults[s.id];
+                return (
+                  <div key={s.id} className={`border border-border p-3 ${s.enabled ? "" : "opacity-60"}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-xs font-medium">{s.name}</p>
+                          <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{s.key}</span>
+                          {!s.enabled && (
+                            <span className="shrink-0 bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已停用</span>
+                          )}
+                        </div>
+                        <a
+                          href={s.base_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:underline"
+                        >
+                          {s.base_url}
+                          <ExternalLink className="h-2.5 w-2.5" strokeWidth={1.5} />
+                        </a>
+                        <p className="text-[10px] text-muted-foreground">
+                          系统账号:{" "}
+                          <Link href={adminUserLink(s.system_account_id)} className="hover:underline">
+                            {s.system_account_id.slice(0, 8)}...
+                            <ChevronRight className="inline h-2.5 w-2.5" strokeWidth={1.5} />
+                          </Link>
+                          {" "}· 在库 {sourceCounts[s.id] ?? 0} 辆
+                        </p>
+                      </div>
+                      {syncing || s.last_sync_status === "running" ? (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                          <Loader2 className="h-2.5 w-2.5 animate-spin" />同步中
+                        </span>
+                      ) : s.last_sync_status === "success" ? (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600">
+                          <Check className="h-2.5 w-2.5" strokeWidth={2} />成功
+                        </span>
+                      ) : s.last_sync_status === "partial" ? (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">
+                          <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />部分成功
+                        </span>
+                      ) : s.last_sync_status === "error" ? (
+                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
+                          <XCircle className="h-2.5 w-2.5" strokeWidth={2} />失败
+                        </span>
+                      ) : (
+                        <span className="shrink-0 text-[10px] text-muted-foreground">—</span>
+                      )}
+                    </div>
+
+                    {/* Last sync */}
+                    <div className="mt-2 border-t border-border pt-2">
+                      <p className="text-[10px] text-muted-foreground">
+                        上次同步:{" "}
+                        {s.last_sync_at ? (
+                          <span title={new Date(s.last_sync_at).toLocaleString("zh-CN")}>
+                            {relativeTime(s.last_sync_at)}
+                          </span>
+                        ) : "从未同步"}
+                      </p>
+                      {d && (
+                        <p className="mt-0.5 text-[10px] text-muted-foreground">
+                          发现 {d.found ?? 0} · 新增 {d.inserted ?? 0} · 更新 {d.updated ?? 0} · 下架 {d.delisted ?? 0} · 耗时 {((d.duration_ms ?? 0) / 1000).toFixed(1)}s
+                        </p>
+                      )}
+                      {d?.errors && d.errors.length > 0 && (
+                        <>
+                          <button
+                            className="mt-0.5 text-left text-[10px] text-red-600 hover:underline"
+                            title={d.errors.slice(0, 3).join("\n")}
+                            onClick={() => setExpandedErrors((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
+                          >
+                            错误 {d.errors.length} 条 {expandedErrors[s.id] ? "收起" : "展开"}
+                          </button>
+                          {expandedErrors[s.id] && (
+                            <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto border border-red-300 bg-red-50 p-2 dark:bg-red-950/20">
+                              {d.errors.map((err, i) => (
+                                <p key={i} className="break-all text-[10px] text-red-600">{err}</p>
+                              ))}
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => syncSource(s)}
+                        disabled={syncingKey !== null || !s.enabled}
+                      >
+                        {syncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" strokeWidth={1.5} />}
+                        {syncing ? "同步中..." : "立即同步"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className={`h-7 gap-1 px-2 text-[11px] ${s.enabled ? "text-red-600 hover:text-red-700" : "text-emerald-600 hover:text-emerald-700"}`}
+                        onClick={() => toggleSource(s.id, !s.enabled)}
+                        disabled={actionLoading === s.id || syncing}
+                      >
+                        {actionLoading === s.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : s.enabled ? (
+                          <XCircle className="h-3 w-3" strokeWidth={1.5} />
+                        ) : (
+                          <Check className="h-3 w-3" strokeWidth={2} />
+                        )}
+                        {s.enabled ? "停用" : "启用"}
+                      </Button>
+                    </div>
+                    {result && (
+                      <p className={`mt-1.5 text-[10px] ${result.ok ? "text-emerald-600" : "text-red-600"}`}>
+                        {result.text}
+                      </p>
+                    )}
+                  </div>
+                );
+              })
             )}
           </div>
         )}
