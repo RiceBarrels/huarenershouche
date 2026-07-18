@@ -41,3 +41,7 @@ export function communityPostLink(id: string): string {
 export function qaQuestionLink(id: string): string {
   return staticLink(`/qa/${id}`, { id });
 }
+
+export function adminUserLink(id: string): string {
+  return staticLink(`/admin/user/${id}`, { id });
+}

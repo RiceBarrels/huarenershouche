@@ -33,6 +33,16 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+function isExpired(car: DbCar): boolean {
+  return car.status === "removed" && !!car.expires_at && new Date(car.expires_at).getTime() < Date.now();
+}
+
+function daysLeft(car: DbCar): number | null {
+  if (!car.expires_at) return null;
+  const ms = new Date(car.expires_at).getTime() - Date.now();
+  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+}
+
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   active: { label: "在售", variant: "default" },
   sold: { label: "已售", variant: "secondary" },
@@ -65,8 +75,13 @@ export default function ListingsPage() {
 
   async function toggleStatus(carId: string, currentStatus: string) {
     const newStatus = currentStatus === "active" ? "removed" : "active";
-    await supabase.from("cars").update({ status: newStatus }).eq("id", carId);
-    mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, status: newStatus as DbCar["status"] } : c)));
+    // 重新上架时续期 30 天
+    const patch: Partial<DbCar> = { status: newStatus as DbCar["status"] };
+    if (newStatus === "active") {
+      patch.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    }
+    await supabase.from("cars").update(patch).eq("id", carId);
+    mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, ...patch } : c)));
   }
 
   async function markSold(carId: string) {
@@ -159,12 +174,15 @@ export default function ListingsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Link href={carLink(car.id)}><h3 className="font-mono text-sm font-semibold hover:underline">{car.title_zh}</h3></Link>
-                      <Badge variant={STATUS_MAP[car.status]?.variant || "outline"} className="font-mono text-[10px]">
-                        {STATUS_MAP[car.status]?.label || car.status}
+                      <Badge variant={isExpired(car) ? "destructive" : (STATUS_MAP[car.status]?.variant || "outline")} className="font-mono text-[10px]">
+                        {isExpired(car) ? "已过期" : (STATUS_MAP[car.status]?.label || car.status)}
                       </Badge>
                     </div>
                     <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                       {formatPrice(car.price)} · {car.location_zh} · {car.views_count || 0} 次浏览
+                      {car.status === "active" && daysLeft(car) !== null && (
+                        <span className={daysLeft(car)! <= 7 ? "text-amber-600" : ""}> · {daysLeft(car)! <= 0 ? "即将过期" : `${daysLeft(car)} 天后过期`}</span>
+                      )}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -179,7 +197,7 @@ export default function ListingsPage() {
                       </Button>
                     )}
                     <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
-                      {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />下架</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />上架</> : null}
+                      {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />下架</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{isExpired(car) ? "续期上架" : "上架"}</> : null}
                     </Button>
                     <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
                       <Trash2 className="h-3 w-3" strokeWidth={1.5} />删除
