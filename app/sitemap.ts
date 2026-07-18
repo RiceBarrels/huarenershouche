@@ -1,10 +1,12 @@
 import type { MetadataRoute } from "next";
 import { SEO_PAGES, SITE_URL } from "@/lib/seo-pages";
+import { supabase } from "@/lib/supabase";
 
 // 静态导出（Capacitor / output: "export"）下必须是纯静态 sitemap
+// （社区帖子在 build 时从 Supabase 拉取,随每次部署刷新）
 export const dynamic = "force-static";
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -35,5 +37,24 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: p.slug.includes("/") ? 0.6 : 0.8,
   }));
 
-  return [...staticRoutes, ...seoRoutes];
+  // 社区帖子详情页(内容页,SEO 长尾)
+  let postRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const { data } = await supabase
+      .from("community_posts")
+      .select("id, updated_at")
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(5000);
+    postRoutes = (data ?? []).map((p) => ({
+      url: `${SITE_URL}/community/${p.id}`,
+      lastModified: p.updated_at ? new Date(p.updated_at) : now,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
+    }));
+  } catch {
+    // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
+  }
+
+  return [...staticRoutes, ...seoRoutes, ...postRoutes];
 }

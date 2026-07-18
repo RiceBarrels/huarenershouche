@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
         "/register",
         "/verify-email",
         "/post",
+        "/community/new",
       ],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
