@@ -67,6 +67,7 @@ const CITY_ZH: Record<string, string> = {
   Manhattan: "曼哈顿",
   Queens: "皇后区",
   Bayside: "贝赛",
+  Douglaston: "道格拉斯顿",
   "Staten Island": "史泰登岛",
   "Long Island City": "长岛市",
   Edison: "爱迪生",

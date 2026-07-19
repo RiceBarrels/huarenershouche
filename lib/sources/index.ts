@@ -2,6 +2,7 @@
 
 import type { SourceAdapter } from "./types";
 import { createDealerCenterAdapter } from "./dealercenter-wp";
+import { createOneNeAutoAdapter } from "./onenauto";
 
 // 同一套 DealerCenter WordPress 模板的站点：加一家 = 加一份配置。
 // location/联系字段是兜底值 —— 系统账号有门店记录时同步引擎会以门店地址覆盖。
@@ -56,6 +57,8 @@ const SITES: SourceAdapter[] = [
     seller_name: "iDeal Auto Sales Rosemead",
     phone: "(626) 929-0008",
   }),
+  // 1neAuto —— JSON API,经 ScrapingAnt 绕过 Cloudflare(见 onenauto.ts)
+  createOneNeAutoAdapter(),
 ];
 
 export const adapters: Record<string, SourceAdapter> = Object.fromEntries(
