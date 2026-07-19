@@ -674,7 +674,9 @@ export default function AdminPage() {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="truncate text-xs font-medium hover:underline">{u.username || "未设置"}</p>
-                            {u.account_type === "dealer" && (
+                            {u.is_system ? (
+                              <span className="shrink-0 bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
+                            ) : u.account_type === "dealer" && (
                               <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px]">车行</span>
                             )}
                             {u.role === "admin" && (

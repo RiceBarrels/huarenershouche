@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { carLink, carEditLink } from "@/lib/static-link";
 import {
-  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2, Pencil,
+  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2, Pencil, Globe,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useIdentity } from "@/components/identity-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -52,24 +53,26 @@ const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondar
 
 export default function ListingsPage() {
   const router = useRouter();
-  const [user, setUser] = useState<string | null>(null);
+  const { actingId, authId, loading: identityLoading } = useIdentity();
+  // 以「正在操作的账号」为准(默认本人;切换到已认领的系统车行时为该车行账号)。
+  const acct = actingId;
   const [draft, setDraft] = useState<PostDraft | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { router.push("/login"); return; }
-      setUser(data.user.id);
-    });
+    if (!identityLoading && !authId) { router.push("/login"); return; }
+  }, [identityLoading, authId, router]);
+
+  useEffect(() => {
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
-  }, [router]);
+  }, []);
 
   const { data: myCarsData, loading, mutate } = useCachedData<DbCar[]>(
-    user ? `account_cars_${user}` : null,
+    acct ? `account_cars_${acct}` : null,
     async () => {
-      const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", user!).order("created_at", { ascending: false });
+      const { data: cars } = await supabase.from("cars").select("*").eq("seller_id", acct!).order("created_at", { ascending: false });
       return (cars as DbCar[]) || [];
     },
-    [user],
+    [acct],
   );
   const myCars = myCarsData || [];
 
@@ -93,6 +96,13 @@ export default function ListingsPage() {
     if (!confirm("确定要删除这辆车吗？此操作不可恢复。")) return;
     await supabase.from("cars").delete().eq("id", carId);
     mutate((prev) => (prev || []).filter((c) => c.id !== carId));
+  }
+
+  // 自动检索(转载)车辆:只允许停用/启用,翻转 owner_hidden。
+  async function toggleDisabled(car: DbCar) {
+    const next = !car.owner_hidden;
+    await supabase.from("cars").update({ owner_hidden: next }).eq("id", car.id);
+    mutate((prev) => (prev || []).map((c) => (c.id === car.id ? { ...c, owner_hidden: next } : c)));
   }
 
   return (
@@ -177,6 +187,14 @@ export default function ListingsPage() {
                       <Badge variant={isExpired(car) ? "destructive" : (STATUS_MAP[car.status]?.variant || "outline")} className="font-mono text-[10px]">
                         {isExpired(car) ? "已过期" : (STATUS_MAP[car.status]?.label || car.status)}
                       </Badge>
+                      {car.source_id && (
+                        <Badge variant="outline" className="gap-1 font-mono text-[10px]">
+                          <Globe className="h-3 w-3" strokeWidth={1.5} />自动检索
+                        </Badge>
+                      )}
+                      {car.source_id && car.owner_hidden && (
+                        <Badge variant="secondary" className="font-mono text-[10px]">已停用</Badge>
+                      )}
                     </div>
                     <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                       {formatPrice(car.price)} · {car.location_zh} · {car.views_count || 0} 次浏览
@@ -186,22 +204,33 @@ export default function ListingsPage() {
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Link href={carEditLink(car.id)}>
-                      <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]">
-                        <Pencil className="h-3 w-3" strokeWidth={1.5} />编辑
+                    {car.source_id ? (
+                      // 自动检索(转载)车辆:不可编辑/删除/标记已售,仅可停用/启用。
+                      <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleDisabled(car)}>
+                        {car.owner_hidden
+                          ? <><Eye className="h-3 w-3" strokeWidth={1.5} />启用</>
+                          : <><XCircle className="h-3 w-3" strokeWidth={1.5} />停用</>}
                       </Button>
-                    </Link>
-                    {car.status === "active" && (
-                      <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => markSold(car.id)}>
-                        <CheckCircle className="h-3 w-3" strokeWidth={1.5} />已售
-                      </Button>
+                    ) : (
+                      <>
+                        <Link href={carEditLink(car.id)}>
+                          <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]">
+                            <Pencil className="h-3 w-3" strokeWidth={1.5} />编辑
+                          </Button>
+                        </Link>
+                        {car.status === "active" && (
+                          <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => markSold(car.id)}>
+                            <CheckCircle className="h-3 w-3" strokeWidth={1.5} />已售
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
+                          {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />下架</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{isExpired(car) ? "续期上架" : "上架"}</> : null}
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
+                          <Trash2 className="h-3 w-3" strokeWidth={1.5} />删除
+                        </Button>
+                      </>
                     )}
-                    <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
-                      {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />下架</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{isExpired(car) ? "续期上架" : "上架"}</> : null}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
-                      <Trash2 className="h-3 w-3" strokeWidth={1.5} />删除
-                    </Button>
                   </div>
                 </div>
               </div>

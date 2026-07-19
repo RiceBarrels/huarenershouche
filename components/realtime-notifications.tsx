@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRealtimeNotifications } from "@/lib/use-realtime-notifications";
+import { useIdentity } from "@/components/identity-provider";
 import { getWatchList, updateWatchedPrice } from "@/lib/price-watch";
 import {
   notifyPriceDrop,
@@ -76,15 +77,10 @@ async function checkSavedSearches() {
 }
 
 export function RealtimeNotifications() {
-  const [userId, setUserId] = useState<string | null>(null);
+  // 新私信提醒按当前操作身份(切换成车行时收车行的提醒)
+  const { actingId } = useIdentity();
 
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUserId(data.user?.id ?? null);
-    });
-  }, []);
-
-  useRealtimeNotifications(userId);
+  useRealtimeNotifications(actingId);
 
   useEffect(() => {
     // 通知未开启/未授权时不做任何检查，避免静默消耗价格快照和

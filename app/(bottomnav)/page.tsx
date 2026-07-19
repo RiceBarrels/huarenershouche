@@ -304,6 +304,7 @@ export default function Home() {
       .from("cars")
       .select("*, profiles!seller_id(account_type, avatar_url)")
       .eq("status", "active")
+      .eq("owner_hidden", false)
       .order("created_at", { ascending: false })
       // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
       .limit(hasHistory ? 200 : 60)
@@ -342,6 +343,7 @@ export default function Home() {
       .from("cars")
       .select("id", { count: "exact", head: true })
       .eq("status", "active")
+      .eq("owner_hidden", false)
       .then(({ count }) => setCarCount(count ?? 0));
 
     // 社区热帖入口:优先带图的最新帖

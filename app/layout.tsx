@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
+import { IdentityProvider } from "@/components/identity-provider";
 import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
@@ -132,18 +133,20 @@ export default function RootLayout({
             }}
           >
             <CapacitorProvider>
-              <div
-                className="pointer-events-none z-50 fixed top-0 left-0 right-0 bg-linear-to-b from-background from-20% to-transparent flex justify-center items-center safe-area-pill-container"
-                style={{
-                  height: "env(safe-area-inset-top, 0px)",
-                }}
-              >
-                <NotchUI />
-              </div>
-              {children}
-              <InitHaptic/>
-              <RealtimeNotifications />
-              <Analytics />
+              <IdentityProvider>
+                <div
+                  className="pointer-events-none z-50 fixed top-0 left-0 right-0 bg-linear-to-b from-background from-20% to-transparent flex justify-center items-center safe-area-pill-container"
+                  style={{
+                    height: "env(safe-area-inset-top, 0px)",
+                  }}
+                >
+                  <NotchUI />
+                </div>
+                {children}
+                <InitHaptic/>
+                <RealtimeNotifications />
+                <Analytics />
+              </IdentityProvider>
             </CapacitorProvider>
           </div>
           </MotionProvider>
