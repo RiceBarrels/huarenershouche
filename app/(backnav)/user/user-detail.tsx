@@ -124,7 +124,7 @@ export default function UserProfilePage() {
             </div>
             <div className="mt-6 space-y-2">
               <Skeleton className="h-4 w-24" />
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="border border-border">
                     <Skeleton className="aspect-[16/10] w-full" />
@@ -235,7 +235,7 @@ export default function UserProfilePage() {
                 在售车辆 ({cars.length})
               </h2>
               {cars.length > 0 ? (
-                <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   {cars.map((car) => (
                     <CarCard key={car.id} car={car} />
                   ))}

@@ -1115,7 +1115,7 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
             <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               相似车辆推荐
             </h2>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {similarCars.map((c) => (
                 <Reveal key={c.id}>
                   <CarCard

@@ -1012,7 +1012,7 @@ function BrowseContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="border border-border">
                   <Skeleton className="aspect-[16/10] w-full" />
@@ -1104,7 +1104,7 @@ function BrowseContent() {
               className="mt-10 border-t border-border pt-6"
             >
               <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+              <div className="mt-3 grid grid-cols-2 gap-2.5 sm:gap-4 sm:grid-cols-3 xl:grid-cols-5">
                 {recentCars.map((car) => (
                   <CarCard
                     key={"recent-" + car.id}

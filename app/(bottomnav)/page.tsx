@@ -622,7 +622,7 @@ export default function Home() {
                 className="mb-6"
               />
             </Reveal>
-            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <RevealGroup className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3">
               {recommended.map((car) => (
                 <RevealItem key={car.id}>
                   <CarCard car={car} />
@@ -646,7 +646,7 @@ export default function Home() {
                 className="mb-6"
               />
             </Reveal>
-            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <RevealGroup className="grid grid-cols-2 gap-2.5 sm:gap-3 md:grid-cols-3">
               {featured.map((car) => (
                 <RevealItem key={car.id}>
                   <CarCard car={car} />
