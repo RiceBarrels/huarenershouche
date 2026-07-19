@@ -19,6 +19,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountUp } from "@/components/count-up";
 import { useCachedData } from "@/lib/use-cached-data";
+import { useIdentity } from "@/components/identity-provider";
 import type { DbCar, DbProfile } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -98,6 +99,10 @@ function AccountContent() {
   const [avatarUploading, setAvatarUploading] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
+  // 身份切换:切换成车行时,资料/车源/收藏都按 acct(操作身份)展示
+  const { actingId, isActingAsClaimed, claimedAccounts, switchTo, switchToSelf } = useIdentity();
+  const acct = actingId ?? (user || null);
+
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
@@ -108,30 +113,30 @@ function AccountContent() {
   }, []);
 
   const { data: profile, loading: profileLoading, mutate: mutateProfile } = useCachedData<DbProfile | null>(
-    user ? `account_profile_${user}` : null,
+    acct ? `account_profile_${acct}` : null,
     async () => {
-      const { data } = await supabase.from("profiles").select("*").eq("id", user!).maybeSingle();
+      const { data } = await supabase.from("profiles").select("*").eq("id", acct!).maybeSingle();
       return (data as DbProfile) || null;
     },
-    [user],
+    [acct],
   );
 
   const { data: myCars, loading: carsLoading, mutate: mutateCars } = useCachedData<DbCar[]>(
-    user ? `account_cars_${user}` : null,
+    acct ? `account_cars_${acct}` : null,
     async () => {
-      const { data } = await supabase.from("cars").select("*").eq("seller_id", user!).order("created_at", { ascending: false });
+      const { data } = await supabase.from("cars").select("*").eq("seller_id", acct!).order("created_at", { ascending: false });
       return (data as DbCar[]) || [];
     },
-    [user],
+    [acct],
   );
 
   const { data: favCount, loading: favLoading, mutate: mutateFavCount } = useCachedData<number>(
-    user ? `account_favcount_${user}` : null,
+    acct ? `account_favcount_${acct}` : null,
     async () => {
-      const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", user!);
+      const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", acct!);
       return count || 0;
     },
-    [user],
+    [acct],
   );
 
   const loading =
@@ -139,20 +144,21 @@ function AccountContent() {
 
   // 下拉刷新：真正重新拉取，而不是原样回写缓存
   const loadAccount = useCallback(async () => {
-    if (!user) return;
+    if (!acct) return;
     const [profileRes, carsRes, favRes] = await Promise.all([
-      supabase.from("profiles").select("*").eq("id", user).maybeSingle(),
-      supabase.from("cars").select("*").eq("seller_id", user).order("created_at", { ascending: false }),
-      supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", user),
+      supabase.from("profiles").select("*").eq("id", acct).maybeSingle(),
+      supabase.from("cars").select("*").eq("seller_id", acct).order("created_at", { ascending: false }),
+      supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", acct),
     ]);
     if (profileRes.data !== undefined) mutateProfile((profileRes.data as DbProfile) || null);
     if (carsRes.data) mutateCars(carsRes.data as DbCar[]);
     if (favRes.count !== null) mutateFavCount(favRes.count || 0);
-  }, [user, mutateProfile, mutateCars, mutateFavCount]);
+  }, [acct, mutateProfile, mutateCars, mutateFavCount]);
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    if (!file || !user) return;
+    // 车行身份下头像由存储桶 RLS(按 auth.uid() 文件夹)限制,此处仅本人可换
+    if (!file || !user || isActingAsClaimed) return;
     setAvatarUploading(true);
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user}/avatar-${Date.now()}.${ext}`;
@@ -229,19 +235,20 @@ function AccountContent() {
               <button
                 type="button"
                 className="group relative h-16 w-16 shrink-0 overflow-hidden border border-border bg-muted"
-                onClick={() => avatarInputRef.current?.click()}
+                onClick={() => { if (!isActingAsClaimed) avatarInputRef.current?.click(); }}
                 aria-label="更换头像"
+                disabled={isActingAsClaimed}
               >
-                <img src={avatarUrl(profile?.avatar_url, user)} alt="" className="h-full w-full object-cover" />
+                <img src={avatarUrl(profile?.avatar_url, acct || undefined)} alt="" className="h-full w-full object-cover" />
                 {avatarUploading ? (
                   <span className="absolute inset-0 flex items-center justify-center bg-background/70">
                     <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
                   </span>
-                ) : (
+                ) : !isActingAsClaimed ? (
                   <span className="absolute inset-0 hidden items-center justify-center bg-background/70 group-hover:flex">
                     <Camera className="h-4 w-4" strokeWidth={1.5} />
                   </span>
-                )}
+                ) : null}
               </button>
               <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
               <div className="min-w-0 flex-1">
@@ -276,6 +283,46 @@ function AccountContent() {
             <StatCell href={user ? "/account/favorites" : "/login"} value={favCount || 0} label="收藏" animate={!!user} />
           </div>
         </div>
+        )}
+
+        {/* 身份切换：认领过系统车行账号时可切换操作身份 */}
+        {user && claimedAccounts.length > 0 && (
+          <div className="mt-4 border border-border">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+              <Store className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+              <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                切换身份
+              </p>
+              {isActingAsClaimed && (
+                <Badge variant="secondary" className="ml-auto font-mono text-[10px]">车行模式</Badge>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={switchToSelf}
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${!isActingAsClaimed ? "bg-muted/40" : ""}`}
+            >
+              <UserCircle className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+              <span className="flex-1 font-mono text-sm">本人账号</span>
+              {!isActingAsClaimed && <span className="font-mono text-[10px] text-brand">当前</span>}
+            </button>
+            {claimedAccounts.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                onClick={() => switchTo(a.id)}
+                className={`flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-muted/50 ${actingId === a.id ? "bg-muted/40" : ""}`}
+              >
+                <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 border border-border object-cover" />
+                <span className="flex-1 truncate font-mono text-sm">{a.username}</span>
+                {actingId === a.id ? (
+                  <span className="font-mono text-[10px] text-brand">当前</span>
+                ) : (
+                  <span className="font-mono text-[10px] text-muted-foreground">车行</span>
+                )}
+              </button>
+            ))}
+          </div>
         )}
 
         {/* Menu sections */}

@@ -41,8 +41,10 @@ export interface DbCar {
   source_listing_id: string | null;
   source_url: string | null;
   last_seen_at: string | null;
+  // Owner-disabled syndicated listing (excluded from public queries; untouched by the sync engine)
+  owner_hidden: boolean;
   // Joined from profiles
-  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null; is_system?: boolean };
+  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null; is_system?: boolean; claimed_by?: string | null };
 }
 
 export interface DbProfile {
@@ -58,6 +60,8 @@ export interface DbProfile {
   banned_at: string | null;
   banned_reason: string | null;
   is_system: boolean;
+  // Set (to a real user's profile id) when an admin links this system account to an owner.
+  claimed_by: string | null;
   created_at: string;
   updated_at: string;
 }

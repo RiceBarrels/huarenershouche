@@ -24,6 +24,7 @@ import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
+import { useIdentity } from "@/components/identity-provider";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -197,6 +198,7 @@ function clearDraft() {
 
 export default function PostCarPage() {
   const router = useRouter();
+  const { actingId, authId, isActingAsClaimed } = useIdentity();
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -306,51 +308,53 @@ export default function PostCarPage() {
     };
   }, []);
 
+  // 发布归属「当前操作身份」(actingId):切换成车行时,新车挂到车行名下。
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
-      if (data.user) {
-        setUser(data.user.id);
-        // Ensure profile exists
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("username, phone, account_type, role")
-          .eq("id", data.user.id)
-          .maybeSingle();
-        if (!profile) {
-          // Auto-create profile if trigger didn't fire
-          await supabase.from("profiles").insert({
-            id: data.user.id,
-            username:
-              data.user.user_metadata?.username || data.user.email || "",
-          });
-          setForm((f) => ({
-            ...f,
-            seller_name:
-              data.user!.user_metadata?.username || data.user!.email || "",
-          }));
-        } else {
-          const dealer = profile.account_type === "dealer";
-          setIsDealer(dealer);
-          if (profile.role === "admin") setIsAdmin(true);
-          setForm((f) => ({
-            ...f,
-            seller_name: profile.username || "",
-            phone: profile.phone || "",
-          }));
+    if (!actingId) return;
+    setUser(actingId);
+    (async () => {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, phone, account_type, role")
+        .eq("id", actingId)
+        .maybeSingle();
+      if (!profile) {
+        // 车行账号必然已存在;仅本人新账号需兜底创建
+        if (isActingAsClaimed) return;
+        const { data: authData } = await supabase.auth.getUser();
+        const u = authData.user;
+        await supabase.from("profiles").insert({
+          id: actingId,
+          username: u?.user_metadata?.username || u?.email || "",
+        });
+        setForm((f) => ({
+          ...f,
+          seller_name: u?.user_metadata?.username || u?.email || "",
+        }));
+      } else {
+        const dealer = profile.account_type === "dealer";
+        setIsDealer(dealer);
+        setIsAdmin(profile.role === "admin");
+        setForm((f) => ({
+          ...f,
+          seller_name: profile.username || "",
+          phone: profile.phone || "",
+        }));
 
-          // Fetch dealer stores if dealer
-          if (dealer) {
-            const { data: stores } = await supabase
-              .from("dealer_stores")
-              .select("*")
-              .eq("owner_id", data.user!.id)
-              .order("created_at", { ascending: false });
-            setDealerStores((stores as DbDealerStore[]) || []);
-          }
+        // Fetch dealer stores if dealer
+        if (dealer) {
+          const { data: stores } = await supabase
+            .from("dealer_stores")
+            .select("*")
+            .eq("owner_id", actingId)
+            .order("created_at", { ascending: false });
+          setDealerStores((stores as DbDealerStore[]) || []);
+        } else {
+          setDealerStores([]);
         }
       }
-    });
-  }, []);
+    })();
+  }, [actingId, isActingAsClaimed]);
 
   // Auto-resolve zipcode to city name (English + Chinese)
   const [zipCity, setZipCity] = useState("");
@@ -399,7 +403,8 @@ export default function PostCarPage() {
       for (const file of images) {
         const compressed = await compressImage(file);
         const ext = compressed.name.split(".").pop() || "webp";
-        const path = `${user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+        // 存储桶 RLS 按 auth.uid() 文件夹校验,故媒体一律传到本人文件夹(车归属仍是 actingId)
+        const path = `${authId || user}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
         const { error } = await supabase.storage
           .from("car-images")
           .upload(path, compressed);
@@ -420,7 +425,7 @@ export default function PostCarPage() {
       }
       setVideoUploading(true);
       const ext = video.name.split(".").pop() || "mp4";
-      const path = `${user}/${Date.now()}-video.${ext}`;
+      const path = `${authId || user}/${Date.now()}-video.${ext}`;
       const { error } = await supabase.storage
         .from("car-images")
         .upload(path, video);
@@ -723,12 +728,16 @@ export default function PostCarPage() {
     // Geocode zipcode to get lat/lng
     const coords = form.zipcode ? await geocodeZipToCoords(form.zipcode) : null;
 
-    // Also save phone to profile
+    // Also save phone to profile（车行身份下经 RPC 更新,普通身份直接更新）
     if (form.phone) {
-      await supabase
-        .from("profiles")
-        .update({ phone: form.phone })
-        .eq("id", user);
+      if (isActingAsClaimed) {
+        await supabase.rpc("update_claimed_profile", { target: user, new_phone: form.phone });
+      } else {
+        await supabase
+          .from("profiles")
+          .update({ phone: form.phone })
+          .eq("id", user);
+      }
     }
 
     // AI 双语翻译:经服务端 /api/translate 补全中英 title / description,

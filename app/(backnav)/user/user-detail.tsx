@@ -26,6 +26,7 @@ interface SellerProfile {
   location: string | null;
   account_type: "private" | "dealer";
   is_system: boolean;
+  claimed_by?: string | null;
   created_at: string;
 }
 
@@ -43,7 +44,7 @@ export default function UserProfilePage() {
       const [profileRes, carsRes, reviewsRes, postsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, username, avatar_url, location, account_type, is_system, created_at")
+          .select("id, username, avatar_url, location, account_type, is_system, claimed_by, created_at")
           .eq("id", userId)
           .maybeSingle(),
         supabase
@@ -51,6 +52,7 @@ export default function UserProfilePage() {
           .select("*")
           .eq("seller_id", userId)
           .eq("status", "active")
+          .eq("owner_hidden", false)
           .order("created_at", { ascending: false }),
         supabase
           .from("dealer_reviews")
@@ -79,9 +81,13 @@ export default function UserProfilePage() {
     fetchData();
   }, [userId]);
 
+  // 已被真实用户认领的系统账号 → 视为认证车行
+  const isClaimedSystem = !!profile?.is_system && !!profile?.claimed_by;
+  const isUnclaimedSystem = !!profile?.is_system && !profile?.claimed_by;
+
   // 系统检索账号:从其车源的 source_url 推导原始车行网站(listing_sources 表仅管理员可读)
   const sourceSite = (() => {
-    if (!profile?.is_system) return null;
+    if (!isUnclaimedSystem) return null;
     const u = cars.find((c) => c.source_url)?.source_url;
     if (!u) return null;
     try {
@@ -159,12 +165,12 @@ export default function UserProfilePage() {
                   <h1 className="font-mono text-lg font-semibold">
                     {profile.username}
                   </h1>
-                  {profile.is_system ? (
+                  {isUnclaimedSystem ? (
                     <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
                       <Globe className="h-3 w-3" strokeWidth={1.5} />
                       系统检索
                     </Badge>
-                  ) : profile.account_type === "dealer" ? (
+                  ) : isClaimedSystem || profile.account_type === "dealer" ? (
                     <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
                       <Store className="h-3 w-3" strokeWidth={1.5} />
                       认证车行
@@ -197,7 +203,7 @@ export default function UserProfilePage() {
                     </span>
                   )}
                 </div>
-                {profile.is_system && (
+                {isUnclaimedSystem && (
                   <div className="mt-2 space-y-1">
                     <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
                       本页车源由系统自动从该车行公开网站检索汇总，非车行本人发布，价格与状态以原站为准

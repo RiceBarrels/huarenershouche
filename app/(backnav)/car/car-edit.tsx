@@ -14,6 +14,7 @@ import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
+import { useIdentity } from "@/components/identity-provider";
 import type { DbCar } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -68,6 +69,7 @@ export default function EditCarPage() {
   const router = useRouter();
   const params = useRouteParams<{ id: string }>();
   const carId = params.id as string;
+  const { actingId, authId } = useIdentity();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -91,21 +93,30 @@ export default function EditCarPage() {
   const [features, setFeatures] = useState<string[]>([]);
 
   useEffect(() => {
+    if (!actingId) return;
     async function load() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { router.push("/login"); return; }
-      setUserId(user.id);
+      // 归属按当前操作身份(切换成车行时可编辑车行自发的车)
+      const acct = actingId || user.id;
+      setUserId(acct);
 
-      // Check admin
+      // Check admin（管理员判定用真实账号）
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-      if (profile?.role === "admin") setIsAdmin(true);
+      const admin = profile?.role === "admin";
+      if (admin) setIsAdmin(true);
 
       const { data: carData } = await supabase.from("cars").select("*").eq("id", carId).single();
       if (!carData) { router.push("/account/listings"); return; }
 
       const c = carData as DbCar;
-      // Only owner or admin can edit
-      if (c.seller_id !== user.id && profile?.role !== "admin") {
+      // 自动检索车源不可编辑(只能停用),非管理员一律拦截
+      if (c.source_id && !admin) {
+        router.push(`/car/${carId}`);
+        return;
+      }
+      // 仅归属者(本人或所操作车行)或管理员可编辑
+      if (c.seller_id !== acct && !admin) {
         router.push(`/car/${carId}`);
         return;
       }
@@ -139,7 +150,7 @@ export default function EditCarPage() {
       setLoading(false);
     }
     load();
-  }, [carId, router]);
+  }, [carId, router, actingId]);
 
   function update(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -151,7 +162,8 @@ export default function EditCarPage() {
     for (const file of files) {
       if (!file.type.startsWith("image/")) continue;
       const ext = file.name.split(".").pop();
-      const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      // 存储桶 RLS 按 auth.uid() 文件夹校验,故传到本人文件夹
+      const path = `${authId || userId}/${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error } = await supabase.storage.from("car-images").upload(path, file);
       if (!error) {
         const { data: urlData } = supabase.storage.from("car-images").getPublicUrl(path);

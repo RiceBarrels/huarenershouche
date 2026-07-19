@@ -9,6 +9,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { ConversationList } from "@/components/conversation-list";
 import { PullToRefresh } from "@/components/pull-to-refresh";
+import { useIdentity } from "@/components/identity-provider";
 
 export default function MessagesPage() {
   return (
@@ -29,6 +30,8 @@ export default function MessagesPage() {
 function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // 收件箱按当前操作身份(切换成车行时看车行收件箱)
+  const { actingId } = useIdentity();
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -39,10 +42,13 @@ function MessagesContent() {
         router.push("/login");
         return;
       }
-      setUser(data.user.id);
       setLoading(false);
     });
   }, [router]);
+
+  useEffect(() => {
+    if (actingId) setUser(actingId);
+  }, [actingId]);
 
   const handleRefresh = useCallback(async () => {
     setRefreshKey((k) => k + 1);

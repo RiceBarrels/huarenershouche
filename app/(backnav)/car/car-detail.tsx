@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRouteParams } from "@/lib/use-route-params";
 import Link from "next/link";
@@ -67,6 +67,7 @@ import { MarketPosition } from "@/components/market-position";
 import { ModelReviews } from "@/components/model-reviews";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
+import { useIdentity } from "@/components/identity-provider";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
@@ -95,6 +96,8 @@ export default function CarDetailPage() {
   const [car, setCar] = useState<DbCar | null>(null);
   const [loading, setLoading] = useState(true);
   const [isFavorited, setIsFavorited] = useState(false);
+  // user = 当前操作身份(actingId,用于归属/私信判断);authId = 真实用户(收藏等个人操作)
+  const { actingId, authId } = useIdentity();
   const [user, setUser] = useState<string | null>(null);
   const [contactVisible, setContactVisible] = useState(false);
   const [callDialogOpen, setCallDialogOpen] = useState(false);
@@ -106,14 +109,14 @@ export default function CarDetailPage() {
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
   const [renewing, setRenewing] = useState(false);
-  const [touchStart, setTouchStart] = useState<number | null>(null);
   const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
+  const mobileGalleryRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function load() {
       const { data } = await supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url, is_system)")
+        .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by)")
         .eq("id", carId)
         .single();
       setCar(data as DbCar);
@@ -145,6 +148,7 @@ export default function CarDetailPage() {
           .from("cars")
           .select("id, make, model, year, price, mileage, status")
           .eq("status", "active")
+          .eq("owner_hidden", false)
           .eq("make", data.make)
           .limit(150);
         setMakePool((pool as DbCar[]) || []);
@@ -155,6 +159,7 @@ export default function CarDetailPage() {
           .from("cars")
           .select("*")
           .eq("status", "active")
+          .eq("owner_hidden", false)
           .eq("make", data.make)
           .neq("id", carId)
           .order("created_at", { ascending: false })
@@ -182,6 +187,7 @@ export default function CarDetailPage() {
             .from("cars")
             .select("*")
             .eq("status", "active")
+            .eq("owner_hidden", false)
             .neq("id", carId)
             .gte("price", data.price * 0.7)
             .lte("price", data.price * 1.3)
@@ -198,12 +204,12 @@ export default function CarDetailPage() {
       setWatching(isWatching(carId));
       setWatchedPrice(getWatchedPrice(carId));
 
-      // Check auth & favorite
+      // Check auth & favorite（收藏始终归属真实用户）
       const {
         data: { user: authUser },
       } = await supabase.auth.getUser();
       if (authUser) {
-        setUser(authUser.id);
+        // user(操作身份)由下面的 actingId effect 统一设置,此处只处理个人收藏
         const { data: fav } = await supabase
           .from("favorites")
           .select("id")
@@ -226,13 +232,18 @@ export default function CarDetailPage() {
     [car, makePool]
   );
 
+  // 操作身份就绪后覆盖 user(用于归属/私信判断);收藏仍走真实用户 authId
+  useEffect(() => {
+    if (actingId) setUser(actingId);
+  }, [actingId]);
+
   async function toggleFavorite() {
-    if (!user) return;
+    if (!authId) return;
     if (isFavorited) {
       const { error } = await supabase
         .from("favorites")
         .delete()
-        .eq("user_id", user)
+        .eq("user_id", authId)
         .eq("car_id", carId);
       if (!error) {
         setIsFavorited(false);
@@ -241,7 +252,7 @@ export default function CarDetailPage() {
     } else {
       const { error } = await supabase
         .from("favorites")
-        .insert({ user_id: user, car_id: carId });
+        .insert({ user_id: authId, car_id: carId });
       if (!error) {
         setIsFavorited(true);
         setCar((prev) => prev ? { ...prev, favorites_count: (prev.favorites_count || 0) + 1 } : prev);
@@ -334,6 +345,25 @@ export default function CarDetailPage() {
       })()
     : null;
 
+  // 手机端轮播:按一屏宽度左右滚动(跟手滑动之外的箭头/圆点跳转都走这里)
+  function scrollGallery(dir: 1 | -1) {
+    const el = mobileGalleryRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth, behavior: "smooth" });
+  }
+
+  const sourceBadge = (
+    <div className="absolute left-3 top-3 z-10">
+      {car.profiles?.is_system ? (
+        <Badge variant="secondary" className="font-mono text-[10px] font-medium">系统检索</Badge>
+      ) : car.profiles?.account_type === "dealer" ? (
+        <Badge variant="secondary" className="font-mono text-[10px] font-medium">车行</Badge>
+      ) : (
+        <Badge variant="outline" className="bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm">个人</Badge>
+      )}
+    </div>
+  );
+
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background font-mono">
 
@@ -345,25 +375,71 @@ export default function CarDetailPage() {
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Left: Image + Details */}
           <div>
-            {/* Image gallery — main + thumbnails on desktop, swipeable on mobile */}
+            {/* Image gallery — main + thumbnails on desktop, real swipe carousel on mobile */}
             <div className="flex gap-2">
-              {/* Main image */}
-              <div
-                className="relative flex-1 aspect-[16/10] overflow-hidden border border-border bg-muted"
-                onTouchStart={(e) => setTouchStart(e.touches[0].clientX)}
-                onTouchEnd={(e) => {
-                  if (touchStart === null) return;
-                  const diff = e.changedTouches[0].clientX - touchStart;
-                  if (Math.abs(diff) > 50) {
-                    if (diff < 0) {
-                      setCurrentImage((prev) => prev === allImages.length - 1 ? 0 : prev + 1);
-                    } else {
-                      setCurrentImage((prev) => prev === 0 ? allImages.length - 1 : prev - 1);
-                    }
-                  }
-                  setTouchStart(null);
-                }}
-              >
+              {/* Mobile: 真·滑动轮播(scroll-snap,跟手滑动 + 吸附) */}
+              <div className="relative flex-1 md:hidden">
+                <div
+                  ref={mobileGalleryRef}
+                  className="flex aspect-[16/10] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain border border-border bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    const idx = Math.round(el.scrollLeft / el.clientWidth);
+                    setCurrentImage((prev) => (prev === idx ? prev : idx));
+                  }}
+                >
+                  {allImages.length > 0 ? (
+                    allImages.map((url, i) => (
+                      <div key={i} className="h-full w-full shrink-0 snap-center snap-always">
+                        {isVideo(url) ? (
+                          <video src={url} className="h-full w-full object-cover" controls muted playsInline />
+                        ) : (
+                          <img
+                            src={url}
+                            alt=""
+                            loading={i === 0 ? "eager" : "lazy"}
+                            className="h-full w-full cursor-zoom-in object-cover"
+                            onClick={() => setLightboxOpen(true)}
+                          />
+                        )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center font-mono text-sm text-muted-foreground">
+                      暂无图片
+                    </div>
+                  )}
+                </div>
+                {sourceBadge}
+                {allImages.length > 1 && (
+                  <>
+                    <button
+                      aria-label="上一张"
+                      onClick={() => scrollGallery(-1)}
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/70 backdrop-blur-sm active:bg-background"
+                    >
+                      <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                    <button
+                      aria-label="下一张"
+                      onClick={() => scrollGallery(1)}
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/70 backdrop-blur-sm active:bg-background"
+                    >
+                      <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                    <div
+                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
+                      onClick={() => setLightboxOpen(true)}
+                    >
+                      <Eye className="h-3 w-3" strokeWidth={1.5} />
+                      ({allImages.length}) 张照片
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Desktop: single image + arrows */}
+              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden border border-border bg-muted md:block">
                 {allImages.length > 0 ? (
                   isVideo(allImages[currentImage]) ? (
                     <video
@@ -386,56 +462,29 @@ export default function CarDetailPage() {
                     暂无图片
                   </div>
                 )}
-                <div className="absolute left-3 top-3">
-                  {car.profiles?.is_system ? (
-                    <Badge
-                      variant="secondary"
-                      className="font-mono text-[10px] font-medium"
-                    >
-                      系统检索
-                    </Badge>
-                  ) : car.profiles?.account_type === "dealer" ? (
-                    <Badge
-                      variant="secondary"
-                      className="font-mono text-[10px] font-medium"
-                    >
-                      车行
-                    </Badge>
-                  ) : (
-                    <Badge
-                      variant="outline"
-                      className="bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm"
-                    >
-                      个人
-                    </Badge>
-                  )}
-                </div>
+                {sourceBadge}
                 {allImages.length > 1 && (
                   <>
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        setCurrentImage((prev) =>
-                          prev === 0 ? allImages.length - 1 : prev - 1
-                        );
+                        setCurrentImage((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
                       }}
-                      className="absolute left-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background md:flex"
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
                     >
                       <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                     <button
                       onClick={(e) => {
                         e.preventDefault();
-                        setCurrentImage((prev) =>
-                          prev === allImages.length - 1 ? 0 : prev + 1
-                        );
+                        setCurrentImage((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
                       }}
-                      className="absolute right-2 top-1/2 hidden h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background md:flex"
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
                     >
                       <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                     <div
-                      className="absolute bottom-3 left-3 flex items-center gap-1 bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm cursor-pointer"
+                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
                       onClick={() => setLightboxOpen(true)}
                     >
                       <Eye className="h-3 w-3" strokeWidth={1.5} />
@@ -477,21 +526,33 @@ export default function CarDetailPage() {
               )}
             </div>
 
-            {/* Mobile image dots */}
+            {/* Mobile image indicator — 点太多时(如 30+ 张图)改用计数,避免超出屏幕 */}
             {allImages.length > 1 && (
-              <div className="mt-2 flex justify-center gap-1.5 md:hidden">
-                {allImages.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => setCurrentImage(i)}
-                    className={`h-1.5 rounded-full transition-all ${
-                      i === currentImage
-                        ? "w-4 bg-foreground"
-                        : "w-1.5 bg-border hover:bg-muted-foreground"
-                    }`}
-                  />
-                ))}
-              </div>
+              allImages.length <= 8 ? (
+                <div className="mt-2 flex justify-center gap-1.5 md:hidden">
+                  {allImages.map((_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const el = mobileGalleryRef.current;
+                        if (el) el.scrollTo({ left: i * el.clientWidth, behavior: "smooth" });
+                        setCurrentImage(i);
+                      }}
+                      className={`h-1.5 rounded-full transition-all ${
+                        i === currentImage
+                          ? "w-4 bg-foreground"
+                          : "w-1.5 bg-border hover:bg-muted-foreground"
+                      }`}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-2 flex justify-center md:hidden">
+                  <span className="rounded-full border border-border bg-background/80 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {currentImage + 1} / {allImages.length}
+                  </span>
+                </div>
+              )
             )}
 
             {/* Car info */}
@@ -896,7 +957,7 @@ export default function CarDetailPage() {
                   </Button>
                 )}
 
-                {!car.profiles?.is_system &&
+                {(!car.profiles?.is_system || car.profiles?.claimed_by) &&
                   (user ? (
                     user !== car.seller_id && (
                       <Button

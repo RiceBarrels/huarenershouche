@@ -7,6 +7,7 @@ import { useRouteParams } from "@/lib/use-route-params";
 import {
   Ban, Check, Loader2, Trash2, Eye, Pencil, Store,
   MessageSquare, Car, AlertTriangle, Save, Mail, Phone, Clock,
+  Handshake, Link2, Unlink,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
@@ -25,9 +26,16 @@ interface EditForm {
   location: string;
   preferred_language: string;
   account_type: "private" | "dealer";
+  is_system: boolean;
   role: "user" | "admin";
   banned: boolean;
   banned_reason: string;
+}
+
+// 账号类型三选一:个人 / 车行 / 系统。系统类型 = 车行账号 + is_system 标记(自动检索车源)。
+type AccountKind = "private" | "dealer" | "system";
+function toKind(f: Pick<EditForm, "account_type" | "is_system">): AccountKind {
+  return f.is_system ? "system" : f.account_type;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -68,6 +76,12 @@ export default function AdminUserManagePage() {
   const [actionId, setActionId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
+  // 认领人（仅系统账号)
+  const [ownerName, setOwnerName] = useState<string | null>(null);
+  const [claimInput, setClaimInput] = useState("");
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimError, setClaimError] = useState("");
+
   const load = useCallback(async () => {
     if (!userId) return;
     const [profRes, carsRes, storesRes, postRes, convBuyerRes, convSellerRes] = await Promise.all([
@@ -90,6 +104,14 @@ export default function AdminUserManagePage() {
     const { data: authRows } = await supabase.rpc("admin_get_auth_user", { target: userId });
     setAuthInfo(Array.isArray(authRows) && authRows.length > 0 ? authRows[0] : null);
 
+    // 系统账号的认领人昵称
+    if (p?.is_system && p.claimed_by) {
+      const { data: owner } = await supabase.from("profiles").select("id, username").eq("id", p.claimed_by).maybeSingle();
+      setOwnerName((owner as { username: string | null } | null)?.username || null);
+    } else {
+      setOwnerName(null);
+    }
+
     if (p) {
       setForm({
         username: p.username || "",
@@ -97,6 +119,7 @@ export default function AdminUserManagePage() {
         location: p.location || "",
         preferred_language: p.preferred_language || "zh",
         account_type: p.account_type || "private",
+        is_system: !!p.is_system,
         role: p.role || "user",
         banned: !!p.banned,
         banned_reason: p.banned_reason || "",
@@ -143,6 +166,7 @@ export default function AdminUserManagePage() {
         location: form.location || null,
         preferred_language: form.preferred_language,
         account_type: form.account_type,
+        is_system: form.is_system,
         role: form.role,
         banned: form.banned,
         banned_at: form.banned ? (profile.banned_at || new Date().toISOString()) : null,
@@ -171,6 +195,61 @@ export default function AdminUserManagePage() {
 
     setSaving(false);
     setSavedAt(true);
+    await load();
+  }
+
+  async function handleLinkClaim() {
+    if (!selfId) return;
+    const input = claimInput.trim();
+    if (!input) { setClaimError("请填写认领人的邮箱或 UUID"); return; }
+    setClaimError("");
+    setClaimBusy(true);
+
+    let ownerId: string | null = null;
+    const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (uuidRe.test(input)) {
+      ownerId = input;
+    } else {
+      const { data: found, error: findErr } = await supabase.rpc("admin_find_profile_by_email", { lookup_email: input });
+      if (findErr) { setClaimError(findErr.message); setClaimBusy(false); return; }
+      const row = Array.isArray(found) && found.length > 0 ? found[0] : null;
+      if (!row) { setClaimError("未找到该邮箱对应的用户"); setClaimBusy(false); return; }
+      ownerId = row.id as string;
+    }
+
+    const { error: claimErr } = await supabase.rpc("admin_set_claim", { target_system: userId, owner: ownerId });
+    if (claimErr) { setClaimError(claimErr.message); setClaimBusy(false); return; }
+
+    await supabase.from("admin_actions").insert({
+      admin_id: selfId,
+      action: "set_claim",
+      target_type: "user",
+      target_id: userId,
+      detail: input,
+    });
+
+    setClaimInput("");
+    setClaimBusy(false);
+    await load();
+  }
+
+  async function handleClearClaim() {
+    if (!selfId) return;
+    setClaimError("");
+    setClaimBusy(true);
+
+    const { error: claimErr } = await supabase.rpc("admin_set_claim", { target_system: userId, owner: null });
+    if (claimErr) { setClaimError(claimErr.message); setClaimBusy(false); return; }
+
+    await supabase.from("admin_actions").insert({
+      admin_id: selfId,
+      action: "clear_claim",
+      target_type: "user",
+      target_id: userId,
+      detail: "unlink",
+    });
+
+    setClaimBusy(false);
     await load();
   }
 
@@ -269,7 +348,11 @@ export default function AdminUserManagePage() {
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <h1 className="truncate text-base font-semibold">{profile.username || "未设置昵称"}</h1>
-              {profile.account_type === "dealer" && <span className="bg-muted px-1 py-0.5 text-[10px]">车行</span>}
+              {profile.is_system ? (
+                <span className="bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
+              ) : profile.account_type === "dealer" ? (
+                <span className="bg-muted px-1 py-0.5 text-[10px]">车行</span>
+              ) : null}
               {profile.role === "admin" && <span className="bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>}
               {profile.banned && <span className="bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>}
             </div>
@@ -355,11 +438,24 @@ export default function AdminUserManagePage() {
               <Label className="text-[11px] text-muted-foreground">账号类型</Label>
               <select
                 className="mt-1 h-9 w-full border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                value={form.account_type}
-                onChange={(e) => upd("account_type", e.target.value as EditForm["account_type"])}
+                value={toKind(form)}
+                onChange={(e) => {
+                  const kind = e.target.value as AccountKind;
+                  setForm((f) =>
+                    f
+                      ? {
+                          ...f,
+                          account_type: kind === "private" ? "private" : "dealer",
+                          is_system: kind === "system",
+                        }
+                      : f,
+                  );
+                  setSavedAt(false);
+                }}
               >
                 <option value="private">个人</option>
                 <option value="dealer">车行</option>
+                <option value="system">系统（自动检索车源）</option>
               </select>
             </div>
             <div>
@@ -480,6 +576,61 @@ export default function AdminUserManagePage() {
                   {s.phone && <p className="text-[11px] text-muted-foreground">电话: {s.phone}</p>}
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Owner / claim (系统账号) */}
+        {profile.is_system && (
+          <div className="mt-6">
+            <h2 className="flex items-center gap-1.5 text-xs font-semibold">
+              <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />
+              认领人 (Owner)
+            </h2>
+            <div className="mt-3 border border-border p-3">
+              {profile.claimed_by ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="text-muted-foreground">已认领:</span>
+                    <span className="font-medium">{ownerName || profile.claimed_by.slice(0, 8)}</span>
+                  </div>
+                  <p className="break-all text-[10px] text-muted-foreground">{profile.claimed_by}</p>
+                  {claimError && <p className="text-[11px] text-destructive">{claimError}</p>}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    disabled={claimBusy}
+                    onClick={handleClearClaim}
+                  >
+                    {claimBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Unlink className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                    解除认领
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <p className="text-[11px] text-muted-foreground">将此系统账号认领给一位真实用户来运营。填写对方的邮箱或用户 UUID。</p>
+                  <div>
+                    <Label className="text-[11px] text-muted-foreground">认领人邮箱 / UUID</Label>
+                    <Input
+                      className="mt-1 h-9 text-xs"
+                      placeholder="owner@example.com 或 UUID"
+                      value={claimInput}
+                      onChange={(e) => { setClaimInput(e.target.value); setClaimError(""); }}
+                    />
+                  </div>
+                  {claimError && <p className="text-[11px] text-destructive">{claimError}</p>}
+                  <Button
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    disabled={claimBusy || !claimInput.trim()}
+                    onClick={handleLinkClaim}
+                  >
+                    {claimBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" strokeWidth={1.5} />}
+                    链接认领人
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
