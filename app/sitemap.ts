@@ -37,6 +37,27 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: p.slug.includes("/") ? 0.6 : 0.8,
   }));
 
+  // 每辆在售车源详情页(核心内容页,SEO 主力)
+  let carRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const { data } = await supabase
+      .from("cars")
+      .select("id, updated_at, source_id")
+      .eq("status", "active")
+      .eq("owner_hidden", false)
+      .order("created_at", { ascending: false })
+      .limit(50000);
+    carRoutes = (data ?? []).map((c) => ({
+      url: `${SITE_URL}/car/${c.id}`,
+      lastModified: c.updated_at ? new Date(c.updated_at) : now,
+      changeFrequency: "daily" as const,
+      // 用户自发车源权重略高于转载车源
+      priority: c.source_id ? 0.7 : 0.8,
+    }));
+  } catch {
+    // 构建环境无法访问 Supabase 时降级
+  }
+
   // 社区帖子详情页(内容页,SEO 长尾)
   let postRoutes: MetadataRoute.Sitemap = [];
   try {
@@ -56,5 +77,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
   }
 
-  return [...staticRoutes, ...seoRoutes, ...postRoutes];
+  return [...staticRoutes, ...seoRoutes, ...carRoutes, ...postRoutes];
 }

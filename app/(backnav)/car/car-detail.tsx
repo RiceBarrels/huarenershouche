@@ -89,12 +89,13 @@ function isVideo(url: string): boolean {
   return VIDEO_RE.test(url);
 }
 
-export default function CarDetailPage() {
+export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | null } = {}) {
   const params = useRouteParams<{ id: string }>();
-  const carId = params.id as string;
+  // SSR 预取时用路由参数兜底(静态导出下 params 才需客户端解析)
+  const carId = (params.id as string) || initialCar?.id || "";
   const router = useRouter();
-  const [car, setCar] = useState<DbCar | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [car, setCar] = useState<DbCar | null>(initialCar ?? null);
+  const [loading, setLoading] = useState(!initialCar);
   const [isFavorited, setIsFavorited] = useState(false);
   // user = 当前操作身份(actingId,用于归属/私信判断);authId = 真实用户(收藏等个人操作)
   const { actingId, authId } = useIdentity();
