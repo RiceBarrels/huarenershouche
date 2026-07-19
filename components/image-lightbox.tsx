@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useState } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -14,6 +14,8 @@ interface ImageLightboxProps {
 export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLightboxProps) {
   const [index, setIndex] = useState(initialIndex);
   const [scale, setScale] = useState(1);
+  const [touchX, setTouchX] = useState<number | null>(null);
+  const thumbStripRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (open) {
@@ -54,6 +56,25 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
       return () => { document.body.style.overflow = ""; };
     }
   }, [open]);
+
+  // 当前图对应的缩略图自动滚入可见范围
+  useEffect(() => {
+    if (!open) return;
+    const strip = thumbStripRef.current;
+    const active = strip?.children[index] as HTMLElement | undefined;
+    active?.scrollIntoView({ inline: "center", block: "nearest", behavior: "smooth" });
+  }, [index, open]);
+
+  // 主图左右滑动切换(未放大时)
+  function onImageTouchEnd(clientX: number) {
+    if (touchX === null) return;
+    const dx = clientX - touchX;
+    if (scale === 1 && Math.abs(dx) > 50) {
+      if (dx < 0) next();
+      else prev();
+    }
+    setTouchX(null);
+  }
 
   return (
     <AnimatePresence>
@@ -102,6 +123,8 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
               className="max-h-[85vh] max-w-[90vw] select-none object-contain"
               style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
               onClick={(e) => { e.stopPropagation(); }}
+              onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
+              onTouchEnd={(e) => { e.stopPropagation(); onImageTouchEnd(e.changedTouches[0].clientX); }}
               controls
               autoPlay
               muted
@@ -117,6 +140,8 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
               className="max-h-[85vh] max-w-[90vw] select-none object-contain"
               style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
               onClick={(e) => { e.stopPropagation(); toggleZoom(); }}
+              onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
+              onTouchEnd={(e) => { e.stopPropagation(); onImageTouchEnd(e.changedTouches[0].clientX); }}
               draggable={false}
             />
           )}
@@ -139,26 +164,31 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
             </>
           )}
 
-          {/* Thumbnail strip */}
+          {/* Thumbnail strip — 横向可滑动;数量少时居中,多时可左右滚动 */}
           {images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 gap-1.5 overflow-x-auto px-4">
-              {images.map((img, i) => (
-                <button
-                  key={i}
-                  onClick={(e) => { e.stopPropagation(); setIndex(i); setScale(1); }}
-                  className={`h-12 w-16 shrink-0 border bg-black/50 transition-all ${
-                    i === index
-                      ? "border-white"
-                      : "border-white/20 opacity-50 hover:opacity-80"
-                  }`}
-                >
-                  {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(img) ? (
-                    <video src={img} className="h-full w-full object-cover" muted />
-                  ) : (
-                    <img src={img} alt="" className="h-full w-full object-cover" />
-                  )}
-                </button>
-              ))}
+            <div
+              className="absolute bottom-4 left-0 right-0 overflow-x-auto px-4 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div ref={thumbStripRef} className="mx-auto flex w-max gap-1.5">
+                {images.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={(e) => { e.stopPropagation(); setIndex(i); setScale(1); }}
+                    className={`h-12 w-16 shrink-0 border bg-black/50 transition-all ${
+                      i === index
+                        ? "border-white"
+                        : "border-white/20 opacity-50 hover:opacity-80"
+                    }`}
+                  >
+                    {/\.(mp4|mov|webm|avi|mkv)(\?|$)/i.test(img) ? (
+                      <video src={img} className="h-full w-full object-cover" muted />
+                    ) : (
+                      <img src={img} alt="" className="h-full w-full object-cover" />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </motion.div>
