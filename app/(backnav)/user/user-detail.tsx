@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouteParams } from "@/lib/use-route-params";
-import { Calendar, Car, MapPin, Store, Star, Loader2 } from "lucide-react";
+import { Calendar, Car, ExternalLink, Globe, MapPin, Store, Star, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
@@ -25,6 +25,7 @@ interface SellerProfile {
   avatar_url: string | null;
   location: string | null;
   account_type: "private" | "dealer";
+  is_system: boolean;
   created_at: string;
 }
 
@@ -42,7 +43,7 @@ export default function UserProfilePage() {
       const [profileRes, carsRes, reviewsRes, postsRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, username, avatar_url, location, account_type, created_at")
+          .select("id, username, avatar_url, location, account_type, is_system, created_at")
           .eq("id", userId)
           .maybeSingle(),
         supabase
@@ -77,6 +78,19 @@ export default function UserProfilePage() {
     }
     fetchData();
   }, [userId]);
+
+  // 系统检索账号:从其车源的 source_url 推导原始车行网站(listing_sources 表仅管理员可读)
+  const sourceSite = (() => {
+    if (!profile?.is_system) return null;
+    const u = cars.find((c) => c.source_url)?.source_url;
+    if (!u) return null;
+    try {
+      const url = new URL(u);
+      return { origin: url.origin, host: url.hostname.replace(/^www\./, "") };
+    } catch {
+      return null;
+    }
+  })();
 
   const memberSince = profile
     ? new Date(profile.created_at).toLocaleDateString("zh-CN", {
@@ -145,7 +159,12 @@ export default function UserProfilePage() {
                   <h1 className="font-mono text-lg font-semibold">
                     {profile.username}
                   </h1>
-                  {profile.account_type === "dealer" ? (
+                  {profile.is_system ? (
+                    <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
+                      <Globe className="h-3 w-3" strokeWidth={1.5} />
+                      系统检索
+                    </Badge>
+                  ) : profile.account_type === "dealer" ? (
                     <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
                       <Store className="h-3 w-3" strokeWidth={1.5} />
                       认证车行
@@ -178,8 +197,31 @@ export default function UserProfilePage() {
                     </span>
                   )}
                 </div>
+                {profile.is_system && (
+                  <div className="mt-2 space-y-1">
+                    <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                      本页车源由系统自动从该车行公开网站检索汇总，非车行本人发布，价格与状态以原站为准
+                    </p>
+                    {sourceSite && (
+                      <a
+                        href={sourceSite.origin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground underline-offset-2 hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                        访问车行官网 · {sourceSite.host}
+                      </a>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
+
+            {/* Dealer reviews — 放在车源列表之前 */}
+            {profile.account_type === "dealer" && (
+              <DealerReviews dealerId={userId} />
+            )}
 
             {/* Listings */}
             <div className="mt-6">
@@ -198,11 +240,6 @@ export default function UserProfilePage() {
                 </p>
               )}
             </div>
-
-            {/* Dealer reviews — 放在车源之后、社区帖子之前 */}
-            {profile.account_type === "dealer" && (
-              <DealerReviews dealerId={userId} />
-            )}
 
             {/* Community posts */}
             {posts.length > 0 && (

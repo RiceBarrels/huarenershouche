@@ -305,12 +305,16 @@ export default function Home() {
       .select("*, profiles!seller_id(account_type, avatar_url)")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      // 有个性化信号时拉更大的候选池来排序,否则只需最新 6 台做展示
-      .limit(hasHistory ? 200 : 6)
+      // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
+      .limit(hasHistory ? 200 : 60)
       .then(async ({ data }) => {
         if (!data) return;
         const cars = data as DbCar[];
-        setFeatured(cars.slice(0, 6));
+        // 个人/车行直发优先于系统检索转载(稳定排序保持组内最新在前)
+        const prioritized = [...cars].sort(
+          (a, b) => Number(!!a.source_id) - Number(!!b.source_id)
+        );
+        setFeatured(prioritized.slice(0, 6));
 
         if (hasHistory) {
           const recentIds = getRecentlyViewed();
@@ -457,6 +461,9 @@ export default function Home() {
           </h1>
           <p className="mt-4 font-mono text-sm text-muted-foreground md:text-base">
             可靠车源 · 中文服务 · 覆盖全美 — CLCAuto.com
+          </p>
+          <p className="mt-2 font-mono text-[11px] leading-relaxed text-muted-foreground/70 md:text-xs">
+            车源来自三类:车行网站车辆自动检索、个人发布、车行发布
           </p>
 
           {/* Structured search form - cars.com style */}

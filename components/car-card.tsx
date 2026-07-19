@@ -115,7 +115,14 @@ export function CarCard({
             </div>
           )}
           <div className="absolute left-2 right-20 top-2 flex flex-wrap gap-1">
-            {car.profiles?.account_type === "dealer" ? (
+            {car.source_id ? (
+              <Badge
+                variant="secondary"
+                className="font-mono text-[10px] font-medium"
+              >
+                系统检索
+              </Badge>
+            ) : car.profiles?.account_type === "dealer" ? (
               <Badge
                 variant="secondary"
                 className="font-mono text-[10px] font-medium"

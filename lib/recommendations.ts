@@ -33,6 +33,7 @@ const W_TRANSMISSION = 5;
 const W_DRIVETRAIN = 5;
 const W_SEARCH = 8; // 命中搜索历史关键词
 const W_RECENCY = 5; // 新上架轻微加成
+const W_USER_POSTED = 12; // 个人/车行直发优先于系统检索转载车源
 const W_DISTANCE_DEFAULT = 6; // 距离加成上限(默认很小)
 
 export function getFavoriteIds(): string[] {
@@ -202,6 +203,9 @@ export function scoreCar(car: DbCar, profile: TasteProfile, opts?: RankOpts): nu
     const text = `${car.make} ${car.model} ${car.title_zh} ${car.title}`.toLowerCase();
     if (profile.searchTerms.some((t) => text.includes(t))) score += W_SEARCH;
   }
+
+  // 个人/车行直发优先于系统检索转载
+  if (!car.source_id) score += W_USER_POSTED;
 
   // 新近度:新上架轻微加成
   const daysOld = (Date.now() - new Date(car.created_at).getTime()) / 86400000;

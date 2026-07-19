@@ -65,6 +65,7 @@ import { VehicleHistoryPanel } from "@/components/vehicle-history";
 import { LoanCalculator } from "@/components/loan-calculator";
 import { MarketPosition } from "@/components/market-position";
 import { ModelReviews } from "@/components/model-reviews";
+import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -322,6 +323,17 @@ export default function CarDetailPage() {
     ...(car.images || []),
   ].filter(Boolean) as string[];
 
+  // 系统检索车源:原始车源网站域名(用于展示与入口链接)
+  const sourceHost = car.source_url
+    ? (() => {
+        try {
+          return new URL(car.source_url).hostname.replace(/^www\./, "");
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
   return (
     <div className="flex min-h-screen flex-col overflow-x-hidden bg-background font-mono">
 
@@ -375,7 +387,14 @@ export default function CarDetailPage() {
                   </div>
                 )}
                 <div className="absolute left-3 top-3">
-                  {car.profiles?.account_type === "dealer" ? (
+                  {car.profiles?.is_system ? (
+                    <Badge
+                      variant="secondary"
+                      className="font-mono text-[10px] font-medium"
+                    >
+                      系统检索
+                    </Badge>
+                  ) : car.profiles?.account_type === "dealer" ? (
                     <Badge
                       variant="secondary"
                       className="font-mono text-[10px] font-medium"
@@ -743,7 +762,7 @@ export default function CarDetailPage() {
                     {car.seller_name}
                   </p>
                   <p className="font-mono text-[10px] text-muted-foreground">
-                    {car.profiles?.account_type === "dealer" ? "认证车行" : "个人卖家"} · 查看主页 →
+                    {car.profiles?.is_system ? "系统检索车源" : car.profiles?.account_type === "dealer" ? "认证车行" : "个人卖家"} · 查看主页 →
                   </p>
                 </div>
               </Link>
@@ -772,9 +791,22 @@ export default function CarDetailPage() {
               )}
 
               {car.profiles?.is_system && (
-                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-                  合作车行车源，请致电联系
-                </p>
+                <div className="mt-2 space-y-1.5 border-t border-border pt-2">
+                  <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">
+                    本车源由系统自动从公开车行网站检索汇总，非平台合作车源，价格与状态以原站为准，请致电核实
+                  </p>
+                  {car.source_url && (
+                    <a
+                      href={car.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 font-mono text-[11px] text-foreground underline-offset-2 hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+                      查看原始车源{sourceHost ? ` · ${sourceHost}` : ""}
+                    </a>
+                  )}
+                </div>
               )}
 
               <div className="mt-4 space-y-2">
@@ -1001,6 +1033,11 @@ export default function CarDetailPage() {
             </div>
           </div>
         </div>
+        {/* 车行评价:卖家为车行时展示 */}
+        {car.profiles?.account_type === "dealer" && (
+          <DealerReviews dealerId={car.seller_id} />
+        )}
+
         {/* 车主口碑:社区车评 */}
         <ModelReviews make={car.make} model={car.model} />
 

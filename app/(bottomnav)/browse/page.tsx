@@ -692,9 +692,12 @@ function BrowseContent() {
         });
         break;
       default:
-        sorted.sort(
-          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        );
+        // 默认排序:个人/车行直发排在系统检索转载之前,各自组内按最新
+        sorted.sort((a, b) => {
+          const tier = Number(!!a.source_id) - Number(!!b.source_id);
+          if (tier !== 0) return tier;
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        });
     }
     return sorted;
   }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt]);
