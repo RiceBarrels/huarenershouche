@@ -27,7 +27,7 @@ import { RegionBrandEntry } from "@/components/region-brand-entry";
 import { TrustReviews } from "@/components/trust-reviews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { hasUserHistory, rankCars } from "@/lib/recommendations";
+import { hasUserHistory, rankCars, getFavoriteIds } from "@/lib/recommendations";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import {
   Select,
@@ -305,7 +305,8 @@ export default function Home() {
       .select("*, profiles!seller_id(account_type, avatar_url)")
       .eq("status", "active")
       .order("created_at", { ascending: false })
-      .limit(hasHistory ? 30 : 6)
+      // 有个性化信号时拉更大的候选池来排序,否则只需最新 6 台做展示
+      .limit(hasHistory ? 200 : 6)
       .then(async ({ data }) => {
         if (!data) return;
         const cars = data as DbCar[];
@@ -313,16 +314,23 @@ export default function Home() {
 
         if (hasHistory) {
           const recentIds = getRecentlyViewed();
-          if (recentIds.length > 0) {
-            const { data: viewedData } = await supabase
-              .from("cars")
-              .select("*")
-              .in("id", recentIds.slice(0, 10));
-            const viewedCars = (viewedData || []) as DbCar[];
-            const excludeIds = new Set(recentIds);
-            const ranked = rankCars(cars, viewedCars, excludeIds);
-            setRecommended(ranked.slice(0, 6));
+          const favIds = getFavoriteIds();
+          const signalIds = [...new Set([...recentIds, ...favIds])];
+
+          let favoriteCars: DbCar[] = [];
+          let viewedCars: DbCar[] = [];
+          if (signalIds.length > 0) {
+            const { data: sig } = await supabase.from("cars").select("*").in("id", signalIds);
+            const byId = new Map(((sig as DbCar[]) || []).map((c) => [c.id, c]));
+            // 保持收藏/浏览的原有顺序(浏览按新近度)
+            favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
+            viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
           }
+
+          // 不把已经看过的车再推给用户
+          const excludeIds = new Set(recentIds);
+          const ranked = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 6 });
+          setRecommended(ranked);
         }
       });
 

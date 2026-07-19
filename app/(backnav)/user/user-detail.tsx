@@ -199,6 +199,11 @@ export default function UserProfilePage() {
               )}
             </div>
 
+            {/* Dealer reviews — 放在车源之后、社区帖子之前 */}
+            {profile.account_type === "dealer" && (
+              <DealerReviews dealerId={userId} />
+            )}
+
             {/* Community posts */}
             {posts.length > 0 && (
               <div className="mt-8 border-t border-border pt-6">
@@ -257,11 +262,6 @@ export default function UserProfilePage() {
                   })}
                 </div>
               </div>
-            )}
-
-            {/* Dealer reviews */}
-            {profile.account_type === "dealer" && (
-              <DealerReviews dealerId={userId} />
             )}
           </>
         )}

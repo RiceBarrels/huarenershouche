@@ -731,12 +731,39 @@ export default function PostCarPage() {
         .eq("id", user);
     }
 
+    // AI 双语翻译:经服务端 /api/translate 补全中英 title / description,
+    // 标签做成双语(任何失败都保持原样,发布流程不受影响)
+    const loc = {
+      title: titleEn as string | null,
+      title_zh: titleZh as string | null,
+      description: null as string | null,
+      description_zh: (form.description_zh || null) as string | null,
+      features: features as string[],
+    };
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      if (accessToken) {
+        const res = await fetch("/api/translate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+          body: JSON.stringify({ title: titleEn, title_zh: titleZh, description_zh: form.description_zh || null, features }),
+        });
+        if (res.ok) {
+          const j = await res.json();
+          if (j?.localized) Object.assign(loc, j.localized);
+        }
+      }
+    } catch {
+      /* 翻译失败,保持原文 */
+    }
+
     const { data, error: insertError } = await supabase
       .from("cars")
       .insert({
         seller_id: user,
-        title: titleEn,
-        title_zh: titleZh,
+        title: loc.title || titleEn,
+        title_zh: loc.title_zh || titleZh,
         year: Number(form.year),
         make: actualMake,
         model: form.model,
@@ -758,10 +785,11 @@ export default function PostCarPage() {
         phone: form.phone || null,
         lat: coords?.lat || null,
         lng: coords?.lng || null,
-        description_zh: form.description_zh || null,
+        description: loc.description,
+        description_zh: loc.description_zh ?? (form.description_zh || null),
         carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
         carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
-        features,
+        features: loc.features.length ? loc.features : features,
         status: "active",
       })
       .select("id")

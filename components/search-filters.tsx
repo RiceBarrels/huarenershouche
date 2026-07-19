@@ -302,7 +302,7 @@ export const INITIAL_FILTERS: Filters = {
   exteriorColor: "",
   interiorColor: "",
   features: "",
-  maxDistance: "",
+  maxDistance: "50",
   bodyStyle: "",
   maxPayment: "",
   dealRating: "",

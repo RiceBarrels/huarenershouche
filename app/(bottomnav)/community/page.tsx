@@ -26,6 +26,8 @@ import {
   haversineDistance,
   formatDistance,
 } from "@/lib/geocode";
+import { rankCars, getFavoriteIds, hasUserHistory } from "@/lib/recommendations";
+import { getRecentlyViewed } from "@/lib/recently-viewed";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -56,7 +58,7 @@ function formatPrice(price: number): string {
 
 type FeedItem =
   | { kind: "post"; post: DbCommunityPost }
-  | { kind: "car"; car: DbCar; distance?: number };
+  | { kind: "car"; car: DbCar; distance?: number; personalized?: boolean };
 
 // 每隔几张帖子插一张附近车源卡(小红书插卡形式)
 const CAR_EVERY = 6;
@@ -106,7 +108,7 @@ export default function CommunityFeedPage() {
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableError, setTableError] = useState(false);
-  const [nearbyCars, setNearbyCars] = useState<{ car: DbCar; distance?: number }[]>([]);
+  const [nearbyCars, setNearbyCars] = useState<{ car: DbCar; distance?: number; personalized?: boolean }[]>([]);
 
   // 搜索:默认不显示任何分类;只有搜索时才出现类型筛选
   const [searchOpen, setSearchOpen] = useState(false);
@@ -339,40 +341,72 @@ export default function CommunityFeedPage() {
     return () => observer.disconnect();
   }, [loadMore]);
 
-  // 附近车源:定位成功按距离排序,失败则取最新
+  // Feed 插卡车源:有个性化信号时按「喜欢/浏览」画像推荐(距离仅小幅加成);
+  // 无信号时退回真正的「附近车源」——在足够大的候选池里按距离排序。
   useEffect(() => {
     async function loadCars() {
+      // 拉较大的候选池,避免「在最新 24 台里挑最近」导致其实并不近
       const { data } = await supabase
         .from("cars")
         .select("*")
         .eq("status", "active")
         .order("created_at", { ascending: false })
-        .limit(24);
+        .limit(200);
       const cars = (data as DbCar[]) || [];
       if (cars.length === 0) return;
 
+      // 用户定位(用于距离)
+      let coords: { lat: number; lng: number } | null = null;
       try {
         const zip = await detectUserZip();
-        if (zip) {
-          const coords = await geocodeZipToCoords(zip);
-          if (coords) {
-            const withDist = cars
-              .filter((c) => c.lat != null && c.lng != null)
-              .map((car) => ({
-                car,
-                distance: haversineDistance(coords.lat, coords.lng, car.lat!, car.lng!),
-              }))
-              .sort((a, b) => a.distance - b.distance);
-            if (withDist.length > 0) {
-              setNearbyCars(withDist.slice(0, 4));
-              return;
-            }
-          }
-        }
+        if (zip) coords = await geocodeZipToCoords(zip);
       } catch {
-        /* fall through to latest */
+        /* 无定位则跳过距离 */
       }
-      setNearbyCars(cars.slice(0, 4).map((car) => ({ car })));
+
+      const withDist = (car: DbCar): number | undefined =>
+        coords && car.lat != null && car.lng != null
+          ? haversineDistance(coords.lat, coords.lng, car.lat, car.lng)
+          : undefined;
+
+      // 有「喜欢/浏览」信号 → 个性化推荐(与首页同一套算法)
+      if (hasUserHistory()) {
+        const recentIds = getRecentlyViewed();
+        const favIds = getFavoriteIds();
+        const signalIds = [...new Set([...recentIds, ...favIds])];
+        let favoriteCars: DbCar[] = [];
+        let viewedCars: DbCar[] = [];
+        if (signalIds.length > 0) {
+          const { data: sig } = await supabase.from("cars").select("*").in("id", signalIds);
+          const byId = new Map(((sig as DbCar[]) || []).map((c) => [c.id, c]));
+          favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
+          viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
+        }
+        const ranked = rankCars(
+          cars,
+          { favorites: favoriteCars, viewed: viewedCars },
+          { excludeIds: new Set(recentIds), userCoords: coords, limit: 6 },
+        );
+        if (ranked.length > 0) {
+          setNearbyCars(ranked.map((car) => ({ car, distance: withDist(car), personalized: true })));
+          return;
+        }
+      }
+
+      // 无信号 → 真正的附近车源(在整个候选池里按距离排序)
+      if (coords) {
+        const nearby = cars
+          .filter((c) => c.lat != null && c.lng != null)
+          .map((car) => ({ car, distance: withDist(car)!, personalized: false }))
+          .sort((a, b) => a.distance - b.distance);
+        if (nearby.length > 0) {
+          setNearbyCars(nearby.slice(0, 6));
+          return;
+        }
+      }
+
+      // 兜底:无定位无信号,取最新
+      setNearbyCars(cars.slice(0, 6).map((car) => ({ car, personalized: false })));
     }
     loadCars().catch(() => {});
   }, []);
@@ -524,7 +558,7 @@ export default function CommunityFeedPage() {
                         onLike={() => toggleLike(item.post)}
                       />
                     ) : (
-                      <CarFeedCard car={item.car} distance={item.distance} />
+                      <CarFeedCard car={item.car} distance={item.distance} personalized={item.personalized} />
                     );
                   const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
                   return (
@@ -669,7 +703,7 @@ function PostCard({
   );
 }
 
-function CarFeedCard({ car, distance }: { car: DbCar; distance?: number }) {
+function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: number; personalized?: boolean }) {
   return (
     <Link
       href={carLink(car.id)}
@@ -689,7 +723,7 @@ function CarFeedCard({ car, distance }: { car: DbCar; distance?: number }) {
           </div>
         )}
         <span className="absolute left-1.5 top-1.5 bg-primary px-1.5 py-0.5 font-mono text-[9px] font-medium text-primary-foreground">
-          附近车源
+          {personalized ? "为你推荐" : "附近车源"}
         </span>
       </div>
       <div className="p-2.5">

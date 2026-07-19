@@ -4,8 +4,26 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DbListingSource } from "@/lib/types";
 import { getAdapter } from "./index";
-import { fetchHtml, sleep, type ParsedListing } from "./types";
+import { fetchHtml, type ParsedListing, type SourceListingRef } from "./types";
 import { createServiceClient } from "./service-client";
+import { localizeListing } from "@/lib/translate";
+
+/** 有界并发:同时最多 concurrency 个 worker 处理队列,全部完成后返回。 */
+async function runPool<T>(
+  items: T[],
+  concurrency: number,
+  worker: (item: T) => Promise<void>,
+): Promise<void> {
+  let cursor = 0;
+  const run = async () => {
+    while (cursor < items.length) {
+      const item = items[cursor++];
+      await worker(item);
+    }
+  };
+  const n = Math.max(1, Math.min(concurrency, items.length));
+  await Promise.all(Array.from({ length: n }, run));
+}
 
 export interface SyncResult {
   key: string;
@@ -21,8 +39,8 @@ export interface SyncResult {
 export interface SyncOptions {
   /** Reuse an existing service client (otherwise one is created). */
   client?: SupabaseClient;
-  /** Delay between detail fetches, ms (default 300). */
-  detailDelayMs?: number;
+  /** 并发抓取/翻译/写库的数量(默认 8)。 */
+  concurrency?: number;
 }
 
 const EXPIRY_DAYS = 30;
@@ -38,6 +56,7 @@ interface ExistingCar {
   source_listing_id: string | null;
   status: string;
   price: number;
+  description_zh: string | null;
 }
 
 /** 常用华人聚居城市中文名（location_zh 用），未命中则回退英文 */
@@ -106,7 +125,7 @@ export async function syncSource(
 ): Promise<SyncResult> {
   const started = Date.now();
   const supabase = opts.client ?? createServiceClient();
-  const detailDelayMs = opts.detailDelayMs ?? 300;
+  const concurrency = opts.concurrency ?? 5;
   const result: SyncResult = {
     key: source.key,
     status: "success",
@@ -121,6 +140,10 @@ export async function syncSource(
   const finish = async (status: SyncResult["status"]): Promise<SyncResult> => {
     result.status = status;
     result.duration_ms = Date.now() - started;
+    console.log(
+      `[sync:${source.key}] DONE status=${status} found=${result.found} inserted=${result.inserted} ` +
+        `updated=${result.updated} delisted=${result.delisted} errors=${result.errors.length} in ${result.duration_ms}ms`,
+    );
     await supabase
       .from("listing_sources")
       .update({
@@ -163,9 +186,13 @@ export async function syncSource(
         }
       : {};
 
+    const log = (msg: string) => console.log(`[sync:${source.key}] ${msg}`);
+
     // 1. Crawl the list pages
+    log("crawling list pages…");
     const crawl = await adapter.listAll(fetchHtml);
     result.found = crawl.refs.length;
+    log(`found ${result.found} listings (declared ${crawl.totalDeclared ?? "?"}, failed=${crawl.failed})`);
     if (crawl.failed) result.errors.push("list crawl incomplete: a page fetch failed");
 
     // 2. Safety rail — never mass-delist off a broken/partial crawl
@@ -182,7 +209,7 @@ export async function syncSource(
     // 3. Load our existing copies for this source
     const { data: existingRows, error: existingErr } = await supabase
       .from("cars")
-      .select("id, source_listing_id, status, price")
+      .select("id, source_listing_id, status, price, description_zh")
       .eq("source_id", source.id);
     if (existingErr) throw new Error(`load existing cars: ${existingErr.message}`);
     const existing = new Map<string, ExistingCar>();
@@ -190,19 +217,49 @@ export async function syncSource(
       if (row.source_listing_id) existing.set(row.source_listing_id, row);
     }
 
-    // 4. Fetch details sequentially and upsert
+    // 4. Fetch details + translate + upsert —— 有界并发(抓取/翻译/写库并行加速)
     const now = new Date().toISOString();
-    for (const ref of crawl.refs) {
+    const total = crawl.refs.length;
+    let done = 0;
+    log(`processing ${total} listings with concurrency=${concurrency}…`);
+
+    const processRef = async (ref: SourceListingRef): Promise<void> => {
       let parsed: ParsedListing;
       try {
         parsed = await adapter.fetchDetail(fetchHtml, ref);
       } catch (err) {
         result.errors.push(`${ref.sourceListingId}: ${err instanceof Error ? err.message : String(err)}`);
-        await sleep(detailDelayMs);
-        continue;
+        log(`(${++done}/${total}) ✗ fetch failed ${ref.sourceListingId}`);
+        return;
       }
 
       const current = existing.get(ref.sourceListingId);
+
+      // AI 双语翻译:系统抓取的车源多为英文,补全中文 title/描述并把标签做成双语。
+      // 新增一定翻译;已有记录仅在「还没中文描述且源站确有描述可译」时回填一次,
+      // 避免无描述车源每次同步都重复翻译。失败时原样返回,不影响同步。
+      const needsTranslation = !current || (!current.description_zh && !!parsed.description);
+      if (needsTranslation) {
+        try {
+          const t0 = Date.now();
+          const loc = await localizeListing({
+            title: parsed.title,
+            title_zh: parsed.title_zh,
+            description: parsed.description,
+            description_zh: parsed.description_zh,
+            features: parsed.features,
+          });
+          log(`translated ${ref.sourceListingId} in ${Date.now() - t0}ms`);
+          parsed.title = loc.title ?? parsed.title;
+          parsed.title_zh = loc.title_zh ?? parsed.title_zh;
+          parsed.description = loc.description ?? parsed.description;
+          parsed.description_zh = loc.description_zh ?? parsed.description_zh;
+          if (loc.features.length) parsed.features = loc.features;
+        } catch {
+          /* 翻译失败:保留原始解析结果 */
+        }
+      }
+
       try {
         if (!current) {
           const { error } = await supabase.from("cars").insert({
@@ -216,14 +273,13 @@ export async function syncSource(
           });
           if (error) throw new Error(error.message);
           result.inserted++;
+          log(`(${++done}/${total}) + new ${parsed.title_zh || parsed.title}`);
         } else {
           const update: Record<string, unknown> = {
             title: parsed.title,
-            title_zh: parsed.title_zh,
             mileage: parsed.mileage,
             image_url: parsed.image_url,
             images: parsed.images,
-            features: parsed.features,
             description: parsed.description,
             exterior_color: parsed.exterior_color,
             interior_color: parsed.interior_color,
@@ -232,6 +288,12 @@ export async function syncSource(
             expires_at: expiresAt(),
             ...locationOverride,
           };
+          // 只有在本轮做了翻译时才写中文/双语字段,否则保留库里已翻译好的内容
+          if (needsTranslation) {
+            update.title_zh = parsed.title_zh;
+            update.description_zh = parsed.description_zh;
+            update.features = parsed.features;
+          }
           if (parsed.price !== current.price) {
             update.price = parsed.price;
             update.original_price = parsed.original_price;
@@ -242,12 +304,16 @@ export async function syncSource(
           const { error } = await supabase.from("cars").update(update).eq("id", current.id);
           if (error) throw new Error(error.message);
           result.updated++;
+          log(`(${++done}/${total}) ↻ upd ${parsed.title_zh || parsed.title}`);
         }
       } catch (err) {
         result.errors.push(`${ref.sourceListingId}: upsert failed: ${err instanceof Error ? err.message : String(err)}`);
+        log(`(${++done}/${total}) ✗ upsert failed ${ref.sourceListingId}`);
       }
-      await sleep(detailDelayMs);
-    }
+    };
+
+    await runPool(crawl.refs, concurrency, processRef);
+    log(`upserts done — inserted ${result.inserted}, updated ${result.updated}`);
 
     // 5. Delist our active copies whose stock id disappeared from the source
     if (delistAllowed) {
