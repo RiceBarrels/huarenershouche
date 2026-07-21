@@ -2,6 +2,8 @@
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { EASE } from "@/lib/motion";
 import Image from "next/image";
 
 import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
@@ -43,7 +45,6 @@ import {
   DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
 interface Filters {
@@ -238,6 +239,9 @@ function BrowseContent() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
+  const reduced = useReducedMotion();
+  // 移动端搜索:默认折叠成按钮,有关键词时展开
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(() => !!(searchParams.get("q") || searchParams.get("keyword")));
 
   // Sync filters & sort to URL (replaceState avoids full Next.js re-render)
   const syncToUrl = useCallback((f: Filters, s: SortKey) => {
@@ -766,26 +770,80 @@ function BrowseContent() {
       <div className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
         <div className="flex items-center gap-2">
           <div ref={searchWrapperRef} className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-            <Input
-              placeholder="搜索品牌、车型..."
-              className="pl-9 font-mono text-sm"
-              value={filters.keyword}
-              onFocus={() => setSearchFocused(true)}
-              onChange={(e) => {
-                const next = { ...filters, keyword: e.target.value };
-                setFilters(next);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && filters.keyword.trim()) {
-                  addSearchHistory(filters.keyword.trim());
-                  setSearchHistory(getSearchHistory());
-                  setSearchFocused(false);
-                }
-              }}
-            />
+            <AnimatePresence initial={false} mode="popLayout">
+              {mobileSearchOpen ? (
+                <motion.div
+                  key="input"
+                  layout={!reduced}
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: EASE }}
+                  className="relative"
+                >
+                  <motion.span
+                    layoutId="browse-search-icon"
+                    className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2"
+                  >
+                    <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  </motion.span>
+                  <Input
+                    autoFocus
+                    placeholder="搜索品牌、车型..."
+                    className="px-9 font-mono text-sm"
+                    value={filters.keyword}
+                    onFocus={() => setSearchFocused(true)}
+                    onChange={(e) => {
+                      const next = { ...filters, keyword: e.target.value };
+                      setFilters(next);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && filters.keyword.trim()) {
+                        addSearchHistory(filters.keyword.trim());
+                        setSearchHistory(getSearchHistory());
+                        setSearchFocused(false);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileSearchOpen(false);
+                      setSearchFocused(false);
+                      setFilters({ ...filters, keyword: "" });
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label="关闭搜索"
+                  >
+                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  </button>
+                </motion.div>
+              ) : (
+                <motion.button
+                  key="button"
+                  type="button"
+                  layout={!reduced}
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: EASE }}
+                  onClick={() => {
+                    setMobileSearchOpen(true);
+                    setSearchFocused(true);
+                  }}
+                  className="flex h-9 w-full items-center gap-2 rounded-[0.3rem] border border-input bg-transparent px-3 text-left"
+                >
+                  <motion.span layoutId="browse-search-icon" className="flex shrink-0">
+                    <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                  </motion.span>
+                  <span className={`truncate font-mono text-sm ${filters.keyword ? "text-foreground" : "text-muted-foreground/70"}`}>
+                    {filters.keyword || "搜索品牌、车型..."}
+                  </span>
+                </motion.button>
+              )}
+            </AnimatePresence>
             {/* Search history dropdown */}
-            {searchFocused && !filters.keyword && searchHistory.length > 0 && (
+            {mobileSearchOpen && searchFocused && !filters.keyword && searchHistory.length > 0 && (
               <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border bg-background shadow-md">
                 <div className="flex items-center justify-between px-3 py-1.5">
                   <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
@@ -1013,21 +1071,18 @@ function BrowseContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="border border-border">
-                  <Skeleton className="aspect-[16/10] w-full" />
-                  <div className="space-y-2 p-3">
-                    <Skeleton className="h-4 w-3/4" />
-                    <Skeleton className="h-3 w-1/2" />
-                    <div className="flex justify-between">
-                      <Skeleton className="h-5 w-20" />
-                      <Skeleton className="h-3 w-16" />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+            /* 加载中用动画过渡代替骨架屏:轻量 spinner,数据到达后卡片逐个淡入 */
+            <motion.div
+              initial={reduced ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2, ease: EASE }}
+              className="flex flex-col items-center justify-center py-24"
+            >
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+              <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
+                Loading
+              </p>
+            </motion.div>
           ) : filtered.length > 0 ? (
             <>
             {/* 瀑布流:显式列分发(与社区一致)。按全局序号 i%列数 分列,

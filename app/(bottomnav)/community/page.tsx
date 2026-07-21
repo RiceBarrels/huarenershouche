@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
+import { EASE } from "@/lib/motion";
+import { useOverlay } from "@/components/car-overlay-provider";
 import {
   Heart,
   Loader2,
@@ -18,7 +21,6 @@ import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { Skeleton } from "@/components/ui/skeleton";
 import { carLink, userLink } from "@/lib/static-link";
 import {
   detectUserZip,
@@ -108,6 +110,7 @@ export default function CommunityFeedPage() {
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableError, setTableError] = useState(false);
+
   const [nearbyCars, setNearbyCars] = useState<{ car: DbCar; distance?: number; personalized?: boolean }[]>([]);
 
   // 搜索:默认不显示任何分类;只有搜索时才出现类型筛选
@@ -115,6 +118,7 @@ export default function CommunityFeedPage() {
   const [keyword, setKeyword] = useState("");
   const [searchType, setSearchType] = useState("");
   const searching = searchOpen && (keyword.trim() !== "" || searchType !== "");
+  const reduced = useReducedMotion();
 
   // 点赞:当前用户 + 已赞集合
   const [userId, setUserId] = useState<string | null>(null);
@@ -440,93 +444,104 @@ export default function CommunityFeedPage() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-4 md:px-4 md:py-6 xl:max-w-6xl">
         {/* Top bar — title + search (sticky) */}
         <div className="sticky top-0 z-30 -mx-3 bg-background/90 px-3 pb-3 pt-1 backdrop-blur-md md:top-14 md:-mx-4 md:px-4">
-          {searchOpen ? (
-            <div>
-              <div className="flex items-center gap-2 border border-border bg-background px-3">
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                <input
-                  autoFocus
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                  placeholder="搜索帖子..."
-                  className="h-10 w-full bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/60"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchOpen(false);
-                    setKeyword("");
-                    setSearchType("");
-                  }}
-                  className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
-                  aria-label="关闭搜索"
+          <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
+            <AnimatePresence initial={false} mode="popLayout">
+              {searchOpen ? (
+                <motion.div
+                  key="search"
+                  layout={!reduced}
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: EASE }}
                 >
-                  <X className="h-4 w-4" strokeWidth={1.5} />
-                </button>
-              </div>
-              {/* 类型筛选只在搜索时出现 */}
-              <div className="mt-2 flex items-center gap-1.5">
-                {SEARCH_TYPE_CHIPS.map((chip) => (
-                  <button
-                    key={chip.key}
-                    onClick={() => setSearchType(chip.key)}
-                    className={`border px-2.5 py-1 font-mono text-[11px] transition-colors ${
-                      searchType === chip.key
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
-                    }`}
-                  >
-                    {chip.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
-                  Community
-                </span>
-                <h1 className="font-mono text-base font-semibold tracking-tight">社区</h1>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setSearchOpen(true)}
-                  className="flex h-9 w-9 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-                  aria-label="搜索帖子"
+                  <div className="flex items-center gap-2 border border-border bg-background px-3">
+                    <motion.span layoutId="community-search-icon" className="shrink-0">
+                      <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                    </motion.span>
+                    <input
+                      autoFocus
+                      value={keyword}
+                      onChange={(e) => setKeyword(e.target.value)}
+                      placeholder="搜索帖子..."
+                      className="h-10 w-full bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchOpen(false);
+                        setKeyword("");
+                        setSearchType("");
+                      }}
+                      className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="关闭搜索"
+                    >
+                      <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                  {/* 类型筛选只在搜索时出现 */}
+                  <div className="mt-2 flex items-center gap-1.5">
+                    {SEARCH_TYPE_CHIPS.map((chip, i) => (
+                      <motion.button
+                        key={chip.key}
+                        initial={reduced ? false : { opacity: 0, y: -4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
+                        onClick={() => setSearchType(chip.key)}
+                        className={`border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                          searchType === chip.key
+                            ? "border-foreground bg-foreground text-background"
+                            : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
+                        }`}
+                      >
+                        {chip.label}
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="header"
+                  layout={!reduced}
+                  initial={reduced ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18, ease: EASE }}
+                  className="flex items-center justify-between gap-3"
                 >
-                  <Search className="h-4 w-4" strokeWidth={1.5} />
-                </button>
-                <Link
-                  href="/community/new"
-                  className="hidden h-9 items-center gap-1 border border-border px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground md:flex"
-                >
-                  <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  发帖
-                </Link>
-              </div>
-            </div>
-          )}
+                  <div>
+                    <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+                      Community
+                    </span>
+                    <h1 className="font-mono text-base font-semibold tracking-tight">社区</h1>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setSearchOpen(true)}
+                      className="flex h-9 w-9 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                      aria-label="搜索帖子"
+                    >
+                      <motion.span layoutId="community-search-icon" className="flex">
+                        <Search className="h-4 w-4" strokeWidth={1.5} />
+                      </motion.span>
+                    </button>
+                    <Link
+                      href="/community/new"
+                      className="hidden h-9 items-center gap-1 border border-border px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground md:flex"
+                    >
+                      <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      发帖
+                    </Link>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
         </div>
 
-        {/* Content */}
-        {loading ? (
-          <div className="columns-2 gap-3 md:columns-3 xl:columns-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="mb-3 break-inside-avoid border border-border">
-                <Skeleton className={i % 2 ? "h-40 w-full" : "h-56 w-full"} />
-                <div className="p-2.5">
-                  <Skeleton className="h-3 w-3/4" />
-                  <div className="mt-2 flex items-center gap-1.5">
-                    <Skeleton className="h-4 w-4" />
-                    <Skeleton className="h-2.5 w-16" />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : tableError ? (
+        {/* Content — 搜索/加载用动画过渡代替骨架屏 */}
+        {tableError ? (
           <div className="mt-12 flex flex-col items-center py-12">
             <ImageIcon className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
             <p className="mt-3 font-mono text-sm text-muted-foreground">社区即将上线</p>
@@ -535,41 +550,67 @@ export default function CommunityFeedPage() {
             </p>
           </div>
         ) : feed.length === 0 ? (
-          <div className="mt-12 flex flex-col items-center py-12">
-            <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
-            <p className="mt-3 font-mono text-sm text-muted-foreground">
-              {searching ? "没有找到相关帖子" : "暂无帖子"}
-            </p>
-            <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
-              {searching ? "换个关键词试试" : "成为第一个发帖的人吧"}
-            </p>
-          </div>
+          loading ? (
+            <div className="mt-16 flex justify-center py-12">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+            </div>
+          ) : (
+            <motion.div
+              initial={reduced ? false : { opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, ease: EASE }}
+              className="mt-12 flex flex-col items-center py-12"
+            >
+              <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
+              <p className="mt-3 font-mono text-sm text-muted-foreground">
+                {searching ? "没有找到相关帖子" : "暂无帖子"}
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
+                {searching ? "换个关键词试试" : "成为第一个发帖的人吧"}
+              </p>
+            </motion.div>
+          )
         ) : (
-          /* 小红书式瀑布流:显式列分发,追加不重排 */
-          <div className="flex items-start gap-3">
+          /* 小红书式瀑布流:显式列分发,追加不重排。搜索切换时卡片淡入淡出过渡,
+             加载中把结果轻微变淡代替骨架屏 */
+          <motion.div
+            className="flex items-start gap-3"
+            animate={{ opacity: loading ? 0.55 : 1 }}
+            transition={{ duration: 0.2, ease: EASE }}
+          >
             {feedColumns.map((col, colIdx) => (
               <div key={colIdx} className="min-w-0 flex-1">
-                {col.map((item) => {
-                  const card =
-                    item.kind === "post" ? (
-                      <PostCard
-                        post={item.post}
-                        liked={likedIds.has(item.post.id)}
-                        onLike={() => toggleLike(item.post)}
-                      />
-                    ) : (
-                      <CarFeedCard car={item.car} distance={item.distance} personalized={item.personalized} />
+                <AnimatePresence initial={false} mode="popLayout">
+                  {col.map((item) => {
+                    const card =
+                      item.kind === "post" ? (
+                        <PostCard
+                          post={item.post}
+                          liked={likedIds.has(item.post.id)}
+                          onLike={() => toggleLike(item.post)}
+                        />
+                      ) : (
+                        <CarFeedCard car={item.car} distance={item.distance} personalized={item.personalized} />
+                      );
+                    const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
+                    return (
+                      <motion.div
+                        key={key}
+                        layout={!reduced}
+                        initial={reduced ? false : { opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={reduced ? undefined : { opacity: 0, scale: 0.97 }}
+                        transition={{ duration: 0.25, ease: EASE }}
+                        className="mb-3"
+                      >
+                        {card}
+                      </motion.div>
                     );
-                  const key = item.kind === "post" ? item.post.id : `car-${item.car.id}`;
-                  return (
-                    <div key={key} className="mb-3">
-                      {card}
-                    </div>
-                  );
-                })}
+                  })}
+                </AnimatePresence>
               </div>
             ))}
-          </div>
+          </motion.div>
         )}
 
         {/* 无限滚动哨兵 + 状态 */}
@@ -594,6 +635,7 @@ export default function CommunityFeedPage() {
       >
         <Plus className="h-5 w-5" strokeWidth={1.5} />
       </Link>
+
     </div>
   );
 }
@@ -608,10 +650,19 @@ function PostCard({
   onLike: () => void;
 }) {
   const router = useRouter();
+  const { enabled: overlayEnabled, openPost, openUser } = useOverlay();
   const cover = post.images?.[0];
   return (
     <Link
       href={`/community/${post.id}`}
+      onClick={(e) => {
+        // 移动端:在当前页浮层打开(从卡片放大);桌面端正常跳转
+        if (overlayEnabled) {
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
+        }
+      }}
       className="block border border-border bg-card transition-colors hover:border-foreground/30"
     >
       {cover ? (
@@ -671,7 +722,8 @@ function PostCard({
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
-              router.push(userLink(post.user_id));
+              if (overlayEnabled) openUser(post.user_id);
+              else router.push(userLink(post.user_id));
             }}
             className="flex min-w-0 items-center gap-1.5 transition-opacity hover:opacity-70"
           >
@@ -704,9 +756,17 @@ function PostCard({
 }
 
 function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: number; personalized?: boolean }) {
+  const { enabled: overlayEnabled, openCar } = useOverlay();
   return (
     <Link
       href={carLink(car.id)}
+      onClick={(e) => {
+        if (overlayEnabled) {
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          openCar(car, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
+        }
+      }}
       className="block border border-border bg-card transition-colors hover:border-foreground/30"
     >
       <div className="relative">

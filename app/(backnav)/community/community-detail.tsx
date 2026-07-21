@@ -25,6 +25,7 @@ import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 import { RelatedPosts } from "@/components/related-posts";
+import { useOverlay } from "@/components/car-overlay-provider";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -57,13 +58,27 @@ interface ReplyTarget {
 export default function CommunityDetailPage({
   initialPost = null,
   initialRelated,
+  embedded = false,
+  onClose,
 }: {
   initialPost?: DbCommunityPost | null;
   initialRelated?: DbCommunityPost[];
+  // embedded:在移动端浮层里内嵌打开(隐藏 Header/Footer,不占满整屏高度)
+  embedded?: boolean;
+  onClose?: () => void;
 } = {}) {
   const { id: routeId } = useRouteParams<{ id: string }>();
   const postId = initialPost?.id ?? routeId;
   const router = useRouter();
+  const showChrome = !embedded;
+  const { enabled: overlayEnabled, openUser } = useOverlay();
+  // 移动端:点头像/名字在浮层打开主页
+  const userClick = (uid: string) => (e: React.MouseEvent) => {
+    if (overlayEnabled) {
+      e.preventDefault();
+      openUser(uid);
+    }
+  };
 
   const [post, setPost] = useState<DbCommunityPost | null>(initialPost);
   const [comments, setComments] = useState<DbPostComment[]>([]);
@@ -380,7 +395,7 @@ export default function CommunityDetailPage({
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
-        <Header />
+        {showChrome && <Header />}
         <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
           <div className="mt-2 flex items-center gap-2">
             <Skeleton className="h-9 w-9" />
@@ -390,7 +405,7 @@ export default function CommunityDetailPage({
           <Skeleton className="mt-4 h-6 w-3/4" />
           <Skeleton className="mt-3 h-20 w-full" />
         </main>
-        <Footer />
+        {showChrome && <Footer />}
       </div>
     );
   }
@@ -398,7 +413,7 @@ export default function CommunityDetailPage({
   if (tableError) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
-        <Header />
+        {showChrome && <Header />}
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-12">
           <ImageIcon
             className="h-8 w-8 text-muted-foreground/50"
@@ -408,7 +423,7 @@ export default function CommunityDetailPage({
             社区即将上线
           </p>
         </main>
-        <Footer />
+        {showChrome && <Footer />}
       </div>
     );
   }
@@ -416,30 +431,39 @@ export default function CommunityDetailPage({
   if (!post) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
-        <Header />
+        {showChrome && <Header />}
         <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-12">
           <p className="font-mono text-sm text-muted-foreground">
             帖子不存在或已被删除
           </p>
         </main>
-        <Footer />
+        {showChrome && <Footer />}
       </div>
     );
   }
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-background font-mono"
-      style={{ paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }}
+      className={
+        embedded
+          ? "flex flex-col bg-background font-mono"
+          : "flex min-h-screen flex-col bg-background font-mono"
+      }
+      style={
+        embedded
+          ? undefined
+          : { paddingBottom: "calc(56px + env(safe-area-inset-bottom, 0px))" }
+      }
     >
-      <Header />
+      {showChrome && <Header />}
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4">
-        <DesktopBack fallback="/community" />
+        {showChrome && <DesktopBack fallback="/community" />}
 
         {/* Author row + share */}
         <div className="flex items-center gap-2.5">
           <Link
             href={userLink(post.user_id)}
+            onClick={userClick(post.user_id)}
             className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted transition-opacity hover:opacity-70"
           >
             <img
@@ -451,6 +475,7 @@ export default function CommunityDetailPage({
           <div className="min-w-0">
             <Link
               href={userLink(post.user_id)}
+              onClick={userClick(post.user_id)}
               className="block truncate font-mono text-xs font-medium transition-colors hover:text-muted-foreground"
             >
               {post.profiles?.username || "匿名"}
@@ -679,11 +704,15 @@ export default function CommunityDetailPage({
           className="mt-8 border-t border-border pt-5"
         />
       </main>
-      <Footer />
+      {showChrome && <Footer />}
 
       {/* 底部固定操作栏:评论输入 + 点赞 + 评论数 */}
       <div
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm"
+        className={
+          embedded
+            ? "absolute inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm"
+            : "fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 backdrop-blur-sm"
+        }
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
         <div className="mx-auto w-full max-w-2xl px-4 py-2">
@@ -805,10 +834,18 @@ function CommentRow({
   onDelete: () => void;
 }) {
   const avatarSize = isReply ? "h-6 w-6" : "h-8 w-8";
+  const { enabled: overlayEnabled, openUser } = useOverlay();
+  const onUser = (e: React.MouseEvent) => {
+    if (overlayEnabled) {
+      e.preventDefault();
+      openUser(comment.user_id);
+    }
+  };
   return (
     <div className="flex gap-2.5">
       <Link
         href={userLink(comment.user_id)}
+        onClick={onUser}
         className={`${avatarSize} flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted transition-opacity hover:opacity-70`}
       >
         <img
@@ -820,6 +857,7 @@ function CommentRow({
       <div className="min-w-0 flex-1">
         <Link
           href={userLink(comment.user_id)}
+          onClick={onUser}
           className="font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
         >
           {comment.profiles?.username || "匿名"}

@@ -30,9 +30,18 @@ interface SellerProfile {
   created_at: string;
 }
 
-export default function UserProfilePage() {
+export default function UserProfilePage({
+  userId: userIdProp,
+  embedded = false,
+  onClose,
+}: {
+  userId?: string;
+  embedded?: boolean;
+  onClose?: () => void;
+} = {}) {
   const params = useRouteParams<{ id: string }>();
-  const userId = params.id as string;
+  const userId = userIdProp ?? (params.id as string);
+  const showChrome = !embedded;
   const [profile, setProfile] = useState<SellerProfile | null>(null);
   const [cars, setCars] = useState<DbCar[]>([]);
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
@@ -106,12 +115,12 @@ export default function UserProfilePage() {
     : "";
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div className={embedded ? "flex flex-col bg-background font-mono" : "flex min-h-screen flex-col bg-background font-mono"}>
 
-      <Header />
+      {showChrome && <Header />}
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
-        <DesktopBack fallback="/" />
+        {showChrome && <DesktopBack fallback="/" />}
         <h2 className="font-mono text-sm font-semibold">卖家主页</h2>
         {loading ? (
           <div className="mt-4">
@@ -309,7 +318,7 @@ export default function UserProfilePage() {
           </>
         )}
       </main>
-      <Footer />
+      {showChrome && <Footer />}
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform } from "framer-motion";
 
 import {
   Search,
@@ -20,7 +20,7 @@ import { CarCard } from "@/components/car-card";
 import { SectionHeader } from "@/components/section-header";
 import { Reveal, RevealGroup, RevealItem } from "@/components/reveal";
 import { CountUp } from "@/components/count-up";
-import { scaleIn } from "@/lib/motion";
+import { scaleIn, EASE } from "@/lib/motion";
 import { PriceDroppedCars } from "@/components/price-dropped-cars";
 import { TrendingSearches } from "@/components/trending-searches";
 import { RegionBrandEntry } from "@/components/region-brand-entry";
@@ -287,6 +287,8 @@ export default function Home() {
   const [monthlyBudget, setMonthlyBudget] = useState("400");
   const [carCount, setCarCount] = useState<number | null>(null);
   const [communityPosts, setCommunityPosts] = useState<DbCommunityPost[]>([]);
+  // 移动端:搜索框默认折叠成按钮,点击展开为完整搜索表单(桌面端始终展开)
+  const [heroFormOpen, setHeroFormOpen] = useState(false);
 
   // Subtle parallax on the hero grid backdrop
   const prefersReduced = useReducedMotion();
@@ -469,12 +471,14 @@ export default function Home() {
           </p>
 
           {/* Structured search form - cars.com style */}
+          {(() => {
+          const searchForm = (
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSearch();
             }}
-            className="mt-10 overflow-hidden rounded-md border border-border bg-background"
+            className="overflow-hidden rounded-md border border-border bg-background"
           >
             {/* Row: Make + Price | Keyword | ZIP | Search */}
             <div className="flex flex-col md:flex-row">
@@ -546,6 +550,49 @@ export default function Home() {
               </Button>
             </div>
           </form>
+          );
+          return (
+            <div className="mt-8 md:mt-10">
+              {/* 桌面端:表单始终展开 */}
+              <div className="hidden md:block">{searchForm}</div>
+
+              {/* 移动端:点击搜索按钮展开成完整表单 */}
+              <div className="md:hidden">
+                <AnimatePresence initial={false} mode="wait">
+                  {heroFormOpen ? (
+                    <motion.div
+                      key="form"
+                      initial={prefersReduced ? false : { opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={prefersReduced ? undefined : { opacity: 0, height: 0 }}
+                      transition={{ duration: 0.28, ease: EASE }}
+                      className="overflow-hidden"
+                    >
+                      {searchForm}
+                    </motion.div>
+                  ) : (
+                    <motion.button
+                      key="pill"
+                      type="button"
+                      initial={prefersReduced ? false : { opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={prefersReduced ? undefined : { opacity: 0 }}
+                      transition={{ duration: 0.18, ease: EASE }}
+                      onClick={() => setHeroFormOpen(true)}
+                      className="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-background px-4 text-left"
+                    >
+                      <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                      <span className="font-mono text-sm text-muted-foreground/70">
+                        搜索车型、品牌、关键词...
+                      </span>
+                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+              </div>
+            </div>
+          );
+          })()}
 
           {/* Popular makes + quick tags */}
           <div className="mt-6 flex flex-wrap items-center gap-1.5">

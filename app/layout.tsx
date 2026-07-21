@@ -4,6 +4,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 import { IdentityProvider } from "@/components/identity-provider";
+import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
@@ -134,6 +135,7 @@ export default function RootLayout({
           >
             <CapacitorProvider>
               <IdentityProvider>
+                <CarOverlayProvider>
                 <div
                   className="pointer-events-none z-50 fixed top-0 left-0 right-0 bg-linear-to-b from-background from-20% to-transparent flex justify-center items-center safe-area-pill-container"
                   style={{
@@ -146,6 +148,7 @@ export default function RootLayout({
                 <InitHaptic/>
                 <RealtimeNotifications />
                 <Analytics />
+                </CarOverlayProvider>
               </IdentityProvider>
             </CapacitorProvider>
           </div>

@@ -10,6 +10,7 @@ import { Heart, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { communityPostLink } from "@/lib/static-link";
+import { useOverlay } from "@/components/car-overlay-provider";
 import type { DbCommunityPost } from "@/lib/types";
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
@@ -36,6 +37,7 @@ export function RelatedPosts({
   className = "",
 }: RelatedPostsProps) {
   const [posts, setPosts] = useState<DbCommunityPost[]>(initial ?? []);
+  const { enabled: overlayEnabled, openPost } = useOverlay();
 
   useEffect(() => {
     if (initial && initial.length > 0) return;
@@ -112,6 +114,17 @@ export function RelatedPosts({
             <Link
               key={post.id}
               href={communityPostLink(post.id)}
+              onClick={(e) => {
+                if (overlayEnabled) {
+                  e.preventDefault();
+                  const r = e.currentTarget.getBoundingClientRect();
+                  openPost(
+                    post,
+                    { top: r.top, left: r.left, width: r.width, height: r.height },
+                    e.currentTarget.outerHTML,
+                  );
+                }
+              }}
               className="block border border-border bg-card transition-colors hover:border-foreground/30"
             >
               {cover ? (

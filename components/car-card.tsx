@@ -11,6 +11,7 @@ import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
 import { estimateMonthlyPayment, timeAgo } from "@/lib/format";
+import { useCarOverlay } from "@/components/car-overlay-provider";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
 
@@ -83,6 +84,7 @@ export function CarCard({
   const [liked, setLiked] = useState(false);
   const [favCount, setFavCount] = useState(car.favorites_count || 0);
   const [inCompare, setInCompare] = useState(false);
+  const { enabled: overlayEnabled, openCar, openUser } = useCarOverlay();
 
   useEffect(() => {
     setLiked(getFavorites().includes(car.id));
@@ -95,7 +97,21 @@ export function CarCard({
   }, [car.id]);
 
   return (
-    <Link href={carLink(car.id)}>
+    <Link
+      href={carLink(car.id)}
+      onClick={(e) => {
+        // 移动端:在当前页浮层打开(从卡片放大);桌面端正常跳转
+        if (overlayEnabled) {
+          e.preventDefault();
+          const r = e.currentTarget.getBoundingClientRect();
+          openCar(
+            car,
+            { top: r.top, left: r.left, width: r.width, height: r.height },
+            e.currentTarget.outerHTML,
+          );
+        }
+      }}
+    >
       <motion.article
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
@@ -309,7 +325,8 @@ export function CarCard({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                window.location.href = `/user/${car.seller_id}`;
+                if (overlayEnabled) openUser(car.seller_id);
+                else window.location.href = `/user/${car.seller_id}`;
               }}
             >
               <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">

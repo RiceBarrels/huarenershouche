@@ -68,6 +68,7 @@ import { ModelReviews } from "@/components/model-reviews";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { useIdentity } from "@/components/identity-provider";
+import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
@@ -89,16 +90,27 @@ function isVideo(url: string): boolean {
   return VIDEO_RE.test(url);
 }
 
-export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | null } = {}) {
+export default function CarDetailPage({
+  initialCar,
+  embedded = false,
+  onClose,
+}: {
+  initialCar?: DbCar | null;
+  // embedded:在移动端浮层里内嵌打开(隐藏 Header/Footer,不占满整屏高度)
+  embedded?: boolean;
+  onClose?: () => void;
+} = {}) {
   const params = useRouteParams<{ id: string }>();
   // SSR 预取时用路由参数兜底(静态导出下 params 才需客户端解析)
   const carId = (params.id as string) || initialCar?.id || "";
   const router = useRouter();
+  const showChrome = !embedded;
   const [car, setCar] = useState<DbCar | null>(initialCar ?? null);
   const [loading, setLoading] = useState(!initialCar);
   const [isFavorited, setIsFavorited] = useState(false);
   // user = 当前操作身份(actingId,用于归属/私信判断);authId = 真实用户(收藏等个人操作)
   const { actingId, authId } = useIdentity();
+  const { enabled: overlayEnabled, openUser } = useOverlay();
   const [user, setUser] = useState<string | null>(null);
   const [contactVisible, setContactVisible] = useState(false);
   const [callDialogOpen, setCallDialogOpen] = useState(false);
@@ -264,7 +276,7 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
-        <Header />
+        {showChrome && <Header />}
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
           <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <div>
@@ -300,7 +312,7 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
             </div>
           </div>
         </main>
-        <Footer />
+        {showChrome && <Footer />}
       </div>
     );
   }
@@ -308,7 +320,7 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
   if (!car) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
-        <Header />
+        {showChrome && <Header />}
         <main className="flex flex-1 items-center justify-center">
           <div className="text-center">
             <p className="font-mono text-sm text-muted-foreground">
@@ -325,7 +337,7 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
             </Link>
           </div>
         </main>
-        <Footer />
+        {showChrome && <Footer />}
       </div>
     );
   }
@@ -366,12 +378,12 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
   );
 
   return (
-    <div className="flex min-h-screen flex-col overflow-x-hidden bg-background font-mono">
+    <div className={embedded ? "flex flex-col overflow-x-hidden bg-background font-mono" : "flex min-h-screen flex-col overflow-x-hidden bg-background font-mono"}>
 
-      <Header />
-      <ScrollProgress />
+      {showChrome && <Header />}
+      {showChrome && <ScrollProgress />}
       <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
-        <DesktopBack fallback="/browse" />
+        {showChrome && <DesktopBack fallback="/browse" />}
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           {/* Left: Image + Details */}
@@ -814,6 +826,12 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
               <Link
                 href={userLink(car.seller_id)}
+                onClick={(e) => {
+                  if (overlayEnabled) {
+                    e.preventDefault();
+                    openUser(car.seller_id);
+                  }
+                }}
                 className="mt-3 flex items-center gap-3 py-2 transition-colors"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
@@ -1130,12 +1148,16 @@ export default function CarDetailPage({ initialCar }: { initialCar?: DbCar | nul
         {/* Spacer for mobile bottom action bar */}
         <div className="h-16 md:hidden" />
       </main>
-      <Footer />
-      <BackToTop />
+      {showChrome && <Footer />}
+      {showChrome && <BackToTop />}
 
       {/* Mobile sticky bottom action bar */}
-      <div 
-        className="fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+      <div
+        className={
+          embedded
+            ? "sticky inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+            : "fixed inset-x-0 bottom-0 z-40 flex items-center gap-2 border-t border-border bg-background/95 px-4 py-2.5 backdrop-blur-sm md:hidden"
+        }
         style={{
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
