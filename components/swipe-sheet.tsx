@@ -165,7 +165,7 @@ export function SwipeSheet({
     };
   }, [x, y, onClose]);
 
-  // 内容(上层)始终与卡片同轨放大 / 缩回;返回时到整段 ~50%~60% 由内层透明度淡出。
+  // 内容(上层)始终与卡片同轨放大 / 缩回;进/退场都在整段 ~50% 处由内层透明度交叉。
   const contentExit = { ...rectVariant, transition: ZOOM };
 
   return (
@@ -196,8 +196,8 @@ export function SwipeSheet({
         />
       )}
 
-      {/* 上层:浮层内容,与卡片同轨放大 / 缩小;内层透明度在 ~50%~60% 交叉:
-          进场淡入盖住卡片,返回淡出(content 变透明)露出卡片。 */}
+      {/* 上层:浮层内容,与卡片同轨放大 / 缩小;内层透明度在整段 ~10% 处交叉:
+          进场时卡片放大到 10% 即溶解成浮层内容,返回时浮层缩到 10% 即溶解回卡片。 */}
       <motion.div
         className="absolute inset-0 origin-top-left"
         initial={rectVariant}
@@ -208,8 +208,8 @@ export function SwipeSheet({
         <motion.div
           className="absolute inset-0"
           initial={hero ? { opacity: 0 } : false}
-          animate={hero ? { opacity: 1, transition: { duration: 0.05, delay: 0.21 } } : {}}
-          exit={hero ? { opacity: 0, transition: { duration: 0.05, delay: 0.21 } } : {}}
+          animate={hero ? { opacity: 1, transition: { duration: 0.08, delay: 0.05 } } : {}}
+          exit={hero ? { opacity: 0, transition: { duration: 0.08, delay: 0.05 } } : {}}
         >
           <motion.div
             ref={panelRef}
