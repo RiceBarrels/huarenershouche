@@ -191,11 +191,12 @@ function carMatchesKeyword(car: DbCar, rawKeyword: string): boolean {
 
 // 响应式列数(与社区瀑布流一致):2 / md 3 / xl 4
 function useColumnCount(): number {
-  const [count, setCount] = useState(2);
+  // 手机端一排一个;平板 3 列、桌面 4 列
+  const [count, setCount] = useState(1);
   useEffect(() => {
     const mdQuery = window.matchMedia("(min-width: 768px)");
     const xlQuery = window.matchMedia("(min-width: 1280px)");
-    const update = () => setCount(xlQuery.matches ? 4 : mdQuery.matches ? 3 : 2);
+    const update = () => setCount(xlQuery.matches ? 4 : mdQuery.matches ? 3 : 1);
     update();
     mdQuery.addEventListener("change", update);
     xlQuery.addEventListener("change", update);
@@ -1012,7 +1013,7 @@ function BrowseContent() {
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-4">
               {[1, 2, 3, 4, 5, 6].map((i) => (
                 <div key={i} className="border border-border">
                   <Skeleton className="aspect-[16/10] w-full" />
