@@ -74,8 +74,9 @@ function isDynamicPath(p: string): boolean { return p.includes("["); }
 function rel(p: string) { return relative(ROOT, p); }
 
 function extractParams(filePath: string): string[] {
-  const matches = filePath.match(/\[([a-zA-Z]+)\]/g);
-  return matches ? matches.map((m) => m.slice(1, -1)) : [];
+  // Handles [id], catch-all [...slug], and optional catch-all [[...slug]]
+  const matches = [...filePath.matchAll(/\[\[?(?:\.\.\.)?([a-zA-Z][a-zA-Z0-9]*)\]\]?/g)];
+  return matches.map((m) => m[1]);
 }
 
 function findParentRoute(filePath: string): string {
