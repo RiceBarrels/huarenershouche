@@ -45,7 +45,7 @@ export interface SyncOptions {
 
 const EXPIRY_DAYS = 30;
 /** Sources synced within this window are skipped unless force (cron runs daily). */
-const MIN_SYNC_GAP_MS = 3.9 * 24 * 60 * 60 * 1000;
+const MIN_SYNC_GAP_MS = 0.9 * 24 * 60 * 60 * 1000;
 
 function expiresAt(): string {
   return new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
