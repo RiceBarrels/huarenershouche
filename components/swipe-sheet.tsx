@@ -26,6 +26,7 @@ export function SwipeSheet({
   onClose,
   originRect,
   heroHtml,
+  topBarExtra,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -33,6 +34,8 @@ export function SwipeSheet({
   originRect?: OriginRect | null;
   // 被点卡片的真实 DOM(outerHTML):作为放大的主体,~50% 时溶解成内容
   heroHtml?: string | null;
+  // 顶部返回栏右侧的快捷操作(如详情页的 收藏/对比/分享)
+  topBarExtra?: ReactNode;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -75,6 +78,21 @@ export function SwipeSheet({
       lt: 0,
       vx: 0,
       vy: 0,
+      inHScroll: false,
+    };
+
+    // 起点是否在可横向滚动的元素内(如图片轮播):是则横滑交给原生滚动,
+    // 不触发浮层拖拽关闭
+    const isInHScroller = (start: EventTarget | null): boolean => {
+      let node = start instanceof HTMLElement ? start : null;
+      while (node && node !== el) {
+        if (node.scrollWidth > node.clientWidth + 1) {
+          const ox = getComputedStyle(node).overflowX;
+          if (ox === "auto" || ox === "scroll") return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
     };
 
     const springBack = () => {
@@ -84,6 +102,11 @@ export function SwipeSheet({
     };
 
     const onStart = (e: TouchEvent) => {
+      // 「静态层」(如图片灯箱)内的手势完全不接管:既不横拖也不下拉关闭
+      if (e.target instanceof HTMLElement && e.target.closest("[data-sheet-static]")) {
+        st.active = false;
+        return;
+      }
       const t = e.touches[0];
       st.active = true;
       st.axis = "";
@@ -91,6 +114,7 @@ export function SwipeSheet({
       st.sy = st.ly = t.clientY;
       st.lt = e.timeStamp;
       st.vx = st.vy = 0;
+      st.inHScroll = isInHScroller(e.target);
     };
 
     const onMove = (e: TouchEvent) => {
@@ -112,7 +136,7 @@ export function SwipeSheet({
       if (!st.axis) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
         if (Math.abs(dx) > Math.abs(dy)) {
-          st.axis = "x";
+          st.axis = st.inHScroll ? "scroll" : "x";
         } else if ((dy > 0 && atTop) || (dy < 0 && atBottom)) {
           st.axis = "y";
         } else {
@@ -216,8 +240,8 @@ export function SwipeSheet({
             className="relative flex h-full w-full flex-col overflow-hidden bg-background shadow-2xl"
             style={{ x, y, scale: dragScale, touchAction: "pan-y" }}
           >
-            {/* 顶部返回栏(往左返回,仅图标) */}
-            <div className="flex h-11 shrink-0 items-center border-b border-border px-1">
+            {/* 顶部返回栏:左侧返回,右侧快捷操作 */}
+            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-1">
               <button
                 type="button"
                 onClick={onClose}
@@ -226,6 +250,7 @@ export function SwipeSheet({
               >
                 <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
               </button>
+              {topBarExtra}
             </div>
             {/* 可滚动内容 */}
             <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">

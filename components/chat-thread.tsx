@@ -1,10 +1,15 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { ArrowLeft, Send, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import type { DbMessage } from "@/lib/types";
+
+// 媒体消息:内容为存储桶里的图片/视频公开 URL,渲染时直接展示
+export const CHAT_MEDIA_RE =
+  /^https?:\/\/\S+\.(jpe?g|png|gif|webp|heic|mp4|mov|webm)(\?\S*)?$/i;
+const VIDEO_EXT_RE = /\.(mp4|mov|webm)(\?\S*)?$/i;
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -27,8 +32,10 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Load messages + mark unread as read
   useEffect(() => {
@@ -98,6 +105,29 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
     inputRef.current?.focus();
   }
 
+  // 上传图片/视频到存储桶,以公开 URL 作为消息内容发送
+  async function handleUpload(file: File) {
+    if (file.size > 50 * 1024 * 1024) {
+      alert("文件不能超过 50MB");
+      return;
+    }
+    setUploading(true);
+    const ext = (file.name.split(".").pop() || "bin").toLowerCase();
+    const path = `chat/${conversationId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+    const { error } = await supabase.storage.from("car-images").upload(path, file);
+    if (!error) {
+      const { data: { publicUrl } } = supabase.storage.from("car-images").getPublicUrl(path);
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: currentUserId,
+        content: publicUrl,
+      });
+    } else {
+      alert("上传失败,请重试");
+    }
+    setUploading(false);
+  }
+
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
@@ -131,17 +161,42 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                   className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[75%] px-3 py-2 ${
+                    className={`max-w-[75%] ${
+                      CHAT_MEDIA_RE.test(msg.content) ? "p-1" : "px-3 py-2"
+                    } ${
                       isMine
                         ? "bg-foreground text-background"
                         : "border border-border bg-muted"
                     }`}
                   >
-                    <p className="whitespace-pre-wrap font-mono text-sm">
-                      {msg.content}
-                    </p>
+                    {CHAT_MEDIA_RE.test(msg.content) ? (
+                      VIDEO_EXT_RE.test(msg.content) ? (
+                        <video
+                          src={msg.content}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          className="max-h-64 w-full"
+                        />
+                      ) : (
+                        <a href={msg.content} target="_blank" rel="noreferrer">
+                          <img
+                            src={msg.content}
+                            alt="图片消息"
+                            loading="lazy"
+                            className="max-h-64 w-full object-contain"
+                          />
+                        </a>
+                      )
+                    ) : (
+                      <p className="whitespace-pre-wrap font-mono text-sm">
+                        {msg.content}
+                      </p>
+                    )}
                     <p
                       className={`mt-1 font-mono text-[10px] ${
+                        CHAT_MEDIA_RE.test(msg.content) ? "px-2 pb-1" : ""
+                      } ${
                         isMine ? "text-background/60" : "text-muted-foreground"
                       }`}
                     >
@@ -159,6 +214,31 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
       {/* Input */}
       <div className="border-t border-border px-4 py-3">
         <div className="flex gap-2">
+          {/* 上传图片/视频 */}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleUpload(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            disabled={uploading}
+            aria-label="发送图片或视频"
+            className="flex h-10 w-10 shrink-0 items-center justify-center self-end border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <Plus className="h-4 w-4" strokeWidth={1.5} />
+            )}
+          </button>
           <textarea
             ref={inputRef}
             className="flex-1 resize-none border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
@@ -174,16 +254,11 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             }}
           />
           <Button
-            size="sm"
-            className="h-auto self-end gap-1 font-mono text-xs"
+            className="self-end gap-1 font-mono text-xs h-10"
             onClick={handleSend}
-            disabled={!content.trim() || sending}
+            disabled={!content.trim()}
           >
-            {sending ? (
-              <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
-            ) : (
-              <Send className="h-3 w-3" strokeWidth={1.5} />
-            )}
+              <><Send className="h-3 w-3" strokeWidth={1.5} /> 发送</>
           </Button>
         </div>
       </div>

@@ -6,6 +6,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { X, GitCompare, Trash2, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+} from "@/components/ui/drawer";
+import { CompareContent } from "@/components/compare-content";
 import { getCompareIds, removeFromCompare, clearCompare } from "@/lib/compare";
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import { supabase } from "@/lib/supabase";
@@ -17,11 +23,13 @@ export function CompareBar() {
   const router = useRouter();
   const pathname = usePathname();
   // 移动端详情浮层(swipe-sheet, z-60)打开时:提层到其上方,并贴屏幕底(导航已被浮层盖住)
-  const { overlayOpen } = useCarOverlay();
+  // enabled = 移动端(<md):「对比」在 drawer 里打开,不跳 /compare(浮层下跳页看不见)
+  const { enabled: isMobile, overlayOpen } = useCarOverlay();
   const [mounted, setMounted] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
   const [cars, setCars] = useState<Map<string, DbCar>>(new Map());
   const [navHeight, setNavHeight] = useState(0);
+  const [compareOpen, setCompareOpen] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -79,6 +87,7 @@ export function CompareBar() {
   const bottomOffset = overlayOpen ? 0 : navHeight;
 
   return createPortal(
+    <>
     <AnimatePresence>
       {visible && (
         <motion.div
@@ -159,7 +168,10 @@ export function CompareBar() {
                 size="sm"
                 className="h-8 gap-1 font-mono text-xs"
                 disabled={ids.length < 2}
-                onClick={() => router.push("/compare")}
+                onClick={() => {
+                  if (isMobile) setCompareOpen(true);
+                  else router.push("/compare");
+                }}
               >
                 对比 ({ids.length})
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -168,7 +180,29 @@ export function CompareBar() {
           </div>
         </motion.div>
       )}
-    </AnimatePresence>,
+    </AnimatePresence>
+
+    {/* 移动端:对比内容在 drawer 里打开(浮层/任意页面上都可见) */}
+    <Drawer open={compareOpen} onOpenChange={setCompareOpen}>
+      <DrawerContent className="max-h-[85vh]">
+        <div className="flex items-center justify-between px-4 pb-2 pt-4">
+          <DrawerClose asChild>
+            <button
+              type="button"
+              className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={1.5} />
+            </button>
+          </DrawerClose>
+          <span className="font-mono text-sm font-semibold">车辆对比</span>
+          <div className="h-8 w-8" />
+        </div>
+        <div className="overflow-y-auto px-4 pb-8">
+          <CompareContent />
+        </div>
+      </DrawerContent>
+    </Drawer>
+    </>,
     document.body
   );
 }

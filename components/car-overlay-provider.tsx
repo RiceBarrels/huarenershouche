@@ -16,6 +16,7 @@ import {
 import { AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { SwipeSheet, type OriginRect } from "@/components/swipe-sheet";
+import { CarSheetActions } from "@/components/car-sheet-actions";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 // 动态载入,打断 detail → card → 本文件 的循环依赖,并分包
@@ -109,7 +110,13 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
       <AnimatePresence>
         {stack.map((layer) =>
           layer.kind === "car" ? (
-            <SwipeSheet key={layer.key} originRect={layer.rect} heroHtml={layer.heroHtml} onClose={closeTop}>
+            <SwipeSheet
+              key={layer.key}
+              originRect={layer.rect}
+              heroHtml={layer.heroHtml}
+              onClose={closeTop}
+              topBarExtra={<CarSheetActions car={layer.car} />}
+            >
               <CarDetail initialCar={layer.car} embedded onClose={closeTop} />
             </SwipeSheet>
           ) : layer.kind === "post" ? (

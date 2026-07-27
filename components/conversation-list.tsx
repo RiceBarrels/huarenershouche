@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
-import { ChatThread } from "@/components/chat-thread";
+import { ChatThread, CHAT_MEDIA_RE } from "@/components/chat-thread";
 import type { DbConversation } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -36,6 +36,17 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
   useEffect(() => {
     loadConversations();
   }, [userId, initialConvId, initialOtherUserId]);
+
+  // 手机端聊天全屏时锁定背景页面滚动
+  useEffect(() => {
+    if (!activeConversation) return;
+    if (window.matchMedia("(min-width: 768px)").matches) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [activeConversation]);
 
   async function loadConversations() {
     setLoading(true);
@@ -118,34 +129,43 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
 
   if (activeConversation) {
     return (
-      <div className="h-[500px] border border-border">
-        <ChatThread
-          conversationId={activeConversation}
-          currentUserId={userId}
-          otherUsername={activeOtherName}
-          onBack={() => {
-            setActiveConversation(null);
-            loadConversations();
-          }}
-        />
+      <div
+        // 手机:全屏接管(盖住页头,聊天占满视口,键盘弹起不跳);桌面:内嵌卡片
+        className="fixed inset-0 z-[70] flex flex-col bg-background font-mono md:static md:z-auto md:h-[600px] md:border md:border-border"
+        style={{
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        }}
+      >
+        <div className="min-h-0 flex-1">
+          <ChatThread
+            conversationId={activeConversation}
+            currentUserId={userId}
+            otherUsername={activeOtherName}
+            onBack={() => {
+              setActiveConversation(null);
+              loadConversations();
+            }}
+          />
+        </div>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <p className="py-8 text-center font-mono text-xs text-muted-foreground">
-        加载中...
-      </p>
+      <div className="flex items-center justify-center py-12">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
+      </div>
     );
   }
 
   if (conversations.length === 0) {
     return (
-      <div className="flex flex-col items-center border border-border py-12">
-        <MessageSquare className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
+      <div className="mx-4 flex flex-col items-center border border-dashed border-border py-12 md:mx-0">
+        <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
         <p className="mt-3 font-mono text-sm text-muted-foreground">暂无消息</p>
-        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+        <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
           在车辆详情页可以给卖家发消息
         </p>
       </div>
@@ -153,11 +173,19 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
   }
 
   return (
-    <div className="space-y-2">
+    <div className="divide-y divide-border border-y border-border md:border-x">
       {conversations.map((conv) => {
         const isBuyer = conv.buyer_id === userId;
         const otherProfile = isBuyer ? conv.seller_profile : conv.buyer_profile;
         const otherName = otherProfile?.username || "用户";
+        const unread = (conv.unread_count ?? 0) > 0;
+        const preview = conv.last_message
+          ? CHAT_MEDIA_RE.test(conv.last_message)
+            ? /\.(mp4|mov|webm)(\?|$)/i.test(conv.last_message)
+              ? "[视频]"
+              : "[图片]"
+            : conv.last_message
+          : "暂无消息";
 
         return (
           <button
@@ -166,45 +194,54 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
               setActiveConversation(conv.id);
               setActiveOtherName(otherName);
             }}
-            className="flex w-full items-start gap-3 border border-border p-3 text-left transition-colors hover:border-foreground/20"
+            className="flex w-full items-center gap-3 px-3 py-3.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
           >
-            {/* Avatar */}
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center border border-border bg-muted">
-              <img
-                src={avatarUrl(otherProfile?.avatar_url, otherProfile?.username)}
-                alt=""
-                className="h-full w-full object-cover"
-              />
+            {/* Avatar + unread dot */}
+            <div className="relative shrink-0">
+              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                <img
+                  src={avatarUrl(otherProfile?.avatar_url, otherProfile?.username)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </span>
+              {unread && (
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[9px] font-semibold text-white">
+                  {conv.unread_count}
+                </span>
+              )}
             </div>
 
             {/* Content */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-xs font-medium">{otherName}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-baseline justify-between gap-2">
+                <span
+                  className={`truncate font-mono text-[13px] ${unread ? "font-semibold" : "font-medium"}`}
+                >
+                  {otherName}
+                </span>
                 <span className="shrink-0 font-mono text-[10px] text-muted-foreground">
                   {timeAgo(conv.last_message_at)}
                 </span>
               </div>
+              <p
+                className={`mt-0.5 truncate font-mono text-[11px] ${
+                  unread ? "font-medium text-foreground" : "text-muted-foreground"
+                }`}
+              >
+                {preview}
+              </p>
               {conv.cars && (
-                <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-[10px] text-muted-foreground/70">
+                  <span className="inline-block h-1 w-1 shrink-0 bg-brand" aria-hidden="true" />
                   {conv.cars.title_zh} · {formatPrice(conv.cars.price)}
                 </p>
               )}
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <p className="truncate font-mono text-[11px] text-muted-foreground">
-                  {conv.last_message || "暂无消息"}
-                </p>
-                {(conv.unread_count ?? 0) > 0 && (
-                  <span className="flex h-4 min-w-4 shrink-0 items-center justify-center rounded-full bg-foreground px-1 font-mono text-[10px] font-medium text-background">
-                    {conv.unread_count}
-                  </span>
-                )}
-              </div>
             </div>
 
             {/* Car thumbnail */}
             {conv.cars?.image_url && (
-              <div className="h-10 w-14 shrink-0 bg-muted">
+              <div className="h-12 w-16 shrink-0 overflow-hidden border border-border bg-muted">
                 <img src={conv.cars.image_url} alt="" className="h-full w-full object-cover" />
               </div>
             )}

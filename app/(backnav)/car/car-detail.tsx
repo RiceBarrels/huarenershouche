@@ -31,10 +31,18 @@ import {
   RefreshCw,
   GitCompare,
   Check,
+  X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
-import { timeAgo } from "@/lib/format";
+import { timeAgo, estimateMonthlyPayment, LOAN_ASSUMPTION } from "@/lib/format";
+import { SITE_URL } from "@/lib/seo-pages";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Reveal } from "@/components/reveal";
@@ -43,6 +51,7 @@ import { ScrollProgress } from "@/components/scroll-progress";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { CommentSection } from "@/components/comment-section";
+import { ChatThread } from "@/components/chat-thread";
 import { BackToTop } from "@/components/back-to-top";
 
 import { Button } from "@/components/ui/button";
@@ -127,6 +136,9 @@ export default function CarDetailPage({
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
   const [renewing, setRenewing] = useState(false);
   const [inCompare, setInCompare] = useState(false);
+  // 移动端:发消息在 drawer 里直接聊(不跳 /messages,浮层下跳页看不见)
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatConvId, setChatConvId] = useState<string | null>(null);
 
   useEffect(() => {
     setInCompare(isInCompare(carId));
@@ -136,6 +148,9 @@ export default function CarDetailPage({
     window.addEventListener("compare-change", onCompareChange);
     return () => window.removeEventListener("compare-change", onCompareChange);
   }, [carId]);
+
+  // 分享用规范公网地址(App 内 origin 是 capacitor://localhost、浮层内 href 是列表页,均不可分享)
+  const shareUrl = `${SITE_URL}/car/${carId}`;
   const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
   const mobileGalleryRef = useRef<HTMLDivElement>(null);
 
@@ -933,8 +948,9 @@ export default function CarDetailPage({
                   </Link>
                 )}
 
-                {user ? (
-                  <>
+                {/* 浮层模式下 收藏/对比/分享 在顶栏(CarSheetActions),此处不再重复 */}
+                {!embedded &&
+                  (user ? (
                     <Button
                       variant="outline"
                       className="w-full gap-1.5 font-mono text-xs"
@@ -946,18 +962,17 @@ export default function CarDetailPage({
                       />
                       {isFavorited ? "已收藏" : "收藏"}
                     </Button>
-                  </>
-                ) : (
-                  <Link href="/login">
-                    <Button
-                      variant="outline"
-                      className="w-full gap-1.5 font-mono text-xs"
-                    >
-                      <Heart className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      登录后收藏
-                    </Button>
-                  </Link>
-                )}
+                  ) : (
+                    <Link href="/login">
+                      <Button
+                        variant="outline"
+                        className="w-full gap-1.5 font-mono text-xs"
+                      >
+                        <Heart className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        登录后收藏
+                      </Button>
+                    </Link>
+                  ))}
 
                 {user && user === car.seller_id && (
                   <Link href={carEditLink(carId)}>
@@ -1001,7 +1016,7 @@ export default function CarDetailPage({
                         variant="outline"
                         className="w-full gap-1.5 font-mono text-xs"
                         onClick={async () => {
-                          // Ensure conversation exists, then navigate
+                          // 确保会话存在;移动端直接在 drawer 里聊,桌面端跳消息页
                           const { data: existing } = await supabase
                             .from("conversations")
                             .select("id")
@@ -1009,16 +1024,25 @@ export default function CarDetailPage({
                             .eq("buyer_id", user)
                             .eq("seller_id", car.seller_id)
                             .maybeSingle();
-                          if (!existing) {
-                            await supabase
+                          let convId = existing?.id as string | undefined;
+                          if (!convId) {
+                            const { data: created } = await supabase
                               .from("conversations")
                               .insert({
                                 car_id: carId,
                                 buyer_id: user,
                                 seller_id: car.seller_id,
-                              });
+                              })
+                              .select("id")
+                              .single();
+                            convId = created?.id;
                           }
-                          router.push(`/messages/${car.seller_id}`);
+                          if (overlayEnabled && convId) {
+                            setChatConvId(convId);
+                            setChatOpen(true);
+                          } else {
+                            router.push(`/messages/${car.seller_id}`);
+                          }
                         }}
                       >
                         <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1066,47 +1090,54 @@ export default function CarDetailPage({
                   {watching ? "取消降价监控" : "降价监控"}
                 </Button>
 
-                <Button
-                  variant="outline"
-                  className="w-full gap-1.5 font-mono text-xs"
-                  onClick={() => {
-                    if (inCompare) removeFromCompare(carId);
-                    else addToCompare(carId);
-                  }}
-                >
-                  {inCompare ? (
-                    <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
-                  ) : (
-                    <GitCompare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  )}
-                  {inCompare ? "已加入对比" : "加入对比"}
-                </Button>
+                {!embedded && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-1.5 font-mono text-xs"
+                    onClick={() => {
+                      if (inCompare) removeFromCompare(carId);
+                      else addToCompare(carId);
+                    }}
+                  >
+                    {inCompare ? (
+                      <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
+                    ) : (
+                      <GitCompare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    )}
+                    {inCompare ? "已加入对比" : "加入对比"}
+                  </Button>
+                )}
 
-                <Button
-                  variant="outline"
-                  className="w-full gap-1.5 font-mono text-xs"
-                  onClick={async () => {
-                    const { nativeShare } = await import("@/lib/capacitor");
-                    const shared = await nativeShare({
-                      title: car.title_zh,
-                      text: `${car.title_zh} - ${formatPrice(car.price)}`,
-                      url: window.location.href,
-                    });
-                    if (!shared) {
-                      navigator.clipboard.writeText(window.location.href);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                    }
-                  }}
-                >
-                  <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  {copied ? "已复制链接" : "分享"}
-                </Button>
+                {!embedded && (
+                  <Button
+                    variant="outline"
+                    className="w-full gap-1.5 font-mono text-xs"
+                    onClick={async () => {
+                      const { nativeShare } = await import("@/lib/capacitor");
+                      const shared = await nativeShare({
+                        title: car.title_zh,
+                        text: `${car.title_zh} - ${formatPrice(car.price)}`,
+                        url: shareUrl,
+                      });
+                      if (!shared) {
+                        navigator.clipboard.writeText(shareUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 2000);
+                      }
+                    }}
+                  >
+                    <Share2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    {copied ? "已复制链接" : "分享"}
+                  </Button>
+                )}
 
-                <QrShare
-                  url={typeof window !== "undefined" ? window.location.href : ""}
-                  title={car.title_zh || car.title}
-                />
+                {/* 二维码分享仅电脑版 */}
+                <div className="hidden md:block">
+                  <QrShare
+                    url={shareUrl}
+                    title={car.title_zh || car.title}
+                  />
+                </div>
 
                 <ReportDialog carId={carId}>
                   <Button
@@ -1120,10 +1151,50 @@ export default function CarDetailPage({
               </div>
             </div>
 
-            {/* Loan Calculator */}
+            {/* 预估月供:摘要卡片,点「计算」打开完整计算器 drawer */}
             {car.price > 0 && (
               <div className="mt-4 border border-border p-4">
-                <LoanCalculator price={car.price} />
+                <h3 className="font-mono text-sm font-semibold">预估月供</h3>
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground">
+                  用计算器估算你的每月还款
+                </p>
+                <div className="mt-3 bg-muted/50 p-4">
+                  <div className="border-l-2 border-foreground pl-3">
+                    <p className="font-mono text-xl font-bold">
+                      ${estimateMonthlyPayment(car.price).toLocaleString()}/月*
+                    </p>
+                    <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+                      按 {(LOAN_ASSUMPTION.apr * 100).toFixed(1)}% APR 估算*
+                    </p>
+                  </div>
+                  <Drawer>
+                    <DrawerTrigger asChild>
+                      <Button className="mt-4 w-full font-mono text-xs">
+                        计算
+                      </Button>
+                    </DrawerTrigger>
+                    <DrawerContent>
+                      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                        <DrawerClose asChild>
+                          <button
+                            type="button"
+                            className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <X className="h-4 w-4" strokeWidth={1.5} />
+                          </button>
+                        </DrawerClose>
+                        <span className="font-mono text-sm font-semibold">月供计算器</span>
+                        <div className="h-8 w-8" />
+                      </div>
+                      <div className="overflow-y-auto px-4 pb-8">
+                        <LoanCalculator price={car.price} />
+                      </div>
+                    </DrawerContent>
+                  </Drawer>
+                  <p className="mt-2 font-mono text-[10px] text-muted-foreground/70">
+                    *按 0 首付 / {LOAN_ASSUMPTION.months} 期估算,实际以贷款机构批核为准
+                  </p>
+                </div>
               </div>
             )}
 
@@ -1213,37 +1284,42 @@ export default function CarDetailPage({
             )}
           </div>
         </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0"
-          onClick={toggleFavorite}
-        >
-          <Heart
-            className={`h-4 w-4 ${isFavorited ? "fill-red-500 text-red-500" : ""}`}
-            strokeWidth={1.5}
-          />
-        </Button>
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-10 w-10 shrink-0"
-          onClick={async () => {
-            const { nativeShare } = await import("@/lib/capacitor");
-            const shared = await nativeShare({
-              title: car.title_zh,
-              text: `${car.title_zh} - ${formatPrice(car.price)}`,
-              url: window.location.href,
-            });
-            if (!shared) {
-              navigator.clipboard.writeText(window.location.href);
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }
-          }}
-        >
-          <Share2 className="h-4 w-4" strokeWidth={1.5} />
-        </Button>
+        {/* 浮层模式下 收藏/分享 已在顶栏,底部只留 价格 + 联系卖家 */}
+        {!embedded && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            onClick={toggleFavorite}
+          >
+            <Heart
+              className={`h-4 w-4 ${isFavorited ? "fill-red-500 text-red-500" : ""}`}
+              strokeWidth={1.5}
+            />
+          </Button>
+        )}
+        {!embedded && (
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-10 w-10 shrink-0"
+            onClick={async () => {
+              const { nativeShare } = await import("@/lib/capacitor");
+              const shared = await nativeShare({
+                title: car.title_zh,
+                text: `${car.title_zh} - ${formatPrice(car.price)}`,
+                url: shareUrl,
+              });
+              if (!shared) {
+                navigator.clipboard.writeText(shareUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }
+            }}
+          >
+            <Share2 className="h-4 w-4" strokeWidth={1.5} />
+          </Button>
+        )}
         {user ? (
           <Button
             className="h-10 gap-1.5 font-mono text-xs"
@@ -1300,6 +1376,22 @@ export default function CarDetailPage({
         open={lightboxOpen}
         onClose={() => setLightboxOpen(false)}
       />
+
+      {/* 移动端:与卖家的对话直接在 drawer 里进行 */}
+      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
+        <DrawerContent>
+          <div className="flex h-[70dvh] flex-col overflow-hidden">
+            {chatConvId && user && (
+              <ChatThread
+                conversationId={chatConvId}
+                currentUserId={user}
+                otherUsername={car.seller_name}
+                onBack={() => setChatOpen(false)}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

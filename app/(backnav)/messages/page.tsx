@@ -75,8 +75,9 @@ function MessagesContent() {
       }}
     >
       <Header />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
-        <div className="hidden md:mb-4 md:block">
+      {/* 手机:列表通栏、无 Footer;桌面:居中卡片 */}
+      <main className="mx-auto w-full max-w-3xl flex-1 py-4 md:px-4">
+        <div className="mb-3 px-4 md:mb-4 md:px-0">
           <div className="flex items-center gap-3">
             <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
               Messages
@@ -95,7 +96,9 @@ function MessagesContent() {
           />
         )}
       </main>
-      <Footer />
+      <div className="hidden md:block">
+        <Footer />
+      </div>
     </div>
     </PullToRefresh>
   );

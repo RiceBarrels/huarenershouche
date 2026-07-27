@@ -179,15 +179,6 @@ export function CarCard({
               </Badge>
             ) : null}
           </div>
-          {/* 系统检索标识:右下角,不与左上角的卖家/新上标签挤在一起 */}
-          {car.source_id && (
-            <Badge
-              variant="secondary"
-              className="absolute bottom-2 right-2 font-mono text-[10px] font-medium"
-            >
-              系统检索
-            </Badge>
-          )}
           {/* Action buttons */}
           <div className="absolute right-2 top-2 flex items-center gap-1">
             <button
@@ -346,12 +337,20 @@ export function CarCard({
               </span>
               {car.seller_name}
             </span>
-            {favCount > 0 && (
-              <span className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground/60">
-                <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
-                {favCount}
-              </span>
-            )}
+            <span className="flex shrink-0 items-center gap-2">
+              {favCount > 0 && (
+                <span className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground/60">
+                  <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
+                  {favCount}
+                </span>
+              )}
+              {/* 系统检索标识:卡片右下角 */}
+              {car.source_id && (
+                <Badge variant="secondary" className="font-mono text-[10px] font-medium">
+                  系统检索
+                </Badge>
+              )}
+            </span>
           </div>
         </div>
       </motion.article>

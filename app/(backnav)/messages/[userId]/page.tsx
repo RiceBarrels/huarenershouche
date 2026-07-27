@@ -73,8 +73,8 @@ function MessagesWithUserContent() {
         style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
       >
         <Header />
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
-          <h1 className="hidden font-mono text-lg font-semibold tracking-tight md:block md:mb-4">
+        <main className="mx-auto w-full max-w-3xl flex-1 py-4 md:px-4">
+          <h1 className="mb-3 px-4 font-mono text-lg font-semibold tracking-tight md:mb-4 md:px-0">
             消息
           </h1>
           {user && (
@@ -85,7 +85,9 @@ function MessagesWithUserContent() {
             />
           )}
         </main>
-        <Footer />
+        <div className="hidden md:block">
+          <Footer />
+        </div>
       </div>
     </PullToRefresh>
   );

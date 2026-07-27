@@ -16,6 +16,8 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
   const [scale, setScale] = useState(1);
   const [touchX, setTouchX] = useState<number | null>(null);
   const thumbStripRef = useRef<HTMLDivElement>(null);
+  // 刚结束拖拽时抑制 click(否则松手会误触发 缩放/关闭)
+  const draggingRef = useRef(false);
 
   useEffect(() => {
     if (open) {
@@ -84,8 +86,13 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
+          data-sheet-static=""
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90"
-          onClick={onClose}
+          onClick={(e) => {
+            if (draggingRef.current) return;
+            onClose();
+            e.stopPropagation();
+          }}
         >
           {/* Top bar */}
           <div className="absolute left-0 right-0 top-0 z-10 flex items-center justify-between p-4">
@@ -135,13 +142,24 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
               src={images[index]}
               alt=""
               initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
+              animate={{ opacity: 1, scale }}
               transition={{ duration: 0.2 }}
               className="max-h-[85vh] max-w-[90vw] select-none object-contain"
-              style={{ transform: `scale(${scale})`, transition: "transform 0.2s ease" }}
-              onClick={(e) => { e.stopPropagation(); toggleZoom(); }}
-              onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
-              onTouchEnd={(e) => { e.stopPropagation(); onImageTouchEnd(e.changedTouches[0].clientX); }}
+              style={{ touchAction: "pan-y" }}
+              // 未放大时跟手左右拖拽切换(触摸/鼠标都可);到阈值或甩动松手即翻页
+              drag={scale === 1 && images.length > 1 ? "x" : false}
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.7}
+              onDragStart={() => { draggingRef.current = true; }}
+              onDragEnd={(_, info) => {
+                if (info.offset.x < -60 || info.velocity.x < -500) next();
+                else if (info.offset.x > 60 || info.velocity.x > 500) prev();
+                setTimeout(() => { draggingRef.current = false; }, 0);
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (!draggingRef.current) toggleZoom();
+              }}
               draggable={false}
             />
           )}
