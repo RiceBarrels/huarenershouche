@@ -27,6 +27,7 @@ export function SwipeSheet({
   originRect,
   heroHtml,
   topBarExtra,
+  zIndex = 60,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -36,6 +37,8 @@ export function SwipeSheet({
   heroHtml?: string | null;
   // 顶部返回栏右侧的快捷操作(如详情页的 收藏/对比/分享)
   topBarExtra?: ReactNode;
+  // 逐层递增的层级(浮层栈里后开的盖前面的),须 <70(对比条)/<80(工具 drawer)
+  zIndex?: number;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -194,7 +197,7 @@ export function SwipeSheet({
 
   return (
     // 根节点为 motion 组件,AnimatePresence 才能在卸载前播放子层退场动画
-    <motion.div className="fixed inset-0 z-[60] md:hidden">
+    <motion.div className="fixed inset-0 md:hidden" style={{ zIndex }}>
       {/* 下层:被点卡片的真实 DOM,始终不透明,从原位连续放大到全屏、退场反向缩回。
           进场前 ~50% 由它露出(内容还透明),之后被内容盖上;返回时内容淡出重新露出它。
           它一直不透明,内容在其上淡入淡出,故交叉过程不会漏出背景、不闪。 */}

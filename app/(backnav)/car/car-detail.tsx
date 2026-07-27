@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import nextDynamic from "next/dynamic";
 import { useRouteParams } from "@/lib/use-route-params";
 import Link from "next/link";
 import { carEditLink, userLink } from "@/lib/static-link";
@@ -32,6 +33,7 @@ import {
   GitCompare,
   Check,
   X,
+  Navigation,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
@@ -102,6 +104,12 @@ const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 function isVideo(url: string): boolean {
   return VIDEO_RE.test(url);
 }
+
+// leaflet 不能 SSR,按需加载
+const StoreMap = nextDynamic(
+  () => import("@/components/store-map").then((m) => m.StoreMap),
+  { ssr: false },
+);
 
 export default function CarDetailPage({
   initialCar,
@@ -1150,6 +1158,53 @@ export default function CarDetailPage({
                 </ReportDialog>
               </div>
             </div>
+
+            {/* 车辆位置:地址 + OpenStreetMap 地图 + 一键导航 */}
+            {(storeAddress || (car.lat != null && car.lng != null)) && (
+              <div className="mt-4 border border-border p-4">
+                <h3 className="font-mono text-sm font-semibold">
+                  {storeAddress ? "门店地址" : "车辆位置"}
+                </h3>
+                <p className="mt-1.5 flex items-start gap-1.5 font-mono text-xs text-muted-foreground">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                  {storeAddress?.address || `${car.location_zh} · ${car.location}`}
+                </p>
+                {(storeAddress?.lat ?? car.lat) != null &&
+                  (storeAddress?.lng ?? car.lng) != null && (
+                    <div className="mt-3">
+                      <StoreMap
+                        markers={[
+                          {
+                            lat: (storeAddress?.lat ?? car.lat) as number,
+                            lng: (storeAddress?.lng ?? car.lng) as number,
+                            name: car.seller_name,
+                            address: storeAddress?.address || car.location_zh,
+                          },
+                        ]}
+                        className="h-44 w-full border border-border"
+                      />
+                    </div>
+                  )}
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full gap-1.5 font-mono text-xs"
+                  asChild
+                >
+                  <a
+                    href={
+                      storeAddress
+                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}`
+                        : `https://www.google.com/maps/search/?api=1&query=${car.lat},${car.lng}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    使用地图打开
+                  </a>
+                </Button>
+              </div>
+            )}
 
             {/* 预估月供:摘要卡片,点「计算」打开完整计算器 drawer */}
             {car.price > 0 && (

@@ -107,13 +107,17 @@ function DrawerOverlay({
 function DrawerContent({
   className,
   children,
+  overlayStyle,
   ...props
-}: React.ComponentProps<typeof DrawerPrimitive.Content>) {
+}: React.ComponentProps<typeof DrawerPrimitive.Content> & {
+  // 遮罩的内联样式(如动态 zIndex,需与内容同层时用)
+  overlayStyle?: React.CSSProperties
+}) {
   const kbHeight = useKeyboardHeight()
 
   return (
     <DrawerPortal data-slot="drawer-portal">
-      <DrawerOverlay />
+      <DrawerOverlay style={overlayStyle} />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
         className={cn(

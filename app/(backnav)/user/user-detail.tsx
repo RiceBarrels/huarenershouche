@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useRouteParams } from "@/lib/use-route-params";
-import { Calendar, Car, ExternalLink, Globe, MapPin, Store, Star, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Calendar, Car, ExternalLink, Globe, MapPin, Store, Star, Loader2, Navigation } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
@@ -12,10 +14,19 @@ import { Footer } from "@/components/footer";
 
 import { CarCard } from "@/components/car-card";
 import { DealerReviews } from "@/components/dealer-reviews";
+import { ChatThread } from "@/components/chat-thread";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 import { Heart, MessageSquare, Play } from "lucide-react";
+
+// leaflet 不能 SSR,按需加载
+const StoreMap = dynamic(
+  () => import("@/components/store-map").then((m) => m.StoreMap),
+  { ssr: false },
+);
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 
@@ -47,10 +58,21 @@ export default function UserProfilePage({
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [avgRating, setAvgRating] = useState<{ avg: number; count: number } | null>(null);
+  const [store, setStore] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
+  // 私信:真实登录用户;移动端在 drawer 里直接聊
+  const [authId, setAuthId] = useState<string | null>(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatConvId, setChatConvId] = useState<string | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setAuthId(data.user?.id ?? null));
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
-      const [profileRes, carsRes, reviewsRes, postsRes] = await Promise.all([
+      const [profileRes, carsRes, reviewsRes, postsRes, storeRes] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, username, avatar_url, location, account_type, is_system, claimed_by, created_at")
@@ -74,10 +96,21 @@ export default function UserProfilePage({
           .eq("status", "active")
           .order("created_at", { ascending: false })
           .limit(12),
+        supabase
+          .from("dealer_stores")
+          .select("address, lat, lng")
+          .eq("owner_id", userId)
+          .limit(1)
+          .maybeSingle(),
       ]);
       setProfile(profileRes.data as SellerProfile | null);
       setCars((carsRes.data as DbCar[]) || []);
       setPosts((postsRes.data as DbCommunityPost[]) || []);
+      setStore(
+        (storeRes.data as { address: string; lat: number | null; lng: number | null } | null)?.address
+          ? (storeRes.data as { address: string; lat: number | null; lng: number | null })
+          : null,
+      );
 
       const reviewData = (reviewsRes.data as { rating: number }[]) || [];
       if (reviewData.length > 0) {
@@ -114,8 +147,53 @@ export default function UserProfilePage({
       })
     : "";
 
+  // 可私信:已登录、不是本人、且不是未认领的系统账号(没人收消息)
+  const canMessage = authId !== userId && !isUnclaimedSystem;
+
+  async function startChat() {
+    if (!authId) {
+      router.push("/login");
+      return;
+    }
+    setChatLoading(true);
+    // 双向查任一已有会话(最近活跃优先)
+    const { data: existing } = await supabase
+      .from("conversations")
+      .select("id")
+      .or(
+        `and(buyer_id.eq.${authId},seller_id.eq.${userId}),and(buyer_id.eq.${userId},seller_id.eq.${authId})`,
+      )
+      .order("last_message_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    let convId = existing?.id as string | undefined;
+    if (!convId) {
+      // 会话必须挂在某辆车上,用该卖家最新在售车
+      const carId = cars[0]?.id;
+      if (!carId) {
+        setChatLoading(false);
+        router.push(`/messages/${userId}`);
+        return;
+      }
+      const { data: created } = await supabase
+        .from("conversations")
+        .insert({ car_id: carId, buyer_id: authId, seller_id: userId })
+        .select("id")
+        .single();
+      convId = created?.id;
+    }
+    setChatLoading(false);
+    if (convId && window.matchMedia("(max-width: 767px)").matches) {
+      // 手机:drawer 里直接聊
+      setChatConvId(convId);
+      setChatOpen(true);
+    } else {
+      router.push(`/messages/${userId}`);
+    }
+  }
+
   return (
-    <div className={embedded ? "flex flex-col bg-background font-mono" : "flex min-h-screen flex-col bg-background font-mono"}>
+    <div className={embedded ? "flex flex-col font-mono" : "flex min-h-screen flex-col font-mono"}>
 
       {showChrome && <Header />}
 
@@ -230,8 +308,87 @@ export default function UserProfilePage({
                     )}
                   </div>
                 )}
+                {canMessage ? 
+                  (
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        className="gap-1.5 font-mono text-xs"
+                        disabled={chatLoading}
+                        onClick={startChat}
+                      >
+                        {chatLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                        ) : (
+                          <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        )}
+                        私信用户
+                      </Button>
+                    </div>
+                  ):(
+                    <div className="mt-3">
+                      <Button
+                        size="sm"
+                        className="gap-1.5 font-mono text-xs"
+                        disabled
+                      >
+                        {chatLoading ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                        ) : (
+                          <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                        )}
+                        该用户无法私信
+                      </Button>
+                      <p className="font-mono text-[10px] leading-relaxed text-muted-foreground">该用户为公开网站检索汇总，因此无法私信。</p>
+                    </div>
+                  )
+                }
               </div>
             </div>
+
+            {/* 门店地址:OpenStreetMap 地图 + 一键导航 */}
+            {store?.address && (
+              <div className="mt-6 border border-border p-4">
+                <h2 className="font-mono text-sm font-semibold">门店地址</h2>
+                <p className="mt-1.5 flex items-start gap-1.5 font-mono text-xs text-muted-foreground">
+                  <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                  {store.address}
+                </p>
+                {store.lat != null && store.lng != null && (
+                  <div className="mt-3">
+                    <StoreMap
+                      markers={[
+                        {
+                          lat: store.lat,
+                          lng: store.lng,
+                          name: profile.username,
+                          address: store.address,
+                        },
+                      ]}
+                      className="h-52 w-full border border-border"
+                    />
+                  </div>
+                )}
+                <Button
+                  variant="outline"
+                  className="mt-3 w-full gap-1.5 font-mono text-xs"
+                  asChild
+                >
+                  <a
+                    href={
+                      store.lat != null && store.lng != null
+                        ? `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`
+                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    使用地图打开
+                  </a>
+                </Button>
+              </div>
+            )}
 
             {/* Dealer reviews — 放在车源列表之前 */}
             {profile.account_type === "dealer" && (
@@ -319,6 +476,22 @@ export default function UserProfilePage({
         )}
       </main>
       {showChrome && <Footer />}
+
+      {/* 手机端:与卖家的对话直接在 drawer 里进行 */}
+      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
+        <DrawerContent>
+          <div className="flex h-[70dvh] flex-col overflow-hidden">
+            {chatConvId && authId && (
+              <ChatThread
+                conversationId={chatConvId}
+                currentUserId={authId}
+                otherUsername={profile?.username || "卖家"}
+                onBack={() => setChatOpen(false)}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

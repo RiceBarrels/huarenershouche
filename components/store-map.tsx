@@ -174,7 +174,13 @@ export function StoreMap({
       `}</style>
       <div
         ref={mapRef}
+        // 地图拖动不应带动外层容器:
+        // data-vaul-no-drag → vaul drawer(卖家主页抽屉)放行
+        // data-sheet-static → SwipeSheet(详情浮层)放行
+        data-vaul-no-drag=""
+        data-sheet-static=""
         className={className || "h-48 w-full border border-border"}
+        style={{ touchAction: "none" }}
       />
     </>
   );

@@ -17,6 +17,7 @@ import { AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { SwipeSheet, type OriginRect } from "@/components/swipe-sheet";
 import { CarSheetActions } from "@/components/car-sheet-actions";
+import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 // 动态载入,打断 detail → card → 本文件 的循环依赖,并分包
@@ -57,6 +58,44 @@ type PostLayerInput = { kind: "post"; post: DbCommunityPost; rect: OriginRect | 
 type UserLayerInput = { kind: "user"; userId: string; rect: OriginRect | null; heroHtml: string | null };
 type LayerInput = CarLayerInput | PostLayerInput | UserLayerInput;
 type Layer = LayerInput & { key: number };
+
+// 卖家主页浮层外壳:底部 drawer(挂载后再置 open 以播放进场动画;
+// 拖拽/点遮罩关闭时等退场动画放完再出栈)
+function ProfileDrawer({
+  onClose,
+  zIndex,
+  children,
+}: {
+  onClose: () => void;
+  zIndex: number;
+  children: React.ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setOpen(true);
+  }, []);
+  return (
+    <Drawer
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          setOpen(false);
+          setTimeout(onClose, 250);
+        }
+      }}
+    >
+      <DrawerContent
+        className="max-h-[92vh]"
+        style={{ zIndex }}
+        overlayStyle={{ zIndex }}
+      >
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          {children}
+        </div>
+      </DrawerContent>
+    </Drawer>
+  );
+}
 
 export function CarOverlayProvider({ children }: { children: React.ReactNode }) {
   const [enabled, setEnabled] = useState(false);
@@ -108,27 +147,32 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
     <Ctx.Provider value={{ enabled, overlayOpen: stack.length > 0, openCar, openPost, openUser }}>
       {children}
       <AnimatePresence>
-        {stack.map((layer) =>
-          layer.kind === "car" ? (
+        {stack.map((layer, i) => {
+          // 逐层递增:后开的层盖住前面的(含「主页 drawer 里再点车」的场景)。
+          // 封顶 69:始终低于对比条(70)与工具类 drawer(80)
+          const z = Math.min(55 + i, 69);
+          return layer.kind === "car" ? (
             <SwipeSheet
               key={layer.key}
               originRect={layer.rect}
               heroHtml={layer.heroHtml}
               onClose={closeTop}
               topBarExtra={<CarSheetActions car={layer.car} />}
+              zIndex={z}
             >
               <CarDetail initialCar={layer.car} embedded onClose={closeTop} />
             </SwipeSheet>
           ) : layer.kind === "post" ? (
-            <SwipeSheet key={layer.key} originRect={layer.rect} heroHtml={layer.heroHtml} onClose={closeTop}>
+            <SwipeSheet key={layer.key} originRect={layer.rect} heroHtml={layer.heroHtml} onClose={closeTop} zIndex={z}>
               <CommunityDetail initialPost={layer.post} embedded onClose={closeTop} />
             </SwipeSheet>
           ) : (
-            <SwipeSheet key={layer.key} onClose={closeTop}>
+            // 卖家主页:用 drawer 打开(非全屏浮层)
+            <ProfileDrawer key={layer.key} onClose={closeTop} zIndex={z}>
               <UserDetail userId={layer.userId} embedded onClose={closeTop} />
-            </SwipeSheet>
-          ),
-        )}
+            </ProfileDrawer>
+          );
+        })}
       </AnimatePresence>
     </Ctx.Provider>
   );
