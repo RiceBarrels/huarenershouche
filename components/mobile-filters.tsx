@@ -7,16 +7,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
-  DrawerNested, DrawerContent, DrawerHeader, DrawerTitle, DrawerTrigger, DrawerClose,
+  DrawerNested, DrawerContent, DrawerTrigger, DrawerClose,
 } from "@/components/ui/drawer";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
-import Image from "next/image";
 import { match } from "pinyin-pro";
 import { Input } from "@/components/ui/input";
 
 // Re-export types and constants from search-filters
 import {
-  US_STATES, PAYMENT_PRESETS, LISTED_WITHIN_OPTIONS, CONDITION_TOGGLES, INITIAL_FILTERS,
+  PAYMENT_PRESETS, LISTED_WITHIN_OPTIONS, CONDITION_TOGGLES, INITIAL_FILTERS,
   isInListCI, toggleInListCI,
 } from "@/components/search-filters";
 import type { Filters, CountOption } from "@/components/search-filters";
@@ -34,12 +33,6 @@ function priceToIndex(price: number): number {
   }
   return 0;
 }
-function formatPriceLabel(price: number): string {
-  if (price >= 200000) return "不限";
-  if (price >= 10000) return `$${(price / 1000).toFixed(0)}k`;
-  return `$${price.toLocaleString()}`;
-}
-
 // --- Mileage breakpoints ---
 const MILEAGE_STOPS: number[] = [];
 for (let i = 0; i <= 300000; i += 10000) MILEAGE_STOPS.push(i);
@@ -106,20 +99,13 @@ const INTERIOR_COLOR_OPTIONS = [
 ];
 
 // Summary text for each filter category
-function getLocationLabel(filters: Filters): string {
+export function getLocationLabel(filters: Filters): string {
   if (!filters.location) return "不限";
-  // Find matching state or sub-region label
-  for (const state of US_STATES) {
-    if (state.value === filters.location) return state.label.split(" ")[0];
-    if (state.subRegions) {
-      const sub = state.subRegions.find((s) => s.value === filters.location);
-      if (sub) return sub.label.split(" ")[0];
-    }
-  }
+  if (/^\d{5}$/.test(filters.location)) return `Zip ${filters.location}`;
   return filters.location;
 }
 
-function getBrandLabel(filters: Filters): string {
+export function getBrandLabel(filters: Filters): string {
   if (!filters.make) return "不限";
   const items = filters.make.split(",");
   const labels = items.map((m) => MAKES_ZH[m] || m);
@@ -188,19 +174,6 @@ function getSpecsLabel(filters: Filters): string {
     const items = filters.drivetrain.split(",");
     parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
   }
-  if (filters.exteriorColor) {
-    const items = filters.exteriorColor.split(",");
-    parts.push("外" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
-  }
-  if (filters.interiorColor) {
-    const items = filters.interiorColor.split(",");
-    parts.push("内" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
-  }
-  return parts.length > 0 ? parts.join(" · ") : "不限";
-}
-
-function getColorLabel(filters: Filters): string {
-  const parts: string[] = [];
   if (filters.exteriorColor) {
     const items = filters.exteriorColor.split(",");
     parts.push("外" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
@@ -394,8 +367,8 @@ function FilterRow({
   );
 }
 
-// --- Location drawer content with nested sub-region drawer ---
-function LocationDrawerContent({
+// --- Location drawer content: 只按 Zipcode + 距离范围筛选 ---
+export function LocationDrawerContent({
   filters,
   onUpdate,
 }: {
@@ -407,115 +380,67 @@ function LocationDrawerContent({
   );
 
   return (
-    <div className="space-y-1">
+    <div>
       {/* Zip code input */}
-      <div className="px-3 pb-2">
-        <div className="flex items-center gap-2">
-          <Input
-            placeholder="输入 Zip Code"
-            className="h-9 flex-1 font-mono text-xs"
-            inputMode="numeric"
-            maxLength={5}
-            value={zip}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "").slice(0, 5);
-              setZip(val);
-              if (val.length === 5) {
-                onUpdate("location", val);
-              }
+      <div className="flex items-center gap-2">
+        <Input
+          placeholder="输入 Zip Code"
+          className="h-9 flex-1 font-mono text-xs"
+          inputMode="numeric"
+          maxLength={5}
+          value={zip}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "").slice(0, 5);
+            setZip(val);
+            if (val.length === 5) onUpdate("location", val);
+            else if (filters.location) onUpdate("location", "");
+          }}
+        />
+        {zip && (
+          <button
+            type="button"
+            className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            onClick={() => {
+              setZip("");
+              onUpdate("location", "");
             }}
-          />
-          {zip && (
-            <button
-              type="button"
-              className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setZip("");
-                onUpdate("location", "");
-              }}
-            >
-              清除
-            </button>
-          )}
-        </div>
-        {/^\d{5}$/.test(filters.location) && (
-          <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-            当前按 Zip {filters.location} 筛选
-          </p>
+          >
+            清除
+          </button>
         )}
       </div>
+      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+        {/^\d{5}$/.test(filters.location)
+          ? `以 Zip ${filters.location} 为中心按距离筛选`
+          : "不填则以自动定位的位置计算距离"}
+      </p>
 
-      <div className="mx-3 h-px bg-border" />
-
-      <button
-        type="button"
-        className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${!filters.location ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-        onClick={() => { setZip(""); onUpdate("location", ""); }}
-      >
-        <span>不限</span>
-        {!filters.location && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-      </button>
-      {US_STATES.map((state) =>
-        state.subRegions ? (
-          <DrawerNested key={state.value}>
-            <DrawerTrigger asChild>
-              <button
-                type="button"
-                className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${filters.location === state.value || filters.location?.startsWith(state.value + "-") ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-              >
-                <span>{state.label}</span>
-                <div className="flex items-center gap-1">
-                  {(filters.location === state.value || filters.location?.startsWith(state.value + "-")) && (
-                    <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                  )}
-                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                </div>
-              </button>
-            </DrawerTrigger>
-            <DrawerContent className="max-h-[85vh]">
-              <DrawerHeader>
-                <DrawerTitle className="font-mono text-sm">{state.label}</DrawerTitle>
-              </DrawerHeader>
-              <div className="overflow-y-auto px-4 pb-6">
-                <div className="space-y-1">
-                  <DrawerClose asChild>
-                    <button
-                      type="button"
-                      className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${filters.location === state.value ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-                      onClick={() => onUpdate("location", state.value)}
-                    >
-                      <span>全部{state.label.split(" ")[0]}</span>
-                      {filters.location === state.value && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-                    </button>
-                  </DrawerClose>
-                  {state.subRegions.map((sub) => (
-                    <DrawerClose key={sub.value} asChild>
-                      <button
-                        type="button"
-                        className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${filters.location === sub.value ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-                        onClick={() => onUpdate("location", sub.value)}
-                      >
-                        <span>{sub.label}</span>
-                        {filters.location === sub.value && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-                      </button>
-                    </DrawerClose>
-                  ))}
-                </div>
-              </div>
-            </DrawerContent>
-          </DrawerNested>
-        ) : (
-          <button
-            key={state.value}
-            type="button"
-            className={`flex w-full items-center justify-between px-3 py-2.5 font-mono text-xs transition-colors ${filters.location === state.value ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
-            onClick={() => onUpdate("location", state.value)}
-          >
-            <span>{state.label}</span>
-            {filters.location === state.value && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-          </button>
-        )
-      )}
+      {/* 距离范围 */}
+      <div className="mt-4 border-t border-border pt-4">
+        <p className="font-mono text-xs font-medium">距离范围</p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {["", "10", "25", "50", "100", "200"].map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`border px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              onClick={() => onUpdate("maxDistance", v)}
+            >
+              {v === "" ? "不限" : `≤${v} mi`}
+            </button>
+          ))}
+        </div>
+        <Input
+          className="mt-2 h-9 font-mono text-xs"
+          placeholder="自定义距离 (miles)"
+          inputMode="numeric"
+          value={filters.maxDistance}
+          onChange={(e) => {
+            const val = e.target.value.replace(/\D/g, "");
+            onUpdate("maxDistance", val);
+          }}
+        />
+      </div>
     </div>
   );
 }
@@ -718,32 +643,6 @@ export function MobileFilterDrawer({
         active={!!filters.location}
       >
         <LocationDrawerContent filters={filters} onUpdate={update} />
-        {/* Distance */}
-        <div className="mt-4 border-t border-border pt-4">
-          <p className="font-mono text-xs font-medium">距离范围</p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {["", "10", "25", "50", "100", "200"].map((v) => (
-              <button
-                key={v}
-                type="button"
-                className={`border px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
-                onClick={() => update("maxDistance", v)}
-              >
-                {v === "" ? "不限" : `≤${v} mi`}
-              </button>
-            ))}
-          </div>
-          <Input
-            className="mt-2 h-9 font-mono text-xs"
-            placeholder="自定义距离 (miles)"
-            inputMode="numeric"
-            value={filters.maxDistance}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "");
-              update("maxDistance", val);
-            }}
-          />
-        </div>
       </FilterRow>
 
       {/* Brand */}

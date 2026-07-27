@@ -113,11 +113,16 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       const user = session?.user ?? null;
       setAuthUser(user);
       if (!user) persist(null);
-      await loadForUser(user);
+      // 回调执行期间 supabase-js 持有 auth 锁,在回调里 await 任何
+      // supabase 查询会死锁(全站请求永久挂起,只有清 localStorage 里的
+      // session 才能恢复)。用 setTimeout 把查询推出回调再执行。
+      setTimeout(() => {
+        loadForUser(user);
+      }, 0);
     });
 
     return () => {

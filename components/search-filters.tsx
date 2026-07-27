@@ -1,6 +1,6 @@
 "use client";
 
-import { Search, X, Clock, Trash2, ChevronRight, Check } from "lucide-react";
+import { Search, X, Clock, Trash2, Check } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { Button } from "@/components/ui/button";
@@ -43,138 +43,6 @@ function formatMileageLabel(miles: number): string {
   if (miles >= 10000) return `${(miles / 10000).toFixed(0)}万mi`;
   return `${miles.toLocaleString()} mi`;
 }
-
-// --- All 50 states + DC with sub-regions for major ones ---
-export interface StateOption {
-  value: string;
-  label: string;
-  subRegions?: { value: string; label: string }[];
-}
-
-export const US_STATES: StateOption[] = [
-  {
-    value: "CA", label: "加州 California",
-    subRegions: [
-      { value: "CA-LA", label: "洛杉矶 Los Angeles" },
-      { value: "CA-SF", label: "旧金山 San Francisco" },
-      { value: "CA-SD", label: "圣地亚哥 San Diego" },
-      { value: "CA-SJ", label: "圣何塞 San Jose" },
-      { value: "CA-SAC", label: "萨克拉门托 Sacramento" },
-      { value: "CA-OC", label: "橙县 Orange County" },
-      { value: "CA-IE", label: "内陆帝国 Inland Empire" },
-      { value: "CA-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "NY", label: "纽约 New York",
-    subRegions: [
-      { value: "NY-NYC", label: "全部纽约市 NYC" },
-      { value: "NY-MAN", label: "曼哈顿 Manhattan" },
-      { value: "NY-BK", label: "布鲁克林 Brooklyn" },
-      { value: "NY-QN", label: "皇后区 Queens" },
-      { value: "NY-BX", label: "布朗克斯 Bronx" },
-      { value: "NY-SI", label: "史丹顿岛 Staten Island" },
-      { value: "NY-LI", label: "长岛 Long Island" },
-      { value: "NY-UP", label: "上州 Upstate" },
-    ],
-  },
-  {
-    value: "TX", label: "德州 Texas",
-    subRegions: [
-      { value: "TX-HOU", label: "休斯顿 Houston" },
-      { value: "TX-DAL", label: "达拉斯 Dallas" },
-      { value: "TX-AUS", label: "奥斯汀 Austin" },
-      { value: "TX-SA", label: "圣安东尼奥 San Antonio" },
-      { value: "TX-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "FL", label: "佛州 Florida",
-    subRegions: [
-      { value: "FL-MIA", label: "迈阿密 Miami" },
-      { value: "FL-ORL", label: "奥兰多 Orlando" },
-      { value: "FL-TPA", label: "坦帕 Tampa" },
-      { value: "FL-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "IL", label: "伊利诺伊 Illinois",
-    subRegions: [
-      { value: "IL-CHI", label: "芝加哥 Chicago" },
-      { value: "IL-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "WA", label: "华盛顿 Washington",
-    subRegions: [
-      { value: "WA-SEA", label: "西雅图 Seattle" },
-      { value: "WA-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "MA", label: "麻省 Massachusetts",
-    subRegions: [
-      { value: "MA-BOS", label: "波士顿 Boston" },
-      { value: "MA-other", label: "其他地区" },
-    ],
-  },
-  {
-    value: "NJ", label: "新泽西 New Jersey" },
-  { value: "PA", label: "宾州 Pennsylvania",
-    subRegions: [
-      { value: "PA-PHL", label: "费城 Philadelphia" },
-      { value: "PA-PIT", label: "匹兹堡 Pittsburgh" },
-      { value: "PA-other", label: "其他地区" },
-    ],
-  },
-  { value: "GA", label: "乔治亚 Georgia",
-    subRegions: [
-      { value: "GA-ATL", label: "亚特兰大 Atlanta" },
-      { value: "GA-other", label: "其他地区" },
-    ],
-  },
-  { value: "OH", label: "俄亥俄 Ohio" },
-  { value: "MI", label: "密歇根 Michigan" },
-  { value: "NC", label: "北卡 North Carolina" },
-  { value: "VA", label: "弗吉尼亚 Virginia" },
-  { value: "AZ", label: "亚利桑那 Arizona" },
-  { value: "MD", label: "马里兰 Maryland" },
-  { value: "CO", label: "科罗拉多 Colorado" },
-  { value: "MN", label: "明尼苏达 Minnesota" },
-  { value: "OR", label: "俄勒冈 Oregon" },
-  { value: "NV", label: "内华达 Nevada" },
-  { value: "CT", label: "康州 Connecticut" },
-  { value: "HI", label: "夏威夷 Hawaii" },
-  { value: "AL", label: "阿拉巴马 Alabama" },
-  { value: "AK", label: "阿拉斯加 Alaska" },
-  { value: "AR", label: "阿肯色 Arkansas" },
-  { value: "DE", label: "特拉华 Delaware" },
-  { value: "DC", label: "华盛顿特区 D.C." },
-  { value: "ID", label: "爱达荷 Idaho" },
-  { value: "IN", label: "印第安纳 Indiana" },
-  { value: "IA", label: "爱荷华 Iowa" },
-  { value: "KS", label: "堪萨斯 Kansas" },
-  { value: "KY", label: "肯塔基 Kentucky" },
-  { value: "LA", label: "路易斯安那 Louisiana" },
-  { value: "ME", label: "缅因 Maine" },
-  { value: "MS", label: "密西西比 Mississippi" },
-  { value: "MO", label: "密苏里 Missouri" },
-  { value: "MT", label: "蒙大拿 Montana" },
-  { value: "NE", label: "内布拉斯加 Nebraska" },
-  { value: "NH", label: "新罕布什尔 New Hampshire" },
-  { value: "NM", label: "新墨西哥 New Mexico" },
-  { value: "ND", label: "北达科他 North Dakota" },
-  { value: "OK", label: "俄克拉荷马 Oklahoma" },
-  { value: "RI", label: "罗德岛 Rhode Island" },
-  { value: "SC", label: "南卡 South Carolina" },
-  { value: "SD", label: "南达科他 South Dakota" },
-  { value: "TN", label: "田纳西 Tennessee" },
-  { value: "UT", label: "犹他 Utah" },
-  { value: "VT", label: "佛蒙特 Vermont" },
-  { value: "WV", label: "西弗吉尼亚 West Virginia" },
-  { value: "WI", label: "威斯康星 Wisconsin" },
-  { value: "WY", label: "怀俄明 Wyoming" },
-];
 
 const FUEL_OPTIONS = [
   { value: "汽油", label: "汽油" },
@@ -414,11 +282,24 @@ export function SearchFilters({
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
   const [searchFocused, setSearchFocused] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
-  const [expandedState, setExpandedState] = useState<string | null>(null);
+  // Zipcode 输入的本地缓冲(未满 5 位时不写入 filters)
+  const [zip, setZip] = useState(() =>
+    /^\d{5}$/.test((initialFilters || INITIAL_FILTERS).location)
+      ? (initialFilters || INITIAL_FILTERS).location
+      : ""
+  );
   const searchRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (initialFilters) setFilters(initialFilters);
+    if (initialFilters) {
+      setFilters(initialFilters);
+      if (/^\d{5}$/.test(initialFilters.location)) {
+        setZip(initialFilters.location);
+      } else if (!initialFilters.location) {
+        // 外部清空(如「清空所有筛选」)时同步清掉;输入中的不完整值保留
+        setZip((z) => (/^\d{5}$/.test(z) ? "" : z));
+      }
+    }
   }, [initialFilters]);
 
   useEffect(() => {
@@ -537,98 +418,54 @@ export function SearchFilters({
         </Button>
       )}
 
-      {/* Location — state / zipcode + distance in one block */}
+      {/* Location — zipcode + distance */}
       <div>
         <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">位置</Label>
-        {!expandedState ? (
-          <>
-            <div className="mt-1 max-h-[200px] overflow-y-auto border border-border">
-              <button
-                type="button"
-                className={`flex w-full items-center justify-between px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted ${!filters.location ? "bg-muted font-medium" : ""}`}
-                onClick={() => update("location", "")}
-              >
-                不限
-              </button>
-              {US_STATES.map((state) => (
-                <button
-                  key={state.value}
-                  type="button"
-                  className={`flex w-full items-center justify-between px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted ${filters.location === state.value ? "bg-muted font-medium" : ""}`}
-                  onClick={() => {
-                    if (state.subRegions) {
-                      setExpandedState(state.value);
-                    } else {
-                      update("location", state.value);
-                    }
-                  }}
-                >
-                  <span>{state.label}</span>
-                  {state.subRegions && (
-                    <ChevronRight className="h-3 w-3 text-muted-foreground" strokeWidth={1.5} />
-                  )}
-                </button>
-              ))}
-            </div>
-            <Input
-              placeholder="或输入 Zipcode"
-              className="mt-1.5 h-8 font-mono text-xs"
-              maxLength={5}
-              value={filters.location.match(/^\d{5}$/) ? filters.location : ""}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, "").slice(0, 5);
-                if (val) update("location", val);
-              }}
-            />
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              <span className="font-mono text-[10px] text-muted-foreground">距离</span>
-              {["", "10", "25", "50", "100", "200"].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  className={`border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
-                  onClick={() => update("maxDistance", v)}
-                >
-                  {v === "" ? "不限" : `≤${v}mi`}
-                </button>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="mt-1 max-h-[200px] overflow-y-auto border border-border">
+        <div className="mt-1.5 flex items-center gap-2">
+          <Input
+            placeholder="输入 Zipcode"
+            className="h-8 flex-1 font-mono text-xs"
+            maxLength={5}
+            inputMode="numeric"
+            value={zip}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, "").slice(0, 5);
+              setZip(val);
+              if (val.length === 5) update("location", val);
+              else if (filters.location) update("location", "");
+            }}
+          />
+          {zip && (
             <button
               type="button"
-              className="flex w-full items-center gap-1 border-b border-border px-3 py-1.5 font-mono text-xs font-medium text-muted-foreground hover:text-foreground"
-              onClick={() => setExpandedState(null)}
-            >
-              ← 返回
-            </button>
-            {/* Select entire state */}
-            <button
-              type="button"
-              className={`flex w-full items-center px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted ${filters.location === expandedState ? "bg-muted font-medium" : ""}`}
+              className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
               onClick={() => {
-                update("location", expandedState);
-                setExpandedState(null);
+                setZip("");
+                update("location", "");
               }}
             >
-              全部{US_STATES.find((s) => s.value === expandedState)?.label.split(" ")[0]}
+              清除
             </button>
-            {US_STATES.find((s) => s.value === expandedState)?.subRegions?.map((sub) => (
-              <button
-                key={sub.value}
-                type="button"
-                className={`flex w-full items-center px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted ${filters.location === sub.value ? "bg-muted font-medium" : ""}`}
-                onClick={() => {
-                  update("location", sub.value);
-                  setExpandedState(null);
-                }}
-              >
-                {sub.label}
-              </button>
-            ))}
-          </div>
-        )}
+          )}
+        </div>
+        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+          {/^\d{5}$/.test(filters.location)
+            ? `以 Zip ${filters.location} 为中心按距离筛选`
+            : "不填则以自动定位的位置计算距离"}
+        </p>
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-[10px] text-muted-foreground">距离</span>
+          {["", "10", "25", "50", "100", "200"].map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              onClick={() => update("maxDistance", v)}
+            >
+              {v === "" ? "不限" : `≤${v}mi`}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Brand */}

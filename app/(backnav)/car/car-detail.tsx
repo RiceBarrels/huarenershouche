@@ -29,8 +29,12 @@ import {
   Loader2,
   Pencil,
   RefreshCw,
+  GitCompare,
+  Check,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
+import { timeAgo } from "@/lib/format";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Reveal } from "@/components/reveal";
@@ -122,6 +126,16 @@ export default function CarDetailPage({
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
   const [renewing, setRenewing] = useState(false);
+  const [inCompare, setInCompare] = useState(false);
+
+  useEffect(() => {
+    setInCompare(isInCompare(carId));
+    function onCompareChange() {
+      setInCompare(isInCompare(carId));
+    }
+    window.addEventListener("compare-change", onCompareChange);
+    return () => window.removeEventListener("compare-change", onCompareChange);
+  }, [carId]);
   const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
   const mobileGalleryRef = useRef<HTMLDivElement>(null);
 
@@ -624,6 +638,10 @@ export default function CarDetailPage({
                   <Heart className="h-3 w-3" strokeWidth={1.5} />
                   {car.favorites_count || 0} 人喜欢
                 </span>
+                <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                  <Calendar className="h-3 w-3" strokeWidth={1.5} />
+                  {timeAgo(car.created_at)}上架
+                </span>
               </div>
             </div>
 
@@ -1046,6 +1064,22 @@ export default function CarDetailPage({
                     <BellRing className="h-3.5 w-3.5" strokeWidth={1.5} />
                   )}
                   {watching ? "取消降价监控" : "降价监控"}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-1.5 font-mono text-xs"
+                  onClick={() => {
+                    if (inCompare) removeFromCompare(carId);
+                    else addToCompare(carId);
+                  }}
+                >
+                  {inCompare ? (
+                    <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
+                  ) : (
+                    <GitCompare className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  )}
+                  {inCompare ? "已加入对比" : "加入对比"}
                 </Button>
 
                 <Button

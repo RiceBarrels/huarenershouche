@@ -59,7 +59,7 @@ export function PriceDroppedCars() {
             <h2 className="font-mono text-sm font-medium">最近降价</h2>
           </div>
           <Link
-            href="/browse?priceDropped=true&showResult=true"
+            href="/browse?priceDropped=true"
             className="flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             查看全部

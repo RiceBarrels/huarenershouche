@@ -32,6 +32,8 @@ const UserDetail = dynamic(() => import("@/app/(backnav)/user/user-detail"), {
 
 interface OverlayCtx {
   enabled: boolean;
+  /** 当前是否有移动端详情浮层打开(CompareBar 等全局固定元素需避让/提层) */
+  overlayOpen: boolean;
   openCar: (car: DbCar, rect?: OriginRect | null, heroHtml?: string | null) => void;
   openPost: (post: DbCommunityPost, rect?: OriginRect | null, heroHtml?: string | null) => void;
   openUser: (userId: string) => void;
@@ -39,6 +41,7 @@ interface OverlayCtx {
 
 const Ctx = createContext<OverlayCtx>({
   enabled: false,
+  overlayOpen: false,
   openCar: () => {},
   openPost: () => {},
   openUser: () => {},
@@ -101,7 +104,7 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <Ctx.Provider value={{ enabled, openCar, openPost, openUser }}>
+    <Ctx.Provider value={{ enabled, overlayOpen: stack.length > 0, openCar, openPost, openUser }}>
       {children}
       <AnimatePresence>
         {stack.map((layer) =>

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 
 import {
   Search,
@@ -13,6 +13,9 @@ import {
   DollarSign,
   Zap,
   ChevronRight,
+  Car,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -20,7 +23,7 @@ import { CarCard } from "@/components/car-card";
 import { SectionHeader } from "@/components/section-header";
 import { Reveal, RevealGroup, RevealItem } from "@/components/reveal";
 import { CountUp } from "@/components/count-up";
-import { scaleIn, EASE } from "@/lib/motion";
+import { scaleIn } from "@/lib/motion";
 import { PriceDroppedCars } from "@/components/price-dropped-cars";
 import { TrendingSearches } from "@/components/trending-searches";
 import { RegionBrandEntry } from "@/components/region-brand-entry";
@@ -30,20 +33,26 @@ import { Input } from "@/components/ui/input";
 import { hasUserHistory, rankCars, getFavoriteIds } from "@/lib/recommendations";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import {
+  MobileFilterDrawer,
+  BrandDrawerContent,
+  LocationDrawerContent,
+  getLocationLabel,
+  getBrandLabel,
+} from "@/components/mobile-filters";
+import { INITIAL_FILTERS, type Filters } from "@/components/search-filters";
+import { MAKES_ZH } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
 import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import { getCurrentPosition, reverseGeocode, detectUserZip } from "@/lib/geocode";
+import { getCurrentPosition, reverseGeocode } from "@/lib/geocode";
 
 import type { DbCar, DbCommunityPost } from "@/lib/types";
-import { Badge } from "@/components/ui/badge";
 import { Heart } from "lucide-react";
 import { avatarUrl } from "@/lib/avatar";
 
@@ -173,15 +182,6 @@ const QUICK_TAGS: { label: string; params: Record<string, string> }[] = [
   { label: "一手车主", params: { oneOwner: "true" } },
 ];
 
-const PRICE_RANGES: { value: string; label: string; min?: number; max?: number }[] = [
-  { value: "any", label: "不限" },
-  { value: "under-10k", label: "$10K以下", max: 10000 },
-  { value: "10k-20k", label: "$10K-20K", min: 10000, max: 20000 },
-  { value: "20k-30k", label: "$20K-30K", min: 20000, max: 30000 },
-  { value: "30k-50k", label: "$30K-50K", min: 30000, max: 50000 },
-  { value: "over-50k", label: "$50K以上", min: 50000 },
-];
-
 const PAYMENT_PRESETS = [200, 300, 400, 500];
 
 // 简洁单色车型剪影(线条风格,配合 currentColor 使用)
@@ -261,7 +261,6 @@ function buildUrl(params: Record<string, string>) {
   for (const [k, v] of Object.entries(params)) {
     if (v) sp.set(k, v);
   }
-  sp.set("showResult", "true");
   return `/browse?${sp.toString()}`;
 }
 
@@ -275,10 +274,8 @@ function formatPrice(price: number): string {
 
 export default function Home() {
   const router = useRouter();
-  const [keyword, setKeyword] = useState("");
-  const [make, setMake] = useState("");
-  const [priceRange, setPriceRange] = useState("");
-  const [zip, setZip] = useState("");
+  // hero 搜索：与 /browse 同构的筛选对象，搜索时整体带入 URL
+  const [searchFilters, setSearchFilters] = useState<Filters>(INITIAL_FILTERS);
   const [featured, setFeatured] = useState<DbCar[]>([]);
   const [recommended, setRecommended] = useState<DbCar[]>([]);
   const [showRecommended, setShowRecommended] = useState(false);
@@ -287,8 +284,6 @@ export default function Home() {
   const [monthlyBudget, setMonthlyBudget] = useState("400");
   const [carCount, setCarCount] = useState<number | null>(null);
   const [communityPosts, setCommunityPosts] = useState<DbCommunityPost[]>([]);
-  // 移动端:搜索框默认折叠成按钮,点击展开为完整搜索表单(桌面端始终展开)
-  const [heroFormOpen, setHeroFormOpen] = useState(false);
 
   // Subtle parallax on the hero grid backdrop
   const prefersReduced = useReducedMotion();
@@ -369,19 +364,21 @@ export default function Home() {
       })
       .finally(() => setLocationLoading(false));
 
-    detectUserZip().then((z) => {
-      if (z) setZip(z);
-    });
   }, []);
+
+  // 更多筛选已选条件数(不含关键词与默认距离)
+  const searchActiveCount = Object.entries(searchFilters).filter(
+    ([k, v]) => v && k !== "keyword" && !(k === "maxDistance" && v === "50")
+  ).length;
 
   function handleSearch() {
     const params: Record<string, string> = {};
-    if (keyword) params.q = keyword;
-    if (make && make !== "all") params.make = make;
-    const range = PRICE_RANGES.find((r) => r.value === priceRange);
-    if (range?.min) params.minPrice = String(range.min);
-    if (range?.max) params.maxPrice = String(range.max);
-    if (zip) params.zip = zip;
+    for (const [k, v] of Object.entries(searchFilters)) {
+      if (!v) continue;
+      if (k === "maxDistance" && v === "50") continue; // 默认值不写入 URL
+      if (k === "keyword") params.q = v;
+      else params[k] = v;
+    }
     router.push(buildUrl(params));
   }
 
@@ -399,7 +396,7 @@ export default function Home() {
               <Link href="/post" className="underline underline-offset-2">免费发布车辆 →</Link>
               <span>🔒 VIN认证 · 真实车源</span>
               <span>📍 覆盖全美 · 中文服务</span>
-              <Link href="/browse?showResult=true" className="underline underline-offset-2">立即找车 →</Link>
+              <Link href="/browse" className="underline underline-offset-2">立即找车 →</Link>
             </span>
           ))}
         </div>
@@ -443,9 +440,6 @@ export default function Home() {
                         if (loc) setUserLocation(loc);
                       })
                       .finally(() => setLocationLoading(false));
-                    detectUserZip().then((z) => {
-                      if (z) setZip(z);
-                    });
                   }}
                   className="font-mono text-[11px] text-muted-foreground/60 underline underline-offset-2 transition-colors hover:text-foreground"
                 >
@@ -470,129 +464,135 @@ export default function Home() {
             车源来自三类:车行网站车辆自动检索、个人发布、车行发布
           </p>
 
-          {/* Structured search form - cars.com style */}
-          {(() => {
-          const searchForm = (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSearch();
-            }}
-            className="overflow-hidden rounded-md border border-border bg-background"
-          >
-            {/* Row: Make + Price | Keyword | ZIP | Search */}
-            <div className="flex flex-col md:flex-row">
-              {/* Make + Price dropdowns (side by side on mobile) */}
-              <div className="flex border-b border-border md:border-b-0">
-                <div className="w-1/2 border-r border-border md:w-auto">
-                  <Select value={make} onValueChange={setMake}>
-                    <SelectTrigger className="h-12 w-full rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-36">
-                      <SelectValue placeholder="品牌" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">全部品牌</SelectItem>
-                      {MAKES.filter((m) => m !== "Other").map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {MAKES_ZH[m]} {m}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="w-1/2 md:w-auto md:border-r md:border-border">
-                  <Select value={priceRange} onValueChange={setPriceRange}>
-                    <SelectTrigger className="h-12 w-full rounded-none border-0 px-4 font-mono text-sm shadow-none focus:ring-0 md:w-32">
-                      <SelectValue placeholder="价格" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PRICE_RANGES.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+          {/* Structured search — 地区/品牌/更多筛选 drawer + 关键词 */}
+          <div className="mt-8 md:mt-10">
+            <div className="grid grid-cols-3 gap-2">
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/30"
+                  >
+                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    <span className="min-w-0">
+                      <span className="block font-mono text-[10px] text-muted-foreground">地区</span>
+                      <span className={`block truncate font-mono text-xs ${searchFilters.location ? "font-medium" : "text-muted-foreground"}`}>
+                        {getLocationLabel(searchFilters)}
+                      </span>
+                    </span>
+                  </button>
+                </DrawerTrigger>
+                <DrawerContent className="max-h-[85vh]">
+                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                    <DrawerClose asChild>
+                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </DrawerClose>
+                    <span className="font-mono text-sm font-semibold">地区</span>
+                    <div className="h-8 w-8" />
+                  </div>
+                  <div className="overflow-y-auto px-4 pb-6">
+                    <LocationDrawerContent
+                      filters={searchFilters}
+                      onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
+                    />
+                  </div>
+                </DrawerContent>
+              </Drawer>
 
-              {/* Keyword input */}
-              <div className="relative flex-1 border-b border-border md:border-b-0 md:border-r">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/30"
+                  >
+                    <Car className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    <span className="min-w-0">
+                      <span className="block font-mono text-[10px] text-muted-foreground">品牌</span>
+                      <span className={`block truncate font-mono text-xs ${searchFilters.make ? "font-medium" : "text-muted-foreground"}`}>
+                        {getBrandLabel(searchFilters)}
+                      </span>
+                    </span>
+                  </button>
+                </DrawerTrigger>
+                <DrawerContent className="max-h-[85vh]">
+                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                    <DrawerClose asChild>
+                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </DrawerClose>
+                    <span className="font-mono text-sm font-semibold">品牌</span>
+                    <div className="h-8 w-8" />
+                  </div>
+                  <div className="overflow-y-auto px-4 pb-6">
+                    <BrandDrawerContent
+                      filters={searchFilters}
+                      onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
+                    />
+                  </div>
+                </DrawerContent>
+              </Drawer>
+
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 border border-border bg-background px-3 py-2.5 text-left transition-colors hover:border-foreground/30"
+                  >
+                    <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    <span className="min-w-0">
+                      <span className="block font-mono text-[10px] text-muted-foreground">更多筛选</span>
+                      <span className={`block truncate font-mono text-xs ${searchActiveCount > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                        {searchActiveCount > 0 ? `${searchActiveCount} 项` : "不限"}
+                      </span>
+                    </span>
+                  </button>
+                </DrawerTrigger>
+                <DrawerContent>
+                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                    <DrawerClose asChild>
+                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </DrawerClose>
+                    <span className="font-mono text-sm font-semibold">筛选</span>
+                    <div className="h-8 w-8" />
+                  </div>
+                  <div className="overflow-y-auto pb-6">
+                    <MobileFilterDrawer
+                      filters={searchFilters}
+                      onFilter={setSearchFilters}
+                      activeCount={searchActiveCount}
+                    />
+                  </div>
+                </DrawerContent>
+              </Drawer>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSearch();
+              }}
+              className="mt-2 flex overflow-hidden rounded-md border border-border bg-background"
+            >
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
                 <Input
-                  placeholder="搜索车型、关键词..."
-                  className="h-12 rounded-none border-0 pl-11 font-mono text-sm shadow-none focus-visible:ring-0"
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  placeholder="搜索品牌、车型、关键词..."
+                  className="h-12 rounded-none border-0 pl-10 font-mono text-sm shadow-none focus-visible:ring-0"
+                  value={searchFilters.keyword}
+                  onChange={(e) => setSearchFilters((prev) => ({ ...prev, keyword: e.target.value }))}
                 />
               </div>
-
-              {/* ZIP input */}
-              <div className="border-b border-border md:border-b-0 md:border-r">
-                <div className="relative">
-                  <MapPin className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-                  <Input
-                    placeholder="ZIP"
-                    className="h-12 w-full rounded-none border-0 pl-11 font-mono text-sm shadow-none focus-visible:ring-0 md:w-28"
-                    value={zip}
-                    onChange={(e) => setZip(e.target.value.replace(/\D/g, "").slice(0, 5))}
-                    inputMode="numeric"
-                  />
-                </div>
-              </div>
-
-              {/* Search button */}
-              <Button
-                type="submit"
-                className="h-12 gap-2 rounded-none px-8 font-mono text-sm"
-              >
+              <Button type="submit" className="h-12 gap-2 rounded-none px-6 font-mono text-sm md:px-8">
                 搜索
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
               </Button>
-            </div>
-          </form>
-          );
-          return (
-            <div className="mt-8 md:mt-10">
-              {/* 桌面端:表单始终展开 */}
-              <div className="hidden md:block">{searchForm}</div>
-
-              {/* 移动端:点击搜索按钮展开成完整表单 */}
-              <div className="md:hidden">
-                <AnimatePresence initial={false} mode="wait">
-                  {heroFormOpen ? (
-                    <motion.div
-                      key="form"
-                      initial={prefersReduced ? false : { opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={prefersReduced ? undefined : { opacity: 0, height: 0 }}
-                      transition={{ duration: 0.28, ease: EASE }}
-                      className="overflow-hidden"
-                    >
-                      {searchForm}
-                    </motion.div>
-                  ) : (
-                    <motion.button
-                      key="pill"
-                      type="button"
-                      initial={prefersReduced ? false : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={prefersReduced ? undefined : { opacity: 0 }}
-                      transition={{ duration: 0.18, ease: EASE }}
-                      onClick={() => setHeroFormOpen(true)}
-                      className="flex h-12 w-full items-center gap-3 rounded-md border border-border bg-background px-4 text-left"
-                    >
-                      <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                      <span className="font-mono text-sm text-muted-foreground/70">
-                        搜索车型、品牌、关键词...
-                      </span>
-                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-              </div>
-            </div>
-          );
-          })()}
+            </form>
+          </div>
 
           {/* Popular makes + quick tags */}
           <div className="mt-6 flex flex-wrap items-center gap-1.5">
@@ -665,7 +665,7 @@ export default function Home() {
                 index="01"
                 label="Recommended"
                 title="为你推荐"
-                action={{ href: "/browse?showResult=true", label: "查看更多" }}
+                action={{ href: "/browse", label: "查看更多" }}
                 className="mb-6"
               />
             </Reveal>
@@ -689,7 +689,7 @@ export default function Home() {
                 index={showRecommended && recommended.length > 0 ? "02" : "01"}
                 label="Latest"
                 title="最新车源"
-                action={{ href: "/browse?showResult=true", label: "查看全部" }}
+                action={{ href: "/browse", label: "查看全部" }}
                 className="mb-6"
               />
             </Reveal>
@@ -723,7 +723,7 @@ export default function Home() {
             {BODY_STYLE_OPTIONS.slice(0, 8).map((opt) => (
               <RevealItem key={opt.value} variants={scaleIn} className="w-32 shrink-0 md:w-auto">
                 <Link
-                  href={`/browse?bodyStyle=${opt.value}&showResult=true`}
+                  href={`/browse?bodyStyle=${opt.value}`}
                   className="group flex flex-col items-center border border-border bg-card px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/50"
                 >
                   <BodyStyleSilhouette
@@ -756,7 +756,7 @@ export default function Home() {
               {PAYMENT_PRESETS.map((p) => (
                 <Link
                   key={p}
-                  href={`/browse?maxPayment=${p}&showResult=true`}
+                  href={`/browse?maxPayment=${p}`}
                   className="border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
                 >
                   ${p}/月
@@ -789,7 +789,7 @@ export default function Home() {
                 size="sm"
                 className="h-8 font-mono text-xs"
                 disabled={budgetPrice <= 0}
-                onClick={() => router.push(`/browse?maxPayment=${monthlyBudgetNum}&showResult=true`)}
+                onClick={() => router.push(`/browse?maxPayment=${monthlyBudgetNum}`)}
               >
                 按此预算看车
               </Button>

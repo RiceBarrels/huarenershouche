@@ -91,7 +91,7 @@ function sortedEntries(params: Record<string, string>) {
 }
 
 export function buildSearchUrl(params: Record<string, string>): string {
-  const qs = new URLSearchParams({ ...cleanParams(params), showResult: "true" });
+  const qs = new URLSearchParams(cleanParams(params));
   return `/browse?${qs.toString()}`;
 }
 

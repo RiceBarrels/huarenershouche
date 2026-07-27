@@ -78,7 +78,7 @@ export function RegionBrandEntry() {
             {regions.map((region) => (
               <Link
                 key={region.nameZh}
-                href={`/browse?location=${encodeURIComponent(region.locationMatch)}&showResult=true`}
+                href={`/browse?location=${encodeURIComponent(region.locationMatch)}`}
                 className="group flex shrink-0 flex-col items-center justify-center border border-border bg-card px-6 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/50 md:px-4"
               >
                 <span className="font-mono text-sm font-medium group-hover:text-foreground">

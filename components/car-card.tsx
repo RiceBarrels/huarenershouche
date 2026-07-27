@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
-import { estimateMonthlyPayment, timeAgo } from "@/lib/format";
+import { estimateMonthlyPayment } from "@/lib/format";
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
@@ -116,7 +116,7 @@ export function CarCard({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group cursor-pointer border border-border bg-card transition-colors hover:border-foreground/30 active:bg-muted/30"
+        className="group cursor-pointer border border-border bg-card transition hover:border-foreground/30 active:bg-muted/30"
       >
         <div className="relative aspect-[16/10] overflow-hidden bg-muted">
           {car.image_url ? (
@@ -130,15 +130,8 @@ export function CarCard({
               暂无图片
             </div>
           )}
-          <div className="absolute left-2 right-20 top-2 flex flex-wrap gap-1">
-            {car.source_id ? (
-              <Badge
-                variant="secondary"
-                className="font-mono text-[10px] font-medium"
-              >
-                系统检索
-              </Badge>
-            ) : car.profiles?.account_type === "dealer" ? (
+          <div className="absolute left-2 right-32 top-2 flex flex-wrap gap-1">
+            {car.source_id ? null : car.profiles?.account_type === "dealer" ? (
               <Badge
                 variant="secondary"
                 className="font-mono text-[10px] font-medium"
@@ -186,11 +179,20 @@ export function CarCard({
               </Badge>
             ) : null}
           </div>
+          {/* 系统检索标识:右下角,不与左上角的卖家/新上标签挤在一起 */}
+          {car.source_id && (
+            <Badge
+              variant="secondary"
+              className="absolute bottom-2 right-2 font-mono text-[10px] font-medium"
+            >
+              系统检索
+            </Badge>
+          )}
           {/* Action buttons */}
           <div className="absolute right-2 top-2 flex items-center gap-1">
             <button
               type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+              className="flex h-8 items-center gap-1 rounded-full bg-background/80 px-2.5 backdrop-blur-sm transition-colors hover:bg-background"
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -203,9 +205,15 @@ export function CarCard({
               title={inCompare ? "移出对比" : "加入对比"}
             >
               {inCompare ? (
-                <Check className="h-4 w-4 text-green-500" strokeWidth={2} />
+                <>
+                  <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
+                  <span className="font-mono text-[11px] text-green-600 dark:text-green-500">已加对比</span>
+                </>
               ) : (
-                <GitCompare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                <>
+                  <GitCompare className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
+                  <span className="font-mono text-[11px] text-muted-foreground">对比</span>
+                </>
               )}
             </button>
             <button
@@ -338,15 +346,12 @@ export function CarCard({
               </span>
               {car.seller_name}
             </span>
-            <span className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground/60">
-              {favCount > 0 && (
-                <span className="flex items-center gap-0.5">
-                  <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
-                  {favCount}
-                </span>
-              )}
-              {timeAgo(car.created_at)}上架
-            </span>
+            {favCount > 0 && (
+              <span className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground/60">
+                <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
+                {favCount}
+              </span>
+            )}
           </div>
         </div>
       </motion.article>

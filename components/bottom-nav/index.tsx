@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { createPortal } from "react-dom";
 import { Search, Plus, User, Users, Home } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
@@ -17,8 +18,12 @@ const TABS = [
 export function MobileTabBar() {
   const pathname = usePathname();
   const [user, setUser] = useState(false);
+  // portal 挂载点:必须渲染在 [vaul-drawer-wrapper] 之外,否则 drawer 打开时
+  // 背景缩放的 transform 会让本组件的 fixed 定位失去视口参照、跑出屏幕
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     supabase.auth.getUser().then(({ data }) => setUser(!!data.user));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(!!session?.user);
@@ -26,8 +31,13 @@ export function MobileTabBar() {
     return () => subscription.unsubscribe();
   }, []);
 
-  return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm md:hidden">
+  if (!mounted) return null;
+
+  return createPortal(
+    <nav
+      data-bottom-nav=""
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm md:hidden"
+    >
       <div className="flex items-stretch">
         {TABS.map((tab) => {
           const active = tab.match(pathname);
@@ -62,6 +72,7 @@ export function MobileTabBar() {
       </div>
       {/* Safe area padding for native */}
       <div className="h-[env(safe-area-inset-bottom,0px)]" />
-    </nav>
+    </nav>,
+    document.body
   );
 }

@@ -1,20 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { X, GitCompare, Trash2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { usePathname, useRouter } from "next/navigation";
+import { X, GitCompare, Trash2, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { getCompareIds, removeFromCompare, clearCompare } from "@/lib/compare";
+import { useCarOverlay } from "@/components/car-overlay-provider";
 import { supabase } from "@/lib/supabase";
 import type { DbCar } from "@/lib/types";
 
+// 全局对比指示条:portal 到 body(躲开 drawer 背景缩放的 transform),
+// 任何页面都显示,有底部导航时自动抬到导航上方,直到用户清空或进入对比页。
 export function CompareBar() {
   const router = useRouter();
+  const pathname = usePathname();
+  // 移动端详情浮层(swipe-sheet, z-60)打开时:提层到其上方,并贴屏幕底(导航已被浮层盖住)
+  const { overlayOpen } = useCarOverlay();
+  const [mounted, setMounted] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
   const [cars, setCars] = useState<Map<string, DbCar>>(new Map());
+  const [navHeight, setNavHeight] = useState(0);
 
   useEffect(() => {
+    setMounted(true);
     setIds(getCompareIds());
     function onCompareChange() {
       setIds(getCompareIds());
@@ -22,6 +32,22 @@ export function CompareBar() {
     window.addEventListener("compare-change", onCompareChange);
     return () => window.removeEventListener("compare-change", onCompareChange);
   }, []);
+
+  // 实测底部导航高度(md 以上或无导航的页面为 0)。导航也是 portal 挂载,
+  // 首次渲染可能晚于本组件,补一次延迟重测。
+  useEffect(() => {
+    function measure() {
+      const nav = document.querySelector("[data-bottom-nav]");
+      setNavHeight(nav instanceof HTMLElement ? nav.offsetHeight : 0);
+    }
+    measure();
+    const t = setTimeout(measure, 300);
+    window.addEventListener("resize", measure);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", measure);
+    };
+  }, [pathname]);
 
   // Fetch car data when ids change
   useEffect(() => {
@@ -43,76 +69,106 @@ export function CompareBar() {
           });
         }
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ids]);
 
-  if (ids.length === 0) return null;
+  if (!mounted) return null;
 
-  return (
+  const visible = ids.length > 0 && pathname !== "/compare";
+  // 浮层打开时导航被盖住,贴屏幕底部即可
+  const bottomOffset = overlayOpen ? 0 : navHeight;
+
+  return createPortal(
     <AnimatePresence>
-      <motion.div
-        initial={{ y: 80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 80, opacity: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm"
-      >
-        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-3">
-          <GitCompare className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-          <div className="flex flex-1 items-center gap-2 overflow-x-auto">
-            {ids.map((id) => {
-              const car = cars.get(id);
-              return (
-                <div
-                  key={id}
-                  className="flex shrink-0 items-center gap-2 border border-border px-2 py-1"
-                >
-                  {car?.image_url && (
-                    <img
-                      src={car.image_url}
-                      alt=""
-                      className="h-8 w-12 object-cover"
-                    />
-                  )}
-                  <span className="max-w-[120px] truncate font-mono text-[11px]">
-                    {car?.title_zh || "加载中..."}
-                  </span>
-                  <button
-                    onClick={() => removeFromCompare(id)}
-                    className="text-muted-foreground hover:text-foreground"
+      {visible && (
+        <motion.div
+          initial={{ y: 24, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 24, opacity: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className={`fixed inset-x-0 md:px-4 ${overlayOpen ? "z-[70]" : "z-40"}`}
+          style={{ bottom: bottomOffset }}
+        >
+          {/* 手机端通栏贴底;桌面端悬浮居中卡片 */}
+          <div
+            className="mx-auto flex w-full items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:border md:shadow-sm"
+            style={
+              bottomOffset === 0
+                ? { paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }
+                : undefined
+            }
+          >
+            <span className="hidden shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground md:flex">
+              <GitCompare className="h-4 w-4" strokeWidth={1.5} />
+              车辆对比
+            </span>
+
+            {/* 已选车辆 */}
+            <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
+              {ids.map((id) => {
+                const car = cars.get(id);
+                return (
+                  <div
+                    key={id}
+                    className="flex shrink-0 items-center gap-1.5 border border-border bg-card p-1 pr-1.5"
                   >
-                    <X className="h-3 w-3" strokeWidth={2} />
-                  </button>
-                </div>
-              );
-            })}
-            {ids.length < 3 && (
-              <span className="font-mono text-[10px] text-muted-foreground">
-                还可添加 {3 - ids.length} 辆
-              </span>
-            )}
+                    {car?.image_url ? (
+                      <img
+                        src={car.image_url}
+                        alt={car.title_zh || ""}
+                        className="h-8 w-11 object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-8 w-11 items-center justify-center bg-muted font-mono text-[9px] text-muted-foreground">
+                        ···
+                      </span>
+                    )}
+                    <span className="hidden max-w-[110px] truncate font-mono text-[11px] md:block">
+                      {car?.title_zh || "加载中..."}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeFromCompare(id)}
+                      aria-label="移出对比"
+                      className="p-0.5 text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" strokeWidth={2} />
+                    </button>
+                  </div>
+                );
+              })}
+              {ids.length < 3 && (
+                <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70">
+                  还可加 {3 - ids.length} 辆
+                </span>
+              )}
+            </div>
+
+            {/* 操作 */}
+            <div className="flex shrink-0 items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => clearCompare()}
+                title="取消对比"
+                aria-label="取消对比"
+                className="flex h-8 w-8 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+              >
+                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </button>
+              <Button
+                size="sm"
+                className="h-8 gap-1 font-mono text-xs"
+                disabled={ids.length < 2}
+                onClick={() => router.push("/compare")}
+              >
+                对比 ({ids.length})
+                <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
+              </Button>
+            </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 gap-1 font-mono text-[11px]"
-              onClick={() => clearCompare()}
-            >
-              <Trash2 className="h-3 w-3" strokeWidth={1.5} />
-              清空
-            </Button>
-            <Button
-              size="sm"
-              className="h-7 gap-1 font-mono text-[11px]"
-              disabled={ids.length < 2}
-              onClick={() => router.push("/compare")}
-            >
-              <GitCompare className="h-3 w-3" strokeWidth={1.5} />
-              对比 ({ids.length})
-            </Button>
-          </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }

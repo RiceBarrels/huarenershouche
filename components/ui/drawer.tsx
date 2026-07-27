@@ -53,6 +53,8 @@ function withHapticClose(
   };
 }
 
+// 注意:背景缩放会给 [vaul-drawer-wrapper] 加 transform,内部 fixed 元素会
+// 失去视口参照 —— 需要保持 fixed 的全局元素(如底部导航)须 portal 到 body
 function Drawer({
   shouldScaleBackground = true,
   onOpenChange,

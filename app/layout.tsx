@@ -9,6 +9,7 @@ import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
+import { CompareBar } from "@/components/compare-bar";
 import { Analytics } from "@vercel/analytics/next";
 import { SITE_URL } from "@/lib/seo-pages";
 
@@ -147,6 +148,7 @@ export default function RootLayout({
                 {children}
                 <InitHaptic/>
                 <RealtimeNotifications />
+                <CompareBar />
                 <Analytics />
                 </CarOverlayProvider>
               </IdentityProvider>

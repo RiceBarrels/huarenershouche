@@ -81,7 +81,7 @@ export function TrendingSearches() {
               {topMakes.map(({ make, count }) => (
                 <Link
                   key={make}
-                  href={`/browse?make=${encodeURIComponent(make)}&showResult=true`}
+                  href={`/browse?make=${encodeURIComponent(make)}`}
                   className="border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
                 >
                   {MAKES_ZH[make] || make}
@@ -103,7 +103,7 @@ export function TrendingSearches() {
             {QUICK_FILTERS.map((tag) => (
               <Link
                 key={tag.label}
-                href={`/browse?${tag.params}&showResult=true`}
+                href={`/browse?${tag.params}`}
                 className="border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
               >
                 {tag.label}

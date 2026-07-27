@@ -1,21 +1,20 @@
 "use client";
 
 import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
 import Image from "next/image";
 
-import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, MapPin, Loader2, Car } from "lucide-react";
+import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import Home from "../page";
 import { CarCard } from "@/components/car-card";
 import { Reveal } from "@/components/reveal";
-import { SearchFilters, US_STATES } from "@/components/search-filters";
-import { MobileFilterDrawer, BrandDrawerContent } from "@/components/mobile-filters";
+import { SearchFilters } from "@/components/search-filters";
+import { MobileFilterDrawer } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -27,7 +26,7 @@ import {
 } from "@/components/ui/select";
 import { match } from "pinyin-pro";
 import { MAKES_ZH } from "@/lib/mock-data";
-import { detectUserZip, geocodeZipToCoords, haversineDistance, lookupZip } from "@/lib/geocode";
+import { detectUserZip, geocodeZipToCoords, haversineDistance } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { getPriceInsight, type PriceInsight } from "@/lib/price-insight";
@@ -36,13 +35,10 @@ import { paymentToPrice } from "@/lib/format";
 import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT, carHasVideo } from "@/lib/saved-searches";
 import { BackToTop } from "@/components/back-to-top";
 import { PullToRefresh } from "@/components/pull-to-refresh";
-import { CompareBar } from "@/components/compare-bar";
 import {
   Drawer,
   DrawerClose,
   DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import type { DbCar } from "@/lib/types";
@@ -127,7 +123,8 @@ function filtersFromParams(sp: URLSearchParams): Filters {
     maxPrice: sp.get("maxPrice") || "",
     minYear: sp.get("minYear") || "",
     maxYear: sp.get("maxYear") || "",
-    location: sp.get("location") || "",
+    // 主页搜索表单用 zip 参数传 Zipcode,统一并入 location(位置筛选只认 zip/城市名)
+    location: sp.get("location") || sp.get("zip") || "",
     sellerType: sp.get("sellerType") || "",
     fuelType: sp.get("fuelType") || "",
     transmission: sp.get("transmission") || "",
@@ -219,7 +216,6 @@ export default function BrowsePage() {
 
 function BrowseContent() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
   // 数据拉取时间，作为"上架时间"筛选的基准（避免在渲染期直接调用 Date.now）
@@ -229,13 +225,11 @@ function BrowseContent() {
   // 无限滚动:增量渲染结果(数据已全量在内存,只分批挂 DOM)
   const [visibleCount, setVisibleCount] = useState(24);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
-  const [showResult, setShowResult] = useState(() => searchParams.get("showResult") === "true");
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
   const columnCount = useColumnCount();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [userZip, setUserZip] = useState("");
-  const [zipLabel, setZipLabel] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -274,8 +268,8 @@ function BrowseContent() {
     if (f.hasVideo) params.set("hasVideo", f.hasVideo);
     if (f.hasPrice) params.set("hasPrice", f.hasPrice);
     if (s !== "newest") params.set("sort", s);
-    params.set("showResult", "true");
-    const url = `/browse?${params.toString()}`;
+    const qs = params.toString();
+    const url = qs ? `/browse?${qs}` : "/browse";
     window.history.replaceState(window.history.state, "", url);
   }, []);
 
@@ -315,7 +309,6 @@ function BrowseContent() {
     setFiltersRaw(filtersFromParams(searchParams));
     const s = (searchParams.get("sort") as SortKey) || "newest";
     setSortRaw(s);
-    if (searchParams.get("showResult") === "true") setShowResult(true);
   }, [searchParams]);
 
   async function fetchCars() {
@@ -350,21 +343,18 @@ function BrowseContent() {
     }
   }, []);
 
-  // Geocode user zipcode for distance calculation + location label (no auto-filter)
+  // 距离计算基准:优先用「位置」筛选里输入的 Zipcode,没有则用自动定位到的 zip
+  const effectiveZip = /^\d{5}$/.test(filters.location) ? filters.location : userZip;
+
   useEffect(() => {
-    if (/^\d{5}$/.test(userZip)) {
-      geocodeZipToCoords(userZip).then((coords) => {
+    if (/^\d{5}$/.test(effectiveZip)) {
+      geocodeZipToCoords(effectiveZip).then((coords) => {
         setUserCoords(coords);
-      });
-      lookupZip(userZip).then((geo) => {
-        if (!geo) { setZipLabel(""); return; }
-        setZipLabel(geo.formatted);
       });
     } else {
       setUserCoords(null);
-      setZipLabel("");
     }
-  }, [userZip]);
+  }, [effectiveZip]);
 
   const distances = useMemo(() => {
     if (!userCoords) return new Map<string, number>();
@@ -476,7 +466,12 @@ function BrowseContent() {
         if (v.trim()) chips.push({ key: `model:${v}`, label: v.trim() });
       }
     }
-    if (filters.location) chips.push({ key: "location", label: filters.location });
+    if (filters.location) {
+      chips.push({
+        key: "location",
+        label: /^\d{5}$/.test(filters.location) ? `Zip ${filters.location}` : filters.location,
+      });
+    }
     if (filters.sellerType) chips.push({ key: "sellerType", label: filters.sellerType === "dealer" ? "车行" : "个人" });
     if (filters.minPrice || filters.maxPrice) {
       const min = filters.minPrice ? `$${Number(filters.minPrice).toLocaleString()}` : "$0";
@@ -623,25 +618,16 @@ function BrowseContent() {
       return true;
     }
 
-    const NYC_KEYWORDS = ["manhattan", "brooklyn", "queens", "bronx", "staten island", "曼哈顿", "布鲁克林", "皇后", "布朗克斯", "史丹顿"];
-
     function applyLocationFilter(car: DbCar): boolean {
       if (!filters.location) return true;
       const loc = filters.location;
-      const locLower = car.location.toLowerCase();
-      const locZh = car.location_zh;
-      if (loc === "NY-NYC") {
-        // Match any of the 5 NYC boroughs
-        return NYC_KEYWORDS.some((kw) => locLower.includes(kw) || locZh.includes(kw));
-      } else if (loc.includes("-")) {
-        const [state] = loc.split("-");
-        if (!locLower.includes(state.toLowerCase()) && !locZh.includes(state)) return false;
-      } else if (/^\d{5}$/.test(loc)) {
-        // Zipcode — don't hard-filter, let distance sort handle it
-      } else {
-        if (!locLower.includes(loc.toLowerCase()) && !locZh.includes(loc)) return false;
-      }
-      return true;
+      // Zipcode:不做硬过滤,由距离筛选/排序(以该 zip 为中心)处理
+      if (/^\d{5}$/.test(loc)) return true;
+      // 城市名(主页「按地区找车」入口链接):子串匹配
+      return (
+        car.location.toLowerCase().includes(loc.toLowerCase()) ||
+        car.location_zh.includes(loc)
+      );
     }
 
     // Apply non-location filters
@@ -729,11 +715,6 @@ function BrowseContent() {
     return () => observer.disconnect();
   }, [filtered.length]);
 
-  // 买车 tab 的主页(未搜索状态)直接复用站点主页组件
-  if (!showResult) {
-    return <Home />;
-  }
-
   return (
     <PullToRefresh onRefresh={fetchCars}>
     <div
@@ -744,8 +725,6 @@ function BrowseContent() {
     >
       <Header />
 
-
-      {showResult && <>
       {/* Banner */}
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
@@ -995,12 +974,6 @@ function BrowseContent() {
           {/* Results toolbar — sticky under header on desktop */}
           <div className="mb-4 md:sticky md:top-14 md:z-20 md:-mx-1 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
             <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href="/"
-                className="font-mono text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
-              >
-                返回搜索
-              </Link>
               <p className="flex items-baseline gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                 <span>Results:</span>
                 <span className="font-semibold tracking-normal text-foreground">
@@ -1176,8 +1149,6 @@ function BrowseContent() {
 
       <Footer />
       <BackToTop />
-      <CompareBar />
-      </>}
     </div>
     </PullToRefresh>
   );
