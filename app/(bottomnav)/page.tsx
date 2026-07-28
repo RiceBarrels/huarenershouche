@@ -462,7 +462,7 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Hero — typographic, grid backdrop */}
-      <section className="relative mx-3 mt-3 overflow-hidden rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 px-4 pb-6 pt-4 md:mx-0 md:mt-0 md:rounded-none md:border-x-0 md:border-t-0 md:border-border md:bg-transparent md:pb-24 md:pt-24">
+      <section className="relative overflow-hidden px-4 pb-6 pt-4 bg-linear-160 from-primary/50 via-background">
         {/* Grid backdrop with subtle parallax */}
         <motion.div
           aria-hidden="true"
