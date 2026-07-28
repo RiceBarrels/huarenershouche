@@ -332,21 +332,21 @@ export default function EditCarPage() {
               onDrop={handleDrop}
             >
               {imageUrls.map((url, i) => (
-                <div key={url} className="group relative h-20 w-28 border border-border bg-muted">
-                  <img src={url} alt="" className="h-full w-full object-cover" />
+                <div key={url} className="group relative h-20 w-28 rounded-lg border border-border bg-muted">
+                  <img src={url} alt="" className="h-full w-full rounded-lg object-cover" />
                   <button
                     type="button"
-                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-white opacity-0 transition-opacity group-hover:opacity-100"
                     onClick={() => setImageUrls((prev) => prev.filter((_, j) => j !== i))}
                   >
                     <X className="h-3 w-3" strokeWidth={2} />
                   </button>
                   {i === 0 && (
-                    <span className="absolute bottom-0 left-0 bg-foreground px-1 py-0.5 text-[9px] text-background">封面</span>
+                    <span className="absolute bottom-0 left-0 rounded-tr-lg rounded-bl-lg bg-foreground px-1 py-0.5 text-[9px] text-background">封面</span>
                   )}
                 </div>
               ))}
-              <label className="flex h-20 w-28 cursor-pointer items-center justify-center border border-dashed border-border bg-muted/30 hover:border-foreground/30">
+              <label className="flex h-20 w-28 cursor-pointer items-center justify-center rounded-xl border border-dashed border-border bg-muted/30 hover:border-foreground/30">
                 {uploading ? (
                   <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
                 ) : (
@@ -449,7 +449,7 @@ export default function EditCarPage() {
           <div>
             <Label className="font-mono text-[11px] text-muted-foreground">描述</Label>
             <textarea
-              className="mt-1 w-full resize-none border border-border bg-background p-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+              className="mt-1 w-full resize-none rounded-lg border border-border bg-background p-2 font-mono text-xs focus:outline-none focus:ring-1 focus:ring-ring"
               rows={4}
               value={form.description_zh}
               onChange={(e) => update("description_zh", e.target.value)}
@@ -502,7 +502,7 @@ export default function EditCarPage() {
               </Button>
             </div>
             {(carfaxSummary || car.carfax_summary) && (
-              <div className="mt-2 flex items-center gap-2 border border-border bg-muted/30 px-3 py-2">
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
                 <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="flex-1 font-mono text-[11px]">
                   {carfaxSummary ? formatCarfaxSummary(carfaxSummary) : car.carfax_summary}
@@ -527,7 +527,7 @@ export default function EditCarPage() {
             <Label className="font-mono text-[11px] text-muted-foreground">亮点标签</Label>
             <div className="mt-1 flex flex-wrap gap-1.5">
               {features.map((f) => (
-                <span key={f} className="flex items-center gap-1 border border-border px-2 py-1 font-mono text-[11px]">
+                <span key={f} className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]">
                   {f}
                   <button type="button" onClick={() => setFeatures((prev) => prev.filter((x) => x !== f))}>
                     <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -552,7 +552,7 @@ export default function EditCarPage() {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-7 w-7 p-0"
+                  className="h-7 w-7 rounded-full p-0"
                   disabled={!featureInput.trim()}
                   onClick={() => {
                     if (featureInput.trim()) {

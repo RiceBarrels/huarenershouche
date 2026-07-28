@@ -562,7 +562,7 @@ export default function AdminPage() {
             <button
               key={t.key}
               onClick={() => handleTabChange(t.key)}
-              className={`relative flex shrink-0 items-center gap-1 border px-3 py-2 text-xs transition-colors ${
+              className={`relative flex shrink-0 items-center gap-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
                 tab === t.key
                   ? "border-foreground bg-foreground text-background"
                   : "border-border hover:border-foreground/30"
@@ -571,7 +571,7 @@ export default function AdminPage() {
               {t.icon}
               {t.label}
               {t.count ? (
-                <span className={`ml-0.5 flex h-4 min-w-4 items-center justify-center px-1 text-[10px] ${
+                <span className={`ml-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] ${
                   tab === t.key ? "bg-background text-foreground" : "bg-foreground text-background"
                 }`}>
                   {t.count}
@@ -588,7 +588,7 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无待审核的认证申请</p>
             ) : (
               pendingStores.map((store) => (
-                <div key={store.id} className="border border-border p-3">
+                <div key={store.id} className="rounded-xl border border-border p-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-medium">{store.name}</p>
@@ -601,7 +601,7 @@ export default function AdminPage() {
                         提交时间: {store.verification_submitted_at ? new Date(store.verification_submitted_at).toLocaleString("zh-CN") : "-"}
                       </p>
                     </div>
-                    <span className="inline-flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">
                       <Clock className="h-3 w-3" strokeWidth={1.5} />待审
                     </span>
                   </div>
@@ -610,7 +610,7 @@ export default function AdminPage() {
                   {store.store_photos.length > 0 && (
                     <div className="mt-2 flex gap-2 overflow-x-auto">
                       {store.store_photos.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block h-20 w-28 shrink-0 overflow-hidden border border-border bg-muted">
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block h-20 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                           <img src={url} alt="" className="h-full w-full object-cover" />
                         </a>
                       ))}
@@ -667,7 +667,7 @@ export default function AdminPage() {
                 <p className="py-12 text-center text-xs text-muted-foreground">无匹配用户</p>
               ) : (
                 filteredUsers.map((u) => (
-                  <div key={u.id} className={`flex items-center justify-between border p-3 ${u.banned ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-border"}`}>
+                  <div key={u.id} className={`flex items-center justify-between rounded-lg border p-3 ${u.banned ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-border"}`}>
                     <div className="min-w-0 flex-1">
                       <Link href={adminUserLink(u.id)} className="flex items-center gap-2 hover:opacity-80">
                         <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
@@ -675,15 +675,15 @@ export default function AdminPage() {
                           <div className="flex items-center gap-1.5">
                             <p className="truncate text-xs font-medium hover:underline">{u.username || "未设置"}</p>
                             {u.is_system ? (
-                              <span className="shrink-0 bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
+                              <span className="shrink-0 rounded-full bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
                             ) : u.account_type === "dealer" && (
-                              <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px]">车行</span>
+                              <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[10px]">车行</span>
                             )}
                             {u.role === "admin" && (
-                              <span className="shrink-0 bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>
+                              <span className="shrink-0 rounded-full bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>
                             )}
                             {u.banned && (
-                              <span className="shrink-0 bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>
+                              <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>
                             )}
                           </div>
                           <p className="truncate text-[10px] text-muted-foreground">
@@ -779,8 +779,8 @@ export default function AdminPage() {
                 <p className="py-12 text-center text-xs text-muted-foreground">无匹配车辆</p>
               ) : (
                 filteredCars.map((car) => (
-                  <div key={car.id} className={`flex items-center gap-3 border p-2 ${car.status === "removed" ? "border-red-300 opacity-60" : "border-border"}`}>
-                    <div className="h-14 w-20 shrink-0 overflow-hidden border border-border bg-muted">
+                  <div key={car.id} className={`flex items-center gap-3 rounded-lg border p-2 ${car.status === "removed" ? "border-red-300 opacity-60" : "border-border"}`}>
+                    <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                       {car.image_url ? (
                         <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                       ) : (
@@ -790,7 +790,7 @@ export default function AdminPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-xs font-medium">{car.title_zh || car.title}</p>
-                        <span className={`shrink-0 px-1 py-0.5 text-[10px] ${
+                        <span className={`shrink-0 rounded-full px-1 py-0.5 text-[10px] ${
                           car.status === "active" ? "bg-emerald-500/10 text-emerald-600"
                             : car.status === "sold" ? "bg-blue-500/10 text-blue-600"
                             : carExpired(car) ? "bg-orange-500/10 text-orange-600"
@@ -871,17 +871,17 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无举报</p>
             ) : (
               reports.map((r) => (
-                <div key={r.id} className="border border-border p-3">
+                <div key={r.id} className="rounded-xl border border-border p-3">
                   <div className="flex items-start gap-3">
                     {r.cars?.image_url && (
-                      <div className="h-14 w-20 shrink-0 overflow-hidden border border-border bg-muted">
+                      <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                         <img src={r.cars.image_url} alt="" className="h-full w-full object-cover" />
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium">{r.cars?.title_zh || "未知车辆"}</p>
                       <div className="mt-0.5 flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-0.5 bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">
                           <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />
                           {r.reason}
                         </span>
@@ -938,11 +938,11 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无工单</p>
             ) : (
               tickets.map((t) => (
-                <div key={t.id} className="border border-border p-3">
+                <div key={t.id} className="rounded-xl border border-border p-3">
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] ${
+                        <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] ${
                           t.type === "contact" ? "bg-blue-500/10 text-blue-600" : "bg-purple-500/10 text-purple-600"
                         }`}>
                           {t.type === "contact" ? (
@@ -1022,14 +1022,14 @@ export default function AdminPage() {
                 const syncing = syncingKey === s.key;
                 const result = syncResults[s.id];
                 return (
-                  <div key={s.id} className={`border border-border p-3 ${s.enabled ? "" : "opacity-60"}`}>
+                  <div key={s.id} className={`rounded-xl border border-border p-3 ${s.enabled ? "" : "opacity-60"}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <p className="truncate text-xs font-medium">{s.name}</p>
-                          <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{s.key}</span>
+                          <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{s.key}</span>
                           {!s.enabled && (
-                            <span className="shrink-0 bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已停用</span>
+                            <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已停用</span>
                           )}
                         </div>
                         <a
@@ -1051,19 +1051,19 @@ export default function AdminPage() {
                         </p>
                       </div>
                       {syncing || s.last_sync_status === "running" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                           <Loader2 className="h-2.5 w-2.5 animate-spin" />同步中
                         </span>
                       ) : s.last_sync_status === "success" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600">
                           <Check className="h-2.5 w-2.5" strokeWidth={2} />成功
                         </span>
                       ) : s.last_sync_status === "partial" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-600">
                           <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />部分成功
                         </span>
                       ) : s.last_sync_status === "error" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
                           <XCircle className="h-2.5 w-2.5" strokeWidth={2} />失败
                         </span>
                       ) : (
@@ -1096,7 +1096,7 @@ export default function AdminPage() {
                             错误 {d.errors.length} 条 {expandedErrors[s.id] ? "收起" : "展开"}
                           </button>
                           {expandedErrors[s.id] && (
-                            <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto border border-red-300 bg-red-50 p-2 dark:bg-red-950/20">
+                            <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto rounded-lg border border-red-300 bg-red-50 p-2 dark:bg-red-950/20">
                               {d.errors.map((err, i) => (
                                 <p key={i} className="break-all text-[10px] text-red-600">{err}</p>
                               ))}

@@ -847,7 +847,7 @@ export default function PostCarPage() {
 
         {/* Admin: fake listing generator */}
         {isAdmin && (
-          <div className="mt-6 border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+          <div className="mt-6 rounded-xl border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-yellow-600" strokeWidth={1.5} />
               <span className="font-mono text-xs font-semibold text-yellow-700 dark:text-yellow-400">管理员工具</span>
@@ -919,7 +919,7 @@ export default function PostCarPage() {
         </Dialog>
 
         {!user ? (
-          <div className="mt-8 flex flex-col items-center border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
             <p className="font-mono text-sm text-muted-foreground">
               请先登录后再发布车辆
             </p>
@@ -951,24 +951,24 @@ export default function PostCarPage() {
                 {imageUrls.map((url, i) => (
                   <div
                     key={i}
-                    className="group relative h-24 w-32 border border-border bg-muted"
+                    className="group relative h-24 w-32 rounded-lg border border-border bg-muted"
                   >
-                    <img src={url} alt="" className="h-full w-full object-cover" />
+                    <img src={url} alt="" className="h-full w-full rounded-lg object-cover" />
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
-                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
                     </button>
                     {i === 0 && (
-                      <span className="absolute bottom-1 left-1 bg-foreground/80 px-1 py-0.5 font-mono text-[9px] text-background">
+                      <span className="absolute bottom-1 left-1 rounded-full bg-foreground/80 px-1 py-0.5 font-mono text-[9px] text-background">
                         封面
                       </span>
                     )}
                   </div>
                 ))}
-                <label className="flex h-24 w-32 cursor-pointer flex-col items-center justify-center border border-dashed border-border transition-colors hover:border-foreground/30">
+                <label className="flex h-24 w-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30">
                   {uploading ? (
                     <Loader2
                       className="h-5 w-5 animate-spin text-muted-foreground"
@@ -998,7 +998,7 @@ export default function PostCarPage() {
 
               {/* Video preview */}
               {videoUrl && (
-                <div className="relative mt-3 overflow-hidden border border-border">
+                <div className="relative mt-3 overflow-hidden rounded-lg border border-border">
                   <video src={videoUrl} controls className="h-32 w-full object-cover" />
                   <button
                     type="button"
@@ -1113,7 +1113,7 @@ export default function PostCarPage() {
                 </Button>
               </div>
               {carfaxSummary && (
-                <div className="mt-2 flex items-center gap-2 border border-border bg-muted/30 px-3 py-2">
+                <div className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
                   <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                   <span className="flex-1 font-mono text-[11px]">
                     {formatCarfaxSummary(carfaxSummary)}
@@ -1247,7 +1247,7 @@ export default function PostCarPage() {
                     <span className="font-mono text-[10px] text-muted-foreground">电议</span>
                   </label>
                   {showCallWarning && !priceCallOnly && (
-                    <div className="mt-2 border border-yellow-500/50 bg-yellow-500/5 p-2">
+                    <div className="mt-2 rounded-lg border border-yellow-500/50 bg-yellow-500/5 p-2">
                       <p className="font-mono text-[11px] text-yellow-600 dark:text-yellow-400">
                         注意：选择电议可能会影响曝光率
                       </p>
@@ -1432,7 +1432,7 @@ export default function PostCarPage() {
                           seller_name: store.name,
                         }));
                       }}
-                      className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                      className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${
                         selectedStoreId === store.id
                           ? "border-foreground bg-foreground text-background"
                           : "border-border hover:border-foreground/30"
@@ -1522,7 +1522,7 @@ export default function PostCarPage() {
                 {features.map((f) => (
                   <span
                     key={f}
-                    className="flex items-center gap-1 border border-border px-2 py-1 font-mono text-[11px]"
+                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
                   >
                     {f}
                     <button
@@ -1600,7 +1600,7 @@ export default function PostCarPage() {
                 车辆描述
               </Label>
               <textarea
-                className="mt-2 w-full border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={5}
                 placeholder="描述车辆状况、保养历史、卖车原因等..."
                 value={form.description_zh}
@@ -1610,7 +1610,7 @@ export default function PostCarPage() {
 
             {/* Error */}
             {error && (
-              <div className="border border-destructive/50 bg-destructive/5 p-3">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                 <p className="font-mono text-xs text-destructive">{error}</p>
               </div>
             )}

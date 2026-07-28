@@ -122,7 +122,7 @@ export default function ListingsPage() {
         {loading ? (
           <div className="mt-4 space-y-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="flex gap-3 border border-border p-3">
+              <div key={i} className="flex gap-3 rounded-xl border border-border p-3">
                 <Skeleton className="h-20 w-28 shrink-0" />
                 <div className="flex-1 space-y-2">
                   <Skeleton className="h-4 w-3/4" />
@@ -136,9 +136,9 @@ export default function ListingsPage() {
         <>
         {/* Draft */}
         {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
-          <div className="mt-4 border border-dashed border-border p-3">
+          <div className="mt-4 rounded-xl border border-dashed border-border p-3">
             <div className="flex items-start gap-3">
-              <div className="h-16 w-24 shrink-0 bg-muted">
+              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
                 {draft.imageUrls?.[0] ? (
                   <img src={draft.imageUrls[0]} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -170,9 +170,9 @@ export default function ListingsPage() {
             </div>
           ) : (
             myCars.map((car) => (
-              <div key={car.id} className="flex gap-3 border border-border p-3">
+              <div key={car.id} className="flex gap-3 rounded-xl border border-border p-3">
                 <Link href={carLink(car.id)} className="shrink-0">
-                  <div className="h-20 w-28 bg-muted">
+                  <div className="h-20 w-28 overflow-hidden rounded-lg bg-muted">
                     {car.image_url ? (
                       <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                     ) : (

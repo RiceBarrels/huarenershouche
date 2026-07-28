@@ -57,7 +57,7 @@ export function MobileTabBar() {
               }`}
             >
               {isPost ? (
-                <span className="flex h-9 w-9 items-center justify-center border border-foreground bg-foreground text-background">
+                <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground bg-foreground text-background">
                   <Plus className="h-5 w-5" strokeWidth={2} />
                 </span>
               ) : (

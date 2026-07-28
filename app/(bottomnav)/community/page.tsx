@@ -455,7 +455,7 @@ export default function CommunityFeedPage() {
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.18, ease: EASE }}
                 >
-                  <div className="flex items-center gap-2 border border-border bg-background px-3">
+                  <div className="flex items-center gap-2 rounded-full border border-border bg-background px-3">
                     <motion.span layoutId="community-search-icon" className="shrink-0">
                       <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                     </motion.span>
@@ -488,7 +488,7 @@ export default function CommunityFeedPage() {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
                         onClick={() => setSearchType(chip.key)}
-                        className={`border px-2.5 py-1 font-mono text-[11px] transition-colors ${
+                        className={`rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors ${
                           searchType === chip.key
                             ? "border-foreground bg-foreground text-background"
                             : "border-border text-muted-foreground hover:border-foreground/40 hover:text-foreground"
@@ -519,7 +519,7 @@ export default function CommunityFeedPage() {
                     <button
                       type="button"
                       onClick={() => setSearchOpen(true)}
-                      className="flex h-9 w-9 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                      className="flex h-9 w-9 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
                       aria-label="搜索帖子"
                     >
                       <motion.span layoutId="community-search-icon" className="flex">
@@ -528,7 +528,7 @@ export default function CommunityFeedPage() {
                     </button>
                     <Link
                       href="/community/new"
-                      className="hidden h-9 items-center gap-1 border border-border px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground md:flex"
+                      className="hidden h-9 items-center gap-1 rounded-full border border-border px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground md:flex"
                     >
                       <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                       发帖
@@ -631,7 +631,7 @@ export default function CommunityFeedPage() {
       {/* Floating post button (mobile) */}
       <Link
         href="/community/new"
-        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
+        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
       >
         <Plus className="h-5 w-5" strokeWidth={1.5} />
       </Link>
@@ -663,7 +663,7 @@ function PostCard({
           openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
         }
       }}
-      className="block border border-border bg-card transition-colors hover:border-foreground/30"
+      className="block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"
     >
       {cover ? (
         <div className="relative">
@@ -677,7 +677,7 @@ function PostCard({
                 className="aspect-[3/4] w-full object-cover"
               />
               <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <span className="flex h-9 w-9 items-center justify-center border border-border bg-background/80 backdrop-blur-sm">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/80 backdrop-blur-sm">
                   <Play className="ml-0.5 h-4 w-4 text-foreground" strokeWidth={1.5} />
                 </span>
               </span>
@@ -691,11 +691,11 @@ function PostCard({
               loading="lazy"
             />
           )}
-          <span className="absolute left-1.5 top-1.5 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
+          <span className="absolute left-1.5 top-1.5 rounded-full border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
             {TYPE_LABELS[post.type] || post.type}
           </span>
           {post.images && post.images.length > 1 && (
-            <span className="absolute right-1.5 top-1.5 bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
+            <span className="absolute right-1.5 top-1.5 rounded-full bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
               +{post.images.length - 1}
             </span>
           )}
@@ -703,7 +703,7 @@ function PostCard({
       ) : null}
       <div className="p-2.5">
         {!cover && (
-          <span className="mb-1.5 inline-block border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+          <span className="mb-1.5 inline-block rounded-full border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
             {TYPE_LABELS[post.type] || post.type}
           </span>
         )}
@@ -727,7 +727,7 @@ function PostCard({
             }}
             className="flex min-w-0 items-center gap-1.5 transition-opacity hover:opacity-70"
           >
-            <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted">
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
               <img src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)} alt="" className="h-full w-full object-cover" />
             </span>
             <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
@@ -767,7 +767,7 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
           openCar(car, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
         }
       }}
-      className="block border border-border bg-card transition-colors hover:border-foreground/30"
+      className="block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"
     >
       <div className="relative">
         {car.image_url ? (
@@ -782,7 +782,7 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
             <span className="font-mono text-[10px] text-muted-foreground">暂无图片</span>
           </div>
         )}
-        <span className="absolute left-1.5 top-1.5 bg-primary px-1.5 py-0.5 font-mono text-[9px] font-medium text-primary-foreground">
+        <span className="absolute left-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 font-mono text-[9px] font-medium text-primary-foreground">
           {personalized ? "为你推荐" : "附近车源"}
         </span>
       </div>

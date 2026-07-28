@@ -144,7 +144,7 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale }}
               transition={{ duration: 0.2 }}
-              className="max-h-[85vh] max-w-[90vw] select-none object-contain"
+              className={`max-h-[85vh] max-w-[90vw] select-none object-contain ${scale === 1 ? "cursor-zoom-in" : "cursor-zoom-out"}`}
               style={{ touchAction: "pan-y" }}
               // 未放大时跟手左右拖拽切换(触摸/鼠标都可);到阈值或甩动松手即翻页
               drag={scale === 1 && images.length > 1 ? "x" : false}
@@ -169,13 +169,13 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); prev(); }}
-                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                className="absolute left-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
               >
                 <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); next(); }}
-                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                className="absolute right-4 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
               >
                 <ChevronRight className="h-5 w-5" strokeWidth={1.5} />
               </button>
@@ -193,7 +193,7 @@ export function ImageLightbox({ images, initialIndex, open, onClose }: ImageLigh
                   <button
                     key={i}
                     onClick={(e) => { e.stopPropagation(); setIndex(i); setScale(1); }}
-                    className={`h-12 w-16 shrink-0 border bg-black/50 transition-all ${
+                    className={`h-12 w-16 shrink-0 overflow-hidden rounded-lg border bg-black/50 transition-all ${
                       i === index
                         ? "border-white"
                         : "border-white/20 opacity-50 hover:opacity-80"

@@ -207,7 +207,7 @@ export default function NewPostPage() {
         </h1>
 
         {!userId ? (
-          <div className="mt-8 flex flex-col items-center border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
             <p className="font-mono text-sm text-muted-foreground">
               请先登录后再发帖
             </p>
@@ -230,7 +230,7 @@ export default function NewPostPage() {
                     key={t.key}
                     type="button"
                     onClick={() => setType(t.key)}
-                    className={`border px-3 py-1.5 font-mono text-xs transition-colors ${
+                    className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
                       type === t.key
                         ? "border-foreground bg-foreground text-background"
                         : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
@@ -266,7 +266,7 @@ export default function NewPostPage() {
                 内容 <span className="text-destructive">*</span>
               </Label>
               <textarea
-                className="mt-1 w-full border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={8}
                 placeholder="分享你的想法..."
                 value={content}
@@ -282,7 +282,7 @@ export default function NewPostPage() {
                 支持拖拽上传，最多 9 个，视频不超过 {MAX_VIDEO_MB}MB
               </p>
               <div
-                className={`mt-2 flex flex-wrap gap-2 p-2 transition-colors ${
+                className={`mt-2 flex flex-wrap gap-2 rounded-xl p-2 transition-colors ${
                   dragging ? "bg-muted/80 ring-2 ring-foreground/20" : ""
                 }`}
                 onDragOver={(e) => {
@@ -295,7 +295,7 @@ export default function NewPostPage() {
                 {imageUrls.map((url, i) => (
                   <div
                     key={i}
-                    className="group relative h-20 w-24 border border-border bg-muted"
+                    className="group relative h-20 w-24 rounded-lg border border-border bg-muted"
                   >
                     {isVideoUrl(url) ? (
                       <video
@@ -303,26 +303,26 @@ export default function NewPostPage() {
                         muted
                         playsInline
                         preload="metadata"
-                        className="h-full w-full object-cover"
+                        className="h-full w-full rounded-lg object-cover"
                       />
                     ) : (
                       <img
                         src={url}
                         alt=""
-                        className="h-full w-full object-cover"
+                        className="h-full w-full rounded-lg object-cover"
                       />
                     )}
                     <button
                       type="button"
                       onClick={() => removeImage(i)}
-                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
+                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 ))}
                 {imageUrls.length < 9 && (
-                  <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center border border-dashed border-border transition-colors hover:border-foreground/30">
+                  <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border transition-colors hover:border-foreground/30">
                     {uploading ? (
                       <Loader2
                         className="h-5 w-5 animate-spin text-muted-foreground"
@@ -354,7 +354,7 @@ export default function NewPostPage() {
 
             {/* Car info for review type */}
             {type === "review" && (
-              <div className="border border-border p-4">
+              <div className="rounded-xl border border-border p-4">
                 <Label className="font-mono text-xs font-semibold">
                   车辆信息（车评可选）
                 </Label>
@@ -406,7 +406,7 @@ export default function NewPostPage() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="flex items-center gap-1 border border-border px-2 py-1 font-mono text-[11px]"
+                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
                   >
                     {tag}
                     <button
@@ -448,7 +448,7 @@ export default function NewPostPage() {
 
             {/* Error */}
             {error && (
-              <div className="border border-destructive/50 bg-destructive/5 p-3">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                 <p className="font-mono text-xs text-destructive">{error}</p>
               </div>
             )}

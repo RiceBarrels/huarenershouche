@@ -823,7 +823,7 @@ function BrowseContent() {
             </AnimatePresence>
             {/* Search history dropdown */}
             {mobileSearchOpen && searchFocused && !filters.keyword && searchHistory.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 border border-border bg-background shadow-md">
+              <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-background shadow-md">
                 <div className="flex items-center justify-between px-3 py-1.5">
                   <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
                   <button
@@ -939,7 +939,7 @@ function BrowseContent() {
               <button
                 key={chip.key}
                 onClick={() => clearFilter(chip.key)}
-                className="flex items-center gap-1 border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
               >
                 {chip.label}
                 <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -987,7 +987,7 @@ function BrowseContent() {
                     if (!searchSaved) saveSearch(savedSearchParams);
                   }}
                   disabled={searchSaved}
-                  className={`flex items-center gap-1 border px-2 py-1 font-mono text-[11px] transition-colors ${
+                  className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${
                     searchSaved
                       ? "border-border bg-muted text-muted-foreground"
                       : "border-border hover:border-foreground hover:text-foreground"
@@ -1026,7 +1026,7 @@ function BrowseContent() {
                   <button
                     key={`${chip.key}-${i}`}
                     onClick={() => clearFilter(chip.key)}
-                    className="flex items-center gap-1 border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                    className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
                   >
                     {chip.label}
                     <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -1087,7 +1087,7 @@ function BrowseContent() {
             )}
             </>
           ) : (
-            <div className="flex flex-col items-center border border-dashed border-border px-6 py-16">
+            <div className="flex flex-col items-center rounded-xl border border-dashed border-border px-6 py-16">
               <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 No Results

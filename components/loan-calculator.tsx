@@ -60,7 +60,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
       <h3 className="font-mono text-xs font-semibold">月供计算器</h3>
 
       {/* Monthly payment highlight */}
-      <div className="border border-border p-3 text-center">
+      <div className="rounded-lg border border-border p-3 text-center">
         <p className="font-mono text-[10px] text-muted-foreground">预估月供</p>
         <p className="mt-1 font-mono text-xl font-bold">
           {fmt(monthlyPayment)}

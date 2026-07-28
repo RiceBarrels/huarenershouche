@@ -73,13 +73,13 @@ export function PriceDroppedCars() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="w-[220px] shrink-0 border border-border"
+                className="w-[220px] shrink-0 overflow-hidden rounded-xl border border-border"
               >
                 <Skeleton className="aspect-[16/10] w-full rounded-none" />
                 <div className="p-2.5">
-                  <Skeleton className="h-3 w-3/4 rounded-none" />
-                  <Skeleton className="mt-2 h-4 w-1/2 rounded-none" />
-                  <Skeleton className="mt-2 h-3 w-2/3 rounded-none" />
+                  <Skeleton className="h-3 w-3/4" />
+                  <Skeleton className="mt-2 h-4 w-1/2" />
+                  <Skeleton className="mt-2 h-3 w-2/3" />
                 </div>
               </div>
             ))}
@@ -98,7 +98,7 @@ export function PriceDroppedCars() {
                 <Link
                   key={car.id}
                   href={carLink(car.id)}
-                  className="group w-[220px] shrink-0 border border-border bg-card transition-colors hover:border-foreground/20"
+                  className="group w-[220px] shrink-0 overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/20"
                 >
                   {/* Image */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-muted">
@@ -119,11 +119,11 @@ export function PriceDroppedCars() {
                     {dropAmount > 0 && (
                       <div className="absolute left-2 top-2 flex items-center gap-1">
                         {discountPct > 0 && (
-                          <span className="bg-green-600 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
+                          <span className="rounded-full bg-green-600 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-white">
                             -{discountPct}%
                           </span>
                         )}
-                        <span className="bg-background/90 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-green-600 dark:text-green-400">
+                        <span className="rounded-full bg-background/90 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-green-600 dark:text-green-400">
                           -{formatPrice(dropAmount)}
                         </span>
                       </div>

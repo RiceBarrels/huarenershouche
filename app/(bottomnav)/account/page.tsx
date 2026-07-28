@@ -195,9 +195,9 @@ function AccountContent() {
       <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:max-w-5xl md:px-6 md:py-8">
         {/* Header band: profile + data strip */}
         {loading ? (
-          <div className="border border-border md:flex md:items-stretch">
+          <div className="overflow-hidden rounded-xl border border-border md:flex md:items-stretch">
             <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6">
-              <Skeleton className="h-16 w-16" />
+              <Skeleton className="h-16 w-16 rounded-full" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="h-3 w-20" />
@@ -213,10 +213,10 @@ function AccountContent() {
             </div>
           </div>
         ) : (
-        <div className="border border-border md:flex md:items-stretch">
+        <div className="overflow-hidden rounded-xl border border-border md:flex md:items-stretch">
           {!user ? (
             <div className="flex flex-col items-center justify-center px-6 py-10 text-center md:flex-1">
-              <div className="flex h-14 w-14 items-center justify-center border border-border bg-muted">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-muted">
                 <UserCircle className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
               </div>
               <p className="mt-4 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">未登录 / Guest</p>
@@ -234,7 +234,7 @@ function AccountContent() {
             <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6 md:py-5">
               <button
                 type="button"
-                className="group relative h-16 w-16 shrink-0 overflow-hidden border border-border bg-muted"
+                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted"
                 onClick={() => { if (!isActingAsClaimed) avatarInputRef.current?.click(); }}
                 aria-label="更换头像"
                 disabled={isActingAsClaimed}
@@ -287,7 +287,7 @@ function AccountContent() {
 
         {/* 身份切换：认领过系统车行账号时可切换操作身份 */}
         {user && claimedAccounts.length > 0 && (
-          <div className="mt-4 border border-border">
+          <div className="mt-4 overflow-hidden rounded-xl border border-border">
             <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
               <Store className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -313,7 +313,7 @@ function AccountContent() {
                 onClick={() => switchTo(a.id)}
                 className={`flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-muted/50 ${actingId === a.id ? "bg-muted/40" : ""}`}
               >
-                <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 border border-border object-cover" />
+                <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 rounded-full border border-border object-cover" />
                 <span className="flex-1 truncate font-mono text-sm">{a.username}</span>
                 {actingId === a.id ? (
                   <span className="font-mono text-[10px] text-brand">当前</span>
@@ -329,7 +329,7 @@ function AccountContent() {
         <div className="mt-6 space-y-6 md:grid md:grid-cols-2 md:items-start md:gap-8 md:space-y-0">
           <div>
             <GroupTitle label="车辆管理" />
-            <div className="mt-2 divide-y divide-border border border-border">
+            <div className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border">
               <MenuRow
                 icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
                 label="我的发布"
@@ -369,7 +369,7 @@ function AccountContent() {
 
           <div>
             <GroupTitle label="账号" />
-            <div className="mt-2 divide-y divide-border border border-border">
+            <div className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border">
               <MenuRow
                 icon={<Settings className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
                 label="账号设置"

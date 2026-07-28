@@ -122,7 +122,7 @@ export function CompareContent() {
       {/* 已选车辆 */}
       <div className="grid grid-cols-3 gap-3">
         {selected.map((car) => (
-          <div key={car.id} className="relative border border-border">
+          <div key={car.id} className="relative overflow-hidden rounded-xl border border-border">
             <div className="aspect-[16/10] overflow-hidden bg-muted">
               {car.image_url ? (
                 <img
@@ -139,7 +139,7 @@ export function CompareContent() {
             <button
               onClick={() => removeFromCompare(car.id)}
               aria-label="移出对比"
-              className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center bg-background/80 backdrop-blur-sm hover:bg-background"
+              className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
             >
               <X className="h-3 w-3" strokeWidth={1.5} />
             </button>

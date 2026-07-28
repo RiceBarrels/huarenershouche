@@ -137,7 +137,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                 const Icon = slide.icon;
                 return (
                   <>
-                    <div className="flex h-20 w-20 items-center justify-center border border-border bg-muted/50">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-xl border border-border bg-muted/50">
                       {Icon ? (
                         <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
                       ) : (
@@ -166,7 +166,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="flex flex-1 flex-col items-center justify-center px-8"
             >
-              <div className="flex h-16 w-16 items-center justify-center border border-border bg-muted/50">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border bg-muted/50">
                 <Zap className="h-7 w-7 text-foreground" strokeWidth={1.2} />
               </div>
               <h1 className="mt-6 text-center font-mono text-xl font-semibold tracking-tight">
@@ -236,7 +236,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                     key={i}
                     type="button"
                     onClick={() => setStep(i)}
-                    className={`h-1.5 transition-all duration-300 ${
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
                       i === step
                         ? "w-6 bg-foreground"
                         : "w-1.5 bg-muted-foreground/30"

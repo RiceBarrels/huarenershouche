@@ -204,7 +204,7 @@ export function SwipeSheet({
       {hero && originRect && (
         <motion.div
           aria-hidden="true"
-          className="pointer-events-none fixed origin-top-left overflow-hidden border border-border bg-card"
+          className="pointer-events-none fixed origin-top-left overflow-hidden rounded-xl border border-border bg-card"
           style={{
             top: originRect.top,
             left: originRect.left,

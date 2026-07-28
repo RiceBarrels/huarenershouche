@@ -108,7 +108,7 @@ export default function ServicesPage() {
         </div>
 
         {!location ? (
-          <div className="mb-8 flex flex-col items-center gap-3 rounded border border-border p-8">
+          <div className="mb-8 flex flex-col items-center gap-3 rounded-xl border border-border p-8">
             <MapPin
               className="h-6 w-6 text-muted-foreground"
               strokeWidth={1.5}
@@ -162,7 +162,7 @@ export default function ServicesPage() {
             return (
               <div
                 key={cat.name}
-                className="flex flex-col gap-3 border border-border p-4"
+                className="flex flex-col gap-3 rounded-xl border border-border p-4"
               >
                 <div className="flex items-center gap-3">
                   <Icon

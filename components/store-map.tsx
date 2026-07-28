@@ -41,9 +41,12 @@ interface StoreMarker {
 export function StoreMap({
   markers,
   className,
+  zoom = 14,
 }: {
   markers: StoreMarker[];
   className?: string;
+  /** 单标记时的缩放级别 */
+  zoom?: number;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<L.Map | null>(null);
@@ -99,7 +102,7 @@ export function StoreMap({
     });
 
     if (markers.length === 1) {
-      map.setView([markers[0].lat, markers[0].lng], 14);
+      map.setView([markers[0].lat, markers[0].lng], zoom);
     } else {
       map.fitBounds(bounds, { padding: [40, 40] });
     }
@@ -108,7 +111,7 @@ export function StoreMap({
       map.remove();
       mapInstance.current = null;
     };
-  }, [markers]);
+  }, [markers, zoom]);
 
   if (markers.length === 0) return null;
 
@@ -180,7 +183,9 @@ export function StoreMap({
         data-vaul-no-drag=""
         data-sheet-static=""
         className={className || "h-48 w-full border border-border"}
-        style={{ touchAction: "none" }}
+        // isolation: leaflet 内部图层 z-index 高达 1000,不隔离会盖住页面上
+        // 与地图同级的浮动元素(如停车页的底部信息卡)
+        style={{ touchAction: "none", isolation: "isolate", zIndex: 0 }}
       />
     </>
   );

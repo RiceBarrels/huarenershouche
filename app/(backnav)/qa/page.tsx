@@ -130,7 +130,7 @@ export default function QaBoardPage() {
         {loading ? (
           <div className="mt-4 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="border border-border p-4">
+              <div key={i} className="rounded-xl border border-border p-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-4 w-12" />
                   <Skeleton className="h-4 w-3/4" />
@@ -176,7 +176,7 @@ export default function QaBoardPage() {
               <Link
                 key={q.id}
                 href={`/qa/${q.id}`}
-                className="block border border-border p-4 transition-colors hover:bg-muted/30"
+                className="block rounded-xl border border-border p-4 transition-colors hover:bg-muted/30"
               >
                 <div className="flex items-start gap-2">
                   <Badge
@@ -211,7 +211,7 @@ export default function QaBoardPage() {
                     {q.tags.slice(0, 3).map((tag) => (
                       <span
                         key={tag}
-                        className="border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                       >
                         {tag}
                       </span>
@@ -249,7 +249,7 @@ export default function QaBoardPage() {
       {/* Floating ask button */}
       <Link
         href="/qa/ask"
-        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center bg-foreground text-background shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-transform hover:scale-105 active:scale-95"
       >
         <Plus className="h-5 w-5" strokeWidth={1.5} />
       </Link>

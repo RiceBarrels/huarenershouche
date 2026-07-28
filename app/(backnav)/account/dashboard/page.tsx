@@ -90,7 +90,7 @@ export default function DashboardPage() {
         {loading ? (
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="border border-border p-4">
+              <div key={i} className="rounded-xl border border-border p-4">
                 <Skeleton className="h-3 w-12" />
                 <Skeleton className="mt-2 h-6 w-16" />
               </div>
@@ -124,7 +124,7 @@ export default function DashboardPage() {
 
             {/* Conversion funnel */}
             {totalViews > 0 && (
-              <div className="mt-6 border border-border p-4">
+              <div className="mt-6 rounded-xl border border-border p-4">
                 <h2 className="font-mono text-xs font-medium text-muted-foreground">转化漏斗</h2>
                 <div className="mt-3 flex items-center gap-4">
                   <FunnelStep label="浏览" value={totalViews} pct={100} />
@@ -149,9 +149,9 @@ export default function DashboardPage() {
                     <Link
                       key={car.id}
                       href={carLink(car.id)}
-                      className="flex items-center gap-3 border border-border p-3 transition-colors hover:border-foreground/20"
+                      className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-foreground/20"
                     >
-                      <div className="h-12 w-16 shrink-0 overflow-hidden bg-muted">
+                      <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                         {car.image_url ? (
                           <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                         ) : (
@@ -191,7 +191,7 @@ export default function DashboardPage() {
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="border border-border p-4">
+    <div className="rounded-xl border border-border p-4">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
         <span className="font-mono text-[11px]">{label}</span>

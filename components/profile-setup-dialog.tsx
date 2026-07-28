@@ -127,7 +127,7 @@ export function ProfileSetupDialog({
             <div className="space-y-3">
               <button
                 onClick={() => handleTypeSelect("private")}
-                className="flex w-full items-center gap-3 border border-border p-4 transition-colors hover:border-foreground/30"
+                className="flex w-full items-center gap-3 rounded-xl border border-border p-4 transition-colors hover:border-foreground/30"
               >
                 <User className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                 <div className="text-left">
@@ -139,7 +139,7 @@ export function ProfileSetupDialog({
               </button>
               <button
                 onClick={() => handleTypeSelect("dealer")}
-                className="flex w-full items-center gap-3 border border-border p-4 transition-colors hover:border-foreground/30"
+                className="flex w-full items-center gap-3 rounded-xl border border-border p-4 transition-colors hover:border-foreground/30"
               >
                 <Store className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                 <div className="text-left">

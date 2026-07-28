@@ -131,7 +131,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
     return (
       <div
         // 手机:全屏接管(盖住页头,聊天占满视口,键盘弹起不跳);桌面:内嵌卡片
-        className="fixed inset-0 z-[70] flex flex-col bg-background font-mono md:static md:z-auto md:h-[600px] md:border md:border-border"
+        className="fixed inset-0 z-[70] flex flex-col bg-background font-mono md:static md:z-auto md:h-[600px] md:overflow-hidden md:rounded-xl md:border md:border-border"
         style={{
           paddingTop: "env(safe-area-inset-top, 0px)",
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
@@ -162,7 +162,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
 
   if (conversations.length === 0) {
     return (
-      <div className="mx-4 flex flex-col items-center border border-dashed border-border py-12 md:mx-0">
+      <div className="mx-4 flex flex-col items-center rounded-xl border border-dashed border-border py-12 md:mx-0">
         <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
         <p className="mt-3 font-mono text-sm text-muted-foreground">暂无消息</p>
         <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
@@ -173,7 +173,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
   }
 
   return (
-    <div className="divide-y divide-border border-y border-border md:border-x">
+    <div className="divide-y divide-border border-y border-border md:overflow-hidden md:rounded-xl md:border-x">
       {conversations.map((conv) => {
         const isBuyer = conv.buyer_id === userId;
         const otherProfile = isBuyer ? conv.seller_profile : conv.buyer_profile;
@@ -233,7 +233,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
               </p>
               {conv.cars && (
                 <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-[10px] text-muted-foreground/70">
-                  <span className="inline-block h-1 w-1 shrink-0 bg-brand" aria-hidden="true" />
+                  <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-brand" aria-hidden="true" />
                   {conv.cars.title_zh} · {formatPrice(conv.cars.price)}
                 </p>
               )}
@@ -241,7 +241,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
 
             {/* Car thumbnail */}
             {conv.cars?.image_url && (
-              <div className="h-12 w-16 shrink-0 overflow-hidden border border-border bg-muted">
+              <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                 <img src={conv.cars.image_url} alt="" className="h-full w-full object-cover" />
               </div>
             )}

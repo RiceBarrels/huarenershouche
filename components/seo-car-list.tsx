@@ -84,13 +84,13 @@ export function SeoCarList({
 
   if (cars.length === 0) {
     return (
-      <div className="border border-dashed border-border px-4 py-10 text-center">
+      <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
         <p className="font-mono text-xs text-muted-foreground">
           该分类下暂时没有在售车源，去看看全部车源吧
         </p>
         <Link
           href="/browse"
-          className="mt-3 inline-flex items-center gap-1 border border-border px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted"
+          className="mt-3 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted"
         >
           浏览全部车源
           <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
@@ -113,7 +113,7 @@ export function SeoCarList({
         <div className="mt-4 text-center">
           <Link
             href={browseHref}
-            className="inline-flex items-center gap-1 border border-border px-4 py-2 font-mono text-xs transition-colors hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded-full border border-border px-4 py-2 font-mono text-xs transition-colors hover:bg-muted"
           >
             查看全部 {cars.length}{cars.length >= 200 ? "+" : ""} 辆
             <ArrowRight className="h-3 w-3" strokeWidth={1.5} />

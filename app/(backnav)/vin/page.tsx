@@ -143,7 +143,7 @@ export default function VinPage() {
         {/* Error */}
         {error && (
           <div
-            className="mt-4 flex items-center gap-2 border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30"
+            className="mt-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-900 dark:bg-red-950/30"
           >
             <ShieldX className="h-5 w-5 shrink-0 text-red-500" strokeWidth={1.5} />
             <span className="font-mono text-xs text-red-600 dark:text-red-400">
@@ -158,7 +158,7 @@ export default function VinPage() {
             className="mt-6"
           >
             {/* Title card */}
-            <div className="border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
+            <div className="rounded-xl border border-green-200 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/30">
               <div className="flex items-center gap-2">
                 <ShieldCheck className="h-5 w-5 text-green-600 dark:text-green-400" strokeWidth={1.5} />
                 <span className="font-mono text-sm font-semibold text-green-700 dark:text-green-300">
@@ -189,7 +189,7 @@ export default function VinPage() {
                 const value = String(result[key] || "");
                 if (!value || value === "0") return null;
                 return (
-                  <div key={key} className="border border-border p-3">
+                  <div key={key} className="rounded-lg border border-border p-3">
                     <div className="flex items-center gap-1.5">
                       <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
                       <span className="font-mono text-[10px] text-muted-foreground">
@@ -239,7 +239,7 @@ export default function VinPage() {
             <p className="mt-3 font-mono text-sm text-muted-foreground">
               输入 VIN 码开始查询
             </p>
-            <div className="mt-4 border border-border p-4">
+            <div className="mt-4 rounded-xl border border-border p-4">
               <p className="font-mono text-[11px] font-medium">VIN 码在哪里找？</p>
               <ul className="mt-2 space-y-1.5">
                 <li className="font-mono text-[11px] text-muted-foreground">

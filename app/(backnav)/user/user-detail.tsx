@@ -203,7 +203,7 @@ export default function UserProfilePage({
         {loading ? (
           <div className="mt-4">
             <div className="flex items-start gap-4 border-b border-border pb-6">
-              <Skeleton className="h-16 w-16 shrink-0" />
+              <Skeleton className="h-16 w-16 shrink-0 rounded-full" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-5 w-32" />
                 <Skeleton className="h-3 w-48" />
@@ -213,7 +213,7 @@ export default function UserProfilePage({
               <Skeleton className="h-4 w-24" />
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {[1, 2, 3].map((i) => (
-                  <div key={i} className="border border-border">
+                  <div key={i} className="overflow-hidden rounded-xl border border-border">
                     <Skeleton className="aspect-[16/10] w-full" />
                     <div className="space-y-2 p-3">
                       <Skeleton className="h-4 w-3/4" />
@@ -240,7 +240,7 @@ export default function UserProfilePage({
           <>
             {/* Profile header */}
             <div className="flex items-start gap-4 border-b border-border pb-6">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center border border-border bg-muted">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
                 <img
                   src={avatarUrl(profile.avatar_url, profile.username)}
                   alt={profile.username}
@@ -348,7 +348,7 @@ export default function UserProfilePage({
 
             {/* 门店地址:OpenStreetMap 地图 + 一键导航 */}
             {store?.address && (
-              <div className="mt-6 border border-border p-4">
+              <div className="mt-6 rounded-xl border border-border p-4">
                 <h2 className="font-mono text-sm font-semibold">门店地址</h2>
                 <p className="mt-1.5 flex items-start gap-1.5 font-mono text-xs text-muted-foreground">
                   <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
@@ -365,7 +365,7 @@ export default function UserProfilePage({
                           address: store.address,
                         },
                       ]}
-                      className="h-52 w-full border border-border"
+                      className="h-52 w-full overflow-hidden rounded-lg border border-border"
                     />
                   </div>
                 )}
@@ -426,7 +426,7 @@ export default function UserProfilePage({
                       <Link
                         key={post.id}
                         href={`/community/${post.id}`}
-                        className="block border border-border bg-card transition-colors hover:border-foreground/30"
+                        className="block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"
                       >
                         {cover && (
                           <div className="relative">
@@ -440,7 +440,7 @@ export default function UserProfilePage({
                                   className="aspect-[4/3] w-full object-cover"
                                 />
                                 <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                  <span className="flex h-7 w-7 items-center justify-center border border-border bg-background/80">
+                                  <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-background/80">
                                     <Play className="ml-0.5 h-3 w-3" strokeWidth={1.5} />
                                   </span>
                                 </span>

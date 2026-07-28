@@ -25,7 +25,7 @@ export function NotificationSettings() {
 
   if (!supported) {
     return (
-      <div className="border border-border p-4">
+      <div className="rounded-xl border border-border p-4">
         <div className="flex items-center gap-2">
           <BellOff className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
           <span className="font-mono text-sm">通知不可用</span>
@@ -64,7 +64,7 @@ export function NotificationSettings() {
   }
 
   return (
-    <div className="border border-border p-4">
+    <div className="rounded-xl border border-border p-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Bell className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />

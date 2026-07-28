@@ -343,18 +343,18 @@ export default function AdminUserManagePage() {
         <DesktopBack />
 
         {/* Identity header */}
-        <div className="flex items-start gap-3 border border-border p-3">
+        <div className="flex items-start gap-3 rounded-xl border border-border p-3">
           <img src={avatarUrl(profile.avatar_url, profile.username)} alt="" className="h-14 w-14 shrink-0 rounded-full border border-border object-cover" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               <h1 className="truncate text-base font-semibold">{profile.username || "未设置昵称"}</h1>
               {profile.is_system ? (
-                <span className="bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
+                <span className="rounded-full bg-foreground/80 px-1 py-0.5 text-[10px] text-background">系统</span>
               ) : profile.account_type === "dealer" ? (
-                <span className="bg-muted px-1 py-0.5 text-[10px]">车行</span>
+                <span className="rounded-full bg-muted px-1 py-0.5 text-[10px]">车行</span>
               ) : null}
-              {profile.role === "admin" && <span className="bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>}
-              {profile.banned && <span className="bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>}
+              {profile.role === "admin" && <span className="rounded-full bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>}
+              {profile.banned && <span className="rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>}
             </div>
             <p className="mt-1 flex items-center gap-1 text-[11px]">
               <Mail className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
@@ -396,7 +396,7 @@ export default function AdminUserManagePage() {
             { icon: <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />, label: "帖子", value: postCount },
             { icon: <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />, label: "对话", value: convCount },
           ].map((s, i) => (
-            <div key={i} className="flex flex-col items-center gap-1 border border-border py-2">
+            <div key={i} className="flex flex-col items-center gap-1 rounded-lg border border-border py-2">
               <span className="text-muted-foreground">{s.icon}</span>
               <span className="text-sm font-semibold">{s.value}</span>
               <span className="text-[10px] text-muted-foreground">{s.label}</span>
@@ -426,7 +426,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">语言</Label>
               <select
-                className="mt-1 h-9 w-full border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 value={form.preferred_language}
                 onChange={(e) => upd("preferred_language", e.target.value)}
               >
@@ -437,7 +437,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">账号类型</Label>
               <select
-                className="mt-1 h-9 w-full border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 value={toKind(form)}
                 onChange={(e) => {
                   const kind = e.target.value as AccountKind;
@@ -461,7 +461,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">角色权限</Label>
               <select
-                className="mt-1 h-9 w-full border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 h-9 w-full rounded-lg border border-border bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                 value={form.role}
                 onChange={(e) => upd("role", e.target.value as EditForm["role"])}
               >
@@ -472,7 +472,7 @@ export default function AdminUserManagePage() {
           </div>
 
           {/* Ban control */}
-          <div className="mt-3 border border-border p-3">
+          <div className="mt-3 rounded-xl border border-border p-3">
             <label className="flex items-center gap-2 text-xs">
               <input
                 type="checkbox"
@@ -514,14 +514,14 @@ export default function AdminUserManagePage() {
             </h2>
             <div className="mt-3 space-y-2">
               {cars.map((car) => (
-                <div key={car.id} className={`flex items-center gap-3 border p-2 ${car.status === "removed" ? "border-red-300 opacity-70" : "border-border"}`}>
-                  <div className="h-12 w-16 shrink-0 overflow-hidden border border-border bg-muted">
+                <div key={car.id} className={`flex items-center gap-3 rounded-lg border p-2 ${car.status === "removed" ? "border-red-300 opacity-70" : "border-border"}`}>
+                  <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                     {car.image_url ? <img src={car.image_url} alt="" className="h-full w-full object-cover" /> : null}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <p className="truncate text-xs font-medium">{car.title_zh || car.title}</p>
-                      <span className="shrink-0 bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{carStatusLabel(car)}</span>
+                      <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{carStatusLabel(car)}</span>
                     </div>
                     <p className="text-[10px] text-muted-foreground">${car.price?.toLocaleString()} · {car.location_zh}</p>
                   </div>
@@ -560,10 +560,10 @@ export default function AdminUserManagePage() {
             </h2>
             <div className="mt-3 space-y-2">
               {stores.map((s) => (
-                <div key={s.id} className="border border-border p-3">
+                <div key={s.id} className="rounded-xl border border-border p-3">
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs font-medium">{s.name}</p>
-                    <span className={`px-1 py-0.5 text-[10px] ${
+                    <span className={`rounded-full px-1 py-0.5 text-[10px] ${
                       s.verification_status === "verified" ? "bg-emerald-500/10 text-emerald-600"
                         : s.verification_status === "pending" ? "bg-amber-500/10 text-amber-600"
                         : s.verification_status === "rejected" ? "bg-red-500/10 text-red-600"
@@ -587,7 +587,7 @@ export default function AdminUserManagePage() {
               <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />
               认领人 (Owner)
             </h2>
-            <div className="mt-3 border border-border p-3">
+            <div className="mt-3 rounded-xl border border-border p-3">
               {profile.claimed_by ? (
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-xs">
@@ -636,7 +636,7 @@ export default function AdminUserManagePage() {
         )}
 
         {/* Danger zone */}
-        <div className="mt-8 border border-red-300 bg-red-50/50 p-3 dark:bg-red-950/10">
+        <div className="mt-8 rounded-xl border border-red-300 bg-red-50/50 p-3 dark:bg-red-950/10">
           <h2 className="flex items-center gap-1.5 text-xs font-semibold text-red-600">
             <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.5} />
             危险操作

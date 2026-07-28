@@ -67,7 +67,7 @@ export default function RegisterPage() {
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.25 }}
-          className="border border-border bg-background p-6"
+          className="rounded-xl border border-border bg-background p-6"
         >
         <div className="flex flex-col items-center">
           <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-12 w-12 object-contain" />

@@ -146,7 +146,7 @@ export default function DealerApplyPage() {
         {/* Benefits */}
         <div className="mt-6 grid grid-cols-2 gap-3">
           {BENEFITS.map((b) => (
-            <div key={b.title} className="border border-border p-3">
+            <div key={b.title} className="rounded-xl border border-border p-3">
               <b.icon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
               <p className="mt-2 font-mono text-xs font-semibold">{b.title}</p>
               <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">{b.desc}</p>
@@ -163,12 +163,12 @@ export default function DealerApplyPage() {
           ) : !user ? (
             <Link
               href="/login"
-              className="block border border-dashed border-border px-4 py-8 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+              className="block rounded-xl border border-dashed border-border px-4 py-8 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
             >
               请先登录后再申请车行入驻 →
             </Link>
           ) : verifiedStore || profile?.account_type === "dealer" ? (
-            <div className="border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2">
                 <BadgeCheck className="h-4 w-4 text-green-600 dark:text-green-400" strokeWidth={1.5} />
                 <p className="font-mono text-sm font-semibold">你已是认证车行</p>
@@ -184,7 +184,7 @@ export default function DealerApplyPage() {
               </Link>
             </div>
           ) : pendingStore && !submitted ? (
-            <div className="border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-500" strokeWidth={1.5} />
                 <p className="font-mono text-sm font-semibold">审核中</p>
@@ -197,7 +197,7 @@ export default function DealerApplyPage() {
               </p>
             </div>
           ) : submitted ? (
-            <div className="border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <div className="flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-500" strokeWidth={1.5} />
                 <p className="font-mono text-sm font-semibold">申请已提交</p>
@@ -209,7 +209,7 @@ export default function DealerApplyPage() {
           ) : (
             <div>
               {rejectedStore && (
-                <div className="mb-4 border border-border p-4">
+                <div className="mb-4 rounded-xl border border-border p-4">
                   <div className="flex items-center gap-2">
                     <XCircle className="h-4 w-4 text-destructive" strokeWidth={1.5} />
                     <p className="font-mono text-sm font-semibold">上次申请未通过</p>

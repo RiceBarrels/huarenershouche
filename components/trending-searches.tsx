@@ -73,7 +73,7 @@ export function TrendingSearches() {
           {loading ? (
             <div className="flex flex-wrap gap-2">
               {Array.from({ length: 8 }).map((_, i) => (
-                <Skeleton key={i} className="h-7 w-16 rounded-none" />
+                <Skeleton key={i} className="h-7 w-16 rounded-full" />
               ))}
             </div>
           ) : (
@@ -82,7 +82,7 @@ export function TrendingSearches() {
                 <Link
                   key={make}
                   href={`/browse?make=${encodeURIComponent(make)}`}
-                  className="border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                  className="rounded-full border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
                 >
                   {MAKES_ZH[make] || make}
                   <span className="ml-1 text-muted-foreground">
@@ -104,7 +104,7 @@ export function TrendingSearches() {
               <Link
                 key={tag.label}
                 href={`/browse?${tag.params}`}
-                className="border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                className="rounded-full border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
               >
                 {tag.label}
               </Link>

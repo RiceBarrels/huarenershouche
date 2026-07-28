@@ -94,7 +94,7 @@ export default function ContactPage() {
         <div className="mt-6 space-y-3">
           <a
             href="mailto:contact@clcauto.com"
-            className="flex items-center gap-3 border border-border p-3 transition-colors hover:border-foreground/30"
+            className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:border-foreground/30"
           >
             <Mail className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>
@@ -102,14 +102,14 @@ export default function ContactPage() {
               <p className="text-[11px] text-muted-foreground">contact@clcauto.com</p>
             </div>
           </a>
-          <div className="flex items-center gap-3 border border-border p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border p-3">
             <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>
               <p className="text-xs font-medium">微信客服</p>
               <p className="text-[11px] text-muted-foreground">clcauto_support</p>
             </div>
           </div>
-          <div className="flex items-center gap-3 border border-border p-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border p-3">
             <Clock className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>
               <p className="text-xs font-medium">工作时间</p>
@@ -123,7 +123,7 @@ export default function ContactPage() {
           <h2 className="text-sm font-semibold">常见问题</h2>
           <div className="mt-3 space-y-2">
             {FAQ.map((item, i) => (
-              <details key={i} className="group border border-border">
+              <details key={i} className="group overflow-hidden rounded-lg border border-border">
                 <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-xs font-medium transition-colors hover:bg-muted/50">
                   {item.q}
                   <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>
@@ -140,7 +140,7 @@ export default function ContactPage() {
         <div className="mt-8">
           <h2 className="text-sm font-semibold">在线留言</h2>
           {sent ? (
-            <div className="mt-4 flex flex-col items-center border border-border py-8">
+            <div className="mt-4 flex flex-col items-center rounded-xl border border-border py-8">
               <CheckCircle className="h-8 w-8 text-emerald-500" strokeWidth={1.5} />
               <p className="mt-3 text-xs font-medium">消息已发送</p>
               <p className="mt-1 text-[11px] text-muted-foreground">我们会尽快回复您</p>
@@ -179,7 +179,7 @@ export default function ContactPage() {
               <div>
                 <Label className="text-[11px]">留言内容</Label>
                 <textarea
-                  className="mt-1 w-full resize-none border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
+                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
                   rows={4}
                   placeholder="请描述您的问题或建议..."
                   value={form.message}

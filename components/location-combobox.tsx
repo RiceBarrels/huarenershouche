@@ -146,7 +146,7 @@ export function LocationCombobox({
                   key={r.formatted}
                   type="button"
                   onClick={() => selectCity(r.formatted)}
-                  className="flex w-full items-center justify-between px-3 py-2 font-mono text-xs transition-colors hover:bg-accent"
+                  className="flex w-full items-center justify-between rounded-lg px-3 py-2 font-mono text-xs transition-colors hover:bg-accent"
                 >
                   <span>{r.formatted}</span>
                   {value === r.formatted && (

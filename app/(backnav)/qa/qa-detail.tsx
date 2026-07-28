@@ -307,7 +307,7 @@ export default function QaDetailPage() {
           {/* Author + stats */}
           <div className="mt-2 flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center border border-border bg-muted">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
                 <img
                   src={avatarUrl(question.profiles?.avatar_url, question.profiles?.username)}
                   alt=""
@@ -333,7 +333,7 @@ export default function QaDetailPage() {
               {question.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                 >
                   {tag}
                 </span>
@@ -357,7 +357,7 @@ export default function QaDetailPage() {
           {answersLoading ? (
             <div className="mt-4 space-y-4">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="border border-border p-4">
+                <div key={i} className="rounded-xl border border-border p-4">
                   <Skeleton className="h-3 w-24" />
                   <Skeleton className="mt-2 h-16 w-full" />
                 </div>
@@ -372,7 +372,7 @@ export default function QaDetailPage() {
               {answers.map((answer) => (
                 <div
                   key={answer.id}
-                  className={`border p-4 ${
+                  className={`rounded-xl border p-4 ${
                     answer.is_accepted
                       ? "border-green-500/30 bg-green-500/5"
                       : "border-border"
@@ -387,7 +387,7 @@ export default function QaDetailPage() {
 
                   {/* Answer author */}
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center border border-border bg-muted">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
                       <img
                         src={avatarUrl(answer.profiles?.avatar_url, answer.profiles?.username)}
                         alt=""
@@ -448,7 +448,7 @@ export default function QaDetailPage() {
                 <div className="flex flex-col gap-2">
                   <textarea
                     ref={inputRef}
-                    className="w-full resize-none border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+                    className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
                     placeholder="分享你的经验和建议..."
                     rows={4}
                     value={content}
@@ -476,7 +476,7 @@ export default function QaDetailPage() {
               ) : (
                 <Link
                   href="/login"
-                  className="block w-full border border-dashed border-border px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                  className="block w-full rounded-xl border border-dashed border-border px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
                 >
                   登录后回答问题
                 </Link>

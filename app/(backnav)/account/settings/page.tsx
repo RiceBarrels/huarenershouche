@@ -298,19 +298,19 @@ export default function SettingsPage() {
           <div>
             <Label className="font-mono text-xs">账号类型</Label>
             {profileForm.account_type === "dealer" ? (
-              <div className="mt-2 flex h-11 items-center gap-2 border border-foreground bg-foreground px-3 font-mono text-xs text-background">
+              <div className="mt-2 flex h-11 items-center gap-2 rounded-lg border border-foreground bg-foreground px-3 font-mono text-xs text-background">
                 <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />认证车行
               </div>
             ) : hasVerifiedStore ? (
               <div className="mt-2 flex gap-2">
-                <div className="flex h-11 flex-1 items-center justify-center border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
-                <button type="button" onClick={() => updateProfileForm({ account_type: "dealer" })} className="flex h-11 flex-1 items-center justify-center gap-1.5 border border-border font-mono text-xs transition-colors hover:border-foreground/30">
+                <div className="flex h-11 flex-1 items-center justify-center rounded-lg border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
+                <button type="button" onClick={() => updateProfileForm({ account_type: "dealer" })} className="flex h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border border-border font-mono text-xs transition-colors hover:border-foreground/30">
                   <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />升级为车行
                 </button>
               </div>
             ) : (
               <div className="mt-2">
-                <div className="flex h-11 items-center justify-center border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
+                <div className="flex h-11 items-center justify-center rounded-lg border border-foreground bg-foreground font-mono text-xs text-background">个人</div>
                 <p className="mt-2 font-mono text-[11px] text-muted-foreground">
                   添加门店并通过认证后可升级为车行账号
                 </p>
@@ -327,28 +327,28 @@ export default function SettingsPage() {
               {profileForm.account_type === "dealer" ? "管理您的门店信息" : "添加门店并提交认证，审核通过后可升级为认证车行"}
             </p>
               {mapMarkers.length > 0 && (
-                <div className="mt-3"><StoreMap markers={mapMarkers} className="h-52 w-full border border-border" /></div>
+                <div className="mt-3"><StoreMap markers={mapMarkers} className="h-52 w-full overflow-hidden rounded-xl border border-border" /></div>
               )}
               {stores.length > 0 && (
                 <div className="mt-3 space-y-3">
                   {stores.map((store) => (
-                    <div key={store.id} className="border border-border p-3">
+                    <div key={store.id} className="rounded-xl border border-border p-3">
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-mono text-xs font-medium">{store.name}</p>
                             {store.verification_status === "verified" && (
-                              <span className="inline-flex items-center gap-0.5 bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-600">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-600">
                                 <ShieldCheck className="h-3 w-3" strokeWidth={1.5} />已认证
                               </span>
                             )}
                             {store.verification_status === "pending" && (
-                              <span className="inline-flex items-center gap-0.5 bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-600">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500/10 px-1.5 py-0.5 font-mono text-[10px] text-amber-600">
                                 <Clock className="h-3 w-3" strokeWidth={1.5} />审核中
                               </span>
                             )}
                             {store.verification_status === "rejected" && (
-                              <span className="inline-flex items-center gap-0.5 bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-600">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-600">
                                 <XCircle className="h-3 w-3" strokeWidth={1.5} />未通过
                               </span>
                             )}
@@ -368,12 +368,12 @@ export default function SettingsPage() {
                       {store.store_photos.length > 0 && (
                         <div className="mt-2 flex gap-2 overflow-x-auto">
                           {store.store_photos.map((url, i) => (
-                            <div key={i} className="relative h-16 w-20 shrink-0 overflow-hidden border border-border bg-muted">
+                            <div key={i} className="relative h-16 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
                               <img src={url} alt="" className="h-full w-full object-cover" />
                               {store.verification_status !== "pending" && store.verification_status !== "verified" && (
                                 <button
                                   type="button"
-                                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center bg-black/50 text-white hover:bg-black/70"
+                                  className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70"
                                   onClick={() => removeStorePhoto(store.id, i)}
                                 >
                                   <X className="h-2.5 w-2.5" strokeWidth={2} />
@@ -387,7 +387,7 @@ export default function SettingsPage() {
                       {/* Upload photos + Apply verification */}
                       {store.verification_status !== "verified" && store.verification_status !== "pending" && (
                         <div className="mt-2 flex items-center gap-2">
-                          <label className="flex cursor-pointer items-center gap-1 border border-dashed border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
+                          <label className="flex cursor-pointer items-center gap-1 rounded-lg border border-dashed border-border px-2 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
                             <ImagePlus className="h-3 w-3" strokeWidth={1.5} />
                             上传照片
                             <input
@@ -427,7 +427,7 @@ export default function SettingsPage() {
                   ))}
                 </div>
               )}
-              <div className="mt-4 space-y-3 border border-dashed border-border p-3">
+              <div className="mt-4 space-y-3 rounded-xl border border-dashed border-border p-3">
                 <p className="font-mono text-[11px] font-medium">添加门店</p>
                 <div className="grid grid-cols-2 gap-2">
                   <div>

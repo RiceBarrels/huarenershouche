@@ -100,7 +100,7 @@ export function CompareBar() {
         >
           {/* 手机端通栏贴底;桌面端悬浮居中卡片 */}
           <div
-            className="mx-auto flex w-full items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:border md:shadow-sm"
+            className="mx-auto flex w-full items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:rounded-xl md:border md:shadow-sm"
             style={
               bottomOffset === 0
                 ? { paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }
@@ -119,16 +119,16 @@ export function CompareBar() {
                 return (
                   <div
                     key={id}
-                    className="flex shrink-0 items-center gap-1.5 border border-border bg-card p-1 pr-1.5"
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border bg-card p-1 pr-1.5"
                   >
                     {car?.image_url ? (
                       <img
                         src={car.image_url}
                         alt={car.title_zh || ""}
-                        className="h-8 w-11 object-cover"
+                        className="h-8 w-11 rounded-lg object-cover"
                       />
                     ) : (
-                      <span className="flex h-8 w-11 items-center justify-center bg-muted font-mono text-[9px] text-muted-foreground">
+                      <span className="flex h-8 w-11 items-center justify-center rounded-lg bg-muted font-mono text-[9px] text-muted-foreground">
                         ···
                       </span>
                     )}
@@ -160,7 +160,7 @@ export function CompareBar() {
                 onClick={() => clearCompare()}
                 title="取消对比"
                 aria-label="取消对比"
-                className="flex h-8 w-8 items-center justify-center border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                className="flex h-8 w-8 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
               </button>

@@ -70,7 +70,7 @@ export default function CarsHubPage() {
                   <Link
                     key={p.slug}
                     href={seoPageHref(p)}
-                    className="border border-border px-2 py-1 font-mono text-[11px] transition-colors hover:bg-muted"
+                    className="rounded-full border border-border px-2 py-1 font-mono text-[11px] transition-colors hover:bg-muted"
                   >
                     {p.label}
                   </Link>

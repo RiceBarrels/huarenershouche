@@ -15,14 +15,14 @@ export function SectionHeader({ index, label, title, action, className }: Sectio
   return (
     <div className={className}>
       {(index || label) && (
-        <div className="mb-2 flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+        <div className="mb-2 hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground md:flex">
           {index && <span className="text-brand">{index}</span>}
           {index && label && <span className="text-foreground/20">/</span>}
           {label && <span>{label}</span>}
         </div>
       )}
       <div className="flex items-end justify-between gap-4">
-        <h2 className="font-mono text-xl font-semibold tracking-tight md:text-2xl">{title}</h2>
+        <h2 className="font-mono text-base font-bold tracking-tight md:text-2xl md:font-semibold">{title}</h2>
         {action && (
           <Link
             href={action.href}
@@ -33,7 +33,7 @@ export function SectionHeader({ index, label, title, action, className }: Sectio
           </Link>
         )}
       </div>
-      <div className="mt-3 h-px w-full bg-border" />
+      <div className="mt-3 hidden h-px w-full bg-border md:block" />
     </div>
   );
 }

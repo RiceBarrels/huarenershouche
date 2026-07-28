@@ -18,7 +18,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group border border-border" open>
+    <details className="group overflow-hidden rounded-xl border border-border" open>
       <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-mono text-sm font-semibold hover:bg-muted/30">
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
         <span>{title}</span>
@@ -102,7 +102,7 @@ export default function DmvGuidePage() {
               <li>拿到临时注册证 (Temporary Registration)</li>
             </ol>
 
-            <div className="mt-4 border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">提示：DMV 预约</p>
               <p className="mt-1 text-[10px] text-muted-foreground">
                 大部分州的 DMV 可以在线预约。强烈建议预约，walk-in 可能要等 2-4 小时。
@@ -135,7 +135,7 @@ export default function DmvGuidePage() {
               <li>向 DMV 提交 Release of Liability（免责通知，非常重要）</li>
             </ol>
 
-            <div className="mt-4 border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">华人买家特别注意</p>
               <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-muted-foreground">
                 <li>F1/H1B 签证持有者可以用护照 + I-94 + I-20/I-797 作为身份证明</li>
@@ -177,7 +177,7 @@ export default function DmvGuidePage() {
             </div>
 
             <h4 className="mt-4 font-semibold">费用计算示例</h4>
-            <div className="mt-2 border border-border p-3">
+            <div className="mt-2 rounded-lg border border-border p-3">
               <p className="text-[10px] text-muted-foreground">
                 在加州购买 $15,000 的二手车
               </p>
@@ -193,7 +193,7 @@ export default function DmvGuidePage() {
               </div>
             </div>
 
-            <div className="mt-4 border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">省钱提示</p>
               <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-muted-foreground">
                 <li>Oregon、Montana、New Hampshire、Delaware 无销售税</li>
@@ -329,7 +329,7 @@ export default function DmvGuidePage() {
           </Section>
         </div>
 
-        <div className="mt-8 border border-border bg-muted/20 p-4">
+        <div className="mt-8 rounded-xl border border-border bg-muted/20 p-4">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>

@@ -73,7 +73,7 @@ export default function AuthCallbackPage() {
       )}
       {status === "success" && (
         <>
-          <div className="flex h-14 w-14 items-center justify-center border border-border bg-muted/50">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-muted/50">
             <Check className="h-7 w-7 text-foreground" strokeWidth={1.5} />
           </div>
           <p className="mt-4 text-sm font-medium">登录成功</p>

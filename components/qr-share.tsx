@@ -38,7 +38,7 @@ export function QrShare({ url, title }: QrShareProps) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="relative mx-4 w-full max-w-xs border border-border bg-white p-6 dark:bg-zinc-950"
+            className="relative mx-4 w-full max-w-xs rounded-xl border border-border bg-white p-6 dark:bg-zinc-950"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -55,7 +55,7 @@ export function QrShare({ url, title }: QrShareProps) {
                 alt="QR Code"
                 width={200}
                 height={200}
-                className="border border-border"
+                className="rounded-lg border border-border"
               />
 
               <p className="text-center font-mono text-xs leading-relaxed">

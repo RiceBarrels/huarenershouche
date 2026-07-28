@@ -317,7 +317,7 @@ export default function CarDetailPage({
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
           <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <div>
-              <Skeleton className="aspect-[16/10] w-full" />
+              <Skeleton className="aspect-[16/10] w-full rounded-xl" />
               <div className="mt-6 space-y-3">
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
@@ -325,7 +325,7 @@ export default function CarDetailPage({
               </div>
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="border border-border p-3 space-y-2">
+                  <div key={i} className="rounded-lg border border-border p-3 space-y-2">
                     <Skeleton className="h-3 w-12" />
                     <Skeleton className="h-4 w-20" />
                   </div>
@@ -333,7 +333,7 @@ export default function CarDetailPage({
               </div>
             </div>
             <div>
-              <div className="border border-border p-4 space-y-3">
+              <div className="rounded-xl border border-border p-4 space-y-3">
                 <Skeleton className="h-4 w-20" />
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-10 w-10 rounded-full" />
@@ -431,7 +431,7 @@ export default function CarDetailPage({
               <div className="relative flex-1 md:hidden">
                 <div
                   ref={mobileGalleryRef}
-                  className="flex aspect-[16/10] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain border border-border bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="flex aspect-[16/10] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl border border-border bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   onScroll={(e) => {
                     const el = e.currentTarget;
                     const idx = Math.round(el.scrollLeft / el.clientWidth);
@@ -466,19 +466,19 @@ export default function CarDetailPage({
                     <button
                       aria-label="上一张"
                       onClick={() => scrollGallery(-1)}
-                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/70 backdrop-blur-sm active:bg-background"
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/70 backdrop-blur-sm active:bg-background"
                     >
                       <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                     <button
                       aria-label="下一张"
                       onClick={() => scrollGallery(1)}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/70 backdrop-blur-sm active:bg-background"
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/70 backdrop-blur-sm active:bg-background"
                     >
                       <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                     <div
-                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
+                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
                       onClick={() => setLightboxOpen(true)}
                     >
                       <Eye className="h-3 w-3" strokeWidth={1.5} />
@@ -489,7 +489,7 @@ export default function CarDetailPage({
               </div>
 
               {/* Desktop: single image + arrows */}
-              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden border border-border bg-muted md:block">
+              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden rounded-xl border border-border bg-muted md:block">
                 {allImages.length > 0 ? (
                   isVideo(allImages[currentImage]) ? (
                     <video
@@ -520,7 +520,7 @@ export default function CarDetailPage({
                         e.preventDefault();
                         setCurrentImage((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
                       }}
-                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
                     >
                       <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                     </button>
@@ -529,12 +529,12 @@ export default function CarDetailPage({
                         e.preventDefault();
                         setCurrentImage((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
                       }}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
                     >
                       <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                     </button>
                     <div
-                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
+                      className="absolute bottom-3 left-3 flex cursor-pointer items-center gap-1 rounded-full bg-background/80 px-2 py-0.5 font-mono text-[10px] backdrop-blur-sm"
                       onClick={() => setLightboxOpen(true)}
                     >
                       <Eye className="h-3 w-3" strokeWidth={1.5} />
@@ -551,7 +551,7 @@ export default function CarDetailPage({
                     <button
                       key={i}
                       onClick={() => setCurrentImage(i)}
-                      className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden border bg-muted transition-colors ${
+                      className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-lg border bg-muted transition-colors ${
                         i === currentImage ? "border-foreground" : "border-border hover:border-foreground/40"
                       }`}
                     >
@@ -622,13 +622,13 @@ export default function CarDetailPage({
                 </span>
                 {insight && (
                   <span
-                    className={`px-1.5 py-0.5 font-mono text-xs font-semibold ${insight.className}`}
+                    className={`rounded-full px-1.5 py-0.5 font-mono text-xs font-semibold ${insight.className}`}
                   >
                     {insight.label}
                   </span>
                 )}
                 {car.original_price && car.original_price > car.price && (
-                  <span className="px-1.5 py-0.5 font-mono text-xs font-semibold bg-green-500/10 text-green-600">
+                  <span className="rounded-full px-1.5 py-0.5 font-mono text-xs font-semibold bg-green-500/10 text-green-600">
                     -{Math.round((1 - car.price / car.original_price) * 100)}%
                   </span>
                 )}
@@ -838,7 +838,7 @@ export default function CarDetailPage({
                     href={car.carfax_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center gap-1.5 border border-border px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted"
                   >
                     <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
                     在 Carfax 查看完整报告
@@ -863,7 +863,7 @@ export default function CarDetailPage({
           <div
             className="lg:sticky lg:top-20 lg:self-start"
           >
-            <div className="border border-border p-4">
+            <div className="rounded-xl border border-border p-4">
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
               <Link
                 href={userLink(car.seller_id)}
@@ -1161,7 +1161,7 @@ export default function CarDetailPage({
 
             {/* 车辆位置:地址 + OpenStreetMap 地图 + 一键导航 */}
             {(storeAddress || (car.lat != null && car.lng != null)) && (
-              <div className="mt-4 border border-border p-4">
+              <div className="mt-4 rounded-xl border border-border p-4">
                 <h3 className="font-mono text-sm font-semibold">
                   {storeAddress ? "门店地址" : "车辆位置"}
                 </h3>
@@ -1181,7 +1181,7 @@ export default function CarDetailPage({
                             address: storeAddress?.address || car.location_zh,
                           },
                         ]}
-                        className="h-44 w-full border border-border"
+                        className="h-44 w-full overflow-hidden rounded-lg border border-border"
                       />
                     </div>
                   )}
@@ -1208,12 +1208,12 @@ export default function CarDetailPage({
 
             {/* 预估月供:摘要卡片,点「计算」打开完整计算器 drawer */}
             {car.price > 0 && (
-              <div className="mt-4 border border-border p-4">
+              <div className="mt-4 rounded-xl border border-border p-4">
                 <h3 className="font-mono text-sm font-semibold">预估月供</h3>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                   用计算器估算你的每月还款
                 </p>
-                <div className="mt-3 bg-muted/50 p-4">
+                <div className="mt-3 rounded-lg bg-muted/50 p-4">
                   <div className="border-l-2 border-foreground pl-3">
                     <p className="font-mono text-xl font-bold">
                       ${estimateMonthlyPayment(car.price).toLocaleString()}/月*
@@ -1254,7 +1254,7 @@ export default function CarDetailPage({
             )}
 
             {/* Safety tips */}
-            <div className="mt-4 border border-border p-4">
+            <div className="mt-4 rounded-xl border border-border p-4">
               <h3 className="font-mono text-xs font-semibold">交易安全提示</h3>
               <ul className="mt-2 space-y-1.5">
                 <li className="font-mono text-[11px] text-muted-foreground">
@@ -1327,13 +1327,13 @@ export default function CarDetailPage({
             <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
             {insight && (
               <span
-                className={`px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
+                className={`rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
               >
                 {insight.label}
               </span>
             )}
             {car.original_price && car.original_price > car.price && (
-              <span className="px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+              <span className="rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
                 -{Math.round((1 - car.price / car.original_price) * 100)}%
               </span>
             )}

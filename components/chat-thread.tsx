@@ -161,8 +161,8 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                   className={`flex ${isMine ? "justify-end" : "justify-start"}`}
                 >
                   <div
-                    className={`max-w-[75%] ${
-                      CHAT_MEDIA_RE.test(msg.content) ? "p-1" : "px-3 py-2"
+                    className={`max-w-[75%] rounded-2xl ${
+                      CHAT_MEDIA_RE.test(msg.content) ? "overflow-hidden p-1" : "px-3 py-2"
                     } ${
                       isMine
                         ? "bg-foreground text-background"
@@ -176,7 +176,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                           controls
                           playsInline
                           preload="metadata"
-                          className="max-h-64 w-full"
+                          className="max-h-64 w-full rounded-xl"
                         />
                       ) : (
                         <a href={msg.content} target="_blank" rel="noreferrer">
@@ -184,7 +184,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                             src={msg.content}
                             alt="图片消息"
                             loading="lazy"
-                            className="max-h-64 w-full object-contain"
+                            className="max-h-64 w-full rounded-xl object-contain"
                           />
                         </a>
                       )
@@ -231,7 +231,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             aria-label="发送图片或视频"
-            className="flex h-10 w-10 shrink-0 items-center justify-center self-end border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
           >
             {uploading ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
@@ -241,7 +241,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           </button>
           <textarea
             ref={inputRef}
-            className="flex-1 resize-none border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+            className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
             placeholder="输入消息..."
             rows={1}
             value={content}

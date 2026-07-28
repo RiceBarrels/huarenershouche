@@ -76,7 +76,7 @@ export default function FavoritesPage() {
             <div className="mt-3 space-y-3">
               {loading ? (
                 [1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-3 border border-border p-3">
+                  <div key={i} className="flex gap-3 rounded-xl border border-border p-3">
                     <Skeleton className="h-20 w-28 shrink-0" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-3/4" />
@@ -93,9 +93,9 @@ export default function FavoritesPage() {
                 </div>
               ) : (
                 list.map((car) => (
-                  <div key={car.id} className="flex gap-3 border border-border p-3">
+                  <div key={car.id} className="flex gap-3 rounded-xl border border-border p-3">
                     <Link href={carLink(car.id)} className="shrink-0">
-                      <div className="h-20 w-28 bg-muted">
+                      <div className="h-20 w-28 overflow-hidden rounded-lg bg-muted">
                         {car.image_url ? (
                           <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                         ) : (
@@ -162,7 +162,7 @@ function SavedSearchesTab() {
         <Link
           key={search.id}
           href={buildSearchUrl(search.params)}
-          className="flex items-center gap-3 border border-border p-3 transition-colors hover:bg-muted/50"
+          className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:bg-muted/50"
         >
           <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
           <div className="min-w-0 flex-1">

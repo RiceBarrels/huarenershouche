@@ -87,7 +87,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
                     key={reason}
                     type="button"
                     onClick={() => setSelected(reason)}
-                    className={`w-full border px-3 py-2 text-left font-mono text-xs transition-colors ${
+                    className={`w-full rounded-lg border px-3 py-2 text-left font-mono text-xs transition-colors ${
                       selected === reason
                         ? "border-foreground bg-foreground text-background"
                         : "border-border hover:border-foreground/30"
@@ -100,7 +100,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
 
               <textarea
                 placeholder="补充说明（可选）"
-                className="w-full border border-border bg-transparent px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
+                className="w-full rounded-lg border border-border bg-transparent px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
                 rows={3}
                 value={detail}
                 onChange={(e) => setDetail(e.target.value)}

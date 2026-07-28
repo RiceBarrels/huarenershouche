@@ -249,7 +249,7 @@ export function TrustReviews() {
               <button
                 type="button"
                 onClick={() => (formOpen ? setFormOpen(false) : openForm())}
-                className="flex items-center gap-1 border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex items-center gap-1 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Pencil className="h-2.5 w-2.5" strokeWidth={1.5} />
                 {ownReview ? "修改我的评价" : "写评价"}
@@ -257,7 +257,7 @@ export function TrustReviews() {
             ) : (
               <Link
                 href="/login"
-                className="border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 登录后写评价
               </Link>
@@ -285,7 +285,7 @@ export function TrustReviews() {
 
         {/* Write review form */}
         {formOpen && userId && (
-          <div className="mb-4 border border-border bg-card p-4">
+          <div className="mb-4 rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-center gap-4">
               <StarPicker value={rating} onChange={setRating} />
               <div className="flex gap-1.5">
@@ -293,7 +293,7 @@ export function TrustReviews() {
                   <button
                     key={t}
                     type="button"
-                    className={`border px-2 py-0.5 font-mono text-[11px] transition-colors ${
+                    className={`rounded-full border px-2 py-0.5 font-mono text-[11px] transition-colors ${
                       transactionType === t
                         ? "border-foreground bg-foreground text-background"
                         : "border-border hover:bg-muted"
@@ -306,7 +306,7 @@ export function TrustReviews() {
               </div>
             </div>
             <textarea
-              className="mt-3 w-full resize-none border border-border bg-background px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+              className="mt-3 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
               placeholder="分享你在平台买车/卖车的真实体验（至少 10 个字）..."
               rows={3}
               maxLength={500}
@@ -348,7 +348,7 @@ export function TrustReviews() {
           {reviews.map((review) => (
             <div
               key={review.id}
-              className={`w-[260px] shrink-0 border bg-card p-4 md:w-auto ${review.isOwn ? "border-foreground/40" : "border-border"}`}
+              className={`w-[260px] shrink-0 rounded-xl border bg-card p-4 md:w-auto ${review.isOwn ? "border-foreground/40" : "border-border"}`}
             >
               {/* Rating */}
               <StarRating rating={review.rating} />
@@ -371,7 +371,7 @@ export function TrustReviews() {
                   <span className="font-mono text-xs font-medium">
                     {review.reviewer}
                   </span>
-                  <span className="border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
+                  <span className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
                     {review.transactionType}
                   </span>
                 </div>

@@ -155,7 +155,7 @@ export function Header() {
                         switchToSelf();
                         setSwitcherOpen(false);
                       }}
-                      className={`flex w-full items-center gap-2 px-2 py-2 text-left text-xs hover:bg-muted ${
+                      className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs hover:bg-muted ${
                         !isActingAsClaimed ? "bg-muted/60" : ""
                       }`}
                     >
@@ -171,14 +171,14 @@ export function Header() {
                           switchTo(acct.id);
                           setSwitcherOpen(false);
                         }}
-                        className={`flex w-full items-center gap-2 px-2 py-2 text-left text-xs hover:bg-muted ${
+                        className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-xs hover:bg-muted ${
                           actingId === acct.id ? "bg-muted/60" : ""
                         }`}
                       >
                         <img
                           src={avatarUrl(acct.avatar_url, acct.id)}
                           alt=""
-                          className="h-4 w-4 shrink-0 border border-border object-cover"
+                          className="h-4 w-4 shrink-0 rounded-full border border-border object-cover"
                         />
                         <span className="flex-1 truncate">{acct.username}</span>
                         {actingId === acct.id ? (

@@ -117,7 +117,7 @@ export default function BusinessPage() {
         {/* Services */}
         <div className="mt-6 space-y-3">
           {SERVICES.map((s, i) => (
-            <div key={i} className="flex items-start gap-3 border border-border p-3">
+            <div key={i} className="flex items-start gap-3 rounded-xl border border-border p-3">
               <div className="shrink-0 text-muted-foreground">{s.icon}</div>
               <div>
                 <p className="text-xs font-medium">{s.title}</p>
@@ -131,7 +131,7 @@ export default function BusinessPage() {
         <div className="mt-8">
           <h2 className="text-sm font-semibold">合作咨询</h2>
           {sent ? (
-            <div className="mt-4 flex flex-col items-center border border-border py-8">
+            <div className="mt-4 flex flex-col items-center rounded-xl border border-border py-8">
               <CheckCircle className="h-8 w-8 text-emerald-500" strokeWidth={1.5} />
               <p className="mt-3 text-xs font-medium">申请已提交</p>
               <p className="mt-1 text-[11px] text-muted-foreground">我们会在 1-3 个工作日内联系您</p>
@@ -196,7 +196,7 @@ export default function BusinessPage() {
                     <button
                       key={t}
                       type="button"
-                      className={`border px-2.5 py-1 text-[11px] transition-colors ${
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
                         form.type === t ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"
                       }`}
                       onClick={() => setForm((f) => ({ ...f, type: t }))}
@@ -209,7 +209,7 @@ export default function BusinessPage() {
               <div>
                 <Label className="text-[11px]">合作详情 *</Label>
                 <textarea
-                  className="mt-1 w-full resize-none border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
+                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
                   rows={4}
                   placeholder="请描述您的合作需求..."
                   value={form.message}

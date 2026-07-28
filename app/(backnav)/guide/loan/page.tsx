@@ -27,7 +27,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group border border-border" open>
+    <details className="group overflow-hidden rounded-xl border border-border" open>
       <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-mono text-sm font-semibold hover:bg-muted/30">
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
         <span>{title}</span>
@@ -69,7 +69,7 @@ export default function LoanGuidePage() {
         </p>
 
         {/* Loan Calculator Section */}
-        <div className="mt-8 border border-border p-4">
+        <div className="mt-8 rounded-xl border border-border p-4">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="font-mono text-sm font-semibold">贷款计算器</h2>
             <div className="flex items-center gap-2">
@@ -196,7 +196,7 @@ export default function LoanGuidePage() {
               </div>
             </div>
 
-            <div className="mt-3 border border-border p-3">
+            <div className="mt-3 rounded-lg border border-border p-3">
               <p className="text-[10px] font-semibold">实际对比：$20,000 贷款 / 7% APR</p>
               <div className="mt-2 space-y-1 text-[10px]">
                 <div className="flex justify-between">
@@ -263,7 +263,7 @@ export default function LoanGuidePage() {
 
             <div className="mt-4 space-y-3">
               {LOAN_PARTNERS.map((partner) => (
-                <div key={partner.id} className="border border-border">
+                <div key={partner.id} className="rounded-xl border border-border">
                   <div className="border-b border-border px-4 py-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -303,7 +303,7 @@ export default function LoanGuidePage() {
               ))}
             </div>
 
-            <div className="mt-4 border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">预审申请流程</p>
               <ol className="mt-1 list-inside list-decimal space-y-0.5 text-[10px] text-muted-foreground">
                 <li>选择上面的贷款机构，点击「立即预审」</li>
@@ -369,7 +369,7 @@ export default function LoanGuidePage() {
           </Section>
         </div>
 
-        <div className="mt-8 border border-border bg-muted/20 p-4">
+        <div className="mt-8 rounded-xl border border-border bg-muted/20 p-4">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>

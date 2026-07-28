@@ -98,7 +98,7 @@ export default function ForgotPasswordPage() {
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.25 }}
-          className="border border-border bg-background p-6"
+          className="rounded-xl border border-border bg-background p-6"
         >
         {step === "email" && (
           <>

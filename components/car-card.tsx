@@ -116,32 +116,33 @@ export function CarCard({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.98 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group cursor-pointer border border-border bg-card transition hover:border-foreground/30 active:bg-muted/30"
+        className="group flex cursor-pointer rounded-xl overflow-hidden bg-card transition hover:border-foreground/30 active:bg-muted/30 md:block"
       >
-        <div className="relative aspect-[16/10] overflow-hidden bg-muted">
+        {/* 图片:手机在左(约 2/5 宽,随文字高度拉伸),桌面在上(16:10) */}
+        <div className="relative w-[38%] shrink-0 self-stretch overflow-hidden bg-muted md:aspect-[16/10] md:w-auto md:self-auto">
           {car.image_url ? (
             <img
               src={car.image_url}
               alt={car.title}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] md:static"
             />
           ) : (
-            <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
+            <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-muted-foreground md:static md:h-full">
               暂无图片
             </div>
           )}
-          <div className="absolute left-2 right-32 top-2 flex flex-wrap gap-1">
+          <div className="absolute left-1.5 top-1.5 flex flex-wrap gap-1 md:left-2 md:right-32 md:top-2">
             {car.source_id ? null : car.profiles?.account_type === "dealer" ? (
               <Badge
                 variant="secondary"
-                className="font-mono text-[10px] font-medium"
+                className="hidden font-mono text-[10px] font-medium md:inline-flex"
               >
                 车行
               </Badge>
             ) : (
               <Badge
                 variant="outline"
-                className="bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm"
+                className="hidden bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm md:inline-flex"
               >
                 个人
               </Badge>
@@ -149,7 +150,7 @@ export function CarCard({
             {distance !== undefined && (
               <Badge
                 variant="outline"
-                className="gap-0.5 bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm"
+                className="hidden gap-0.5 bg-background/80 font-mono text-[10px] font-medium backdrop-blur-sm md:inline-flex"
               >
                 <Navigation className="h-2.5 w-2.5" strokeWidth={1.5} />
                 {formatDistance(distance)}
@@ -158,29 +159,29 @@ export function CarCard({
             {daysListed(car) < 1 ? (
               <Badge
                 variant="outline"
-                className="bg-background/80 font-mono text-[10px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400"
+                className="bg-background/80 px-1 font-mono text-[9px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400 md:px-2 md:text-[10px]"
               >
                 今日新上
               </Badge>
             ) : daysListed(car) <= 3 ? (
               <Badge
                 variant="outline"
-                className="bg-background/80 font-mono text-[10px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400"
+                className="bg-background/80 px-1 font-mono text-[9px] font-medium text-blue-600 backdrop-blur-sm dark:text-blue-400 md:px-2 md:text-[10px]"
               >
                 新上架
               </Badge>
             ) : isHotListing(car) ? (
               <Badge
                 variant="outline"
-                className="gap-0.5 bg-background/80 font-mono text-[10px] font-medium text-orange-600 backdrop-blur-sm"
+                className="gap-0.5 bg-background/80 px-1 font-mono text-[9px] font-medium text-orange-600 backdrop-blur-sm md:px-2 md:text-[10px]"
               >
                 <Flame className="h-2.5 w-2.5" strokeWidth={1.5} />
                 热门
               </Badge>
             ) : null}
           </div>
-          {/* Action buttons */}
-          <div className="absolute right-2 top-2 flex items-center gap-1">
+          {/* 图上操作按钮:仅桌面(手机版操作在文字区底部) */}
+          <div className="absolute right-2 top-2 hidden items-center gap-1 md:flex">
             <button
               type="button"
               className="flex h-8 items-center gap-1 rounded-full bg-background/80 px-2.5 backdrop-blur-sm transition-colors hover:bg-background"
@@ -227,37 +228,37 @@ export function CarCard({
           </div>
         </div>
 
-        <div className="p-3">
-          <h3 className="font-mono text-sm font-semibold leading-tight tracking-tight">
+        <div className="min-w-0 flex-1 p-2.5 md:p-3">
+          <h3 className="truncate font-mono text-[13px] font-semibold leading-tight tracking-tight md:whitespace-normal md:text-sm">
             {car.title_zh}
           </h3>
-          <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
+          <p className="mt-0.5 hidden font-mono text-[11px] text-muted-foreground md:block">
             {car.title}
           </p>
 
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="font-mono text-base font-bold">
+          <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5 md:mt-2">
+            <span className="font-mono text-[15px] font-bold md:text-base">
               {formatPrice(car.price)}
             </span>
             {car.original_price && car.original_price > car.price && (
-              <span className="px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+              <span className="rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
                 -{Math.round((1 - car.price / car.original_price) * 100)}%
               </span>
             )}
             {car.original_price && car.original_price > car.price && (
-              <span className="font-mono text-[10px] text-muted-foreground line-through">
+              <span className="hidden font-mono text-[10px] text-muted-foreground line-through md:inline">
                 {formatPrice(car.original_price)}
               </span>
             )}
             {priceInsight && (
               <span
-                className={`px-1.5 py-0.5 font-mono text-[10px] font-semibold ${priceInsight.className}`}
+                className={`rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold md:px-1.5 ${priceInsight.className}`}
               >
                 {priceInsight.label}
               </span>
             )}
             {car.price > 0 && (
-              <span className="font-mono text-[10px] text-muted-foreground">
+              <span className="hidden font-mono text-[10px] text-muted-foreground md:inline">
                 分期 ~${estimateMonthlyPayment(car.price)}/月
               </span>
             )}
@@ -266,7 +267,7 @@ export function CarCard({
           {priceInsight &&
             (priceInsight.level === "great" || priceInsight.level === "good") &&
             priceInsight.delta >= 300 && (
-              <p className="mt-1 font-mono text-[10px] text-green-600">
+              <p className="mt-1 hidden font-mono text-[10px] text-green-600 md:block">
                 比同类均价低 {formatPrice(priceInsight.delta)}
                 <span className="text-muted-foreground">
                   {" "}· {priceInsight.sampleSize} 台同类对比
@@ -274,7 +275,14 @@ export function CarCard({
               </p>
             )}
 
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
+          {/* 手机:一行紧凑参数 */}
+          <p className="mt-1 truncate font-mono text-[10px] text-muted-foreground md:hidden">
+            {car.year}年 · {formatMileage(car.mileage)} mi · {car.fuel_type}
+            {car.source_id ? " · 系统检索" : ""}
+          </p>
+
+          {/* 桌面:2×2 参数栅格 */}
+          <div className="mt-3 hidden grid-cols-2 gap-x-4 gap-y-1.5 md:grid">
             <div className="flex items-center gap-1.5">
               <Gauge
                 className="h-3 w-3 text-muted-foreground"
@@ -318,7 +326,68 @@ export function CarCard({
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
+          {/* 手机:位置 + 收藏/对比 操作 */}
+          <div className="mt-1.5 flex items-center justify-between gap-2 md:hidden">
+            <span className="flex min-w-0 items-center gap-1 font-mono text-[10px] text-muted-foreground">
+              <MapPin className="h-2.5 w-2.5 shrink-0" strokeWidth={1.5} />
+              <span className="truncate">
+                {car.location_zh}
+                {distance !== undefined && (
+                  <span className="font-medium text-blue-600 dark:text-blue-400">
+                    {" · "}{formatDistance(distance)}
+                  </span>
+                )}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                className="flex h-6 items-center gap-0.5 rounded-full border border-border px-1.5 font-mono text-[10px] text-muted-foreground transition-colors active:bg-muted"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (inCompare) {
+                    removeFromCompare(car.id);
+                  } else {
+                    addToCompare(car.id);
+                  }
+                }}
+              >
+                {inCompare ? (
+                  <>
+                    <Check className="h-3 w-3 text-green-500" strokeWidth={2} />
+                    <span className="text-green-600 dark:text-green-500">已加</span>
+                  </>
+                ) : (
+                  <>
+                    <GitCompare className="h-3 w-3" strokeWidth={1.5} />
+                    对比
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                aria-label={liked ? "取消收藏" : "收藏"}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-border transition-colors active:bg-muted"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const { liked: newLiked, delta } = toggleFavorite(car.id);
+                  setLiked(newLiked);
+                  setFavCount((c) => Math.max(0, c + delta));
+                  updateFavCount(car.id, delta);
+                }}
+              >
+                <Heart
+                  className={`h-3 w-3 ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
+                  strokeWidth={1.5}
+                />
+              </button>
+            </span>
+          </div>
+
+          {/* 桌面:卖家/收藏数/系统检索 底栏 */}
+          <div className="mt-3 hidden items-center justify-between border-t border-border pt-2.5 md:flex">
             <span
               className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
               onClick={(e) => {

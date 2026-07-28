@@ -464,7 +464,7 @@ export default function CommunityDetailPage({
           <Link
             href={userLink(post.user_id)}
             onClick={userClick(post.user_id)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted transition-opacity hover:opacity-70"
+            className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted transition-opacity hover:opacity-70"
           >
             <img
               src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
@@ -497,7 +497,7 @@ export default function CommunityDetailPage({
           <button
             type="button"
             onClick={handleShare}
-            className="ml-auto flex shrink-0 items-center gap-1.5 border border-border px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
           >
             <Share className="h-3.5 w-3.5" strokeWidth={1.5} />
             {shareCopied ? "已复制" : "分享"}
@@ -506,7 +506,7 @@ export default function CommunityDetailPage({
 
         {/* Media carousel(XHS 式:媒体在正文之前,整宽轮播 + 指示点)*/}
         {media.length > 0 && (
-          <div className="-mx-4 mt-3 md:mx-0 md:border md:border-border">
+          <div className="-mx-4 mt-3 overflow-hidden md:mx-0 md:rounded-xl md:border md:border-border">
             <div
               ref={trackRef}
               onScroll={() => {
@@ -558,7 +558,7 @@ export default function CommunityDetailPage({
                 {media.map((_, i) => (
                   <span
                     key={i}
-                    className={`h-1 w-1 transition-colors ${
+                    className={`h-1 w-1 rounded-full transition-colors ${
                       i === activeImg ? "bg-foreground" : "bg-border"
                     }`}
                   />
@@ -594,7 +594,7 @@ export default function CommunityDetailPage({
 
         {/* Car info for reviews */}
         {post.type === "review" && (post.make || post.model || post.year) && (
-          <div className="mt-3 border border-border bg-muted/30 px-3 py-2">
+          <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
             <span className="font-mono text-[11px] text-muted-foreground">
               车型：
               {[post.year, post.make, post.model].filter(Boolean).join(" ")}
@@ -733,7 +733,7 @@ export default function CommunityDetailPage({
             {userId ? (
               <textarea
                 ref={inputRef}
-                className="min-h-9 flex-1 resize-none border border-border bg-muted/30 px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:bg-background focus:outline-none"
+                className="min-h-9 flex-1 resize-none rounded-lg border border-border bg-muted/30 px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:bg-background focus:outline-none"
                 placeholder={
                   replyTo ? `回复 @${replyTo.name}...` : "说点什么..."
                 }
@@ -754,7 +754,7 @@ export default function CommunityDetailPage({
             ) : (
               <Link
                 href="/login"
-                className="flex h-9 flex-1 items-center border border-dashed border-border px-3 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                className="flex h-9 flex-1 items-center rounded-lg border border-dashed border-border px-3 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
               >
                 登录后参与讨论
               </Link>
@@ -765,7 +765,7 @@ export default function CommunityDetailPage({
                 type="button"
                 onClick={handleComment}
                 disabled={sending}
-                className="flex h-9 shrink-0 items-center gap-1.5 border border-border bg-foreground px-3 font-mono text-xs text-background transition-opacity hover:opacity-85 disabled:opacity-50"
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-foreground px-3 font-mono text-xs text-background transition-opacity hover:opacity-85 disabled:opacity-50"
               >
                 {sending ? (
                   <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
@@ -846,7 +846,7 @@ function CommentRow({
       <Link
         href={userLink(comment.user_id)}
         onClick={onUser}
-        className={`${avatarSize} flex shrink-0 items-center justify-center overflow-hidden border border-border bg-muted transition-opacity hover:opacity-70`}
+        className={`${avatarSize} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted transition-opacity hover:opacity-70`}
       >
         <img
           src={avatarUrl(comment.profiles?.avatar_url, comment.profiles?.username)}

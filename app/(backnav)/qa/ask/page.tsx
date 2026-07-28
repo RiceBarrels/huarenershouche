@@ -119,7 +119,7 @@ export default function AskQuestionPage() {
         </p>
 
         {!userId ? (
-          <div className="mt-8 flex flex-col items-center border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
             <p className="font-mono text-sm text-muted-foreground">
               请先登录后再提问
             </p>
@@ -142,7 +142,7 @@ export default function AskQuestionPage() {
                     key={cat.key}
                     type="button"
                     onClick={() => setCategory(cat.key)}
-                    className={`border px-3 py-1.5 font-mono text-xs transition-colors ${
+                    className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
                       category === cat.key
                         ? "border-foreground bg-foreground text-background"
                         : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
@@ -178,7 +178,7 @@ export default function AskQuestionPage() {
                 问题描述 <span className="text-destructive">*</span>
               </Label>
               <textarea
-                className="mt-1 w-full border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                 rows={8}
                 placeholder="详细描述你的问题，包括相关背景信息..."
                 value={content}
@@ -197,7 +197,7 @@ export default function AskQuestionPage() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="flex items-center gap-1 border border-border px-2 py-1 font-mono text-[11px]"
+                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
                   >
                     {tag}
                     <button
@@ -239,7 +239,7 @@ export default function AskQuestionPage() {
 
             {/* Error */}
             {error && (
-              <div className="border border-destructive/50 bg-destructive/5 p-3">
+              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
                 <p className="font-mono text-xs text-destructive">{error}</p>
               </div>
             )}
