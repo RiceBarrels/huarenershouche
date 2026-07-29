@@ -14,7 +14,7 @@ export default function LoanToolPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <h1 className="font-mono text-lg font-bold">月供计算器</h1>
+        <h1 className="font-logo text-xl">月供计算器</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           输入车价,调整首付与期数,估算每月还款
         </p>

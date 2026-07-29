@@ -4,33 +4,8 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
-
-function useKeyboardHeight() {
-  const [height, setHeight] = React.useState(0)
-
-  React.useEffect(() => {
-    let showHandle: { remove: () => void } | undefined
-    let hideHandle: { remove: () => void } | undefined
-
-    import("@capacitor/keyboard")
-      .then(({ Keyboard }) => {
-        Keyboard.addListener("keyboardWillShow", (info) => {
-          setHeight(info.keyboardHeight)
-        }).then((h) => { showHandle = h })
-        Keyboard.addListener("keyboardWillHide", () => {
-          setHeight(0)
-        }).then((h) => { hideHandle = h })
-      })
-      .catch(() => {})
-
-    return () => {
-      showHandle?.remove()
-      hideHandle?.remove()
-    }
-  }, [])
-
-  return height
-}
+import { NativeBarHideLock } from "@/components/native-bar-hide-lock"
+import { useKeyboardHeight } from "@/hooks/use-keyboard-height"
 
 function triggerHaptic() {
   // Native (Capacitor)
@@ -120,17 +95,25 @@ function DrawerContent({
       <DrawerOverlay style={overlayStyle} />
       <DrawerPrimitive.Content
         data-slot="drawer-content"
+        // --kb 供 max-height 钳制用;动画由底部常驻 spacer 的 height 过渡完成
+        // (vaul 会往 content 写内联 transition,这里不能依赖 content 自身的过渡类)
+        style={{ "--kb": `${kbHeight}px` } as React.CSSProperties}
         className={cn(
-          "group/drawer-content fixed z-[80] flex h-auto flex-col bg-card text-sm data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[80vh] data-[vaul-drawer-direction=bottom]:rounded-t-[32px] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
+          "group/drawer-content fixed z-[80] flex h-auto flex-col bg-card text-sm data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[min(80vh,calc(100dvh-var(--kb,0px)-1.5rem))] data-[vaul-drawer-direction=bottom]:rounded-t-[32px] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
           className
         )}
         {...props}
       >
-        <div className="mx-auto mt-4 hidden h-1 w-[100px] shrink-0 rounded-full bg-muted group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
+        {/* 打开期间隐藏 iOS 原生底部导航(children 才随 open 挂载,wrapper 本身常驻) */}
+        <NativeBarHideLock />
+        <div className="mx-auto mt-4 hidden h-1 w-[100px] shrink-0 cursor-grab rounded-full bg-muted active:cursor-grabbing group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
-        {kbHeight > 0 && (
-          <div className="shrink-0 transition-[height] duration-200" style={{ height: kbHeight }} />
-        )}
+        {/* 键盘垫高层:常驻渲染,height 0 <-> 键盘高度之间过渡,曲线贴近 iOS 键盘动画 */}
+        <div
+          aria-hidden
+          className="shrink-0 transition-[height] duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+          style={{ height: kbHeight }}
+        />
       </DrawerPrimitive.Content>
     </DrawerPortal>
   )

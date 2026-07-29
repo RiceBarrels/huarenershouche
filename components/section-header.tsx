@@ -22,7 +22,7 @@ export function SectionHeader({ index, label, title, action, className }: Sectio
         </div>
       )}
       <div className="flex items-end justify-between gap-4">
-        <h2 className="font-mono text-base font-bold tracking-tight md:text-2xl md:font-semibold">{title}</h2>
+        <h2 className="font-logo text-lg tracking-tight md:text-2xl">{title}</h2>
         {action && (
           <Link
             href={action.href}

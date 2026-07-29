@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { match } from "pinyin-pro";
 import { Search, X, LayoutGrid } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { useCarOverlay } from "@/components/car-overlay-provider";
 import {
   Drawer,
   DrawerClose,
@@ -101,6 +102,7 @@ function FeatureIcon({ f, size = "lg" }: { f: Feature; size?: "lg" | "sm" }) {
 
 export function FeatureRow() {
   const router = useRouter();
+  const { openPage } = useCarOverlay();
   const [recent, setRecent] = useState<string[]>(DEFAULT_ORDER);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -112,6 +114,8 @@ export function FeatureRow() {
   function go(f: Feature) {
     recordUse(f.id);
     setOpen(false);
+    // 手机端:注册过的页面以浮层栈打开(当前页保持挂载,真实垫在后面);否则正常跳转
+    if (openPage(f.href)) return;
     router.push(f.href);
   }
 

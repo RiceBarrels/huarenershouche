@@ -318,7 +318,7 @@ export default function EditCarPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="font-mono text-lg font-semibold tracking-tight">编辑车辆</h1>
+        <h1 className="font-logo text-xl tracking-tight">编辑车辆</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">{car.title_zh}</p>
 
         <div className="mt-6 space-y-6">

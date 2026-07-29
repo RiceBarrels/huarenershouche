@@ -84,7 +84,7 @@ function MessagesContent() {
             </span>
             <span className="h-px flex-1 bg-border" aria-hidden="true" />
           </div>
-          <h1 className="mt-2 font-mono text-lg font-semibold tracking-tight">
+          <h1 className="mt-2 font-logo text-xl tracking-tight">
             消息
           </h1>
         </div>

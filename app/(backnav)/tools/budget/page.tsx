@@ -20,7 +20,7 @@ export default function BudgetToolPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <h1 className="font-mono text-lg font-bold">预算估车价</h1>
+        <h1 className="font-logo text-xl">预算估车价</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           用能接受的月供反推可以买多贵的车
         </p>

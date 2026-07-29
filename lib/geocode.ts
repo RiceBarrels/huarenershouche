@@ -62,37 +62,87 @@ async function googleGeocode(
 
 /**
  * Get user's current position via Capacitor Geolocation (native) or browser API (web)
+ *
+ * 5 分钟内复用上次定位;并发调用共享同一个请求,
+ * 避免多个页面同时触发原生权限弹窗互相打架。
  */
+let lastFix: { pos: GeolocationPosition; at: number } | null = null;
+let inFlight: Promise<GeolocationPosition> | null = null;
+const FIX_MAX_AGE = 300000; // 5 min
+
 export async function getCurrentPosition(): Promise<GeolocationPosition> {
-  // On native, use Capacitor Geolocation plugin for proper permission handling
+  if (lastFix && Date.now() - lastFix.at < FIX_MAX_AGE) return lastFix.pos;
+  if (inFlight) return inFlight;
+  inFlight = fetchPosition()
+    .then((pos) => {
+      lastFix = { pos, at: Date.now() };
+      return pos;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
+}
+
+function toWebPosition(pos: {
+  coords: {
+    latitude: number;
+    longitude: number;
+    accuracy: number;
+    altitude: number | null;
+    altitudeAccuracy: number | null | undefined;
+    heading: number | null;
+    speed: number | null;
+  };
+  timestamp: number;
+}): GeolocationPosition {
+  return {
+    coords: {
+      latitude: pos.coords.latitude,
+      longitude: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      altitude: pos.coords.altitude,
+      altitudeAccuracy: pos.coords.altitudeAccuracy,
+      heading: pos.coords.heading,
+      speed: pos.coords.speed,
+    },
+    timestamp: pos.timestamp,
+  } as GeolocationPosition;
+}
+
+async function fetchPosition(): Promise<GeolocationPosition> {
+  let native = false;
   try {
     const { Capacitor } = await import("@capacitor/core");
-    if (Capacitor.isNativePlatform()) {
-      const { Geolocation } = await import("@capacitor/geolocation");
-      const perm = await Geolocation.checkPermissions();
-      if (perm.location === "prompt" || perm.location === "prompt-with-rationale") {
-        await Geolocation.requestPermissions();
-      }
+    native = Capacitor.isNativePlatform();
+  } catch {
+    // Capacitor not available — treat as web
+  }
+
+  if (native) {
+    // 原生端只走 Capacitor 插件,失败不回退 navigator.geolocation
+    // (WKWebView 里会再弹一个 WebKit 层的位置询问框,或直接挂起)
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const perm = await Geolocation.checkPermissions();
+    if (perm.location === "prompt" || perm.location === "prompt-with-rationale") {
+      // 走共享的权限请求,避免和权限弹窗同时触发两个系统弹窗
+      const { requestLocationPermission } = await import("@/lib/capacitor");
+      const state = await requestLocationPermission();
+      if (state !== "granted") throw new Error("Location permission not granted");
+    } else if (perm.location !== "granted") {
+      throw new Error("Location permission not granted");
+    }
+    try {
       const pos = await Geolocation.getCurrentPosition({
         enableHighAccuracy: false,
-        timeout: 10000,
+        timeout: 15000,
+        maximumAge: FIX_MAX_AGE,
       });
-      // Return a GeolocationPosition-compatible object
-      return {
-        coords: {
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          altitude: pos.coords.altitude,
-          altitudeAccuracy: pos.coords.altitudeAccuracy,
-          heading: pos.coords.heading,
-          speed: pos.coords.speed,
-        },
-        timestamp: pos.timestamp,
-      } as GeolocationPosition;
+      return toWebPosition(pos);
+    } catch {
+      // iOS 上 getCurrentPosition 偶发超时/失败:用 watchPosition 等首个定位兜底
+      return watchFirstFix(Geolocation);
     }
-  } catch {
-    // Fall through to web API
   }
 
   return new Promise((resolve, reject) => {
@@ -103,7 +153,47 @@ export async function getCurrentPosition(): Promise<GeolocationPosition> {
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: false,
       timeout: 8000,
-      maximumAge: 300000, // cache for 5 min
+      maximumAge: FIX_MAX_AGE,
+    });
+  });
+}
+
+function watchFirstFix(
+  Geolocation: typeof import("@capacitor/geolocation").Geolocation
+): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let watchId: string | null = null;
+
+    function cleanup() {
+      clearTimeout(timer);
+      if (watchId) Geolocation.clearWatch({ id: watchId });
+    }
+
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error("Location timeout"));
+    }, 15000);
+
+    Geolocation.watchPosition(
+      { enableHighAccuracy: false, timeout: 15000 },
+      (pos, err) => {
+        if (settled) return;
+        if (pos) {
+          settled = true;
+          cleanup();
+          resolve(toWebPosition(pos));
+        } else if (err) {
+          settled = true;
+          cleanup();
+          reject(err instanceof Error ? err : new Error(String(err)));
+        }
+      }
+    ).then((id) => {
+      watchId = id;
+      if (settled) cleanup();
     });
   });
 }

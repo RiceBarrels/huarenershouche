@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
-import { setBackNavigation } from "@/components/page-transition";
+import { setBackNavigation, animatedBack } from "@/components/page-transition";
 
 interface BackNavProps {
   title?: string;
@@ -14,12 +14,14 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
   const router = useRouter();
 
   const handleBack = useCallback(() => {
-    setBackNavigation();
-    if (window.history.length > 1) {
-      router.back();
-    } else {
+    if (window.history.length <= 1) {
       router.push(fallback);
+      return;
     }
+    // 与边缘手势同款的「当前页滑出」动画(内部自行 router.back);无人接管再退回普通返回
+    if (animatedBack()) return;
+    setBackNavigation();
+    router.back();
   }, [router, fallback]);
 
   return (
@@ -36,7 +38,7 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
         <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
       </button>
       {title && (
-        <span className="font-mono text-sm font-medium truncate">
+        <span className="font-logo text-base truncate">
           {title}
         </span>
       )}

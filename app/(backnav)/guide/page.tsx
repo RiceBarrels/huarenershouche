@@ -114,7 +114,7 @@ export default function GuidePage() {
         </div>
         <div className="flex items-center gap-2">
           <BookOpen className="h-5 w-5" strokeWidth={1.5} />
-          <h1 className="font-mono text-lg font-semibold tracking-tight">
+          <h1 className="font-logo text-xl tracking-tight">
             购车资讯
           </h1>
         </div>

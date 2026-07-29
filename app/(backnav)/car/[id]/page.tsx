@@ -53,7 +53,7 @@ function buildDescription(car: DbCar): string {
   ].filter(Boolean);
   const zh = car.description_zh?.replace(/\s+/g, " ").trim();
   const base = parts.join(" · ");
-  return (zh ? `${base}。${zh}` : `${base}。常来车网 · 北美华人二手车`).slice(0, 160);
+  return (zh ? `${base}。${zh}` : `${base}。常來車網 · 北美华人二手车`).slice(0, 160);
 }
 
 export async function generateMetadata({

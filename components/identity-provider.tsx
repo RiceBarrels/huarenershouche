@@ -16,7 +16,7 @@ import { supabase } from "@/lib/supabase";
 import type { DbProfile } from "@/lib/types";
 import type { User as SupaUser } from "@supabase/supabase-js";
 
-const ACTING_KEY = "clc_acting_id";
+export const ACTING_KEY = "clc_acting_id";
 
 interface IdentityValue {
   /** 真实登录用户(始终是本人)。 */
@@ -104,10 +104,12 @@ export function IdentityProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getUser().then(async ({ data }) => {
+    // getSession 读本地存储的会话,不走网络,让依赖身份的页面能立即用缓存渲染
+    supabase.auth.getSession().then(async ({ data }) => {
       if (cancelled) return;
-      setAuthUser(data.user ?? null);
-      await loadForUser(data.user ?? null);
+      const user = data.session?.user ?? null;
+      setAuthUser(user);
+      await loadForUser(user);
       if (!cancelled) setLoading(false);
     });
 

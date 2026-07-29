@@ -1,7 +1,7 @@
 "use client";
 
-// 停车定位:满屏 OpenStreetMap + 底部悬浮信息卡(类苹果「查找」UI)。
-// 车位存 localStorage;未记录时地图显示当前位置。
+// 停车定位:满屏地图 + 底部悬浮信息卡(类苹果「查找」UI)。
+// iOS 原生壳走 MapKit(behind 模式),其余平台 leaflet;车位存 localStorage。
 
 import { useEffect, useMemo, useState } from "react";
 import nextDynamic from "next/dynamic";
@@ -9,11 +9,12 @@ import { Header } from "@/components/header";
 import { LocateFixed, Navigation, Trash2, Loader2, CarFront } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { haversineDistance, formatDistance } from "@/lib/geocode";
+import { haversineDistance, formatDistance, getCurrentPosition } from "@/lib/geocode";
+import { OpenInMaps } from "@/components/open-in-maps";
 
 // leaflet 不能 SSR,按需加载
-const StoreMap = nextDynamic(
-  () => import("@/components/store-map").then((m) => m.StoreMap),
+const AppMap = nextDynamic(
+  () => import("@/components/app-map").then((m) => m.AppMap),
   { ssr: false },
 );
 
@@ -43,21 +44,19 @@ export default function ParkingToolPage() {
       }
     } catch { /* ignore */ }
 
-    // 当前位置:未记录车位时用于居中地图;已记录时用于显示距离
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => {},
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    // 当前位置(经 Capacitor 插件,原生端正确弹权限):未记录车位时居中地图,已记录时算距离
+    getCurrentPosition()
+      .then((pos) => setHere({ lat: pos.coords.latitude, lng: pos.coords.longitude }))
+      .catch(() => {});
   }, []);
 
   // 地图标记:仅坐标变化时重建(备注输入不触发地图重绘)
   const markers = useMemo(
     () =>
       spot
-        ? [{ lat: spot.lat, lng: spot.lng, name: "我的车", address: "车停在这里" }]
+        ? [{ id: "spot", lat: spot.lat, lng: spot.lng, name: "我的车", address: "车停在这里" }]
         : here
-          ? [{ lat: here.lat, lng: here.lng, name: "当前位置", address: "你在这附近" }]
+          ? [{ id: "here", lat: here.lat, lng: here.lng, name: "当前位置", address: "你在这附近" }]
           : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [spot?.lat, spot?.lng, here?.lat, here?.lng],
@@ -66,28 +65,25 @@ export default function ParkingToolPage() {
   const distance =
     spot && here ? haversineDistance(here.lat, here.lng, spot.lat, spot.lng) : null;
 
-  function save() {
+  async function save() {
     setSaving(true);
     setError("");
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const s: Spot = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          note,
-          at: new Date().toISOString(),
-        };
-        localStorage.setItem(KEY, JSON.stringify(s));
-        setSpot(s);
-        setHere({ lat: s.lat, lng: s.lng });
-        setSaving(false);
-      },
-      () => {
-        setError("获取定位失败,请检查定位权限");
-        setSaving(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 },
-    );
+    try {
+      const pos = await getCurrentPosition();
+      const s: Spot = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        note,
+        at: new Date().toISOString(),
+      };
+      localStorage.setItem(KEY, JSON.stringify(s));
+      setSpot(s);
+      setHere({ lat: s.lat, lng: s.lng });
+    } catch {
+      setError("获取定位失败,请检查定位权限");
+    } finally {
+      setSaving(false);
+    }
   }
 
   function saveNote(v: string) {
@@ -100,14 +96,16 @@ export default function ParkingToolPage() {
   }
 
   return (
-    <div className="flex h-[calc(100dvh-41px)] flex-col bg-background font-mono">
+    <div className="native-map-transparent flex h-[calc(100dvh-41px)] flex-col bg-background font-mono">
       <Header />
       <main className="relative min-h-0 flex-1">
-        {/* 满屏地图 */}
+        {/* 满屏地图(原生 behind 模式 / leaflet) */}
         {markers.length > 0 ? (
-          <StoreMap
+          <AppMap
             markers={markers}
             zoom={17}
+            mode="fullscreen"
+            showsUserLocation
             className="absolute inset-0 h-full w-full"
           />
         ) : (
@@ -120,6 +118,7 @@ export default function ParkingToolPage() {
 
         {/* 底部悬浮信息卡(类苹果「查找」) */}
         <div
+          data-native-map-ui=""
           className="absolute inset-x-0 bottom-0 z-10 p-3"
           style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}
         >
@@ -148,16 +147,20 @@ export default function ParkingToolPage() {
                 />
 
                 <div className="mt-3 flex gap-2">
-                  <Button asChild className="flex-1 gap-1.5 font-mono text-xs">
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&destination=${spot.lat},${spot.lng}&travelmode=walking`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
+                  <OpenInMaps
+                    target={{
+                      lat: spot.lat,
+                      lng: spot.lng,
+                      name: "我的车",
+                      mode: "directions",
+                      travelmode: "walking",
+                    }}
+                  >
+                    <Button className="flex-1 gap-1.5 font-mono text-xs">
                       <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
                       导航回车位
-                    </a>
-                  </Button>
+                    </Button>
+                  </OpenInMaps>
                   <Button
                     variant="outline"
                     className="gap-1.5 font-mono text-xs"

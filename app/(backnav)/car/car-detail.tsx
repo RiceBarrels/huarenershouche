@@ -74,6 +74,7 @@ import { recordPrice } from "@/lib/price-history";
 import { PriceHistoryChart } from "@/components/price-history-chart";
 import { isWatching, addPriceWatch, removePriceWatch, getWatchedPrice } from "@/lib/price-watch";
 import { ReportDialog } from "@/components/report-dialog";
+import { OpenInMaps } from "@/components/open-in-maps";
 import { VinCheck } from "@/components/vin-check";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { VehicleHistoryPanel } from "@/components/vehicle-history";
@@ -895,20 +896,23 @@ export default function CarDetailPage({
               )}
 
               {storeAddress && (
-                <a
-                  href={
-                    storeAddress.lat != null && storeAddress.lng != null
-                      ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}&center=${storeAddress.lat},${storeAddress.lng}`
-                      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}`
-                  }
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-1.5 flex items-start gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                <OpenInMaps
+                  target={{
+                    address: storeAddress.address,
+                    lat: storeAddress.lat,
+                    lng: storeAddress.lng,
+                    name: car.seller_name,
+                  }}
                 >
-                  <MapPin className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
-                  <span>{storeAddress.address}</span>
-                  <ExternalLink className="mt-0.5 h-2.5 w-2.5 shrink-0" strokeWidth={1.5} />
-                </a>
+                  <button
+                    type="button"
+                    className="mt-1.5 flex items-start gap-1.5 text-left font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                  >
+                    <MapPin className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
+                    <span>{storeAddress.address}</span>
+                    <ExternalLink className="mt-0.5 h-2.5 w-2.5 shrink-0" strokeWidth={1.5} />
+                  </button>
+                </OpenInMaps>
               )}
 
               {car.profiles?.is_system && (
@@ -1185,24 +1189,26 @@ export default function CarDetailPage({
                       />
                     </div>
                   )}
-                <Button
-                  variant="outline"
-                  className="mt-3 w-full gap-1.5 font-mono text-xs"
-                  asChild
+                <OpenInMaps
+                  target={
+                    storeAddress
+                      ? {
+                          address: storeAddress.address,
+                          lat: storeAddress.lat,
+                          lng: storeAddress.lng,
+                          name: car.seller_name,
+                        }
+                      : { lat: car.lat, lng: car.lng, name: car.seller_name }
+                  }
                 >
-                  <a
-                    href={
-                      storeAddress
-                        ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(storeAddress.address)}`
-                        : `https://www.google.com/maps/search/?api=1&query=${car.lat},${car.lng}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    variant="outline"
+                    className="mt-3 w-full gap-1.5 font-mono text-xs"
                   >
                     <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
                     使用地图打开
-                  </a>
-                </Button>
+                  </Button>
+                </OpenInMaps>
               </div>
             )}
 

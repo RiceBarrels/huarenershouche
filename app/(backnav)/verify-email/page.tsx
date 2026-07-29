@@ -159,7 +159,7 @@ function VerifyEmailContent() {
         <Header />
         <main className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center px-4 py-12">
           <CheckCircle className="h-12 w-12 text-green-500" strokeWidth={1.5} />
-          <h1 className="mt-4 font-mono text-lg font-semibold">验证成功</h1>
+          <h1 className="mt-4 font-logo text-xl">验证成功</h1>
           <p className="mt-2 font-mono text-xs text-muted-foreground">
             {showProfileSetup ? "请完成账户设置" : "正在跳转..."}
           </p>
@@ -187,7 +187,7 @@ function VerifyEmailContent() {
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
         <div className="flex flex-col items-center">
           <Mail className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-          <h1 className="mt-4 font-mono text-lg font-semibold tracking-tight">
+          <h1 className="mt-4 font-logo text-xl tracking-tight">
             验证邮箱
           </h1>
           <p className="mt-2 text-center font-mono text-xs text-muted-foreground">

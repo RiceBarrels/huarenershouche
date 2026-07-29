@@ -95,7 +95,7 @@ export default async function SeoLandingPage({
           <span>{def.label}</span>
         </nav>
 
-        <h1 className="mt-4 font-mono text-xl font-semibold">{def.h1}</h1>
+        <h1 className="mt-4 font-logo text-2xl">{def.h1}</h1>
 
         {def.intro.map((para, i) => (
           <p

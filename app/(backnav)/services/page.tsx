@@ -5,6 +5,7 @@ import { Header } from "@/components/header";
 
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { OpenInMaps } from "@/components/open-in-maps";
 import {
   Wrench,
   Shield,
@@ -79,11 +80,6 @@ export default function ServicesPage() {
       setError("无法获取位置，请允许访问您的位置");
     }
     setLoading(false);
-  }
-
-  function getMapsUrl(query: string) {
-    if (!location) return "#";
-    return `https://www.google.com/maps/search/${query}/@${location.lat},${location.lng},13z`;
   }
 
   return (
@@ -176,31 +172,34 @@ export default function ServicesPage() {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full gap-1.5 font-mono text-xs"
-                  disabled={!location}
-                  asChild
-                >
-                  {location ? (
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const { openBrowser } = await import("@/lib/capacitor");
-                        openBrowser(getMapsUrl(cat.query));
-                      }}
+                {location ? (
+                  <OpenInMaps
+                    target={{
+                      query: cat.query,
+                      lat: location.lat,
+                      lng: location.lng,
+                    }}
+                  >
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full gap-1.5 font-mono text-xs"
                     >
                       <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} />
                       查看附近
-                    </button>
-                  ) : (
-                    <span>
-                      <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} />
-                      查看附近
-                    </span>
-                  )}
-                </Button>
+                    </Button>
+                  </OpenInMaps>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full gap-1.5 font-mono text-xs"
+                    disabled
+                  >
+                    <MapPin className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    查看附近
+                  </Button>
+                )}
               </div>
             );
           })}

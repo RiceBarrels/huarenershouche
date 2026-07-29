@@ -21,6 +21,7 @@ import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { PullToRefresh } from "@/components/pull-to-refresh";
 import { carLink, userLink } from "@/lib/static-link";
 import {
   detectUserZip,
@@ -68,6 +69,22 @@ const FIRST_CAR_AT = 2;
 
 // 无限滚动每页条数
 const PAGE_SIZE = 20;
+
+// 会话缓存:重进社区不重新洗牌/刷新,下拉刷新才拉新 feed
+const FEED_CACHE_KEY = "clc_community_feed_v1";
+interface FeedCache {
+  ids: string[];
+  posts: DbCommunityPost[];
+  nearbyCars: { car: DbCar; distance?: number; personalized?: boolean }[];
+}
+function readFeedCache(): FeedCache | null {
+  try {
+    const raw = sessionStorage.getItem(FEED_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as FeedCache) : null;
+  } catch {
+    return null;
+  }
+}
 
 // Fisher-Yates 洗牌:每次刷新 feed 顺序都不同
 function shuffleArray<T>(arr: T[]): T[] {
@@ -117,6 +134,8 @@ export default function CommunityFeedPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [keyword, setKeyword] = useState("");
   const [searchType, setSearchType] = useState("");
+  // 下拉刷新在搜索态重跑当前搜索
+  const [searchNonce, setSearchNonce] = useState(0);
   const searching = searchOpen && (keyword.trim() !== "" || searchType !== "");
   const reduced = useReducedMotion();
 
@@ -220,44 +239,60 @@ export default function CommunityFeedPage() {
     return ids.map((id) => byId.get(id)).filter(Boolean) as DbCommunityPost[];
   }
 
-  // 浏览模式初始化:拉全部 id → 洗牌 → 取第一页
+  // 拉全部 id → 洗牌 → 取第一页(浏览模式初始加载与下拉刷新共用)
+  const loadFeed = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from("community_posts")
+        .select("id")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+      if (error) {
+        markTableError(error);
+        setPosts([]);
+        return;
+      }
+      const ids = shuffleArray((data || []).map((r) => r.id as string));
+      orderIdsRef.current = ids;
+      const first = await fetchPostsByIds(ids.slice(0, PAGE_SIZE));
+      setPosts(first);
+      setHasMore(ids.length > PAGE_SIZE);
+    } catch (err) {
+      console.error("Failed to load community posts:", err);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 浏览模式初始化:先还原会话缓存(重进/退出搜索不刷新 feed),没有缓存才拉取
   useEffect(() => {
     if (searching) return;
-    let cancelled = false;
+    const cached = readFeedCache();
+    if (cached && cached.posts.length > 0) {
+      orderIdsRef.current = cached.ids;
+      setPosts(cached.posts);
+      setHasMore(cached.posts.length < cached.ids.length);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setPosts([]);
     setHasMore(true);
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from("community_posts")
-          .select("id")
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1000);
-        if (cancelled) return;
-        if (error) {
-          markTableError(error);
-          setPosts([]);
-          return;
-        }
-        const ids = shuffleArray((data || []).map((r) => r.id as string));
-        orderIdsRef.current = ids;
-        const first = await fetchPostsByIds(ids.slice(0, PAGE_SIZE));
-        if (cancelled) return;
-        setPosts(first);
-        setHasMore(ids.length > PAGE_SIZE);
-      } catch (err) {
-        console.error("Failed to load community posts:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searching]);
+    loadFeed().finally(() => setLoading(false));
+  }, [searching, loadFeed]);
+
+  // 已加载内容写入会话缓存(浏览模式;加载更多也会追加进缓存)
+  useEffect(() => {
+    if (searching || loading || posts.length === 0) return;
+    try {
+      sessionStorage.setItem(
+        FEED_CACHE_KEY,
+        JSON.stringify({ ids: orderIdsRef.current, posts, nearbyCars } satisfies FeedCache),
+      );
+    } catch {
+      /* 超配额等错误直接放弃缓存 */
+    }
+  }, [posts, nearbyCars, searching, loading]);
 
   // 搜索模式:按时间排序 + 关键词/类型过滤,分页
   useEffect(() => {
@@ -295,7 +330,7 @@ export default function CommunityFeedPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [keyword, searchType, searching]);
+  }, [keyword, searchType, searching, searchNonce]);
 
   // 加载下一页
   const loadMore = useCallback(async () => {
@@ -348,6 +383,12 @@ export default function CommunityFeedPage() {
   // Feed 插卡车源:有个性化信号时按「喜欢/浏览」画像推荐(距离仅小幅加成);
   // 无信号时退回真正的「附近车源」——在足够大的候选池里按距离排序。
   useEffect(() => {
+    // 会话缓存里已有插卡车源 → 直接还原,保持 feed 与上次一致
+    const cached = readFeedCache();
+    if (cached?.nearbyCars && cached.nearbyCars.length > 0) {
+      setNearbyCars(cached.nearbyCars);
+      return;
+    }
     async function loadCars() {
       // 拉较大的候选池,避免「在最新 24 台里挑最近」导致其实并不近
       const { data } = await supabase
@@ -415,6 +456,20 @@ export default function CommunityFeedPage() {
     loadCars().catch(() => {});
   }, []);
 
+  // 下拉刷新:清会话缓存重新洗牌拉新;搜索态则重跑当前搜索
+  const refreshFeed = useCallback(async () => {
+    if (searching) {
+      setSearchNonce((n) => n + 1);
+      return;
+    }
+    try {
+      sessionStorage.removeItem(FEED_CACHE_KEY);
+    } catch {
+      /* ignore */
+    }
+    await loadFeed();
+  }, [searching, loadFeed]);
+
   // 帖子 + 穿插车源合成瀑布流(搜索时不插车源卡)
   const feed = useMemo<FeedItem[]>(() => {
     const items: FeedItem[] = posts.map((post) => ({ kind: "post", post }));
@@ -439,11 +494,15 @@ export default function CommunityFeedPage() {
   }, [feed, columnCount]);
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <PullToRefresh onRefresh={refreshFeed}>
+    <div
+      className="flex min-h-screen flex-col bg-background font-mono"
+      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
+    >
       <Header />
       <main className="mx-auto w-full max-w-5xl flex-1 px-3 py-4 md:px-4 md:py-6 xl:max-w-6xl">
         {/* Top bar — title + search (sticky) */}
-        <div className="sticky top-0 z-30 -mx-3 bg-background/90 px-3 pb-3 pt-1 backdrop-blur-md md:top-14 md:-mx-4 md:px-4">
+        <div className="sticky top-[env(safe-area-inset-top,0px)] z-30 -mx-3 bg-background/90 px-3 pb-3 pt-1 backdrop-blur-md md:top-14 md:-mx-4 md:px-4">
           <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
             <AnimatePresence initial={false} mode="popLayout">
               {searchOpen ? (
@@ -513,7 +572,7 @@ export default function CommunityFeedPage() {
                     <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                       Community
                     </span>
-                    <h1 className="font-mono text-base font-semibold tracking-tight">社区</h1>
+                    <h1 className="font-logo text-lg tracking-tight">社区</h1>
                   </div>
                   <div className="flex items-center gap-1">
                     <button
@@ -627,16 +686,8 @@ export default function CommunityFeedPage() {
         )}
       </main>
       <Footer />
-
-      {/* Floating post button (mobile) */}
-      <Link
-        href="/community/new"
-        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95 md:hidden"
-      >
-        <Plus className="h-5 w-5" strokeWidth={1.5} />
-      </Link>
-
     </div>
+    </PullToRefresh>
   );
 }
 

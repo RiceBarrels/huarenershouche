@@ -45,7 +45,7 @@ export default function LuckToolPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <h1 className="flex items-center gap-1.5 font-mono text-lg font-bold">
+        <h1 className="flex items-center gap-1.5 font-logo text-xl">
           <Sparkles className="h-5 w-5 text-amber-500" strokeWidth={1.5} />
           今日车运
         </h1>

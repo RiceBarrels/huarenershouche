@@ -99,7 +99,7 @@ export default function QaBoardPage() {
           </span>
           <span className="h-px flex-1 bg-border" aria-hidden="true" />
         </div>
-        <h1 className="mt-2 font-mono text-sm font-semibold tracking-tight">
+        <h1 className="mt-2 font-logo text-base tracking-tight">
           问答
         </h1>
         <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">

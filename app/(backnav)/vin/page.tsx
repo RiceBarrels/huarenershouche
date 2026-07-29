@@ -88,7 +88,7 @@ export default function VinPage() {
           </span>
           <span className="h-px flex-1 bg-border" />
         </div>
-        <h1 className="font-mono text-xl font-semibold tracking-tight">
+        <h1 className="font-logo text-2xl tracking-tight">
           VIN 车辆认证
         </h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">

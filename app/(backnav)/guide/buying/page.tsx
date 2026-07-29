@@ -43,7 +43,7 @@ export default function BuyingGuidePage() {
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
         <div className="flex items-center gap-2">
           <Car className="h-5 w-5" strokeWidth={1.5} />
-          <h1 className="font-mono text-lg font-semibold tracking-tight">
+          <h1 className="font-logo text-xl tracking-tight">
             华人购车完全指南
           </h1>
         </div>

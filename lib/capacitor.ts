@@ -215,30 +215,159 @@ export async function setupDeepLinkListener(onAuth: () => void) {
   }
 }
 
-/** Get geolocation (native or web) */
+// ---------- Permissions (notifications & location) ----------
+
+export type AppPermissionState = "granted" | "denied" | "prompt";
+
+function normalizePermission(state: string | undefined): AppPermissionState {
+  if (state === "granted") return "granted";
+  if (state === "denied") return "denied";
+  return "prompt"; // "prompt" | "prompt-with-rationale" | unknown
+}
+
+/** Check notification permission status (native only; web returns "granted" to stay quiet) */
+export async function checkNotificationPermission(): Promise<AppPermissionState> {
+  if (!isNative()) return "granted";
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const status = await PushNotifications.checkPermissions();
+    return normalizePermission(status.receive);
+  } catch {
+    return "granted"; // plugin unavailable — don't nag
+  }
+}
+
+/** Request notification permission; registers for push if granted */
+export async function requestNotificationPermission(): Promise<AppPermissionState> {
+  if (!isNative()) return "granted";
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+    const status = await PushNotifications.requestPermissions();
+    const state = normalizePermission(status.receive);
+    if (state === "granted") await registerPushNotifications();
+    return state;
+  } catch {
+    return "denied";
+  }
+}
+
+/** Check location permission status (native only; web returns "granted" to stay quiet) */
+export async function checkLocationPermission(): Promise<AppPermissionState> {
+  if (!isNative()) return "granted";
+  try {
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const status = await Geolocation.checkPermissions();
+    return normalizePermission(status.location);
+  } catch {
+    // iOS throws if location services are disabled system-wide
+    return "denied";
+  }
+}
+
+/** Request location permission via the system dialog(并发调用共享同一次请求) */
+let locPermRequest: Promise<AppPermissionState> | null = null;
+
+export async function requestLocationPermission(): Promise<AppPermissionState> {
+  if (!isNative()) return "granted";
+  if (locPermRequest) return locPermRequest;
+  locPermRequest = (async () => {
+    try {
+      const { Geolocation } = await import("@capacitor/geolocation");
+      const status = await Geolocation.requestPermissions();
+      const state = normalizePermission(status.location);
+      if (state === "granted") notifyLocationGranted();
+      return state;
+    } catch {
+      return "denied" as const;
+    } finally {
+      locPermRequest = null;
+    }
+  })();
+  return locPermRequest;
+}
+
+/** 定位权限刚被授予时广播,让已挂载的页面重新检测位置(页面只在 mount 时检测一次) */
+export function notifyLocationGranted() {
+  window.dispatchEvent(new Event("clc-location-granted"));
+}
+
+/** Open the app's page in system settings (for permissions denied at OS level) */
+export async function openAppSettings() {
+  if (!isNative()) return;
+  try {
+    const { NativeSettings, AndroidSettings, IOSSettings } = await import(
+      "capacitor-native-settings"
+    );
+    await NativeSettings.open({
+      optionAndroid: AndroidSettings.ApplicationDetails,
+      optionIOS: IOSSettings.App,
+    });
+  } catch {
+    // Plugin not available
+  }
+}
+
+/** Register with APNs/FCM and persist the device token for the signed-in user */
+export async function registerPushNotifications() {
+  if (!isNative()) return;
+  try {
+    const { PushNotifications } = await import("@capacitor/push-notifications");
+
+    await PushNotifications.removeAllListeners();
+
+    PushNotifications.addListener("registration", async ({ value: token }) => {
+      try {
+        localStorage.setItem("clc_push_token", token);
+        const { supabase } = await import("@/lib/supabase");
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return; // saved locally; synced on next launch after login
+        await supabase.from("push_tokens").upsert(
+          { user_id: user.id, token, platform: getPlatform() },
+          { onConflict: "token" }
+        );
+      } catch {
+        // Table may not exist yet — token stays in localStorage
+      }
+    });
+
+    // Tapping a notification: deep-link if the payload carries a url
+    PushNotifications.addListener("pushNotificationActionPerformed", (action) => {
+      const url = action.notification.data?.url;
+      if (typeof url === "string" && url.startsWith("/")) {
+        window.location.href = url;
+      }
+    });
+
+    await PushNotifications.register();
+  } catch {
+    // Plugin not available
+  }
+}
+
+/** Run a callback every time the app returns to the foreground */
+export async function onAppResume(callback: () => void): Promise<() => void> {
+  if (!isNative()) return () => {};
+  try {
+    const { App } = await import("@capacitor/app");
+    const handle = await App.addListener("appStateChange", ({ isActive }) => {
+      if (isActive) callback();
+    });
+    return () => handle.remove();
+  } catch {
+    return () => {};
+  }
+}
+
+/** Get geolocation (native or web) — 复用 geocode 里带权限处理/缓存/兜底的实现 */
 export async function getLocation(): Promise<{
   lat: number;
   lng: number;
 } | null> {
-  if (isNative()) {
-    try {
-      const { Geolocation } = await import("@capacitor/geolocation");
-      const pos = await Geolocation.getCurrentPosition();
-      return { lat: pos.coords.latitude, lng: pos.coords.longitude };
-    } catch {
-      // Fall through to web
-    }
+  try {
+    const { getCurrentPosition } = await import("@/lib/geocode");
+    const pos = await getCurrentPosition();
+    return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  } catch {
+    return null;
   }
-  // Web fallback
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 10000 }
-    );
-  });
 }

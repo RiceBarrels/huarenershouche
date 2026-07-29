@@ -74,7 +74,7 @@ function MessagesWithUserContent() {
       >
         <Header />
         <main className="mx-auto w-full max-w-3xl flex-1 py-4 md:px-4">
-          <h1 className="mb-3 px-4 font-mono text-lg font-semibold tracking-tight md:mb-4 md:px-0">
+          <h1 className="mb-3 px-4 font-logo text-xl tracking-tight md:mb-4 md:px-0">
             消息
           </h1>
           {user && (

@@ -52,6 +52,7 @@ import { MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
 import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
+import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
 import { getCurrentPosition, reverseGeocode } from "@/lib/geocode";
 
 import type { DbCar, DbCommunityPost } from "@/lib/types";
@@ -289,6 +290,16 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+// 首页数据会话缓存:重进不再重复请求,过期后台静默刷新
+const HOME_CACHE_KEY = "clc_home_v1";
+const HOME_CACHE_TTL = 10 * 60 * 1000;
+interface HomeCache {
+  featured: DbCar[];
+  recommended: DbCar[];
+  carCount: number | null;
+  communityPosts: DbCommunityPost[];
+}
+
 export default function Home() {
   const router = useRouter();
   // hero 搜索：与 /browse 同构的筛选对象，搜索时整体带入 URL
@@ -327,67 +338,93 @@ export default function Home() {
 
   useEffect(() => {
     const hasHistory = hasUserHistory();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage 信号,仅首帧一次
     setShowRecommended(hasHistory);
 
-    supabase
-      .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url)")
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .order("created_at", { ascending: false })
-      // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
-      .limit(hasHistory ? 200 : 60)
-      .then(async ({ data }) => {
-        if (!data) return;
-        const cars = data as DbCar[];
-        // 个人/车行直发优先于系统检索转载(稳定排序保持组内最新在前)
-        const prioritized = [...cars].sort(
-          (a, b) => Number(!!a.source_id) - Number(!!b.source_id)
-        );
-        setFeatured(prioritized.slice(0, 6));
+    async function load(withHistory: boolean) {
+      const [carsRes, countRes, postsRes] = await Promise.all([
+        supabase
+          .from("cars")
+          .select("*, profiles!seller_id(account_type, avatar_url)")
+          .eq("status", "active")
+          .eq("owner_hidden", false)
+          .order("created_at", { ascending: false })
+          // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
+          .limit(withHistory ? 200 : 60),
+        supabase
+          .from("cars")
+          .select("id", { count: "exact", head: true })
+          .eq("status", "active")
+          .eq("owner_hidden", false),
+        // 社区热帖入口:优先带图的最新帖
+        supabase
+          .from("community_posts")
+          .select("*, profiles!user_id(username, avatar_url)")
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(12),
+      ]);
 
-        if (hasHistory) {
-          const recentIds = getRecentlyViewed();
-          const favIds = getFavoriteIds();
-          const signalIds = [...new Set([...recentIds, ...favIds])];
+      const cars = (carsRes.data as DbCar[]) || [];
+      // 个人/车行直发优先于系统检索转载(稳定排序保持组内最新在前)
+      const prioritized = [...cars].sort(
+        (a, b) => Number(!!a.source_id) - Number(!!b.source_id)
+      );
+      const featuredNext = prioritized.slice(0, 6);
+      setFeatured(featuredNext);
 
-          let favoriteCars: DbCar[] = [];
-          let viewedCars: DbCar[] = [];
-          if (signalIds.length > 0) {
-            const { data: sig } = await supabase.from("cars").select("*").in("id", signalIds);
-            const byId = new Map(((sig as DbCar[]) || []).map((c) => [c.id, c]));
-            // 保持收藏/浏览的原有顺序(浏览按新近度)
-            favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
-            viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
-          }
+      let recommendedNext: DbCar[] = [];
+      if (withHistory && cars.length > 0) {
+        const recentIds = getRecentlyViewed();
+        const favIds = getFavoriteIds();
+        const signalIds = [...new Set([...recentIds, ...favIds])];
 
-          // 不把已经看过的车再推给用户
-          const excludeIds = new Set(recentIds);
-          const ranked = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 6 });
-          setRecommended(ranked);
+        let favoriteCars: DbCar[] = [];
+        let viewedCars: DbCar[] = [];
+        if (signalIds.length > 0) {
+          const { data: sig } = await supabase.from("cars").select("*").in("id", signalIds);
+          const byId = new Map(((sig as DbCar[]) || []).map((c) => [c.id, c]));
+          // 保持收藏/浏览的原有顺序(浏览按新近度)
+          favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
+          viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
         }
-      });
 
-    supabase
-      .from("cars")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .then(({ count }) => setCarCount(count ?? 0));
+        // 不把已经看过的车再推给用户
+        const excludeIds = new Set(recentIds);
+        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 6 });
+        setRecommended(recommendedNext);
+      }
 
-    // 社区热帖入口:优先带图的最新帖
-    supabase
-      .from("community_posts")
-      .select("*, profiles!user_id(username, avatar_url)")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(12)
-      .then(({ data }) => {
-        const rows = (data as DbCommunityPost[]) || [];
-        const withImg = rows.filter((p) => p.images && p.images.length > 0);
-        const withoutImg = rows.filter((p) => !p.images || p.images.length === 0);
-        setCommunityPosts([...withImg, ...withoutImg].slice(0, 4));
-      });
+      const countNext = countRes.count ?? 0;
+      setCarCount(countNext);
+
+      const rows = (postsRes.data as DbCommunityPost[]) || [];
+      const withImg = rows.filter((p) => p.images && p.images.length > 0);
+      const withoutImg = rows.filter((p) => !p.images || p.images.length === 0);
+      const postsNext = [...withImg, ...withoutImg].slice(0, 4);
+      setCommunityPosts(postsNext);
+
+      if (featuredNext.length > 0) {
+        writeSessionCache<HomeCache>(HOME_CACHE_KEY, {
+          featured: featuredNext,
+          recommended: recommendedNext,
+          carCount: countNext,
+          communityPosts: postsNext,
+        });
+      }
+    }
+
+    // 会话缓存:本会话拉过一次就直接复用,不重复请求;过期(10 分钟)后台静默刷新
+    const cached = readSessionCache<HomeCache>(HOME_CACHE_KEY);
+    if (cached && cached.data.featured.length > 0) {
+      setFeatured(cached.data.featured);
+      setRecommended(cached.data.recommended || []);
+      setCarCount(cached.data.carCount);
+      setCommunityPosts(cached.data.communityPosts || []);
+      if (Date.now() - cached.at > HOME_CACHE_TTL) load(hasHistory).catch(() => {});
+    } else {
+      load(hasHistory).catch(() => {});
+    }
 
     // Auto-detect user location with detailed region info
     detectDetailedLocation()
@@ -396,6 +433,17 @@ export default function Home() {
       })
       .finally(() => setLocationLoading(false));
 
+  }, []);
+
+  // 定位权限刚被授予(权限弹窗/设置页开启)时重新检测——mount 时那次可能因无权限失败
+  useEffect(() => {
+    function onLocationGranted() {
+      detectDetailedLocation().then((loc) => {
+        if (loc) setUserLocation(loc);
+      });
+    }
+    window.addEventListener("clc-location-granted", onLocationGranted);
+    return () => window.removeEventListener("clc-location-granted", onLocationGranted);
   }, []);
 
   // 更多筛选已选条件数(不含关键词与默认距离)
@@ -417,7 +465,6 @@ export default function Home() {
   return (
     <div
       className="flex min-h-screen flex-col bg-muted/30 font-mono md:bg-background"
-      style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
     >
       <Header />
 
@@ -462,7 +509,10 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Hero — typographic, grid backdrop */}
-      <section className="relative overflow-hidden px-4 pb-6 pt-4 bg-linear-160 from-primary/50 via-background">
+      <section 
+        className="relative overflow-hidden px-4 pb-6 pt-4 bg-linear-160 from-primary/50 via-background"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
+      >
         {/* Grid backdrop with subtle parallax */}
         <motion.div
           aria-hidden="true"
@@ -477,8 +527,8 @@ export default function Home() {
               North America · Chinese Used Car Marketplace
             </p>
             <span className="flex items-center gap-1.5 md:hidden">
-              <Image src="/logo.png" alt="常来车网" width={22} height={22} className="h-[22px] w-[22px] object-contain" />
-              <span className="font-mono text-base font-bold">常来车网</span>
+              <Image src="/logo.png" alt="常來車網" width={22} height={22} className="h-[22px] w-[22px] object-contain" />
+              <span className="font-logo text-lg">常來車網</span>
             </span>
             <div className="flex items-center gap-1.5">
               <MapPin className="h-3 w-3 text-muted-foreground/60" strokeWidth={1.5} />
@@ -511,11 +561,11 @@ export default function Home() {
           </div>
 
           {/* Oversized mono headline */}
-          <h1 className="mt-8 hidden font-mono text-4xl font-bold leading-[1.08] tracking-tight md:mt-10 md:block md:text-6xl xl:text-7xl">
-            <span className="sr-only">常来车网 - 北美华人二手车交易平台，买车卖车免费发布</span>
+          <h1 className="mt-8 hidden font-logo text-4xl leading-[1.08] tracking-tight md:mt-10 md:block md:text-6xl xl:text-7xl">
+            <span className="sr-only">常來車網 - 北美华人二手车交易平台，买车卖车免费发布</span>
             <span aria-hidden="true" className="block">华人买车</span>
             <span aria-hidden="true" className="block">
-              就上常来车网<span className="animate-cursor-blink text-brand">_</span>
+              就上常來車網<span className="animate-cursor-blink text-brand">_</span>
             </span>
           </h1>
           <p className="mt-4 hidden font-mono text-sm text-muted-foreground md:block md:text-base">
@@ -1158,7 +1208,7 @@ export default function Home() {
       <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-14">
         <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
           <Reveal>
-            <SectionHeader index="06" label="Why Us" title="为什么选择常来车网" className="mb-2" />
+            <SectionHeader index="06" label="Why Us" title="为什么选择常來車網" className="mb-2" />
           </Reveal>
           <p className="font-mono text-xs text-muted-foreground">专为北美华人打造的二手车交易平台</p>
           <RevealGroup stagger={0.1} className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
@@ -1233,10 +1283,10 @@ export default function Home() {
       {/* About / SEO content */}
       <section className="px-3 py-3 md:border-t md:border-border md:px-4 md:py-12">
         <div className="mx-auto max-w-3xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0">
-          <h2 className="font-mono text-lg font-semibold">关于常来车网</h2>
+          <h2 className="font-logo text-xl">关于常來車網</h2>
           <div className="mt-4 space-y-3 font-mono text-xs leading-relaxed text-muted-foreground">
             <p>
-              常来车网（CLCAuto）是专为北美华人打造的二手车交易平台。无论你在
+              常來車網（CLCAuto）是专为北美华人打造的二手车交易平台。无论你在
               <Link href="/cars/los-angeles" className="underline underline-offset-2 hover:text-foreground">洛杉矶</Link>、
               <Link href="/cars/san-francisco" className="underline underline-offset-2 hover:text-foreground">旧金山</Link>、
               <Link href="/cars/new-york-city" className="underline underline-offset-2 hover:text-foreground">纽约</Link>、
@@ -1245,7 +1295,7 @@ export default function Home() {
               都可以在这里找到同城华人车行和个人卖家直售的二手车源，按品牌、车型、价格、里程和距离精确筛选，全程中文沟通。
             </p>
             <p>
-              买二手车最怕信息不透明。常来车网为每辆车提供免费的 VIN 召回记录查询和 NHTSA
+              买二手车最怕信息不透明。常來車網为每辆车提供免费的 VIN 召回记录查询和 NHTSA
               安全评级，部分车源附带 Carfax 车史报告；价格分析功能会将车源与全站同款车型对比，标出高于或低于市场价的车，帮你避开坑、砍好价。热门车型如
               <Link href="/cars/toyota/camry" className="underline underline-offset-2 hover:text-foreground">丰田凯美瑞</Link>、
               <Link href="/cars/honda/civic" className="underline underline-offset-2 hover:text-foreground">本田思域</Link>、

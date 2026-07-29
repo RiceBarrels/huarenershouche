@@ -68,8 +68,8 @@ export function Footer() {
       <div className="mx-auto max-w-7xl px-4 py-12">
         {/* Watermark wordmark */}
         <div className="select-none pb-10">
-          <p className="font-mono text-5xl font-bold leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl">
-            常来车网 / CLCAUTO
+          <p className="font-logo text-5xl leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl">
+            常來車網 / CLCAUTO
           </p>
         </div>
 
@@ -77,8 +77,8 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
-              <Image src="/logo.png" alt="常来车网" width={24} height={24} className="h-6 w-6 object-contain" />
-              <span className="font-mono text-sm font-semibold">常来车网</span>
+              <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6 object-contain" />
+              <span className="font-logo text-base">常來車網</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
               北美华人最信赖的二手车交易平台，让买卖车更简单、更安心。
@@ -176,7 +176,7 @@ export function Footer() {
         {/* Bottom bar */}
         <div className="mt-10 flex flex-col items-center justify-between gap-3 border-t border-border pt-6 sm:flex-row">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} 常来车网 CLCAuto. All rights reserved.
+            &copy; {new Date().getFullYear()} 常來車網 CLCAuto. All rights reserved.
           </p>
           <div className="flex items-center gap-4 text-xs text-muted-foreground">
             <Link href="/terms" className="transition-colors hover:text-foreground">

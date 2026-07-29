@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Upload, X, Plus, Loader2, Store, FileText, ShieldCheck, Wand2, ExternalLink, Video } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import {
+  X,
+  Plus,
+  Loader2,
+  Store,
+  FileText,
+  ShieldCheck,
+  Wand2,
+  ExternalLink,
+  ChevronLeft,
+  Check,
+  Play,
+  CircleHelp,
+  Trash2,
+} from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
-import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,12 +32,20 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { Combobox, type ComboboxOption } from "@/components/combobox";
 import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
 import { useIdentity } from "@/components/identity-provider";
+import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
+import { EASE } from "@/lib/motion";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -107,7 +128,6 @@ const yearOptions: ComboboxOption[] = YEAR_OPTIONS.map((y) => ({
   label: String(y),
 }));
 
-
 const fuelOptions: ComboboxOption[] = FUEL_TYPES.map((f) => ({
   value: f,
   label: f,
@@ -168,33 +188,127 @@ const seatOptions: ComboboxOption[] = [
   { value: "other", label: "其他" },
 ];
 
-const conditionOptions: ComboboxOption[] = [
-  { value: "new", label: "新车 New" },
-  { value: "used", label: "二手 Used" },
+// 常见配置亮点(点选快速添加)
+const FEATURE_SUGGESTIONS = [
+  "倒车影像",
+  "全景天窗",
+  "CarPlay",
+  "座椅加热",
+  "无事故",
+  "一手车主",
+  "真皮座椅",
+  "自适应巡航",
 ];
 
-const DRAFT_KEY = "huaren_post_draft";
+// ===== 多草稿存储:数组按 updatedAt 倒序,发布/删除时移除对应条目 =====
+const DRAFTS_KEY = "huaren_post_drafts";
+const LEGACY_DRAFT_KEY = "huaren_post_draft";
+const MAX_DRAFTS = 10;
 
-function loadDraft(): { form: Record<string, string>; imageUrls: string[]; features: string[] } | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = localStorage.getItem(DRAFT_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw);
-  } catch {
-    return null;
-  }
+export interface PostDraft {
+  id: string;
+  updatedAt: number;
+  form: Record<string, string>;
+  imageUrls: string[];
+  features: string[];
+  videoUrl?: string | null;
 }
 
-function saveDraft(form: Record<string, string>, imageUrls: string[], features: string[]) {
+function persistDrafts(drafts: PostDraft[]) {
+  try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch { /* ignore */ }
+}
+
+function loadDrafts(): PostDraft[] {
+  if (typeof window === "undefined") return [];
+  let drafts: PostDraft[] = [];
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify({ form, imageUrls, features }));
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) drafts = arr.filter((d) => d && d.id && d.form);
   } catch { /* ignore */ }
+  // 迁移旧版单草稿
+  try {
+    const legacy = localStorage.getItem(LEGACY_DRAFT_KEY);
+    if (legacy) {
+      const d = JSON.parse(legacy);
+      if (d?.form && (d.form.make || d.form.vin || d.imageUrls?.length)) {
+        drafts.unshift({
+          id: `d-${Date.now()}`,
+          updatedAt: Date.now(),
+          form: d.form,
+          imageUrls: d.imageUrls || [],
+          features: d.features || [],
+        });
+        persistDrafts(drafts);
+      }
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
+    }
+  } catch { /* ignore */ }
+  return drafts.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
-function clearDraft() {
-  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+// 草稿是否有值得保留的内容(空表单不落盘,避免覆盖/堆积垃圾草稿)
+function draftHasContent(form: Record<string, string>, imageUrls: string[], features: string[]) {
+  return Boolean(
+    form.vin || form.make || form.model || form.price || form.mileage ||
+    form.description_zh || imageUrls.length > 0 || features.length > 0
+  );
 }
+
+function draftTitle(d: PostDraft) {
+  const f = d.form || {};
+  const make = f.make === "Other" ? f.customMake : f.make;
+  const name = [f.year, make ? `${MAKES_ZH[make] || ""}${make}` : "", f.model]
+    .filter(Boolean)
+    .join(" ");
+  if (name) return name;
+  if (f.vin) return `VIN …${f.vin.slice(-6)}`;
+  return "未命名草稿";
+}
+
+function draftTime(ts: number) {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} 天前`;
+  return new Date(ts).toLocaleDateString("zh-CN");
+}
+
+// ===== 逐题问答式步骤定义 =====
+type StepId =
+  | "photos"
+  | "vin"
+  | "carinfo"
+  | "condition"
+  | "price"
+  | "mileage"
+  | "details"
+  | "colors"
+  | "location"
+  | "contact"
+  | "carfax"
+  | "features"
+  | "description";
+
+const STEPS: { id: StepId; title: string; sub?: string; optional?: boolean }[] = [
+  { id: "photos", title: "先来几张车辆照片", sub: "第一张将作为封面图,建议 5-10 张" },
+  { id: "vin", title: "输入 VIN 码", sub: "按「继续」自动识别并填写车辆信息" },
+  { id: "carinfo", title: "这是什么车?", sub: "核对或补充车辆信息" },
+  { id: "condition", title: "新车还是二手?" },
+  { id: "price", title: "这辆车卖多少钱?" },
+  { id: "mileage", title: "跑了多少英里?" },
+  { id: "details", title: "车辆参数", sub: "VIN 识别的会自动填好,可跳过", optional: true },
+  { id: "colors", title: "什么颜色?", sub: "可跳过", optional: true },
+  { id: "location", title: "车在哪里?", sub: "填写邮编即可,详细地址选填" },
+  { id: "contact", title: "怎么联系你?", sub: "买家将通过这些方式找到你" },
+  { id: "carfax", title: "有 Carfax 报告吗?", sub: "粘贴链接自动获取摘要,可跳过", optional: true },
+  { id: "features", title: "有哪些配置亮点?", sub: "可跳过", optional: true },
+  { id: "description", title: "再介绍几句", sub: "车况、保养历史、卖车原因等,选填" },
+];
 
 export default function PostCarPage() {
   const router = useRouter();
@@ -209,8 +323,10 @@ export default function PostCarPage() {
   const [features, setFeatures] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [hasDraft, setHasDraft] = useState(false);
-  const [draftDialogOpen, setDraftDialogOpen] = useState(false);
+  // 草稿箱:多份草稿 + 当前正在编辑的草稿 id(未编辑过内容前为 null)
+  const [drafts, setDrafts] = useState<PostDraft[]>([]);
+  const [draftId, setDraftId] = useState<string | null>(null);
+  const [vinHelpOpen, setVinHelpOpen] = useState(false);
 
   const [vinDecoding, setVinDecoding] = useState(false);
   const [vinAutoFilled, setVinAutoFilled] = useState(false);
@@ -224,6 +340,12 @@ export default function PostCarPage() {
   const [fakeGenerating, setFakeGenerating] = useState(false);
   const [fakeDialogOpen, setFakeDialogOpen] = useState(false);
   const [fakeResult, setFakeResult] = useState("");
+  const [showAddress, setShowAddress] = useState(false);
+
+  // 向导状态:当前步 + 动画方向(1 前进 / -1 后退)
+  const [step, setStep] = useState(0);
+  const [dir, setDir] = useState(1);
+  const kbHeight = useKeyboardHeight();
 
   const defaultForm = {
     make: "",
@@ -258,49 +380,65 @@ export default function PostCarPage() {
   const [carfaxLoading, setCarfaxLoading] = useState(false);
   const [carfaxSummary, setCarfaxSummary] = useState<CarfaxSummary | null>(null);
 
-  // Check for draft on mount — ask user before restoring
-  useEffect(() => {
-    const draft = loadDraft();
-    if (draft && (draft.form?.make || draft.form?.vin || (draft.imageUrls && draft.imageUrls.length > 0))) {
-      setDraftDialogOpen(true);
-    }
-  }, []);
+  // 挂载时读入草稿箱(localStorage 仅客户端可读,一次性回填,不构成级联渲染)
+  /* eslint-disable-next-line react-hooks/set-state-in-effect */
+  useEffect(() => setDrafts(loadDrafts()), []);
 
-  function restoreDraft() {
-    const draft = loadDraft();
-    if (draft) {
-      setHasDraft(true);
-      setForm((f) => ({ ...f, ...draft.form }));
-      setImageUrls(draft.imageUrls || []);
-      setFeatures(draft.features || []);
-    }
-    setDraftDialogOpen(false);
+  function restoreDraft(d: PostDraft) {
+    const merged = { ...defaultForm, ...d.form };
+    setForm(merged);
+    setImageUrls(d.imageUrls || []);
+    setFeatures(d.features || []);
+    setVideoUrl(d.videoUrl || null);
+    setDraftId(d.id);
+    setVinAutoFilled(false);
+    // 跳到第一个未完成的必填步,接着上次的进度答
+    setStep(firstIncompleteStep(merged, d.imageUrls || []));
+    setDir(1);
   }
 
-  function discardDraft() {
-    clearDraft();
-    setDraftDialogOpen(false);
+  function deleteDraft(id: string) {
+    setDrafts((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      persistDrafts(next);
+      return next;
+    });
+    if (draftId === id) setDraftId(null);
   }
 
-  // Auto-save draft on changes (debounced)
+  // 自动保存(防抖):只在有实际内容时写入,且只写当前草稿条目——
+  // 空表单不会再覆盖旧草稿(修复"继续编辑没反应":以前挂载 500ms 后
+  // 空表单就把唯一草稿冲掉了)
   const draftTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const formRef = useRef(form);
-  const imageUrlsRef = useRef(imageUrls);
-  const featuresRef = useRef(features);
-  formRef.current = form;
-  imageUrlsRef.current = imageUrls;
-  featuresRef.current = features;
-
-  const scheduleDraftSave = useCallback(() => {
-    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
-    draftTimeoutRef.current = setTimeout(() => {
-      saveDraft(formRef.current, imageUrlsRef.current, featuresRef.current);
-    }, 500);
-  }, []);
+  const draftIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    draftIdRef.current = draftId;
+  }, [draftId]);
 
   useEffect(() => {
-    scheduleDraftSave();
-  }, [form, imageUrls, features, scheduleDraftSave]);
+    if (draftTimeoutRef.current) clearTimeout(draftTimeoutRef.current);
+    if (!draftHasContent(form, imageUrls, features)) return;
+    draftTimeoutRef.current = setTimeout(() => {
+      let id = draftIdRef.current;
+      if (!id) {
+        id = `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+        setDraftId(id);
+      }
+      const entry: PostDraft = {
+        id,
+        updatedAt: Date.now(),
+        form,
+        imageUrls,
+        features,
+        videoUrl,
+      };
+      setDrafts((prev) => {
+        const next = [entry, ...prev.filter((d) => d.id !== id)].slice(0, MAX_DRAFTS);
+        persistDrafts(next);
+        return next;
+      });
+    }, 500);
+  }, [form, imageUrls, features, videoUrl]);
 
   useEffect(() => {
     return () => {
@@ -309,6 +447,7 @@ export default function PostCarPage() {
   }, []);
 
   // 发布归属「当前操作身份」(actingId):切换成车行时,新车挂到车行名下。
+  /* eslint-disable react-hooks/set-state-in-effect -- 同步记录当前身份,后续均为异步回填 */
   useEffect(() => {
     if (!actingId) return;
     setUser(actingId);
@@ -337,8 +476,8 @@ export default function PostCarPage() {
         setIsAdmin(profile.role === "admin");
         setForm((f) => ({
           ...f,
-          seller_name: profile.username || "",
-          phone: profile.phone || "",
+          seller_name: f.seller_name || profile.username || "",
+          phone: f.phone || profile.phone || "",
         }));
 
         // Fetch dealer stores if dealer
@@ -355,10 +494,12 @@ export default function PostCarPage() {
       }
     })();
   }, [actingId, isActingAsClaimed]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Auto-resolve zipcode to city name (English + Chinese)
   const [zipCity, setZipCity] = useState("");
   const [zipCityZh, setZipCityZh] = useState("");
+  /* eslint-disable react-hooks/set-state-in-effect -- 邮编不足 5 位时同步清空提示,开销极小 */
   useEffect(() => {
     if (form.zipcode.length !== 5) {
       setZipCity("");
@@ -381,6 +522,7 @@ export default function PostCarPage() {
       }
     });
   }, [form.zipcode]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function update(key: string, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -390,6 +532,7 @@ export default function PostCarPage() {
     const files = e.target.files;
     if (!files) return;
     await uploadFiles(Array.from(files));
+    e.target.value = "";
   }
 
   async function uploadFiles(files: File[]) {
@@ -490,11 +633,17 @@ export default function PostCarPage() {
     }
   }
 
-  async function handleVinAutoFill() {
+  function toggleFeature(f: string) {
+    setFeatures((prev) =>
+      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f]
+    );
+  }
+
+  async function handleVinAutoFill(): Promise<boolean> {
     const cleaned = form.vin.trim().toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "");
     if (!isValidVinFormat(cleaned)) {
       setError("请输入有效的 17 位 VIN 码");
-      return;
+      return false;
     }
     setVinDecoding(true);
     setError("");
@@ -502,8 +651,8 @@ export default function PostCarPage() {
     setVinDecoding(false);
 
     if (!result || !hasVinData(result)) {
-      setError("无法识别此 VIN，请手动填写信息");
-      return;
+      setError("无法识别此 VIN,请核对是否输入正确");
+      return false;
     }
 
     // Map make to MAKES list or use "Other" + customMake
@@ -558,6 +707,7 @@ export default function PostCarPage() {
       return next;
     });
     setVinAutoFilled(true);
+    return true;
   }
 
   // === Admin: generate fake listings ===
@@ -681,8 +831,7 @@ export default function PostCarPage() {
     }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSubmit() {
     if (!user) return;
     setError("");
 
@@ -808,876 +957,926 @@ export default function PostCarPage() {
     if (insertError) {
       setError(`发布失败: ${insertError.message}`);
     } else if (data) {
-      clearDraft();
+      if (draftId) deleteDraft(draftId);
       router.push(`/car/${data.id}`);
     }
   }
 
+  // ===== 向导:每步的完成校验 =====
+  function stepComplete(id: StepId, f = form, imgs = imageUrls): boolean {
+    switch (id) {
+      case "photos":
+        return imgs.length > 0;
+      case "vin":
+        return isValidVinFormat(f.vin);
+      case "carinfo":
+        return Boolean(
+          f.make &&
+          (f.make !== "Other" || f.customMake.trim()) &&
+          f.model.trim() &&
+          f.year.length === 4
+        );
+      case "condition":
+        return Boolean(f.condition);
+      case "price":
+        return priceCallOnly || Number(f.price) > 0;
+      case "mileage":
+        return f.mileage !== "" && Number(f.mileage) >= 0;
+      case "location":
+        return f.zipcode.length === 5;
+      case "contact": {
+        const digits = f.phone.replace(/\D/g, "");
+        return Boolean(f.seller_name.trim()) && digits.length >= 10;
+      }
+      // 可选步始终可继续
+      default:
+        return true;
+    }
+  }
+
+  function firstIncompleteStep(f: typeof defaultForm, imgs: string[]): number {
+    for (let i = 0; i < STEPS.length; i++) {
+      if (!STEPS[i].optional && !stepComplete(STEPS[i].id, f, imgs)) return i;
+    }
+    return STEPS.length - 1;
+  }
+
+  const current = STEPS[step];
+  const isLast = step === STEPS.length - 1;
+  const canProceed = stepComplete(current.id);
+
+  async function goNext() {
+    if (isLast) {
+      handleSubmit();
+      return;
+    }
+    // VIN 步:按「继续」自动识别并填充;识别不出来不能进入下一步
+    if (current.id === "vin" && !vinAutoFilled) {
+      const ok = await handleVinAutoFill();
+      if (!ok) return;
+    }
+    setError("");
+    setDir(1);
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  }
+
+  function goPrev() {
+    if (step === 0) return;
+    setError("");
+    setDir(-1);
+    setStep((s) => Math.max(s - 1, 0));
+  }
+
+  // 主按钮文案:最后一步是发布;可选步没填内容显示「跳过」
+  const optionalEmpty =
+    (current.id === "details" && !form.transmission && !form.drivetrain && !form.body_type && !form.cylinders && !form.seats) ||
+    (current.id === "colors" && !form.exterior_color && !form.interior_color) ||
+    (current.id === "carfax" && !form.carfax_url.trim()) ||
+    (current.id === "features" && features.length === 0);
+  const mainLabel = isLast
+    ? loading ? "发布中..." : "发布车辆"
+    : current.id === "vin" && vinDecoding ? "识别中..."
+    : current.optional && optionalEmpty ? "跳过" : "继续";
+
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
-      <Header />
-      <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="font-mono text-lg font-semibold tracking-tight">
-          发布车辆
-        </h1>
-        <div className="mt-1 flex items-center gap-3">
-          <p className="font-mono text-xs text-muted-foreground">
-            填写车辆信息，发布后即可被其他用户看到
-          </p>
-          {hasDraft && (
-            <span className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-              <FileText className="h-3 w-3" strokeWidth={1.5} />
-              已恢复草稿
-              <button
-                type="button"
-                onClick={() => {
-                  clearDraft();
-                  setForm(defaultForm);
-                  setImageUrls([]);
-                  setFeatures([]);
-                  setHasDraft(false);
-                }}
-                className="ml-1 underline underline-offset-2 hover:text-foreground"
-              >
-                清除
-              </button>
-            </span>
-          )}
-        </div>
-
-        {/* Admin: fake listing generator */}
-        {isAdmin && (
-          <div className="mt-6 rounded-xl border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-yellow-600" strokeWidth={1.5} />
-              <span className="font-mono text-xs font-semibold text-yellow-700 dark:text-yellow-400">管理员工具</span>
-            </div>
-            <p className="mt-2 font-mono text-[11px] text-muted-foreground">
-              批量生成假车源用于测试和展示
-            </p>
-            <div className="mt-3 flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <Label className="font-mono text-[11px] text-muted-foreground">数量</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={fakeCount}
-                  onChange={(e) => setFakeCount(Number(e.target.value))}
-                  className="h-8 w-20 font-mono text-xs"
-                />
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                className="gap-1.5 font-mono text-xs"
-                disabled={fakeGenerating}
-                onClick={() => setFakeDialogOpen(true)}
-              >
-                {fakeGenerating ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                ) : (
-                  <Wand2 className="h-3.5 w-3.5" strokeWidth={1.5} />
-                )}
-                批量生成
-              </Button>
-            </div>
-            {fakeResult && (
-              <p className={`mt-2 font-mono text-[11px] ${fakeResult.startsWith("失败") ? "text-destructive" : "text-green-600"}`}>
-                {fakeResult}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Confirm dialog for fake generation */}
-        <Dialog open={fakeDialogOpen} onOpenChange={setFakeDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-mono text-sm">确认生成假车源</DialogTitle>
-              <DialogDescription className="font-mono text-xs">
-                将以当前账号生成 {fakeCount} 条假车源，数据随机生成（品牌、价格、里程、地区等）。确认继续？
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter className="gap-2">
-              <Button variant="outline" size="sm" className="font-mono text-xs" onClick={() => setFakeDialogOpen(false)}>
-                取消
-              </Button>
-              <Button
-                size="sm"
-                className="font-mono text-xs"
-                disabled={fakeGenerating}
-                onClick={() => {
-                  setFakeDialogOpen(false);
-                  handleGenerateFake();
-                }}
-              >
-                确认生成
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {!user ? (
-          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
-            <p className="font-mono text-sm text-muted-foreground">
-              请先登录后再发布车辆
-            </p>
+    <div className="flex min-h-screen flex-col bg-background">
+      {!user ? (
+        <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
+          <div className="mt-8 flex flex-col items-center rounded-2xl border border-border p-8">
+            <p className="text-sm text-muted-foreground">请先登录后再发布车辆</p>
             <Link href="/login">
-              <Button size="sm" className="mt-4 font-mono text-xs">
+              <Button size="sm" className="mt-4 rounded-full text-xs">
                 登录 / 注册
               </Button>
             </Link>
           </div>
-        ) : (
-          <>
-          <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-            {/* Images */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">
-                车辆照片 <span className="text-destructive">*</span>
-              </Label>
-              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                至少上传一张照片，第一张将作为封面图，建议 5-10 张
-              </p>
-              <div
-                className={`mt-2 flex flex-wrap gap-2 rounded p-2 transition-colors ${
-                  dragging ? "bg-muted/80 ring-2 ring-foreground/20" : ""
-                }`}
-                onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
+        </main>
+      ) : (
+        <>
+          {/* 进度:细进度条 + 计数 */}
+          <div className="mx-auto w-full max-w-2xl px-5 pt-3">
+            <div className="flex items-center gap-3">
+              <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full bg-primary transition-[width] duration-300"
+                  style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                />
+              </div>
+              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                {step + 1}/{STEPS.length}
+              </span>
+            </div>
+          </div>
+
+          <main className="mx-auto w-full max-w-2xl flex-1 overflow-x-hidden px-5 pb-44 pt-6">
+            <AnimatePresence mode="wait" custom={dir} initial={false}>
+              <motion.div
+                key={current.id}
+                custom={dir}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                variants={{
+                  enter: (d: number) => ({ opacity: 0, x: d * 36 }),
+                  center: { opacity: 1, x: 0, transition: { duration: 0.28, ease: EASE } },
+                  exit: (d: number) => ({ opacity: 0, x: d * -36, transition: { duration: 0.2, ease: EASE } }),
+                }}
               >
-                {imageUrls.map((url, i) => (
-                  <div
-                    key={i}
-                    className="group relative h-24 w-32 rounded-lg border border-border bg-muted"
-                  >
-                    <img src={url} alt="" className="h-full w-full rounded-lg object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                    {i === 0 && (
-                      <span className="absolute bottom-1 left-1 rounded-full bg-foreground/80 px-1 py-0.5 font-mono text-[9px] text-background">
-                        封面
-                      </span>
-                    )}
-                  </div>
-                ))}
-                <label className="flex h-24 w-32 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-border transition-colors hover:border-foreground/30">
-                  {uploading ? (
-                    <Loader2
-                      className="h-5 w-5 animate-spin text-muted-foreground"
-                      strokeWidth={1.5}
-                    />
-                  ) : (
-                    <>
-                      <Upload
-                        className="h-5 w-5 text-muted-foreground"
-                        strokeWidth={1.5}
+                {/* 大字提问 */}
+                <h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1>
+                {current.sub && (
+                  <p className="mt-1.5 text-sm text-muted-foreground">{current.sub}</p>
+                )}
+
+                <div className="mt-6">
+                  {/* ==== 照片 ==== */}
+                  {current.id === "photos" && (
+                    <div>
+                      {/* 草稿箱:有历史草稿时,第一页可直接选一份继续(也可删除) */}
+                      {drafts.filter((d) => d.id !== draftId).length > 0 && (
+                        <div className="mb-5 rounded-2xl border border-border bg-card p-4">
+                          <p className="text-sm font-medium text-foreground">继续上次的草稿</p>
+                          <div className="mt-3 space-y-2">
+                            {drafts.filter((d) => d.id !== draftId).map((d) => (
+                              <div key={d.id} className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => restoreDraft(d)}
+                                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-muted px-3.5 py-3 text-left transition-colors active:bg-muted/70"
+                                >
+                                  {d.imageUrls?.[0] ? (
+                                    <img
+                                      src={d.imageUrls[0]}
+                                      alt=""
+                                      className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                                    />
+                                  ) : (
+                                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background">
+                                      <FileText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                                    </span>
+                                  )}
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-sm text-foreground">
+                                      {draftTitle(d)}
+                                    </span>
+                                    <span className="block text-xs text-muted-foreground">
+                                      {d.imageUrls?.length ? `${d.imageUrls.length} 张照片 · ` : ""}
+                                      {draftTime(d.updatedAt)}
+                                    </span>
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  aria-label="删除草稿"
+                                  onClick={() => deleteDraft(d.id)}
+                                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-muted"
+                                >
+                                  <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      <div
+                        className={`flex flex-wrap gap-3 rounded-xl transition-colors ${
+                          dragging ? "bg-muted/80 ring-2 ring-primary/30" : ""
+                        }`}
+                        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+                        onDragLeave={() => setDragging(false)}
+                        onDrop={handleDrop}
+                      >
+                        {imageUrls.map((url, i) => (
+                          <div
+                            key={i}
+                            className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted"
+                          >
+                            <img src={url} alt="" className="h-full w-full object-cover" />
+                            <button
+                              type="button"
+                              onClick={() => removeImage(i)}
+                              className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                            {i === 0 && (
+                              <span className="absolute bottom-1 left-1 rounded-full bg-black/50 px-1.5 py-0.5 text-[10px] text-white">
+                                封面
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-border bg-muted/50 active:bg-muted">
+                          {uploading ? (
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" strokeWidth={1.5} />
+                          ) : (
+                            <Plus className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
+                          )}
+                          <input
+                            type="file"
+                            accept="image/*,video/mp4,video/quicktime,video/webm"
+                            multiple
+                            className="hidden"
+                            onChange={handleImageUpload}
+                            disabled={uploading}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Video preview */}
+                      {videoUrl && (
+                        <div className="relative mt-3 h-24 w-24 overflow-hidden rounded-xl bg-muted">
+                          <video src={videoUrl} muted playsInline preload="metadata" className="h-full w-full object-cover" />
+                          <span className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/50">
+                            <Play className="h-2.5 w-2.5 fill-white text-white" />
+                          </span>
+                          <button
+                            type="button"
+                            className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white"
+                            onClick={() => setVideoUrl(null)}
+                          >
+                            <X className="h-3 w-3" strokeWidth={2} />
+                          </button>
+                        </div>
+                      )}
+                      {videoUploading && (
+                        <div className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                          <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />上传视频中...
+                        </div>
+                      )}
+                      {!videoUrl && !videoUploading && (
+                        <p className="mt-3 text-xs text-muted-foreground/70">
+                          也可上传 1 个短视频（≤30秒，≤50MB）
+                        </p>
+                      )}
+
+                      {/* Admin: fake listing generator */}
+                      {isAdmin && (
+                        <div className="mt-6 rounded-xl border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+                          <div className="flex items-center gap-2">
+                            <ShieldCheck className="h-4 w-4 text-yellow-600" strokeWidth={1.5} />
+                            <span className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">管理员工具</span>
+                          </div>
+                          <div className="mt-3 flex items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <Label className="text-[11px] text-muted-foreground">数量</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={100}
+                                value={fakeCount}
+                                onChange={(e) => setFakeCount(Number(e.target.value))}
+                                className="h-8 w-20 text-xs"
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="gap-1.5 text-xs"
+                              disabled={fakeGenerating}
+                              onClick={() => setFakeDialogOpen(true)}
+                            >
+                              {fakeGenerating ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                              ) : (
+                                <Wand2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              )}
+                              批量生成假车源
+                            </Button>
+                          </div>
+                          {fakeResult && (
+                            <p className={`mt-2 text-[11px] ${fakeResult.startsWith("失败") ? "text-destructive" : "text-green-600"}`}>
+                              {fakeResult}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==== VIN ==== */}
+                  {current.id === "vin" && (
+                    <div>
+                      <input
+                        autoFocus
+                        className="w-full bg-transparent font-mono text-2xl uppercase tracking-widest text-foreground placeholder:text-muted-foreground/40 placeholder:tracking-normal focus:outline-none"
+                        placeholder="17 位 VIN 码"
+                        value={form.vin}
+                        onChange={(e) => {
+                          const v = e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "").slice(0, 17);
+                          update("vin", v);
+                          if (vinAutoFilled) setVinAutoFilled(false);
+                        }}
+                        maxLength={17}
                       />
-                      <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-                        上传图片
-                      </span>
-                    </>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*,video/mp4,video/quicktime,video/webm"
-                    multiple
-                    className="hidden"
-                    onChange={handleImageUpload}
-                    disabled={uploading}
-                  />
-                </label>
-              </div>
-
-              {/* Video preview */}
-              {videoUrl && (
-                <div className="relative mt-3 overflow-hidden rounded-lg border border-border">
-                  <video src={videoUrl} controls className="h-32 w-full object-cover" />
-                  <button
-                    type="button"
-                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1"
-                    onClick={() => setVideoUrl(null)}
-                  >
-                    <X className="h-3 w-3 text-white" strokeWidth={2} />
-                  </button>
-                </div>
-              )}
-              {videoUploading && (
-                <div className="mt-2 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />上传视频中...
-                </div>
-              )}
-              {!videoUrl && !videoUploading && (
-                <p className="mt-2 font-mono text-[10px] text-muted-foreground">
-                  支持上传 1 个短视频（≤30秒，≤50MB）
-                </p>
-              )}
-            </div>
-
-            {/* VIN Auto-fill */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">VIN 码 <span className="text-destructive">*</span></h2>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                输入 VIN 码可自动填写车辆信息（必填）
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Input
-                  className="h-9 flex-1 font-mono text-xs uppercase"
-                  placeholder="输入 17 位 VIN 码"
-                  value={form.vin}
-                  onChange={(e) => {
-                    const v = e.target.value.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, "").slice(0, 17);
-                    update("vin", v);
-                    if (vinAutoFilled) setVinAutoFilled(false);
-                  }}
-                  maxLength={17}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 font-mono text-[11px]"
-                  disabled={vinDecoding || form.vin.length !== 17}
-                  onClick={handleVinAutoFill}
-                >
-                  {vinDecoding ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                  ) : (
-                    <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  )}
-                  自动填写
-                </Button>
-              </div>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                {form.vin.length}/17 位
-              </p>
-              {vinAutoFilled && (
-                <p className="mt-1 font-mono text-[11px] text-green-600 dark:text-green-400">
-                  已根据 VIN 自动填写车辆信息，请核实并补充其余内容
-                </p>
-              )}
-            </div>
-
-            {/* Carfax link */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">Carfax 报告</h2>
-              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                粘贴 Carfax 链接，系统将自动获取报告摘要
-              </p>
-              <div className="mt-3 flex gap-2">
-                <Input
-                  className="h-9 flex-1 font-mono text-xs"
-                  placeholder="https://www.carfax.com/vehicle/..."
-                  value={form.carfax_url}
-                  onChange={(e) => {
-                    update("carfax_url", e.target.value);
-                    setCarfaxSummary(null);
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-9 gap-1.5 font-mono text-[11px]"
-                  disabled={carfaxLoading || !form.carfax_url.trim()}
-                  onClick={async () => {
-                    const url = normalizeCarfaxUrl(form.carfax_url);
-                    if (!isCarfaxUrl(url)) {
-                      setError("请输入有效的 Carfax 链接");
-                      return;
-                    }
-                    setCarfaxLoading(true);
-                    setError("");
-                    const result = await fetchCarfaxSummary(url);
-                    setCarfaxLoading(false);
-                    if (result) {
-                      setCarfaxSummary(result);
-                    } else {
-                      setCarfaxSummary({ title: "Carfax Report", owners: null, accidents: null, serviceRecords: null });
-                    }
-                  }}
-                >
-                  {carfaxLoading ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                  ) : (
-                    <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  )}
-                  获取报告
-                </Button>
-              </div>
-              {carfaxSummary && (
-                <div className="mt-2 flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2">
-                  <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                  <span className="flex-1 font-mono text-[11px]">
-                    {formatCarfaxSummary(carfaxSummary)}
-                  </span>
-                  <a
-                    href={normalizeCarfaxUrl(form.carfax_url)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-                  >
-                    <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
-                    Carfax
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Basic info */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">基本信息</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    品牌 *
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={makeOptions}
-                      value={form.make}
-                      onValueChange={(v) => {
-                        update("make", v);
-                        if (v !== "Other") update("customMake", "");
-                      }}
-                      placeholder="选择品牌"
-                      searchPlaceholder="搜索品牌..."
-                      emptyText="未找到该品牌"
-                    />
-                  </div>
-                  {form.make === "Other" && (
-                    <Input
-                      className="mt-2 h-9 font-mono text-xs"
-                      placeholder="请输入品牌名称"
-                      value={form.customMake || ""}
-                      onChange={(e) => update("customMake", e.target.value)}
-                      required
-                    />
-                  )}
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    车型 *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="如 Camry, CR-V"
-                    value={form.model}
-                    onChange={(e) => update("model", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    年份 *
-                  </Label>
-                  <Input
-                    type="number"
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="如 2020"
-                    value={form.year}
-                    onChange={(e) => update("year", e.target.value.replace(/\D/g, "").slice(0, 4))}
-                    min={1900}
-                    max={2030}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    配置等级
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="如 SE, EX-L, Sport"
-                    value={form.trim}
-                    onChange={(e) => update("trim", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    车况 *
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={conditionOptions}
-                      value={form.condition}
-                      onValueChange={(v) => update("condition", v)}
-                      placeholder="选择车况"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    价格 ($) *
-                  </Label>
-                  <div className="mt-1 flex items-center gap-2">
-                    <Input
-                      className="h-9 font-mono text-xs"
-                      type="number"
-                      placeholder="25000"
-                      value={form.price}
-                      onChange={(e) => update("price", e.target.value)}
-                      required={!priceCallOnly}
-                      disabled={priceCallOnly}
-                    />
-                  </div>
-                  <label className="mt-1.5 flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={priceCallOnly}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setShowCallWarning(true);
-                        } else {
-                          setPriceCallOnly(false);
-                          setShowCallWarning(false);
-                        }
-                      }}
-                      className="h-3 w-3"
-                    />
-                    <span className="font-mono text-[10px] text-muted-foreground">电议</span>
-                  </label>
-                  {showCallWarning && !priceCallOnly && (
-                    <div className="mt-2 rounded-lg border border-yellow-500/50 bg-yellow-500/5 p-2">
-                      <p className="font-mono text-[11px] text-yellow-600 dark:text-yellow-400">
-                        注意：选择电议可能会影响曝光率
-                      </p>
-                      <div className="mt-1.5 flex gap-2">
+                      <div className="mt-2 h-px w-full bg-border" />
+                      <div className="mt-2 flex items-center justify-between">
+                        <p className="text-xs tabular-nums text-muted-foreground">
+                          {form.vin.length}/17 位
+                        </p>
                         <button
                           type="button"
-                          onClick={() => { setPriceCallOnly(true); setShowCallWarning(false); update("price", "0"); }}
-                          className="font-mono text-[10px] text-foreground underline"
+                          onClick={() => setVinHelpOpen(true)}
+                          className="flex items-center gap-1 text-xs text-muted-foreground underline underline-offset-2"
                         >
-                          确认电议
+                          <CircleHelp className="h-3.5 w-3.5" strokeWidth={1.5} />
+                          在哪里查看 VIN?
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowCallWarning(false)}
-                          className="font-mono text-[10px] text-muted-foreground"
-                        >
-                          取消
-                        </button>
+                      </div>
+                      {vinAutoFilled && (
+                        <p className="mt-3 flex items-center gap-1.5 text-sm text-primary">
+                          <Check className="h-4 w-4" strokeWidth={2} />
+                          已自动填写车辆信息,后面几步核对一下就行
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==== 车辆信息 ==== */}
+                  {current.id === "carinfo" && (
+                    <div className="space-y-3">
+                      <Combobox
+                        options={makeOptions}
+                        value={form.make}
+                        onValueChange={(v) => {
+                          update("make", v);
+                          if (v !== "Other") update("customMake", "");
+                        }}
+                        placeholder="品牌 *"
+                        searchPlaceholder="搜索品牌..."
+                        emptyText="未找到该品牌"
+                      />
+                      {form.make === "Other" && (
+                        <input
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          placeholder="请输入品牌名称 *"
+                          value={form.customMake || ""}
+                          onChange={(e) => update("customMake", e.target.value)}
+                        />
+                      )}
+                      <input
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        placeholder="车型 * 如 Camry, CR-V"
+                        value={form.model}
+                        onChange={(e) => update("model", e.target.value)}
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <Combobox
+                          options={yearOptions}
+                          value={form.year}
+                          onValueChange={(v) => update("year", v)}
+                          placeholder="年份 *"
+                          searchPlaceholder="搜索年份..."
+                          emptyText="未找到"
+                        />
+                        <input
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          placeholder="配置等级 如 SE"
+                          value={form.trim}
+                          onChange={(e) => update("trim", e.target.value)}
+                        />
                       </div>
                     </div>
                   )}
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    里程 (mi) *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    type="number"
-                    placeholder="12000"
-                    value={form.mileage}
-                    onChange={(e) => update("mileage", e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* Vehicle details */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">车辆详情</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    燃油类型
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={fuelOptions}
-                      value={form.fuel_type}
-                      onValueChange={(v) => update("fuel_type", v)}
-                      placeholder="选择燃油"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    变速箱
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={transmissionOptions}
-                      value={form.transmission}
-                      onValueChange={(v) => update("transmission", v)}
-                      placeholder="选择变速箱"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    外观颜色
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={exteriorColorOptions}
-                      value={form.exterior_color}
-                      onValueChange={(v) => update("exterior_color", v)}
-                      placeholder="选择颜色"
-                      searchPlaceholder="搜索颜色..."
-                      emptyText="未找到该颜色"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    内饰颜色
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={interiorColorOptions}
-                      value={form.interior_color}
-                      onValueChange={(v) => update("interior_color", v)}
-                      placeholder="选择颜色"
-                      searchPlaceholder="搜索颜色..."
-                      emptyText="未找到该颜色"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    驱动方式
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={drivetrainOptions}
-                      value={form.drivetrain}
-                      onValueChange={(v) => update("drivetrain", v)}
-                      placeholder="选择驱动"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    车辆类型
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={bodyTypeOptions}
-                      value={form.body_type}
-                      onValueChange={(v) => update("body_type", v)}
-                      placeholder="选择车型"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    气缸数
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={cylinderOptions}
-                      value={form.cylinders}
-                      onValueChange={(v) => update("cylinders", v)}
-                      placeholder="选择气缸"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    座位数
-                  </Label>
-                  <div className="mt-1">
-                    <Combobox
-                      options={seatOptions}
-                      value={form.seats}
-                      onValueChange={(v) => update("seats", v)}
-                      placeholder="选择座位"
-                      searchPlaceholder="搜索..."
-                      emptyText="未找到"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
+                  {/* ==== 车况 ==== */}
+                  {current.id === "condition" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { value: "used", label: "二手", sub: "Used" },
+                        { value: "new", label: "新车", sub: "New" },
+                      ].map((c) => {
+                        const active = form.condition === c.value;
+                        return (
+                          <button
+                            key={c.value}
+                            type="button"
+                            onClick={() => {
+                              update("condition", c.value);
+                              // 点选即前进,少按一次「继续」
+                              setTimeout(() => {
+                                setDir(1);
+                                setStep((s) => Math.min(s + 1, STEPS.length - 1));
+                              }, 180);
+                            }}
+                            className={`flex flex-col items-center gap-1 rounded-2xl border-2 py-8 transition-colors ${
+                              active
+                                ? "border-primary bg-primary/5"
+                                : "border-border bg-card active:bg-muted"
+                            }`}
+                          >
+                            <span className={`text-xl font-semibold ${active ? "text-primary" : "text-foreground"}`}>
+                              {c.label}
+                            </span>
+                            <span className="text-xs text-muted-foreground">{c.sub}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
-            {/* Location */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">所在位置</h2>
-              {isDealer && dealerStores.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {dealerStores.map((store) => (
-                    <button
-                      key={store.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedStoreId(store.id);
-                        setForm((f) => ({
-                          ...f,
-                          address: store.address,
-                          zipcode: store.zipcode || f.zipcode,
-                          phone: store.phone || f.phone,
-                          seller_name: store.name,
-                        }));
-                      }}
-                      className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${
-                        selectedStoreId === store.id
-                          ? "border-foreground bg-foreground text-background"
-                          : "border-border hover:border-foreground/30"
-                      }`}
-                    >
-                      <Store className="h-3 w-3" strokeWidth={1.5} />
-                      {store.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div className="col-span-2 sm:col-span-3">
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    Address
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="123 Main St (optional)"
-                    value={form.address}
-                    onChange={(e) => {
-                      update("address", e.target.value);
-                      setSelectedStoreId("");
-                    }}
-                  />
-                </div>
-                <div className="col-span-2 sm:col-span-3">
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    Address Line 2
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="Apt, Suite, Unit (optional)"
-                    value={form.address2}
-                    onChange={(e) => update("address2", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    City
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="City (optional)"
-                    value={form.city}
-                    onChange={(e) => update("city", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    State
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="CA (optional)"
-                    maxLength={2}
-                    value={form.state}
-                    onChange={(e) => update("state", e.target.value.toUpperCase())}
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    Zip Code *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="91007"
-                    maxLength={5}
-                    value={form.zipcode}
-                    onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
-                    inputMode="numeric"
-                    required
-                  />
-                  {(zipCityZh || zipCity) && (
-                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-                      {zipCityZh ? `${zipCityZh} · ${zipCity}` : zipCity}
-                    </p>
+                  {/* ==== 价格 ==== */}
+                  {current.id === "price" && (
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <span className={`text-3xl font-semibold ${priceCallOnly ? "text-muted-foreground/40" : "text-foreground"}`}>$</span>
+                        <input
+                          autoFocus
+                          type="number"
+                          inputMode="numeric"
+                          className="w-full bg-transparent text-3xl font-semibold text-foreground placeholder:text-muted-foreground/40 focus:outline-none disabled:text-muted-foreground/40"
+                          placeholder="25000"
+                          value={form.price}
+                          onChange={(e) => update("price", e.target.value)}
+                          disabled={priceCallOnly}
+                        />
+                      </div>
+                      <div className="mt-2 h-px w-full bg-border" />
+                      <label className="mt-4 flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={priceCallOnly}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setShowCallWarning(true);
+                            } else {
+                              setPriceCallOnly(false);
+                              setShowCallWarning(false);
+                            }
+                          }}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span className="text-sm text-muted-foreground">电议(不显示价格)</span>
+                      </label>
+                      {showCallWarning && !priceCallOnly && (
+                        <div className="mt-3 rounded-xl border border-yellow-500/50 bg-yellow-500/5 p-3">
+                          <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                            注意：选择电议可能会影响曝光率
+                          </p>
+                          <div className="mt-2 flex gap-4">
+                            <button
+                              type="button"
+                              onClick={() => { setPriceCallOnly(true); setShowCallWarning(false); update("price", "0"); }}
+                              className="text-sm font-medium text-foreground underline underline-offset-2"
+                            >
+                              确认电议
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowCallWarning(false)}
+                              className="text-sm text-muted-foreground"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==== 里程 ==== */}
+                  {current.id === "mileage" && (
+                    <div>
+                      <div className="flex items-baseline gap-2">
+                        <input
+                          autoFocus
+                          type="number"
+                          inputMode="numeric"
+                          className="w-full bg-transparent text-3xl font-semibold text-foreground placeholder:text-muted-foreground/40 focus:outline-none"
+                          placeholder="32000"
+                          value={form.mileage}
+                          onChange={(e) => update("mileage", e.target.value)}
+                        />
+                        <span className="shrink-0 text-lg text-muted-foreground">英里</span>
+                      </div>
+                      <div className="mt-2 h-px w-full bg-border" />
+                    </div>
+                  )}
+
+                  {/* ==== 车辆参数 ==== */}
+                  {current.id === "details" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Combobox
+                        options={fuelOptions}
+                        value={form.fuel_type}
+                        onValueChange={(v) => update("fuel_type", v)}
+                        placeholder="燃油类型"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                      <Combobox
+                        options={transmissionOptions}
+                        value={form.transmission}
+                        onValueChange={(v) => update("transmission", v)}
+                        placeholder="变速箱"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                      <Combobox
+                        options={drivetrainOptions}
+                        value={form.drivetrain}
+                        onValueChange={(v) => update("drivetrain", v)}
+                        placeholder="驱动方式"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                      <Combobox
+                        options={bodyTypeOptions}
+                        value={form.body_type}
+                        onValueChange={(v) => update("body_type", v)}
+                        placeholder="车辆类型"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                      <Combobox
+                        options={cylinderOptions}
+                        value={form.cylinders}
+                        onValueChange={(v) => update("cylinders", v)}
+                        placeholder="气缸数"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                      <Combobox
+                        options={seatOptions}
+                        value={form.seats}
+                        onValueChange={(v) => update("seats", v)}
+                        placeholder="座位数"
+                        searchPlaceholder="搜索..."
+                        emptyText="未找到"
+                      />
+                    </div>
+                  )}
+
+                  {/* ==== 颜色 ==== */}
+                  {current.id === "colors" && (
+                    <div className="space-y-3">
+                      <Combobox
+                        options={exteriorColorOptions}
+                        value={form.exterior_color}
+                        onValueChange={(v) => update("exterior_color", v)}
+                        placeholder="外观颜色"
+                        searchPlaceholder="搜索颜色..."
+                        emptyText="未找到该颜色"
+                      />
+                      <Combobox
+                        options={interiorColorOptions}
+                        value={form.interior_color}
+                        onValueChange={(v) => update("interior_color", v)}
+                        placeholder="内饰颜色"
+                        searchPlaceholder="搜索颜色..."
+                        emptyText="未找到该颜色"
+                      />
+                    </div>
+                  )}
+
+                  {/* ==== 位置 ==== */}
+                  {current.id === "location" && (
+                    <div>
+                      {isDealer && dealerStores.length > 0 && (
+                        <div className="mb-4 flex flex-wrap gap-2">
+                          {dealerStores.map((store) => (
+                            <button
+                              key={store.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedStoreId(store.id);
+                                setForm((f) => ({
+                                  ...f,
+                                  address: store.address,
+                                  zipcode: store.zipcode || f.zipcode,
+                                  phone: store.phone || f.phone,
+                                  seller_name: store.name,
+                                }));
+                              }}
+                              className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-colors ${
+                                selectedStoreId === store.id
+                                  ? "bg-primary/10 font-medium text-primary"
+                                  : "bg-muted text-muted-foreground active:bg-muted/70"
+                              }`}
+                            >
+                              <Store className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              {store.name}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      <input
+                        autoFocus
+                        inputMode="numeric"
+                        maxLength={5}
+                        className="w-full bg-transparent text-3xl font-semibold tracking-widest text-foreground placeholder:text-muted-foreground/40 placeholder:tracking-normal focus:outline-none"
+                        placeholder="邮编 Zip Code"
+                        value={form.zipcode}
+                        onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
+                      />
+                      <div className="mt-2 h-px w-full bg-border" />
+                      {(zipCityZh || zipCity) && (
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-primary">
+                          <Check className="h-4 w-4" strokeWidth={2} />
+                          {zipCityZh ? `${zipCityZh} · ${zipCity}` : zipCity}
+                        </p>
+                      )}
+
+                      {!showAddress ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowAddress(true)}
+                          className="mt-4 text-sm text-muted-foreground underline underline-offset-2"
+                        >
+                          + 添加详细地址(选填)
+                        </button>
+                      ) : (
+                        <div className="mt-4 space-y-3">
+                          <input
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                            placeholder="街道地址 123 Main St"
+                            value={form.address}
+                            onChange={(e) => {
+                              update("address", e.target.value);
+                              setSelectedStoreId("");
+                            }}
+                          />
+                          <input
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                            placeholder="Apt, Suite, Unit(选填)"
+                            value={form.address2}
+                            onChange={(e) => update("address2", e.target.value)}
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                              placeholder="City"
+                              value={form.city}
+                              onChange={(e) => update("city", e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground placeholder:normal-case placeholder:text-muted-foreground/50 focus:outline-none"
+                              placeholder="State 如 CA"
+                              maxLength={2}
+                              value={form.state}
+                              onChange={(e) => update("state", e.target.value.toUpperCase())}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==== 联系方式 ==== */}
+                  {current.id === "contact" && (
+                    <div className="space-y-3">
+                      <input
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        placeholder="你的名字或车行名 *"
+                        value={form.seller_name}
+                        onChange={(e) => update("seller_name", e.target.value)}
+                      />
+                      <input
+                        type="tel"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        placeholder="联系电话 (626) 555-0123 *"
+                        value={form.phone}
+                        onChange={(e) => update("phone", e.target.value)}
+                      />
+                    </div>
+                  )}
+
+                  {/* ==== Carfax ==== */}
+                  {current.id === "carfax" && (
+                    <div>
+                      <input
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        placeholder="https://www.carfax.com/vehicle/..."
+                        value={form.carfax_url}
+                        onChange={(e) => {
+                          update("carfax_url", e.target.value);
+                          setCarfaxSummary(null);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={carfaxLoading || !form.carfax_url.trim()}
+                        onClick={async () => {
+                          const url = normalizeCarfaxUrl(form.carfax_url);
+                          if (!isCarfaxUrl(url)) {
+                            setError("请输入有效的 Carfax 链接");
+                            return;
+                          }
+                          setCarfaxLoading(true);
+                          setError("");
+                          const result = await fetchCarfaxSummary(url);
+                          setCarfaxLoading(false);
+                          if (result) {
+                            setCarfaxSummary(result);
+                          } else {
+                            setCarfaxSummary({ title: "Carfax Report", owners: null, accidents: null, serviceRecords: null });
+                          }
+                        }}
+                        className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-full bg-muted py-3 text-sm font-medium text-foreground transition-colors active:bg-muted/70 disabled:opacity-40"
+                      >
+                        {carfaxLoading ? (
+                          <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+                        ) : (
+                          <FileText className="h-4 w-4" strokeWidth={1.5} />
+                        )}
+                        获取报告摘要
+                      </button>
+                      {carfaxSummary && (
+                        <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-4 py-3">
+                          <FileText className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                          <span className="flex-1 text-sm">
+                            {formatCarfaxSummary(carfaxSummary)}
+                          </span>
+                          <a
+                            href={normalizeCarfaxUrl(form.carfax_url)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-xs text-muted-foreground"
+                          >
+                            <ExternalLink className="h-3 w-3" strokeWidth={1.5} />
+                            Carfax
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ==== 配置亮点 ==== */}
+                  {current.id === "features" && (
+                    <div>
+                      <div className="flex gap-2">
+                        <input
+                          className="min-w-0 flex-1 rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          placeholder="如：倒车影像、全景天窗"
+                          value={featureInput}
+                          onChange={(e) => setFeatureInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addFeature();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={addFeature}
+                          className="flex shrink-0 items-center gap-1 rounded-xl bg-muted px-4 text-sm text-foreground active:bg-muted/70"
+                        >
+                          <Plus className="h-4 w-4" strokeWidth={1.5} />
+                          添加
+                        </button>
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {[...features.filter((f) => !FEATURE_SUGGESTIONS.includes(f)), ...FEATURE_SUGGESTIONS].map((f) => {
+                          const selected = features.includes(f);
+                          return (
+                            <button
+                              key={f}
+                              type="button"
+                              onClick={() => toggleFeature(f)}
+                              className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
+                                selected
+                                  ? "bg-primary/10 font-medium text-primary"
+                                  : "bg-muted text-muted-foreground active:bg-muted/70"
+                              }`}
+                            >
+                              {selected ? (
+                                <X className="mr-1 inline h-3.5 w-3.5" strokeWidth={2} />
+                              ) : (
+                                <Plus className="mr-1 inline h-3.5 w-3.5" strokeWidth={1.5} />
+                              )}
+                              {f}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ==== 描述 + 发布 ==== */}
+                  {current.id === "description" && (
+                    <textarea
+                      autoFocus
+                      className="min-h-[30vh] w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                      placeholder="描述车辆状况、保养历史、卖车原因等..."
+                      value={form.description_zh}
+                      onChange={(e) => update("description_zh", e.target.value)}
+                    />
                   )}
                 </div>
-              </div>
-            </div>
 
-            {/* Features */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">车辆配置</h2>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {features.map((f) => (
-                  <span
-                    key={f}
-                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
-                  >
-                    {f}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setFeatures((prev) => prev.filter((x) => x !== f))
-                      }
-                    >
-                      <X className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <Input
-                  className="h-8 font-mono text-xs"
-                  placeholder="添加配置，如：倒车影像、全景天窗"
-                  value={featureInput}
-                  onChange={(e) => setFeatureInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addFeature();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1 font-mono text-xs"
-                  onClick={addFeature}
-                >
-                  <Plus className="h-3 w-3" strokeWidth={1.5} />
-                  添加
-                </Button>
-              </div>
-            </div>
-
-            {/* Seller info */}
-            <div className="border-t border-border pt-6">
-              <h2 className="font-mono text-xs font-semibold">卖家信息</h2>
-              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    卖家名称 *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    placeholder="你的名字或车行名"
-                    value={form.seller_name}
-                    onChange={(e) => update("seller_name", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label className="font-mono text-[11px] text-muted-foreground">
-                    联系电话 *
-                  </Label>
-                  <Input
-                    className="mt-1 h-9 font-mono text-xs"
-                    type="tel"
-                    placeholder="(626) 555-0123"
-                    value={form.phone}
-                    onChange={(e) => update("phone", e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="border-t border-border pt-6">
-              <Label className="font-mono text-xs font-semibold">
-                车辆描述
-              </Label>
-              <textarea
-                className="mt-2 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                rows={5}
-                placeholder="描述车辆状况、保养历史、卖车原因等..."
-                value={form.description_zh}
-                onChange={(e) => update("description_zh", e.target.value)}
-              />
-            </div>
-
-            {/* Error */}
-            {error && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
-                <p className="font-mono text-xs text-destructive">{error}</p>
-              </div>
-            )}
-
-            {/* Submit */}
-            <div className="flex gap-3 border-t border-border pt-6">
-              <Button
-                type="submit"
-                className="gap-1.5 font-mono text-xs"
-                disabled={loading}
-              >
-                {loading ? (
-                  <>
-                    <Loader2
-                      className="h-3.5 w-3.5 animate-spin"
-                      strokeWidth={1.5}
-                    />
-                    发布中...
-                  </>
-                ) : (
-                  "发布车辆"
+                {/* 错误提示 */}
+                {error && (
+                  <div className="mt-4 rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+                    <p className="text-sm text-destructive">{error}</p>
+                  </div>
                 )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="font-mono text-xs"
-                onClick={() => router.back()}
-              >
-                取消
-              </Button>
-            </div>
-          </form>
-          </>
-        )}
-      </main>
-      <Footer />
+              </motion.div>
+            </AnimatePresence>
+          </main>
 
-      {/* Draft restore dialog */}
-      <Dialog open={draftDialogOpen} onOpenChange={setDraftDialogOpen}>
-        <DialogContent className="max-w-xs">
+          {/* 底部操作栏:上一步 + 继续/跳过/发布;键盘弹起时随键盘顶起 */}
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm transition-transform duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+            style={{
+              paddingBottom: kbHeight > 0 ? "0.75rem" : "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
+              transform: kbHeight > 0 ? `translateY(-${kbHeight}px)` : "translateY(0)",
+            }}
+          >
+            <div className="mx-auto flex max-w-2xl items-center gap-3">
+              {step > 0 && (
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  aria-label="上一步"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors active:bg-muted"
+                >
+                  <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={goNext}
+                disabled={!canProceed || loading || vinDecoding}
+                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-40"
+              >
+                {(loading || vinDecoding) && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />}
+                {mainLabel}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Confirm dialog for fake generation */}
+      <Dialog open={fakeDialogOpen} onOpenChange={setFakeDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="font-mono text-sm">发现未完成的草稿</DialogTitle>
-            <DialogDescription className="font-mono text-xs">
-              是否继续编辑上次的草稿？
+            <DialogTitle className="text-sm">确认生成假车源</DialogTitle>
+            <DialogDescription className="text-xs">
+              将以当前账号生成 {fakeCount} 条假车源，数据随机生成（品牌、价格、里程、地区等）。确认继续？
             </DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex-row gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1 font-mono text-xs"
-              onClick={discardDraft}
-            >
-              重新开始
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" className="text-xs" onClick={() => setFakeDialogOpen(false)}>
+              取消
             </Button>
             <Button
               size="sm"
-              className="flex-1 gap-1.5 font-mono text-xs"
-              onClick={restoreDraft}
+              className="text-xs"
+              disabled={fakeGenerating}
+              onClick={() => {
+                setFakeDialogOpen(false);
+                handleGenerateFake();
+              }}
             >
-              <FileText className="h-3.5 w-3.5" strokeWidth={1.5} />
-              继续编辑
+              确认生成
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* VIN 位置教程 drawer */}
+      <Drawer open={vinHelpOpen} onOpenChange={setVinHelpOpen}>
+        <DrawerContent>
+          <DrawerHeader>
+            <DrawerTitle>在哪里查看 VIN 码?</DrawerTitle>
+          </DrawerHeader>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)]">
+            {[
+              {
+                title: "挡风玻璃左下角",
+                desc: "驾驶位一侧仪表台与前挡风玻璃的交界处,从车外透过玻璃看最清楚",
+              },
+              {
+                title: "驾驶员侧门框",
+                desc: "打开驾驶室车门,B 柱(门框)上的贴纸,通常和胎压标签在一起",
+              },
+              {
+                title: "行驶证 / 保险卡 / Title",
+                desc: "Registration、保险卡和车辆产权证(Title)上都印有 VIN",
+              },
+              {
+                title: "引擎舱铭牌",
+                desc: "部分车型在发动机舱防火墙或散热器支架上也有 VIN 铭牌",
+              },
+            ].map((item, i) => (
+              <div key={item.title} className="flex gap-3 rounded-2xl bg-muted px-4 py-3.5">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                  {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{item.title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+            <p className="px-1 pt-1 text-xs leading-relaxed text-muted-foreground/70">
+              VIN 共 17 位,由数字和大写字母组成,不含字母 I、O、Q。
+            </p>
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

@@ -1,28 +1,107 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Upload,
   X,
   Plus,
   Loader2,
-  ChevronLeft,
-  ImageIcon,
+  Hash,
+  Car,
+  Play,
+  ChevronRight,
+  Check,
+  FileText,
+  Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
-import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { KeyboardToolbar } from "@/components/keyboard-toolbar";
 
 const POST_TYPES = [
   { key: "review", label: "车评" },
   { key: "showoff", label: "晒车" },
   { key: "discussion", label: "讨论" },
 ] as const;
+
+// 快捷标签建议(类似小红书发布页的地点建议)
+const TAG_SUGGESTIONS = [
+  "新手购车",
+  "提车作业",
+  "二手车",
+  "保养维修",
+  "自驾游",
+  "改装",
+];
+
+// ===== 多草稿存储(与 /post 同款交互:列表选择 + 可删除) =====
+const DRAFTS_KEY = "community_post_drafts";
+const LEGACY_DRAFT_KEY = "community_post_draft";
+const MAX_DRAFTS = 10;
+
+interface CommunityDraft {
+  id: string;
+  updatedAt: number;
+  type: string;
+  title: string;
+  content: string;
+  imageUrls: string[];
+  make: string;
+  model: string;
+  year: string;
+  tags: string[];
+}
+
+function persistDrafts(drafts: CommunityDraft[]) {
+  try { localStorage.setItem(DRAFTS_KEY, JSON.stringify(drafts)); } catch { /* ignore */ }
+}
+
+function loadDrafts(): CommunityDraft[] {
+  let drafts: CommunityDraft[] = [];
+  try {
+    const raw = localStorage.getItem(DRAFTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    if (Array.isArray(arr)) drafts = arr.filter((d) => d && d.id);
+  } catch { /* ignore */ }
+  // 迁移旧版单草稿
+  try {
+    const legacy = localStorage.getItem(LEGACY_DRAFT_KEY);
+    if (legacy) {
+      const d = JSON.parse(legacy);
+      if (d && (d.title || d.content || d.imageUrls?.length)) {
+        drafts.unshift({
+          id: `d-${Date.now()}`,
+          updatedAt: Date.now(),
+          type: d.type || "discussion",
+          title: d.title || "",
+          content: d.content || "",
+          imageUrls: Array.isArray(d.imageUrls) ? d.imageUrls : [],
+          make: d.make || "",
+          model: d.model || "",
+          year: d.year || "",
+          tags: Array.isArray(d.tags) ? d.tags : [],
+        });
+        persistDrafts(drafts);
+      }
+      localStorage.removeItem(LEGACY_DRAFT_KEY);
+    }
+  } catch { /* ignore */ }
+  return drafts.sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+function draftTime(ts: number) {
+  const diff = Date.now() - ts;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return "刚刚";
+  if (min < 60) return `${min} 分钟前`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr} 小时前`;
+  const day = Math.floor(hr / 24);
+  if (day < 30) return `${day} 天前`;
+  return new Date(ts).toLocaleDateString("zh-CN");
+}
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 const MAX_VIDEO_MB = 100;
@@ -38,6 +117,7 @@ export default function NewPostPage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
+  const [draftSaved, setDraftSaved] = useState(false);
 
   const [type, setType] = useState<string>("discussion");
   const [title, setTitle] = useState("");
@@ -48,12 +128,74 @@ export default function NewPostPage() {
   const [year, setYear] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tags, setTags] = useState<string[]>([]);
+  const [carInfoOpen, setCarInfoOpen] = useState(false);
+  // 草稿箱:多份草稿 + 当前正在编辑的草稿 id
+  const [drafts, setDrafts] = useState<CommunityDraft[]>([]);
+  const [draftId, setDraftId] = useState<string | null>(null);
+
+  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     supabase.auth
       .getUser()
       .then(({ data }) => setUserId(data.user?.id ?? null));
   }, []);
+
+  // 读入草稿箱:localStorage 只在客户端可读,挂载后一次性回填(不构成级联渲染)。
+  // 不再自动恢复内容——有草稿时在页面顶部展示列表,由用户自己选
+  /* eslint-disable-next-line react-hooks/set-state-in-effect */
+  useEffect(() => setDrafts(loadDrafts()), []);
+
+  function restoreDraft(d: CommunityDraft) {
+    setType(d.type || "discussion");
+    setTitle(d.title || "");
+    setContent(d.content || "");
+    setImageUrls(d.imageUrls || []);
+    setMake(d.make || "");
+    setModel(d.model || "");
+    setYear(d.year || "");
+    setTags(d.tags || []);
+    setDraftId(d.id);
+  }
+
+  function deleteDraft(id: string) {
+    setDrafts((prev) => {
+      const next = prev.filter((d) => d.id !== id);
+      persistDrafts(next);
+      return next;
+    });
+    if (draftId === id) setDraftId(null);
+  }
+
+  // 正文输入区自适应高度
+  function autoGrow() {
+    const el = contentRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  }
+  useEffect(autoGrow, [content]);
+
+  function saveDraft() {
+    if (!title.trim() && !content.trim() && imageUrls.length === 0) return;
+    let id = draftId;
+    if (!id) {
+      id = `d-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      setDraftId(id);
+    }
+    const entry: CommunityDraft = {
+      id,
+      updatedAt: Date.now(),
+      type, title, content, imageUrls, make, model, year, tags,
+    };
+    setDrafts((prev) => {
+      const next = [entry, ...prev.filter((d) => d.id !== id)].slice(0, MAX_DRAFTS);
+      persistDrafts(next);
+      return next;
+    });
+    setDraftSaved(true);
+    setTimeout(() => setDraftSaved(false), 1500);
+  }
 
   async function uploadFiles(files: File[]) {
     if (!userId || files.length === 0) return;
@@ -85,6 +227,7 @@ export default function NewPostPage() {
     const files = e.target.files;
     if (!files) return;
     uploadFiles(Array.from(files));
+    e.target.value = "";
   }
 
   async function handleDrop(e: React.DragEvent) {
@@ -139,16 +282,21 @@ export default function NewPostPage() {
     setImageUrls((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function addTag() {
-    const trimmed = tagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed]);
-      setTagInput("");
-    }
+  function toggleTag(tag: string) {
+    setTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  function addCustomTag() {
+    const trimmed = tagInput.trim().replace(/^#/, "");
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags((prev) => [...prev, trimmed]);
+    }
+    setTagInput("");
+  }
+
+  async function handleSubmit() {
     if (!userId) return;
     setError("");
 
@@ -193,298 +341,334 @@ export default function NewPostPage() {
         setError(`发布失败: ${insertError.message}`);
       }
     } else if (data) {
+      if (draftId) deleteDraft(draftId);
       router.push(`/community/${data.id}`);
     }
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-background font-mono">
+    <div className="flex min-h-screen flex-col bg-background">
       <Header />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6">
 
-        <h1 className="mt-4 font-mono text-sm font-semibold tracking-tight">
-          发帖
-        </h1>
-
-        {!userId ? (
-          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
-            <p className="font-mono text-sm text-muted-foreground">
-              请先登录后再发帖
-            </p>
+      {!userId ? (
+        <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
+          <div className="mt-8 flex flex-col items-center rounded-2xl border border-border p-8">
+            <p className="text-sm text-muted-foreground">请先登录后再发帖</p>
             <Link href="/login">
-              <Button size="sm" className="mt-4 font-mono text-xs">
+              <Button size="sm" className="mt-4 rounded-full text-xs">
                 登录 / 注册
               </Button>
             </Link>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="mt-6 space-y-6">
-            {/* Type selector */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">
-                帖子类型
-              </Label>
-              <div className="mt-2 flex gap-1">
-                {POST_TYPES.map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    onClick={() => setType(t.key)}
-                    className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
-                      type === t.key
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
-                    }`}
-                  >
-                    {t.label}
-                  </button>
-                ))}
+        </main>
+      ) : (
+        <>
+          <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-44 pt-4">
+            {/* 草稿箱:有历史草稿时可直接选一份继续(也可删除) */}
+            {drafts.filter((d) => d.id !== draftId).length > 0 && (
+              <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+                <p className="text-sm font-medium text-foreground">继续上次的草稿</p>
+                <div className="mt-3 space-y-2">
+                  {drafts.filter((d) => d.id !== draftId).map((d) => (
+                    <div key={d.id} className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => restoreDraft(d)}
+                        className="flex min-w-0 flex-1 items-center gap-3 rounded-xl bg-muted px-3.5 py-3 text-left transition-colors active:bg-muted/70"
+                      >
+                        {d.imageUrls?.[0] && !isVideoUrl(d.imageUrls[0]) ? (
+                          <img
+                            src={d.imageUrls[0]}
+                            alt=""
+                            className="h-10 w-10 shrink-0 rounded-lg object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-background">
+                            <FileText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
+                          </span>
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm text-foreground">
+                            {d.title || d.content?.slice(0, 24) || "未命名草稿"}
+                          </span>
+                          <span className="block text-xs text-muted-foreground">
+                            {d.imageUrls?.length ? `${d.imageUrls.length} 个媒体 · ` : ""}
+                            {draftTime(d.updatedAt)}
+                          </span>
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="删除草稿"
+                        onClick={() => deleteDraft(d.id)}
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors active:bg-muted"
+                      >
+                        <Trash2 className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Title */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">
-                标题 <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                className="mt-1 h-9 font-mono text-xs"
-                placeholder="输入标题"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={100}
-                required
-              />
-              <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                {title.length}/100
-              </p>
-            </div>
-
-            {/* Content */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">
-                内容 <span className="text-destructive">*</span>
-              </Label>
-              <textarea
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                rows={8}
-                placeholder="分享你的想法..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                required
-              />
-            </div>
-
-            {/* Images / videos */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">图片 / 视频</Label>
-              <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
-                支持拖拽上传，最多 9 个，视频不超过 {MAX_VIDEO_MB}MB
-              </p>
-              <div
-                className={`mt-2 flex flex-wrap gap-2 rounded-xl p-2 transition-colors ${
-                  dragging ? "bg-muted/80 ring-2 ring-foreground/20" : ""
-                }`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-              >
-                {imageUrls.map((url, i) => (
-                  <div
-                    key={i}
-                    className="group relative h-20 w-24 rounded-lg border border-border bg-muted"
-                  >
-                    {isVideoUrl(url) ? (
+            {/* 媒体上传:方形缩略图 + 加号块(支持拖拽) */}
+            <div
+              className={`flex gap-3 overflow-x-auto pb-1 scrollbar-none rounded-xl transition-colors ${
+                dragging ? "bg-muted/80 ring-2 ring-primary/30" : ""
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragging(true);
+              }}
+              onDragLeave={() => setDragging(false)}
+              onDrop={handleDrop}
+            >
+              {imageUrls.map((url, i) => (
+                <div
+                  key={i}
+                  className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted"
+                >
+                  {isVideoUrl(url) ? (
+                    <>
                       <video
                         src={url}
                         muted
                         playsInline
                         preload="metadata"
-                        className="h-full w-full rounded-lg object-cover"
+                        className="h-full w-full object-cover"
                       />
-                    ) : (
-                      <img
-                        src={url}
-                        alt=""
-                        className="h-full w-full rounded-lg object-cover"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeImage(i)}
-                      className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-foreground text-background opacity-0 transition-opacity group-hover:opacity-100"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </div>
-                ))}
-                {imageUrls.length < 9 && (
-                  <label className="flex h-20 w-24 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border transition-colors hover:border-foreground/30">
-                    {uploading ? (
-                      <Loader2
-                        className="h-5 w-5 animate-spin text-muted-foreground"
-                        strokeWidth={1.5}
-                      />
-                    ) : (
-                      <>
-                        <Upload
-                          className="h-5 w-5 text-muted-foreground"
-                          strokeWidth={1.5}
-                        />
-                        <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-                          上传
-                        </span>
-                      </>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,video/*"
-                      multiple
-                      className="hidden"
-                      onChange={handleImageUpload}
-                      disabled={uploading}
+                      <span className="absolute bottom-1.5 left-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-black/50">
+                        <Play className="h-2.5 w-2.5 fill-white text-white" />
+                      </span>
+                    </>
+                  ) : (
+                    <img src={url} alt="" className="h-full w-full object-cover" />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/50 text-white"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {imageUrls.length < 9 && (
+                <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-border bg-muted/50 active:bg-muted">
+                  {uploading ? (
+                    <Loader2
+                      className="h-6 w-6 animate-spin text-muted-foreground"
+                      strokeWidth={1.5}
                     />
-                  </label>
-                )}
-              </div>
+                  ) : (
+                    <Plus
+                      className="h-7 w-7 text-muted-foreground"
+                      strokeWidth={1.5}
+                    />
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={uploading}
+                  />
+                </label>
+              )}
             </div>
 
-            {/* Car info for review type */}
-            {type === "review" && (
-              <div className="rounded-xl border border-border p-4">
-                <Label className="font-mono text-xs font-semibold">
-                  车辆信息（车评可选）
-                </Label>
-                <div className="mt-3 grid grid-cols-3 gap-3">
-                  <div>
-                    <Label className="font-mono text-[11px] text-muted-foreground">
-                      品牌
-                    </Label>
-                    <Input
-                      className="mt-1 h-8 font-mono text-xs"
-                      placeholder="Toyota"
-                      value={make}
-                      onChange={(e) => setMake(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="font-mono text-[11px] text-muted-foreground">
-                      车型
-                    </Label>
-                    <Input
-                      className="mt-1 h-8 font-mono text-xs"
-                      placeholder="Camry"
-                      value={model}
-                      onChange={(e) => setModel(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <Label className="font-mono text-[11px] text-muted-foreground">
-                      年份
-                    </Label>
-                    <Input
-                      className="mt-1 h-8 font-mono text-xs"
-                      type="number"
-                      placeholder="2023"
-                      value={year}
-                      onChange={(e) => setYear(e.target.value)}
-                      min={1990}
-                      max={2030}
-                    />
-                  </div>
+            {/* 标题:无边框大字号输入 */}
+            <div className="mt-4 flex items-center gap-3">
+              <input
+                className="w-full bg-transparent text-xl font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                placeholder="添加标题"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                maxLength={100}
+              />
+              {title.length > 0 && (
+                <span className="shrink-0 text-xs text-muted-foreground/60">
+                  {title.length}/100
+                </span>
+              )}
+            </div>
+
+            {/* 正文:无边框自增高输入区 */}
+            <textarea
+              ref={contentRef}
+              className="mt-3 min-h-[38vh] w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+              placeholder="分享你的想法..."
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              rows={1}
+            />
+
+            {/* 类型胶囊(类似 #话题 @用户 一排) */}
+            <div className="mt-2 flex gap-2">
+              {POST_TYPES.map((t) => {
+                const active = type === t.key;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setType(t.key)}
+                    className={`rounded-full px-4 py-2 text-sm transition-colors ${
+                      active
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "bg-muted text-muted-foreground active:bg-muted/70"
+                    }`}
+                  >
+                    {active && (
+                      <Check className="mr-1 inline h-3.5 w-3.5" strokeWidth={2} />
+                    )}
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* 设置行列表 */}
+            <div className="mt-5 border-t border-border">
+              {/* 标签 */}
+              <div className="py-4">
+                <div className="flex items-center gap-3">
+                  <Hash
+                    className="h-5 w-5 text-foreground"
+                    strokeWidth={1.5}
+                  />
+                  <span className="text-[15px]">添加标签</span>
+                  <input
+                    className="min-w-0 flex-1 bg-transparent text-right text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                    placeholder="自定义标签"
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        addCustomTag();
+                      }
+                    }}
+                    onBlur={() => tagInput.trim() && addCustomTag()}
+                  />
+                </div>
+                {/* 建议标签 + 已选标签(横向滚动胶囊) */}
+                <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-none">
+                  {[...tags.filter((t) => !TAG_SUGGESTIONS.includes(t)), ...TAG_SUGGESTIONS].map(
+                    (tag) => {
+                      const selected = tags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => toggleTag(tag)}
+                          className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
+                            selected
+                              ? "bg-primary/10 text-primary"
+                              : "bg-muted text-muted-foreground active:bg-muted/70"
+                          }`}
+                        >
+                          {selected && (
+                            <X className="mr-1 inline h-3 w-3" strokeWidth={2} />
+                          )}
+                          #{tag}
+                        </button>
+                      );
+                    }
+                  )}
                 </div>
               </div>
-            )}
 
-            {/* Tags */}
-            <div>
-              <Label className="font-mono text-xs font-semibold">标签</Label>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
+              {/* 车辆信息(车评可选) */}
+              {type === "review" && (
+                <div className="border-t border-border py-4">
+                  <button
+                    type="button"
+                    className="flex w-full items-center gap-3"
+                    onClick={() => setCarInfoOpen((v) => !v)}
                   >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTags((prev) => prev.filter((t) => t !== tag))
-                      }
-                    >
-                      <X className="h-2.5 w-2.5 text-muted-foreground" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-              <div className="mt-2 flex gap-2">
-                <Input
-                  className="h-8 font-mono text-xs"
-                  placeholder="添加标签，如：新手购车、二手车"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addTag();
-                    }
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1 font-mono text-xs"
-                  onClick={addTag}
-                >
-                  <Plus className="h-3 w-3" strokeWidth={1.5} />
-                  添加
-                </Button>
-              </div>
+                    <Car className="h-5 w-5 text-foreground" strokeWidth={1.5} />
+                    <span className="text-[15px]">车辆信息</span>
+                    <span className="flex-1 text-right text-sm text-muted-foreground/60">
+                      {[make, model, year].filter(Boolean).join(" ") || "选填"}
+                    </span>
+                    <ChevronRight
+                      className={`h-4 w-4 text-muted-foreground transition-transform ${
+                        carInfoOpen ? "rotate-90" : ""
+                      }`}
+                      strokeWidth={1.5}
+                    />
+                  </button>
+                  {carInfoOpen && (
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          ["品牌", make, setMake, "Toyota", "text"],
+                          ["车型", model, setModel, "Camry", "text"],
+                          ["年份", year, setYear, "2023", "number"],
+                        ] as const
+                      ).map(([label, value, set, ph, inputType]) => (
+                        <input
+                          key={label}
+                          type={inputType}
+                          className="rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          aria-label={label}
+                          placeholder={`${label} ${ph}`}
+                          value={value}
+                          onChange={(e) => set(e.target.value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Error */}
+            {/* 错误提示 */}
             {error && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
-                <p className="font-mono text-xs text-destructive">{error}</p>
+              <div className="mt-2 rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+                <p className="text-xs text-destructive">{error}</p>
               </div>
             )}
+          </main>
 
-            {/* Submit */}
-            <div className="flex gap-3 border-t border-border pt-6">
-              <Button
-                type="submit"
-                className="gap-1.5 font-mono text-xs"
+          {/* 底部操作栏:存草稿 + 发布 */}
+          <div
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm"
+            style={{
+              paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
+            }}
+          >
+            <div className="mx-auto flex max-w-2xl items-center gap-3">
+              <button
+                type="button"
+                onClick={saveDraft}
+                className="shrink-0 rounded-full border border-border px-6 py-3 text-sm text-muted-foreground transition-colors active:bg-muted"
+              >
+                {draftSaved ? "已保存" : "存草稿"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSubmit}
                 disabled={loading}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary py-3 text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-60"
               >
                 {loading ? (
                   <>
-                    <Loader2
-                      className="h-3.5 w-3.5 animate-spin"
-                      strokeWidth={1.5}
-                    />
+                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
                     发布中...
                   </>
                 ) : (
-                  "发布帖子"
+                  "发布"
                 )}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                className="font-mono text-xs"
-                onClick={() => router.back()}
-              >
-                取消
-              </Button>
+              </button>
             </div>
-          </form>
-        )}
-      </main>
-      <Footer />
+          </div>
+
+          {/* 键盘弹起时吸附在键盘上方的工具条(表情 / #话题 / 完成) */}
+          <KeyboardToolbar />
+        </>
+      )}
     </div>
   );
 }

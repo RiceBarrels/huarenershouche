@@ -8,14 +8,14 @@ const serverUrl = process.env.CAPACITOR_SERVER_URL || "https://www.clcauto.com/"
 
 const config: CapacitorConfig = {
   appId: "com.clcauto.app",
-  appName: "常来车网",
+  appName: "常來車網",
   webDir: "out",
   server: {
     // In production, load from deployed URL (supports SSR + dynamic routes)
     // // In dev, load from local dev server
     // ...(serverUrl ? { url: serverUrl } : {}),
     androidScheme: "https",
-    iosScheme: "capacitor",
+    iosScheme: "clcauto",
     // cleartext: process.env.NODE_ENV !== "production",
     // When remote URL fails to load (no network), show local fallback page
     errorPath: "index.html",
@@ -30,7 +30,7 @@ const config: CapacitorConfig = {
     SplashScreen: {
       launchAutoHide: true,
       launchShowDuration: 1500,
-      backgroundColor: "#0C0A09",
+      backgroundColor: "#FFFFFF",
       showSpinner: false,
     },
     StatusBar: {
@@ -41,6 +41,9 @@ const config: CapacitorConfig = {
     Keyboard: {
       resize: "body" as any,
       resizeOnFullScreen: true,
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
     },
   },
   ios: {

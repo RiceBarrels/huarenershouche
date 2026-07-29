@@ -39,7 +39,7 @@ export default function FuelToolPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <h1 className="font-mono text-lg font-bold">油费计算器</h1>
+        <h1 className="font-logo text-xl">油费计算器</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           按油价、油耗和月里程,估算每月油钱
         </p>

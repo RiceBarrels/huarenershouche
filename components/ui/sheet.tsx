@@ -4,6 +4,7 @@ import * as React from "react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
+import { NativeBarHideLock } from "@/components/native-bar-hide-lock"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
 
@@ -67,6 +68,8 @@ function SheetContent({
         )}
         {...props}
       >
+        {/* 打开期间隐藏 iOS 原生底部导航(children 才随 open 挂载,wrapper 本身常驻) */}
+        <NativeBarHideLock />
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close data-slot="sheet-close" asChild>

@@ -38,7 +38,7 @@ export default function HaggleToolPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-md flex-1 px-4 py-6">
-        <h1 className="font-mono text-lg font-bold">砍价锦囊</h1>
+        <h1 className="font-logo text-xl">砍价锦囊</h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           谈价前抄两句,底气足一点
         </p>

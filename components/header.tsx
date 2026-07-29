@@ -80,9 +80,9 @@ export function Header() {
     >
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="常来车网" width={24} height={24} className="h-6 w-6" />
-          <span className="font-mono text-sm font-semibold tracking-tight">
-            常来车网
+          <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
+          <span className="font-logo text-base tracking-tight">
+            常來車網
             <span className="animate-cursor-blink text-brand">_</span>
           </span>
           <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>

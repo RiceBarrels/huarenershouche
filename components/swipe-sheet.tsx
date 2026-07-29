@@ -117,7 +117,9 @@ export function SwipeSheet({
       st.sy = st.ly = t.clientY;
       st.lt = e.timeStamp;
       st.vx = st.vy = 0;
-      st.inHScroll = isInHScroller(e.target);
+      // 左缘起手豁免:返回手势优先于轮播横滑(与系统边缘返回一致),
+      // 否则起手落在轮播上时第一滑被轮播吃掉,要滑两次才能关闭
+      st.inHScroll = t.clientX > 24 && isInHScroller(e.target);
     };
 
     const onMove = (e: TouchEvent) => {
@@ -243,8 +245,14 @@ export function SwipeSheet({
             className="relative flex h-full w-full flex-col overflow-hidden bg-background shadow-2xl"
             style={{ x, y, scale: dragScale, touchAction: "pan-y" }}
           >
-            {/* 顶部返回栏:左侧返回,右侧快捷操作 */}
-            <div className="flex h-11 shrink-0 items-center justify-between border-b border-border px-1">
+            {/* 顶部返回栏:左侧返回,右侧快捷操作(垫出刘海安全区) */}
+            <div
+              className="flex h-11 shrink-0 items-center justify-between border-b border-border px-1"
+              style={{
+                paddingTop: "env(safe-area-inset-top, 0px)",
+                height: "calc(2.75rem + env(safe-area-inset-top, 0px))",
+              }}
+            >
               <button
                 type="button"
                 onClick={onClose}

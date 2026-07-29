@@ -19,7 +19,7 @@ import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CountUp } from "@/components/count-up";
 import { useCachedData } from "@/lib/use-cached-data";
-import { useIdentity } from "@/components/identity-provider";
+import { useIdentity, ACTING_KEY } from "@/components/identity-provider";
 import type { DbCar, DbProfile } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -101,13 +101,19 @@ function AccountContent() {
 
   // 身份切换:切换成车行时,资料/车源/收藏都按 acct(操作身份)展示
   const { actingId, isActingAsClaimed, claimedAccounts, switchTo, switchToSelf } = useIdentity();
-  const acct = actingId ?? (user || null);
+  // IdentityProvider 校验完成前,先信任 localStorage 里的操作身份,让缓存数据立即可显示
+  const [localActing] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    try { return localStorage.getItem(ACTING_KEY); } catch { return null; }
+  });
+  const acct = actingId ?? localActing ?? (user || null);
 
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user?.id ?? null);
+    // getSession 读本地会话(不走网络),首屏直接用 localStorage 缓存渲染
+    supabase.auth.getSession().then(({ data }) => {
+      setUser(data.session?.user?.id ?? null);
     });
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
   }, []);
@@ -198,14 +204,14 @@ function AccountContent() {
           <div className="overflow-hidden rounded-xl border border-border md:flex md:items-stretch">
             <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6">
               <Skeleton className="h-16 w-16 rounded-full" />
-              <div className="flex-1 space-y-2">
+              <div className="flex-1 space-y-3">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="h-3 w-20" />
               </div>
             </div>
             <div className="grid grid-cols-3 divide-x divide-border border-t border-border md:w-80 md:border-l md:border-t-0 lg:w-96">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col items-center gap-1.5 py-3.5">
+                <div key={i} className="flex flex-col items-center gap-2.75 py-3.5">
                   <Skeleton className="h-6 w-8" />
                   <Skeleton className="h-3 w-8" />
                 </div>

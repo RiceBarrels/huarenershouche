@@ -54,7 +54,7 @@ export default function CarsHubPage() {
           <span>二手车</span>
         </nav>
 
-        <h1 className="mt-4 font-mono text-xl font-semibold">二手车分类导航</h1>
+        <h1 className="mt-4 font-logo text-2xl">二手车分类导航</h1>
         <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
           按品牌、地区、车身类型、预算、年份快速找到北美华人社区的二手车源，中文沟通，免费发布。
         </p>

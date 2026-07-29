@@ -107,7 +107,7 @@ export default function BusinessPage() {
         <DesktopBack />
         <h1 className="text-lg font-semibold">商业合作</h1>
         <p className="mt-1 text-xs text-muted-foreground">
-          常来车网面向车行、金融、保险等行业伙伴开放合作。车行入驻请前往
+          常來車網面向车行、金融、保险等行业伙伴开放合作。车行入驻请前往
           <Link href="/dealer-apply" className="underline underline-offset-2 hover:text-foreground">
             车行入驻申请
           </Link>

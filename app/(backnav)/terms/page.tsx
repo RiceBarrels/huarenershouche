@@ -6,14 +6,14 @@ export default function TermsPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
-        <h1 className="font-mono text-lg font-semibold">用户协议 Terms of Service</h1>
+        <h1 className="font-logo text-xl">用户协议 Terms of Service</h1>
         <p className="mt-1 font-mono text-[11px] text-muted-foreground">最后更新：2025年3月</p>
 
         <div className="mt-6 space-y-6 font-mono text-sm leading-relaxed text-muted-foreground">
           <section>
             <h2 className="font-mono text-sm font-semibold text-foreground">1. 接受条款</h2>
             <p className="mt-2">
-              欢迎使用常来车网（以下简称"本平台"）。访问或使用本平台即表示您同意受本用户协议约束。如果您不同意这些条款，请勿使用本平台。
+              欢迎使用常來車網（以下简称"本平台"）。访问或使用本平台即表示您同意受本用户协议约束。如果您不同意这些条款，请勿使用本平台。
             </p>
           </section>
 

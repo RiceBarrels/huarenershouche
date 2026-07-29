@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
@@ -23,6 +24,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// 品牌字体:logo 同款 ZCOOL QingKe HuangYou,本地自托管,仅 400 单字重
+// 全量 CJK 字体较大(2.4MB),不 preload,交给 swap 渐进加载
+const zcoolQingKe = localFont({
+  src: "./fonts/ZCOOLQingKeHuangYou-Regular.woff2",
+  variable: "--font-zcool",
+  weight: "400",
+  display: "swap",
+  preload: false,
+});
+
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
@@ -34,11 +45,11 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "常来车网 CLCAuto - 北美华人二手车交易平台 | 买车卖车·免费发布·中文服务",
-    template: "%s | 常来车网",
+    default: "常來車網 CLCAuto - 北美华人二手车交易平台 | 买车卖车·免费发布·中文服务",
+    template: "%s | 常來車網",
   },
   description:
-    "常来车网是北美华人最信赖的二手车买卖平台：覆盖洛杉矶、旧金山、纽约、西雅图、达拉斯等华人社区，个人与华人车行直售二手车，支持按品牌、价格、里程、距离筛选，免费发布卖车信息，提供 VIN 召回查询、Carfax 报告和全中文服务，让买车卖车更简单放心。",
+    "常來車網是北美华人最信赖的二手车买卖平台：覆盖洛杉矶、旧金山、纽约、西雅图、达拉斯等华人社区，个人与华人车行直售二手车，支持按品牌、价格、里程、距离筛选，免费发布卖车信息，提供 VIN 召回查询、Carfax 报告和全中文服务，让买车卖车更简单放心。",
   keywords: [
     "北美华人二手车",
     "美国二手车",
@@ -49,13 +60,13 @@ export const metadata: Metadata = {
     "留学生买车",
     "used car chinese",
     "chinese used car marketplace",
-    "常来车网",
+    "常來車網",
   ],
   openGraph: {
     type: "website",
     locale: "zh_CN",
-    siteName: "常来车网",
-    title: "常来车网 CLCAuto - 北美华人二手车交易平台",
+    siteName: "常來車網",
+    title: "常來車網 CLCAuto - 北美华人二手车交易平台",
     description:
       "北美华人二手车买卖平台：覆盖洛杉矶、旧金山、纽约等华人社区，个人与车行直售，免费发布，VIN 召回查询，全中文服务。",
   },
@@ -75,7 +86,7 @@ const JSON_LD = {
     {
       "@type": "Organization",
       "@id": `${SITE_URL}/#organization`,
-      name: "常来车网",
+      name: "常來車網",
       alternateName: "CLCAuto",
       url: SITE_URL,
       logo: `${SITE_URL}/logo.png`,
@@ -87,7 +98,7 @@ const JSON_LD = {
     {
       "@type": "WebSite",
       "@id": `${SITE_URL}/#website`,
-      name: "常来车网",
+      name: "常來車網",
       url: SITE_URL,
       publisher: { "@id": `${SITE_URL}/#organization` },
       inLanguage: "zh-CN",
@@ -122,7 +133,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} antialiased`}
       >
         <ThemeProvider>
           <MotionProvider>

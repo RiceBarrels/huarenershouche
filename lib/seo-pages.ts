@@ -6,7 +6,7 @@ import { MAKES, MAKES_ZH, HOT_MAKES } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 
 export const SITE_URL = "https://www.clcauto.com";
-export const SITE_NAME = "常来车网";
+export const SITE_NAME = "常來車網";
 
 // ── 州数据（与 browse 页 location 代码一致）──
 export interface SeoState {

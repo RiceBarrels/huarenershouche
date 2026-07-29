@@ -1,12 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Loader2, MapPin, Shield, Zap } from "lucide-react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
+import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -22,7 +23,7 @@ function GoogleIcon({ className }: { className?: string }) {
 const SLIDES = [
   {
     icon: null as any,
-    title: "常来车网",
+    title: "常來車網",
     subtitle: "北美华人最信赖的二手车交易平台",
     description: "免费发布 · 中文沟通 · 覆盖全美",
   },
@@ -49,6 +50,9 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
 
   const isLastSlide = step === SLIDES.length - 1;
   const showAuth = step >= SLIDES.length;
+
+  // iOS 原生 tab 栏浮在所有网页内容之上,欢迎页展示期间加锁隐藏
+  useEffect(() => acquireNativeBarHideLock(), []);
 
   async function handleGoogleLogin() {
     setGoogleLoading(true);
@@ -141,10 +145,10 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                       {Icon ? (
                         <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
                       ) : (
-                        <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-12 w-12 object-contain" />
+                        <Image src="/logo.png" alt="常來車網" width={48} height={48} className="h-12 w-12 object-contain" />
                       )}
                     </div>
-                    <h1 className="mt-8 text-center font-mono text-2xl font-semibold tracking-tight">
+                    <h1 className="mt-8 text-center font-logo text-2xl tracking-tight">
                       {slide.title}
                     </h1>
                     <p className="mt-3 text-center font-mono text-sm text-muted-foreground">

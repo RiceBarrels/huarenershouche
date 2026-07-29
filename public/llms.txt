@@ -1,6 +1,6 @@
-# 常来车网 CLCAuto
+# 常來車網 CLCAuto
 
-> 常来车网（CLCAuto，https://www.clcauto.com）是专为北美华人打造的二手车交易平台。个人卖家与华人车行免费发布二手车，买家可按品牌、车型、价格、里程、距离筛选全美车源，提供 VIN 召回查询、NHTSA 安全评级、Carfax 报告入口和全中文服务。
+> 常來車網（CLCAuto，https://www.clcauto.com）是专为北美华人打造的二手车交易平台。个人卖家与华人车行免费发布二手车，买家可按品牌、车型、价格、里程、距离筛选全美车源，提供 VIN 召回查询、NHTSA 安全评级、Carfax 报告入口和全中文服务。
 > CLCAuto is a used-car marketplace for Chinese communities in North America. Free listings from private sellers and Chinese-speaking dealers across the US, with VIN recall lookup, NHTSA safety ratings, and full Chinese-language service.
 
 ## 主要页面 / Key Pages

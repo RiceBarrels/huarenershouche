@@ -10,8 +10,11 @@ import {
   setupBackButton,
   setupDeepLinkListener,
   isNative,
+  checkNotificationPermission,
+  registerPushNotifications,
 } from "@/lib/capacitor";
 import { WelcomeScreen } from "@/components/welcome-screen";
+import { PermissionPrompt } from "@/components/permission-prompt";
 
 function OfflinePage() {
   const [retrying, setRetrying] = useState(false);
@@ -41,7 +44,7 @@ function OfflinePage() {
         <RefreshCw className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} strokeWidth={1.5} />
         {retrying ? "正在重试..." : "重试"}
       </button>
-      <p className="mt-12 text-[10px] text-muted-foreground">常来车网 · CLC Auto</p>
+      <p className="mt-12 text-[10px] text-muted-foreground">常來車網 · CLC Auto</p>
     </div>
   );
 }
@@ -73,6 +76,11 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
     setupStatusBar();
     setupKeyboard();
     setupBackButton();
+
+    // 已授权过通知的设备:每次启动都重新注册,刷新并同步推送 token
+    checkNotificationPermission().then((state) => {
+      if (state === "granted") registerPushNotifications();
+    });
 
     // Sync native WebView background with theme to prevent black edges on overscroll
     function syncNativeBg() {
@@ -125,6 +133,7 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
       {showWelcome && (
         <WelcomeScreen onComplete={() => setShowWelcome(false)} />
       )}
+      <PermissionPrompt active={!showWelcome} />
     </>
   );
 }

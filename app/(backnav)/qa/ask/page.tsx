@@ -111,7 +111,7 @@ export default function AskQuestionPage() {
           返回问答
         </Link>
 
-        <h1 className="mt-4 font-mono text-sm font-semibold tracking-tight">
+        <h1 className="mt-4 font-logo text-base tracking-tight">
           提问
         </h1>
         <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">

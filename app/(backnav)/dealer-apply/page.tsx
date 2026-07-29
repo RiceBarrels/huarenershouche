@@ -137,10 +137,10 @@ export default function DealerApplyPage() {
 
         <div className="flex items-center gap-2">
           <Store className="h-5 w-5" strokeWidth={1.5} />
-          <h1 className="font-mono text-xl font-semibold">车行入驻</h1>
+          <h1 className="font-logo text-2xl">车行入驻</h1>
         </div>
         <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">
-          华人车行免费入驻常来车网，提交门店资料后 1-2 个工作日完成审核，审核通过自动升级为认证车行账号。
+          华人车行免费入驻常來車網，提交门店资料后 1-2 个工作日完成审核，审核通过自动升级为认证车行账号。
         </p>
 
         {/* Benefits */}

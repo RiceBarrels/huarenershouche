@@ -19,6 +19,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OpenInMaps } from "@/components/open-in-maps";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 import { Heart, MessageSquare, Play } from "lucide-react";
 
@@ -369,24 +370,22 @@ export default function UserProfilePage({
                     />
                   </div>
                 )}
-                <Button
-                  variant="outline"
-                  className="mt-3 w-full gap-1.5 font-mono text-xs"
-                  asChild
+                <OpenInMaps
+                  target={{
+                    address: store.address,
+                    lat: store.lat,
+                    lng: store.lng,
+                    name: profile.username,
+                  }}
                 >
-                  <a
-                    href={
-                      store.lat != null && store.lng != null
-                        ? `https://www.google.com/maps/search/?api=1&query=${store.lat},${store.lng}`
-                        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(store.address)}`
-                    }
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <Button
+                    variant="outline"
+                    className="mt-3 w-full gap-1.5 font-mono text-xs"
                   >
                     <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
                     使用地图打开
-                  </a>
-                </Button>
+                  </Button>
+                </OpenInMaps>
               </div>
             )}
 

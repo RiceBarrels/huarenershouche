@@ -74,17 +74,7 @@ export default function FavoritesPage() {
           </TabsList>
           <TabsContent value="cars">
             <div className="mt-3 space-y-3">
-              {loading ? (
-                [1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-3 rounded-xl border border-border p-3">
-                    <Skeleton className="h-20 w-28 shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
-                      <Skeleton className="h-8 w-24" />
-                    </div>
-                  </div>
-                ))
+              {loading ? (<div></div>
               ) : list.length === 0 ? (
                 <div className="flex flex-col items-center py-16">
                   <Heart className="h-10 w-10 text-muted-foreground" strokeWidth={1} />

@@ -4,15 +4,28 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { EASE } from "@/lib/motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+// 分步出现的滑入/滑出过渡
+const slide = {
+  initial: { opacity: 0, x: 28 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -28 },
+  transition: { duration: 0.22, ease: EASE },
+} as const;
+
+// 大号输入框(text-base=16px,避免 iOS 聚焦自动放大)与大号按钮
+const bigInput = "mt-1.5 h-12 rounded-xl font-mono text-base";
+const bigBtn = "h-12 w-full rounded-xl font-mono text-sm";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -27,6 +40,8 @@ function GoogleIcon({ className }: { className?: string }) {
 
 export default function LoginPage() {
   const router = useRouter();
+  // 一步一个输入:先邮箱,再密码
+  const [step, setStep] = useState<"email" | "password">("email");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -116,121 +131,153 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 -z-10 bg-grid [mask-image:linear-gradient(to_bottom,black,60%,transparent)]"
       />
       <Header />
-      <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.97 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.25 }}
-          className="rounded-xl border border-border bg-background p-6"
-        >
+      <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-12">
         <div className="flex flex-col items-center">
-          <Image src="/logo.png" alt="常来车网" width={48} height={48} className="h-12 w-12 object-contain" />
-          <h1 className="mt-4 font-mono text-lg font-semibold tracking-tight">
+          <Image src="/logo.png" alt="常來車網" width={48} height={48} className="h-12 w-12 object-contain" />
+          <h1 className="mt-4 font-logo text-xl tracking-tight">
             登录
           </h1>
           <p className="mt-1 font-mono text-xs text-muted-foreground">
-            登录你的常来车网账号
+            登录你的常來車網账号
           </p>
         </div>
 
-        {/* Social login */}
-        <div className="mt-8 space-y-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full gap-2 font-mono text-xs"
-            disabled={googleLoading}
-            onClick={handleGoogleLogin}
-          >
-            {googleLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+        <div className="mt-8 overflow-x-clip">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {step === "email" ? (
+              <motion.div key="email" {...slide}>
+                {/* Social login */}
+                <div className="space-y-2.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={`${bigBtn} gap-2`}
+                    disabled={googleLoading}
+                    onClick={handleGoogleLogin}
+                  >
+                    {googleLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                      <GoogleIcon className="h-5 w-5" />
+                    )}
+                    使用 Google 登录
+                  </Button>
+                  <Button
+                    type="button"
+                    className={`${bigBtn} gap-2 bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90`}
+                    disabled={appleLoading}
+                    onClick={handleAppleLogin}
+                  >
+                    {appleLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                      <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+                      </svg>
+                    )}
+                    使用 Apple 登录
+                  </Button>
+                </div>
+
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-background px-3 font-mono text-[11px] text-muted-foreground">
+                      或使用邮箱登录
+                    </span>
+                  </div>
+                </div>
+
+                {/* 第一步:只填邮箱 */}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setError("");
+                    setStep("password");
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <Label className="font-mono text-xs text-muted-foreground">
+                      邮箱
+                    </Label>
+                    <Input
+                      className={bigInput}
+                      type="email"
+                      placeholder="email@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                    />
+                  </div>
+                  {error && (
+                    <p className="font-mono text-xs text-destructive">{error}</p>
+                  )}
+                  <Button type="submit" className={bigBtn}>
+                    下一步
+                  </Button>
+                </form>
+              </motion.div>
             ) : (
-              <GoogleIcon className="h-4 w-4" />
+              <motion.div key="password" {...slide}>
+                {/* 已填邮箱:点击返回修改 */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("email");
+                    setError("");
+                  }}
+                  className="mx-auto flex max-w-full items-center gap-2 rounded-full border border-border px-4 py-2 transition-colors hover:border-foreground/40"
+                >
+                  <span className="truncate font-mono text-xs text-foreground">{email}</span>
+                  <span className="shrink-0 font-mono text-[11px] text-muted-foreground">修改</span>
+                </button>
+
+                {/* 第二步:只填密码 */}
+                <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <Label className="font-mono text-xs text-muted-foreground">
+                        密码
+                      </Label>
+                      <Link
+                        href="/forgot-password"
+                        className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        忘记密码？
+                      </Link>
+                    </div>
+                    <Input
+                      className={bigInput}
+                      type="password"
+                      placeholder="输入密码"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      minLength={6}
+                      autoFocus
+                    />
+                  </div>
+
+                  {error && (
+                    <p className="font-mono text-xs text-destructive">{error}</p>
+                  )}
+
+                  <Button type="submit" className={bigBtn} disabled={loading}>
+                    {loading ? (
+                      <Loader2 className="mr-1.5 h-4 w-4 animate-spin" strokeWidth={1.5} />
+                    ) : null}
+                    {loading ? "登录中..." : "登录"}
+                  </Button>
+                </form>
+              </motion.div>
             )}
-            使用 Google 登录
-          </Button>
-          <Button
-            type="button"
-            className="w-full gap-2 bg-black font-mono text-xs text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90"
-            disabled={appleLoading}
-            onClick={handleAppleLogin}
-          >
-            {appleLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
-            ) : (
-              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
-              </svg>
-            )}
-            使用 Apple 登录
-          </Button>
+          </AnimatePresence>
         </div>
 
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center">
-            <span className="bg-background px-3 font-mono text-[11px] text-muted-foreground">
-              或使用邮箱登录
-            </span>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <Label className="font-mono text-[11px] text-muted-foreground">
-              邮箱
-            </Label>
-            <Input
-              className="mt-1 font-mono text-sm"
-              type="email"
-              placeholder="email@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <div className="flex items-center justify-between">
-              <Label className="font-mono text-[11px] text-muted-foreground">
-                密码
-              </Label>
-              <Link
-                href="/forgot-password"
-                className="font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-              >
-                忘记密码？
-              </Link>
-            </div>
-            <Input
-              className="mt-1 font-mono text-sm"
-              type="password"
-              placeholder="输入密码"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-            />
-          </div>
-
-          {error && (
-            <p className="font-mono text-[11px] text-destructive">{error}</p>
-          )}
-
-          <Button
-            type="submit"
-            className="w-full font-mono text-xs"
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-            ) : null}
-            {loading ? "登录中..." : "登录"}
-          </Button>
-        </form>
-
-        <p className="mt-6 text-center font-mono text-[11px] text-muted-foreground">
+        <p className="mt-6 text-center font-mono text-xs text-muted-foreground">
           没有账号？{" "}
           <Link
             href="/register"
@@ -239,7 +286,6 @@ export default function LoginPage() {
             点击注册
           </Link>
         </p>
-        </motion.div>
       </main>
       <Footer />
     </div>

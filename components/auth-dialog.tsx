@@ -118,7 +118,7 @@ export function AuthDialog({
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
-            <DialogTitle className="font-mono text-sm">
+            <DialogTitle className="font-logo text-base">
               {mode === "login" ? "登录" : "注册"}
             </DialogTitle>
           </DialogHeader>

@@ -6,9 +6,10 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
 import Image from "next/image";
 
-import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car } from "lucide-react";
+import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car, Map as MapIcon } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
@@ -24,15 +25,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { match } from "pinyin-pro";
 import { MAKES_ZH } from "@/lib/mock-data";
-import { detectUserZip, geocodeZipToCoords, haversineDistance } from "@/lib/geocode";
+import { detectUserZip, geocodeZipToCoords } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { getPriceInsight, type PriceInsight } from "@/lib/price-insight";
-import { classifyBodyStyle, bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
-import { paymentToPrice } from "@/lib/format";
-import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT, carHasVideo } from "@/lib/saved-searches";
+import { bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
+import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT } from "@/lib/saved-searches";
+import {
+  applyCarFilters,
+  buildDistances,
+  filtersFromParams,
+  filtersToQuery,
+  sortCars,
+  INITIAL_FILTERS,
+  SORT_OPTIONS,
+  type Filters,
+  type SortKey,
+} from "@/lib/car-filters";
 import { BackToTop } from "@/components/back-to-top";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import {
@@ -43,149 +53,9 @@ import {
 } from "@/components/ui/drawer";
 import type { DbCar } from "@/lib/types";
 
-interface Filters {
-  keyword: string;
-  make: string;
-  model: string;
-  minPrice: string;
-  maxPrice: string;
-  minYear: string;
-  maxYear: string;
-  location: string;
-  sellerType: string;
-  fuelType: string;
-  transmission: string;
-  drivetrain: string;
-  maxMileage: string;
-  exteriorColor: string;
-  interiorColor: string;
-  features: string;
-  maxDistance: string;
-  bodyStyle: string;
-  maxPayment: string;
-  dealRating: string;
-  priceDropped: string;
-  listedWithin: string;
-  noAccident: string;
-  oneOwner: string;
-  hasCarfax: string;
-  hasVideo: string;
-  hasPrice: string;
-}
-
-const INITIAL_FILTERS: Filters = {
-  keyword: "",
-  make: "",
-  model: "",
-  minPrice: "",
-  maxPrice: "",
-  minYear: "",
-  maxYear: "",
-  location: "",
-  sellerType: "",
-  fuelType: "",
-  transmission: "",
-  drivetrain: "",
-  maxMileage: "",
-  exteriorColor: "",
-  interiorColor: "",
-  features: "",
-  maxDistance: "50",
-  bodyStyle: "",
-  maxPayment: "",
-  dealRating: "",
-  priceDropped: "",
-  listedWithin: "",
-  noAccident: "",
-  oneOwner: "",
-  hasCarfax: "",
-  hasVideo: "",
-  hasPrice: "",
-};
-
-type SortKey = "newest" | "price-asc" | "price-desc" | "mileage" | "year" | "distance";
-
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "newest", label: "最新发布" },
-  { value: "price-asc", label: "价格↑" },
-  { value: "price-desc", label: "价格↓" },
-  { value: "mileage", label: "里程最少" },
-  { value: "year", label: "年份最新" },
-  { value: "distance", label: "距离最近" },
-];
-
-function filtersFromParams(sp: URLSearchParams): Filters {
-  return {
-    keyword: sp.get("q") || sp.get("keyword") || "",
-    make: sp.get("make") || "",
-    model: sp.get("model") || "",
-    minPrice: sp.get("minPrice") || "",
-    maxPrice: sp.get("maxPrice") || "",
-    minYear: sp.get("minYear") || "",
-    maxYear: sp.get("maxYear") || "",
-    // 主页搜索表单用 zip 参数传 Zipcode,统一并入 location(位置筛选只认 zip/城市名)
-    location: sp.get("location") || sp.get("zip") || "",
-    sellerType: sp.get("sellerType") || "",
-    fuelType: sp.get("fuelType") || "",
-    transmission: sp.get("transmission") || "",
-    drivetrain: sp.get("drivetrain") || "",
-    maxMileage: sp.get("maxMileage") || "",
-    exteriorColor: sp.get("exteriorColor") || "",
-    interiorColor: sp.get("interiorColor") || "",
-    features: sp.get("features") || "",
-    maxDistance: sp.get("maxDistance") || "50",
-    bodyStyle: sp.get("bodyStyle") || "",
-    maxPayment: sp.get("maxPayment") || "",
-    dealRating: sp.get("dealRating") || "",
-    priceDropped: sp.get("priceDropped") || "",
-    listedWithin: sp.get("listedWithin") || "",
-    noAccident: sp.get("noAccident") || "",
-    oneOwner: sp.get("oneOwner") || "",
-    hasCarfax: sp.get("hasCarfax") || "",
-    hasVideo: sp.get("hasVideo") || "",
-    hasPrice: sp.get("hasPrice") || "",
-  };
-}
-
-// 关键词全字段检索:把该车所有可读信息(中英标题、双语描述、标签、配置、
-// 颜色、地区、卖家、VIN、年份等)拼成一个字符串,按空格拆词做「与」匹配
-// (输入越多词结果越精确,且与词序无关)。英文/中文直接子串命中,
-// 另对较短的中文字段做拼音匹配(支持 kaimeirui / byd 这类拼音/首字母输入)。
-function carMatchesKeyword(car: DbCar, rawKeyword: string): boolean {
-  const tokens = rawKeyword.toLowerCase().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return true;
-
-  const haystack = [
-    car.title, car.title_zh,
-    car.make, MAKES_ZH[car.make], car.model, car.trim, String(car.year ?? ""),
-    car.description, car.description_zh,
-    (car.features || []).join(" "),
-    car.fuel_type, car.transmission, car.drivetrain,
-    car.exterior_color, car.interior_color,
-    car.location, car.location_zh, car.seller_name, car.vin,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-
-  // 拼音检索:仅保留「纯中文字符」(去掉英文车型名/配置/卖家名等,否则拼音会误配
-  // 英文字母,导致 camry 命中几乎所有车),并且只对纯字母词(可能是拼音输入)启用。
-  const zhOnly = [
-    car.title_zh, MAKES_ZH[car.make], car.location_zh, car.seller_name,
-    (car.features || []).join(" "),
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .replace(/[^一-鿿]/g, "");
-
-  // continuous: 拼音必须连续命中(默认允许跳字匹配,会让 camry 这类英文词
-  // 以 c-a-m-r-y 首字母散落命中长中文串里不相邻的五个字,导致搜什么都全命中)
-  return tokens.every(
-    (tok) =>
-      haystack.includes(tok) ||
-      (/^[a-z]+$/.test(tok) && zhOnly.length > 0 && match(zhOnly, tok, { continuous: true }) !== null),
-  );
-}
+// 车源列表会话缓存:重进不再重复请求,过期后台静默刷新
+const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
+const BROWSE_CACHE_TTL = 10 * 60 * 1000;
 
 // 响应式列数(与社区瀑布流一致):2 / md 3 / xl 4
 function useColumnCount(): number {
@@ -239,36 +109,7 @@ function BrowseContent() {
 
   // Sync filters & sort to URL (replaceState avoids full Next.js re-render)
   const syncToUrl = useCallback((f: Filters, s: SortKey) => {
-    const params = new URLSearchParams();
-    if (f.keyword) params.set("q", f.keyword);
-    if (f.make) params.set("make", f.make);
-    if (f.model) params.set("model", f.model);
-    if (f.minPrice) params.set("minPrice", f.minPrice);
-    if (f.maxPrice) params.set("maxPrice", f.maxPrice);
-    if (f.minYear) params.set("minYear", f.minYear);
-    if (f.maxYear) params.set("maxYear", f.maxYear);
-    if (f.location) params.set("location", f.location);
-    if (f.sellerType) params.set("sellerType", f.sellerType);
-    if (f.fuelType) params.set("fuelType", f.fuelType);
-    if (f.transmission) params.set("transmission", f.transmission);
-    if (f.drivetrain) params.set("drivetrain", f.drivetrain);
-    if (f.maxMileage) params.set("maxMileage", f.maxMileage);
-    if (f.exteriorColor) params.set("exteriorColor", f.exteriorColor);
-    if (f.interiorColor) params.set("interiorColor", f.interiorColor);
-    if (f.features) params.set("features", f.features);
-    if (f.maxDistance) params.set("maxDistance", f.maxDistance);
-    if (f.bodyStyle) params.set("bodyStyle", f.bodyStyle);
-    if (f.maxPayment) params.set("maxPayment", f.maxPayment);
-    if (f.dealRating) params.set("dealRating", f.dealRating);
-    if (f.priceDropped) params.set("priceDropped", f.priceDropped);
-    if (f.listedWithin) params.set("listedWithin", f.listedWithin);
-    if (f.noAccident) params.set("noAccident", f.noAccident);
-    if (f.oneOwner) params.set("oneOwner", f.oneOwner);
-    if (f.hasCarfax) params.set("hasCarfax", f.hasCarfax);
-    if (f.hasVideo) params.set("hasVideo", f.hasVideo);
-    if (f.hasPrice) params.set("hasPrice", f.hasPrice);
-    if (s !== "newest") params.set("sort", s);
-    const qs = params.toString();
+    const qs = filtersToQuery(f, s);
     const url = qs ? `/browse?${qs}` : "/browse";
     window.history.replaceState(window.history.state, "", url);
   }, []);
@@ -311,16 +152,8 @@ function BrowseContent() {
     setSortRaw(s);
   }, [searchParams]);
 
-  async function fetchCars() {
-    const { data } = await supabase
-      .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url)")
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .order("created_at", { ascending: false });
-    const allCars = (data as DbCar[]) || [];
+  function applyCars(allCars: DbCar[]) {
     setCars(allCars);
-    setFetchedAt(Date.now());
     setLoading(false);
 
     const recentIds = getRecentlyViewed();
@@ -332,8 +165,29 @@ function BrowseContent() {
     }
   }
 
+  async function fetchCars() {
+    const { data } = await supabase
+      .from("cars")
+      .select("*, profiles!seller_id(account_type, avatar_url)")
+      .eq("status", "active")
+      .eq("owner_hidden", false)
+      .order("created_at", { ascending: false });
+    const allCars = (data as DbCar[]) || [];
+    applyCars(allCars);
+    setFetchedAt(Date.now());
+    if (allCars.length > 0) writeSessionCache(BROWSE_CACHE_KEY, allCars);
+  }
+
   useEffect(() => {
-    fetchCars();
+    // 会话缓存:本会话拉过一次车源就直接复用;过期(10 分钟)后台静默刷新
+    const cached = readSessionCache<DbCar[]>(BROWSE_CACHE_KEY);
+    if (cached && cached.data.length > 0) {
+      applyCars(cached.data);
+      setFetchedAt(cached.at);
+      if (Date.now() - cached.at > BROWSE_CACHE_TTL) fetchCars();
+    } else {
+      fetchCars();
+    }
 
     // Auto-detect user zipcode for distance calculation only (don't auto-filter)
     if (!userZip) {
@@ -341,6 +195,16 @@ function BrowseContent() {
         if (zip) setUserZip(zip);
       });
     }
+
+    // 定位权限刚被授予时重试——mount 时那次可能因无权限失败
+    function onLocationGranted() {
+      detectUserZip().then((zip) => {
+        if (zip) setUserZip(zip);
+      });
+    }
+    window.addEventListener("clc-location-granted", onLocationGranted);
+    return () => window.removeEventListener("clc-location-granted", onLocationGranted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 距离计算基准:优先用「位置」筛选里输入的 Zipcode,没有则用自动定位到的 zip
@@ -356,16 +220,7 @@ function BrowseContent() {
     }
   }, [effectiveZip]);
 
-  const distances = useMemo(() => {
-    if (!userCoords) return new Map<string, number>();
-    const map = new Map<string, number>();
-    for (const car of cars) {
-      if (car.lat && car.lng) {
-        map.set(car.id, haversineDistance(userCoords.lat, userCoords.lng, car.lat, car.lng));
-      }
-    }
-    return map;
-  }, [cars, userCoords]);
+  const distances = useMemo(() => buildDistances(cars, userCoords), [cars, userCoords]);
 
   // 价格评级：以完整未过滤的车源列表为对比基准，建一张 carId -> insight 的表
   // （筛选与卡片渲染复用，避免在 filter 循环里反复线性扫全表）
@@ -540,159 +395,21 @@ function BrowseContent() {
   }, [filters]);
 
   const filtered = useMemo(() => {
-    // Helper: check if car value matches any of the comma-separated filter values
-    function matchesMulti(filterVal: string, carVal: string | undefined | null): boolean {
-      if (!filterVal) return true;
-      if (!carVal) return false;
-      return filterVal.split(",").includes(carVal);
-    }
-
-    function matchesColorMulti(filterVal: string, carVal: string | undefined | null): boolean {
-      if (!filterVal) return true;
-      if (!carVal) return false;
-      return filterVal.split(",").some((c) => carVal.includes(c));
-    }
-
-    // 预计算：月供预算换算的价格上限 / 上架时间截止点（避免在循环里重复算）
-    const paymentPriceCap = filters.maxPayment ? paymentToPrice(Number(filters.maxPayment)) : null;
-    const listedCutoff =
-      filters.listedWithin && fetchedAt
-        ? fetchedAt - Number(filters.listedWithin) * 24 * 60 * 60 * 1000
-        : null;
-
-    // Filter without location first to check fallback
-    function applyNonLocationFilters(car: DbCar): boolean {
-      if (filters.keyword && !carMatchesKeyword(car, filters.keyword)) return false;
-      if (filters.make && !matchesMulti(filters.make, car.make)) return false;
-      if (filters.model) {
-        const models = filters.model
-          .split(",")
-          .map((m) => m.trim().toLowerCase())
-          .filter(Boolean);
-        if (models.length > 0 && (!car.model || !models.includes(car.model.trim().toLowerCase()))) return false;
-      }
-      if (filters.minPrice && car.price < Number(filters.minPrice)) return false;
-      if (filters.maxPrice && car.price > Number(filters.maxPrice)) return false;
-      if (filters.minYear && car.year < Number(filters.minYear)) return false;
-      if (filters.maxYear && car.year > Number(filters.maxYear)) return false;
-      if (filters.sellerType && car.profiles?.account_type !== filters.sellerType) return false;
-      if (filters.fuelType && !matchesMulti(filters.fuelType, car.fuel_type)) return false;
-      if (filters.transmission && !matchesMulti(filters.transmission, car.transmission)) return false;
-      if (filters.drivetrain && !matchesMulti(filters.drivetrain, car.drivetrain)) return false;
-      if (filters.maxMileage && car.mileage > Number(filters.maxMileage)) return false;
-      if (filters.exteriorColor && !matchesColorMulti(filters.exteriorColor, car.exterior_color)) return false;
-      if (filters.interiorColor && !matchesColorMulti(filters.interiorColor, car.interior_color)) return false;
-      if (filters.bodyStyle) {
-        const style = classifyBodyStyle(car);
-        if (!style || !filters.bodyStyle.split(",").includes(style)) return false;
-      }
-      if (paymentPriceCap !== null) {
-        // 电议（price<=0）的车无法估算月供，排除
-        if (car.price <= 0 || car.price > paymentPriceCap) return false;
-      }
-      if (filters.dealRating) {
-        const insight = insightMap.get(car.id);
-        if (!insight) return false;
-        if (filters.dealRating === "great" && insight.level !== "great") return false;
-        if (filters.dealRating === "good" && insight.level !== "great" && insight.level !== "good") return false;
-      }
-      if (filters.priceDropped === "true") {
-        if (!car.original_price || car.original_price <= car.price) return false;
-      }
-      if (listedCutoff !== null) {
-        if (new Date(car.created_at).getTime() < listedCutoff) return false;
-      }
-      if (filters.features) {
-        // AND 语义：车辆需包含全部所选配置
-        const wanted = filters.features.split(",").filter(Boolean);
-        const has = car.features || [];
-        if (!wanted.every((f) => has.includes(f))) return false;
-      }
-      if (filters.noAccident === "true" && !car.carfax_summary?.includes("无事故")) return false;
-      if (filters.oneOwner === "true") {
-        if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
-      }
-      if (filters.hasCarfax === "true" && !car.carfax_url) return false;
-      if (filters.hasVideo === "true" && !carHasVideo(car)) return false;
-      if (filters.hasPrice === "true" && car.price <= 0) return false;
-      return true;
-    }
-
-    function applyLocationFilter(car: DbCar): boolean {
-      if (!filters.location) return true;
-      const loc = filters.location;
-      // Zipcode:不做硬过滤,由距离筛选/排序(以该 zip 为中心)处理
-      if (/^\d{5}$/.test(loc)) return true;
-      // 城市名(主页「按地区找车」入口链接):子串匹配
-      return (
-        car.location.toLowerCase().includes(loc.toLowerCase()) ||
-        car.location_zh.includes(loc)
-      );
-    }
-
-    // Apply non-location filters
-    const nonLocFiltered = cars.filter(applyNonLocationFilters);
-
-    // Try applying location filter
-    let result: DbCar[];
-    let usingDistanceFallback = false;
-    if (filters.location) {
-      const locFiltered = nonLocFiltered.filter(applyLocationFilter);
-      if (locFiltered.length > 0) {
-        result = locFiltered;
-      } else {
-        // Fallback: show all results sorted by distance
-        result = nonLocFiltered;
-        usingDistanceFallback = true;
-      }
-    } else {
-      result = nonLocFiltered;
-    }
-
-    // Apply distance filter
-    if (filters.maxDistance && userCoords) {
-      const maxDist = Number(filters.maxDistance);
-      if (maxDist > 0) {
-        result = result.filter((car) => {
-          const d = distances.get(car.id);
-          return d !== undefined && d <= maxDist;
-        });
-      }
-    }
-
-    const sorted = [...result];
+    const { cars: result, forcedDistanceSort } = applyCarFilters(cars, filters, {
+      userCoords,
+      distances,
+      insightMap,
+      fetchedAt,
+    });
     // If location yielded no results and we have coords, sort by distance
-    const effectiveSort = usingDistanceFallback && userCoords ? "distance" as SortKey : sort;
-    switch (effectiveSort) {
-      case "price-asc":
-        sorted.sort((a, b) => a.price - b.price);
-        break;
-      case "price-desc":
-        sorted.sort((a, b) => b.price - a.price);
-        break;
-      case "mileage":
-        sorted.sort((a, b) => a.mileage - b.mileage);
-        break;
-      case "year":
-        sorted.sort((a, b) => b.year - a.year);
-        break;
-      case "distance":
-        sorted.sort((a, b) => {
-          const da = distances.get(a.id) ?? Infinity;
-          const db = distances.get(b.id) ?? Infinity;
-          return da - db;
-        });
-        break;
-      default:
-        // 默认排序:个人/车行直发排在系统检索转载之前,各自组内按最新
-        sorted.sort((a, b) => {
-          const tier = Number(!!a.source_id) - Number(!!b.source_id);
-          if (tier !== 0) return tier;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-    }
-    return sorted;
+    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances);
   }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt]);
+
+  // 地图找车入口:携带当前筛选条件跳转 /browse/map
+  const mapHref = useMemo(() => {
+    const qs = filtersToQuery(filters, sort);
+    return qs ? `/browse/map?${qs}` : "/browse/map";
+  }, [filters, sort]);
 
   // 筛选/排序变化时回到第一批
   useEffect(() => {
@@ -731,7 +448,7 @@ function BrowseContent() {
           <div>
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
-              <p className="font-mono text-sm font-semibold">常来车网</p>
+              <p className="font-mono text-sm font-semibold">常來車網</p>
             </div>
             <p className="font-mono text-[11px] text-muted-foreground">
               北美华人最信赖的二手车交易平台 · 免费发布 · 中文服务
@@ -1017,6 +734,12 @@ function BrowseContent() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Link href={mapHref}>
+                  <Button size="sm" className="h-8 gap-1.5 font-mono text-xs font-semibold shadow-sm">
+                    <MapIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                    地图找车
+                  </Button>
+                </Link>
               </div>
             </div>
             {/* Desktop active filter chips */}
@@ -1132,7 +855,7 @@ function BrowseContent() {
             <section
               className="mt-10 border-t border-border pt-6"
             >
-              <h2 className="font-mono text-sm font-semibold">最近浏览</h2>
+              <h2 className="font-logo text-base">最近浏览</h2>
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-5">
                 {recentCars.map((car) => (
                   <CarCard
@@ -1149,6 +872,17 @@ function BrowseContent() {
 
       <Footer />
       <BackToTop />
+
+      {/* 地图找车悬浮入口(主推功能):移动端固定在底部导航上方居中 */}
+      <Link
+        href={mapHref}
+        className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2 md:hidden"
+      >
+        <span className="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 font-mono text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95">
+          <MapIcon className="h-4 w-4" strokeWidth={1.75} />
+          地图找车
+        </span>
+      </Link>
     </div>
     </PullToRefresh>
   );
