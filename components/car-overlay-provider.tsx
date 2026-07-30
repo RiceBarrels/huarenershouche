@@ -88,7 +88,11 @@ type LayerInput = CarLayerInput | PostLayerInput | UserLayerInput | PageLayerInp
 type Layer = LayerInput & { key: number };
 
 // 卖家主页浮层外壳:底部 drawer(挂载后再置 open 以播放进场动画;
-// 拖拽/点遮罩关闭时等退场动画放完再出栈)
+// 拖拽/点遮罩关闭时等退场动画放完再出栈)。
+// modal={false}:浮层栈里 drawer 与 SwipeSheet 可任意交替叠开——modal 抽屉
+// 会把 body 置 pointer-events:none 并在「内容区外 pointerdown」时自关,叠在
+// 上面的层要么点不动、要么一点就把下层 drawer 带关。非 modal 时 vaul 不渲染
+// 遮罩,这里自绘一层(点按关闭,淡入淡出与抽屉动画同步)。
 function ProfileDrawer({
   onClose,
   zIndex,
@@ -100,28 +104,41 @@ function ProfileDrawer({
 }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
-    setOpen(true);
+    // 先画一帧关闭态再置 open,确保进场动画可靠播放
+    const raf = requestAnimationFrame(() => setOpen(true));
+    return () => cancelAnimationFrame(raf);
   }, []);
+  const close = () => {
+    setOpen(false);
+    setTimeout(onClose, 250);
+  };
   return (
-    <Drawer
-      open={open}
-      onOpenChange={(o) => {
-        if (!o) {
-          setOpen(false);
-          setTimeout(onClose, 250);
-        }
-      }}
-    >
-      <DrawerContent
-        className="max-h-[92vh]"
-        style={{ zIndex }}
-        overlayStyle={{ zIndex }}
+    <>
+      <div
+        data-app-overlay=""
+        className="fixed inset-0 bg-black/40 transition-opacity supports-backdrop-filter:backdrop-blur-xs"
+        style={{
+          zIndex,
+          opacity: open ? 1 : 0,
+          transitionDuration: "250ms",
+          touchAction: "none",
+        }}
+        onClick={close}
+      />
+      <Drawer
+        open={open}
+        modal={false}
+        onOpenChange={(o) => {
+          if (!o) close();
+        }}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          {children}
-        </div>
-      </DrawerContent>
-    </Drawer>
+        <DrawerContent className="max-h-[92vh]" style={{ zIndex }}>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {children}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
   );
 }
 

@@ -18,9 +18,14 @@ export interface NativeMapMarker {
   title?: string;      // callout title
   subtitle?: string;   // callout subtitle
   label?: string;      // short pill text e.g. "$1.2万" — renders a price-pill annotation instead of a default pin
+  image?: string;      // 胶囊内圆形缩略图 URL(车图/店铺照片)
+  kind?: "car" | "store"; // store 不参与聚簇,文字用前景色
+  previewImages?: string[]; // 店铺胶囊下方的在售车图片条(最多 3 张)
+  previewCount?: number;    // 在售总数(超出 3 张时最后一张叠 N+)
   selected?: boolean;
 }
 export interface NativeMapFrame { x: number; y: number; width: number; height: number } // CSS px, viewport-relative
+export interface NativeMapRegion { north: number; south: number; east: number; west: number; zoom: number }
 
 export interface NativeMapPlugin {
   create(options: { id: string; frame: NativeMapFrame; markers: NativeMapMarker[]; mode?: "overlay" | "behind"; zoom?: number; interactive?: boolean; showsUserLocation?: boolean; dark?: boolean }): Promise<void>;
@@ -35,6 +40,7 @@ export interface NativeMapPlugin {
   addListener(eventName: "markerTap", listener: (ev: { mapId: string; markerId: string }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: "clusterTap", listener: (ev: { mapId: string; markerIds: string[] }) => void): Promise<PluginListenerHandle>;
   addListener(eventName: "mapTap", listener: (ev: { mapId: string }) => void): Promise<PluginListenerHandle>;
+  addListener(eventName: "regionChange", listener: (ev: NativeMapRegion & { mapId: string }) => void): Promise<PluginListenerHandle>;
   removeAllListeners(): Promise<void>;
 }
 

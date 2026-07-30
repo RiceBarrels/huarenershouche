@@ -199,7 +199,8 @@ export function SwipeSheet({
 
   return (
     // 根节点为 motion 组件,AnimatePresence 才能在卸载前播放子层退场动画
-    <motion.div className="fixed inset-0 md:hidden" style={{ zIndex }}>
+    // data-app-overlay:原生地图页据此把整屏触摸放行给 webview(见 app-map)
+    <motion.div className="fixed inset-0 md:hidden" style={{ zIndex }} data-app-overlay="">
       {/* 下层:被点卡片的真实 DOM,始终不透明,从原位连续放大到全屏、退场反向缩回。
           进场前 ~50% 由它露出(内容还透明),之后被内容盖上;返回时内容淡出重新露出它。
           它一直不透明,内容在其上淡入淡出,故交叉过程不会漏出背景、不闪。 */}

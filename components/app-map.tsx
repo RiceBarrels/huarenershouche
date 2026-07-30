@@ -26,7 +26,24 @@ export interface AppMapMarker {
   address?: string;
   /** 价格胶囊文本(如 "$1.2万");存在时渲染胶囊标注而非默认图钉 */
   label?: string;
+  /** 胶囊内圆形缩略图 URL(车图/店铺照片) */
+  image?: string;
+  /** store = 店铺标记:不参与聚簇,文字用前景色(默认 car) */
+  kind?: "car" | "store";
+  /** 店铺胶囊下方的在售车图片条(最多 3 张) */
+  previewImages?: string[];
+  /** 在售总数(超出 3 张时最后一张叠 N+) */
+  previewCount?: number;
   selected?: boolean;
+}
+
+/** 视口范围(regionChange 上报,视口检索用) */
+export interface AppMapRegion {
+  north: number;
+  south: number;
+  east: number;
+  west: number;
+  zoom: number;
 }
 
 // ---------- leaflet 侧素材(沿用 StoreMap) ----------
@@ -51,11 +68,39 @@ function escapeHtml(s: string): string {
   );
 }
 
-// 价格胶囊标注(divIcon):锚点为 [0,0],胶囊自身 translate(-50%,-50%) 居中
-function createPillIcon(label: string, selected: boolean) {
+// 价格胶囊标注(divIcon):锚点为 [0,0],整体 translate(-50%,-50%) 居中;
+// 店铺胶囊下方挂在售车图片条(最多 3 张,多余的最后一张叠 N+)
+function createPillIcon(m: AppMapMarker) {
+  const cls = [
+    "car-pill",
+    m.selected ? "car-pill--selected" : "",
+    m.kind === "store" ? "car-pill--store" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const img = m.image
+    ? `<img class="car-pill__img" src="${escapeHtml(m.image)}" alt="" loading="lazy" />`
+    : "";
+  const pill = `<div class="${cls}">${img}<span class="car-pill__text">${escapeHtml(m.label ?? "")}</span></div>`;
+
+  const previews = m.kind === "store" ? (m.previewImages ?? []).slice(0, 3) : [];
+  let strip = "";
+  if (previews.length > 0) {
+    const more = (m.previewCount ?? previews.length) - previews.length;
+    strip = `<div class="car-pill-strip">${previews
+      .map((url, i) => {
+        const overlay =
+          i === previews.length - 1 && more > 0
+            ? `<span class="car-pill-strip__more">${more}+</span>`
+            : "";
+        return `<span class="car-pill-strip__item"><img src="${escapeHtml(url)}" alt="" loading="lazy" />${overlay}</span>`;
+      })
+      .join("")}</div>`;
+  }
+
   return L.divIcon({
     className: "car-pill-anchor",
-    html: `<div class="car-pill${selected ? " car-pill--selected" : ""}">${escapeHtml(label)}</div>`,
+    html: `<div class="car-pill-wrap">${pill}${strip}</div>`,
     iconSize: [0, 0],
     iconAnchor: [0, 0],
   });
@@ -113,6 +158,10 @@ function toNativeMarker(m: AppMapMarker): NativeMapMarker {
     title: m.name,
     subtitle: m.address,
     label: m.label,
+    image: m.image,
+    kind: m.kind,
+    previewImages: m.previewImages,
+    previewCount: m.previewCount,
     selected: m.selected,
   };
 }
@@ -132,10 +181,12 @@ export function AppMap({
   showsUserLocation = false,
   fitPadding = 40,
   forceWeb = false,
+  autoFit = true,
   center,
   onMarkerTap,
   onClusterTap,
   onMapTap,
+  onRegionChange,
 }: {
   markers: AppMapMarker[];
   className?: string;
@@ -144,17 +195,21 @@ export function AppMap({
   /** embed = 嵌入卡片(原生 overlay);fullscreen = 全屏地图页(原生 behind) */
   mode?: "embed" | "fullscreen";
   interactive?: boolean;
-  /** 仅原生路径支持显示用户位置 */
+  /** 显示用户位置(原生 = MapKit 蓝点;leaflet = watchPosition 蓝点 + 精度圈) */
   showsUserLocation?: boolean;
   /** 多标记 fitBounds 的内边距(px) */
   fitPadding?: number;
   /** 强制走 leaflet(嵌入可滚动/浮层内容时必须:原生 overlay 视图压不住层级) */
   forceWeb?: boolean;
+  /** false = 标记更新时从不自动 fit(视口检索页:相机归页面管,fit 会打断用户) */
+  autoFit?: boolean;
   /** 受控相机:对象引用变化时飞到该点(定位到我/选中标记等场景) */
   center?: { lat: number; lng: number; zoom?: number } | null;
   onMarkerTap?: (id: string) => void;
   onClusterTap?: (ids: string[]) => void;
   onMapTap?: () => void;
+  /** 相机停稳后上报视口范围(按视口检索数据用) */
+  onRegionChange?: (region: AppMapRegion) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [platform, setPlatform] = useState<"init" | "native" | "web">("init");
@@ -174,6 +229,13 @@ export function AppMap({
   onClusterTapRef.current = onClusterTap;
   const onMapTapRef = useRef(onMapTap);
   onMapTapRef.current = onMapTap;
+  const onRegionChangeRef = useRef(onRegionChange);
+  onRegionChangeRef.current = onRegionChange;
+  const autoFitRef = useRef(autoFit);
+  autoFitRef.current = autoFit;
+  // 建图完成前到达的受控相机不能丢(视口检索页靠它触发首次 regionChange)
+  const centerRef = useRef(center);
+  centerRef.current = center;
 
   // 首批非空标记到达后置 true;之后的标记更新不再自动 fit(保留用户视角)
   const hadMarkersRef = useRef(false);
@@ -199,6 +261,7 @@ export function AppMap({
   const layerGroupRef = useRef<L.LayerGroup | null>(null);
 
   function fitWeb(map: L.Map) {
+    if (!autoFitRef.current) return;
     const ms = markersRef.current;
     if (ms.length === 0) return;
     if (ms.length === 1) {
@@ -217,7 +280,7 @@ export function AppMap({
       if (m.label) {
         // 价格胶囊:无弹窗,点击直接回调
         marker = L.marker([m.lat, m.lng], {
-          icon: createPillIcon(m.label, !!m.selected),
+          icon: createPillIcon(m),
           zIndexOffset: m.selected ? 1000 : 0,
         });
       } else {
@@ -304,15 +367,76 @@ export function AppMap({
     // 点空白处(标记点击不冒泡到地图)
     map.on("click", () => onMapTapRef.current?.());
 
+    // 建图前已到达的受控相机(如挂载即定位成功)此刻补上
+    if (centerRef.current) {
+      map.setView(
+        [centerRef.current.lat, centerRef.current.lng],
+        centerRef.current.zoom ?? zoomRef.current
+      );
+    }
+
+    // 相机停稳 → 上报视口范围(setView/fitBounds/拖拽缩放后都会触发 moveend);
+    // 初始视野也上报一次,否则用户不动地图就不会有首次检索
+    const reportRegion = () => {
+      const cb = onRegionChangeRef.current;
+      if (!cb) return;
+      const b = map.getBounds();
+      cb({
+        north: b.getNorth(),
+        south: b.getSouth(),
+        east: b.getEast(),
+        west: b.getWest(),
+        zoom: map.getZoom(),
+      });
+    };
+    map.on("moveend", reportRegion);
+    reportRegion();
+
+    // 用户位置蓝点(对齐原生 showsUserLocation):watchPosition 持续更新
+    // 蓝点 + 精度圈;拿不到权限就静默跳过
+    let geoWatch: number | null = null;
+    let userDot: L.CircleMarker | null = null;
+    let userAcc: L.Circle | null = null;
+    if (showsUserLocation && "geolocation" in navigator) {
+      geoWatch = navigator.geolocation.watchPosition(
+        (pos) => {
+          const ll: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+          if (!userDot) {
+            userAcc = L.circle(ll, {
+              radius: pos.coords.accuracy,
+              weight: 0,
+              fillColor: "#007aff",
+              fillOpacity: 0.08,
+              interactive: false,
+            }).addTo(map);
+            userDot = L.circleMarker(ll, {
+              radius: 6,
+              color: "#ffffff",
+              weight: 2,
+              fillColor: "#007aff",
+              fillOpacity: 1,
+              interactive: false,
+            }).addTo(map);
+          } else {
+            userDot.setLatLng(ll);
+            userAcc?.setLatLng(ll).setRadius(pos.coords.accuracy);
+          }
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 30000 }
+      );
+    }
+
     return () => {
       disposed = true;
+      if (geoWatch !== null) navigator.geolocation.clearWatch(geoWatch);
       map.remove();
       container.classList.remove("clc-map--raster");
       leafletMapRef.current = null;
       layerGroupRef.current = null;
     };
 
-  }, [platform, dark, mode, interactive]);
+  }, [platform, dark, mode, interactive, showsUserLocation]);
 
   // 标记同步 effect:只重建标记图层,不重建地图(保留用户平移/缩放)
   useEffect(() => {
@@ -337,7 +461,7 @@ export function AppMap({
 
   function sendNativeMarkers() {
     const ms = markersRef.current;
-    const fit = !hadMarkersRef.current && ms.length > 1;
+    const fit = autoFitRef.current && !hadMarkersRef.current && ms.length > 1;
     if (ms.length > 0) hadMarkersRef.current = true;
     NativeMap.setMarkers({
       id: nativeIdRef.current!,
@@ -386,6 +510,16 @@ export function AppMap({
         if (sentMarkers.length > 0) hadMarkersRef.current = true;
         // create 在途期间标记已变化 → 补发一次
         if (markersRef.current !== sentMarkers) sendNativeMarkers();
+        // 建图前已到达的受控相机此刻补上(也触发首次 regionChange)
+        if (centerRef.current) {
+          NativeMap.setCamera({
+            id,
+            lat: centerRef.current.lat,
+            lng: centerRef.current.lng,
+            zoom: centerRef.current.zoom,
+            animate: false,
+          }).catch(() => {});
+        }
       })
       .catch(() => {
         // 原生创建失败 → 回退 leaflet
@@ -402,6 +536,17 @@ export function AppMap({
       }),
       NativeMap.addListener("mapTap", (ev) => {
         if (ev.mapId === id) onMapTapRef.current?.();
+      }),
+      NativeMap.addListener("regionChange", (ev) => {
+        if (ev.mapId === id) {
+          onRegionChangeRef.current?.({
+            north: ev.north,
+            south: ev.south,
+            east: ev.east,
+            west: ev.west,
+            zoom: ev.zoom,
+          });
+        }
       }),
     ];
 
@@ -448,9 +593,11 @@ export function AppMap({
       const rects: NativeMapFrame[] = [
         { x: 0, y: 0, width: 20, height: window.innerHeight },
       ];
-      const overlayOpen =
-        !!(window.history.state as { overlay?: boolean } | null)?.overlay ||
-        !!document.querySelector("[data-vaul-drawer]");
+      // 浮层判定用 DOM 标记(SwipeSheet/ProfileDrawer 带 data-app-overlay,
+      // vaul 抽屉带 data-vaul-drawer),不依赖 history 状态——可靠且无时序问题
+      const overlayOpen = !!document.querySelector(
+        "[data-app-overlay], [data-vaul-drawer]"
+      );
       if (overlayOpen) {
         rects.push({ x: 0, y: 0, width: window.innerWidth, height: window.innerHeight });
       } else {
@@ -466,7 +613,10 @@ export function AppMap({
         .join(";");
       if (key !== lastPassKey) {
         lastPassKey = key;
-        NativeMap.setPassthroughRects({ id, rects }).catch(() => {});
+        NativeMap.setPassthroughRects({ id, rects }).catch(() => {
+          // 发送失败(如原生短暂重建中)则下一帧重试,不能让放行区停在旧状态
+          lastPassKey = null;
+        });
       }
     }
 
@@ -622,7 +772,9 @@ export function AppMap({
             border: none;
           }
           .car-pill {
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             transform: translate(-50%, -50%);
             padding: 3px 9px;
             font-family: var(--font-mono, "PingFang SC", sans-serif);
@@ -636,6 +788,72 @@ export function AppMap({
             border: 1px solid var(--border, #e5e7eb);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
             cursor: pointer;
+          }
+          .car-pill:has(.car-pill__img) {
+            padding: 3px 9px 3px 3px;
+          }
+          .car-pill__img {
+            width: 20px;
+            height: 20px;
+            border-radius: 9999px;
+            object-fit: cover;
+            flex-shrink: 0;
+            background: var(--muted, #f4f4f5);
+          }
+          .car-pill__text {
+            max-width: 110px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          /* 店铺标记:前景色文字,与价格胶囊区分 */
+          .car-pill--store {
+            color: var(--foreground, #111);
+          }
+          /* 胶囊 + 店铺图片条的竖排容器(整体居中于坐标) */
+          .car-pill-wrap {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+          }
+          .car-pill-wrap .car-pill {
+            transform: none;
+          }
+          .car-pill-wrap .car-pill--selected {
+            transform: scale(1.08);
+          }
+          .car-pill-strip {
+            display: flex;
+            gap: 3px;
+          }
+          .car-pill-strip__item {
+            position: relative;
+            display: block;
+            width: 40px;
+            height: 32px;
+            overflow: hidden;
+            border-radius: 6px;
+            border: 1px solid var(--background, #fff);
+            background: var(--muted, #f4f4f5);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+          }
+          .car-pill-strip__item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .car-pill-strip__more {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0, 0, 0, 0.45);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 600;
           }
           .car-pill--selected {
             transform: translate(-50%, -50%) scale(1.08);
