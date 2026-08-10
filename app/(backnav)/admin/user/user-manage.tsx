@@ -354,7 +354,7 @@ export default function AdminUserManagePage() {
                 <span className="rounded-full bg-muted px-1 py-0.5 text-[10px]">车行</span>
               ) : null}
               {profile.role === "admin" && <span className="rounded-full bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>}
-              {profile.banned && <span className="rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>}
+              {profile.banned && <span className="rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">已封禁</span>}
             </div>
             <p className="mt-1 flex items-center gap-1 text-[11px]">
               <Mail className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
@@ -364,7 +364,7 @@ export default function AdminUserManagePage() {
                 <>
                   <a href={`mailto:${authInfo.email}`} className="break-all font-medium hover:underline">{authInfo.email}</a>
                   {authInfo.email_confirmed_at ? (
-                    <span className="shrink-0 text-[9px] text-emerald-600">已验证</span>
+                    <span className="shrink-0 text-[9px] text-emerald-600 dark:text-emerald-400">已验证</span>
                   ) : (
                     <span className="shrink-0 text-[9px] text-amber-600">未验证</span>
                   )}
@@ -480,7 +480,7 @@ export default function AdminUserManagePage() {
                 onChange={(e) => upd("banned", e.target.checked)}
                 className="h-3.5 w-3.5 accent-red-600"
               />
-              <Ban className="h-3.5 w-3.5 text-red-600" strokeWidth={1.5} />
+              <Ban className="h-3.5 w-3.5 text-red-600 dark:text-red-400" strokeWidth={1.5} />
               封禁该用户
             </label>
             {form.banned && (
@@ -501,7 +501,7 @@ export default function AdminUserManagePage() {
               {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" strokeWidth={1.5} />}
               保存修改
             </Button>
-            {savedAt && <span className="flex items-center gap-1 text-[11px] text-emerald-600"><Check className="h-3 w-3" strokeWidth={2} />已保存</span>}
+            {savedAt && <span className="flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400"><Check className="h-3 w-3" strokeWidth={2} />已保存</span>}
           </div>
         </div>
 
@@ -537,11 +537,11 @@ export default function AdminUserManagePage() {
                         {actionId === car.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Ban className="h-3.5 w-3.5" strokeWidth={1.5} />}
                       </Button>
                     ) : car.status === "removed" ? (
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-600" onClick={() => restoreCar(car.id)} disabled={actionId === car.id} title="重新上架">
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-emerald-600 dark:text-emerald-400" onClick={() => restoreCar(car.id)} disabled={actionId === car.id} title="重新上架">
                         {actionId === car.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3.5 w-3.5" strokeWidth={2} />}
                       </Button>
                     ) : null}
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600" onClick={() => deleteCar(car.id)} disabled={actionId === car.id} title="永久删除">
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-600 dark:text-red-400" onClick={() => deleteCar(car.id)} disabled={actionId === car.id} title="永久删除">
                       <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
                     </Button>
                   </div>
@@ -564,9 +564,9 @@ export default function AdminUserManagePage() {
                   <div className="flex items-center gap-1.5">
                     <p className="text-xs font-medium">{s.name}</p>
                     <span className={`rounded-full px-1 py-0.5 text-[10px] ${
-                      s.verification_status === "verified" ? "bg-emerald-500/10 text-emerald-600"
+                      s.verification_status === "verified" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                         : s.verification_status === "pending" ? "bg-amber-500/10 text-amber-600"
-                        : s.verification_status === "rejected" ? "bg-red-500/10 text-red-600"
+                        : s.verification_status === "rejected" ? "bg-red-500/10 text-red-600 dark:text-red-400"
                         : "bg-muted text-muted-foreground"
                     }`}>
                       {s.verification_status === "verified" ? "已认证" : s.verification_status === "pending" ? "待审核" : s.verification_status === "rejected" ? "已拒绝" : "未认证"}
@@ -637,7 +637,7 @@ export default function AdminUserManagePage() {
 
         {/* Danger zone */}
         <div className="mt-8 rounded-xl border border-red-300 bg-red-50/50 p-3 dark:bg-red-950/10">
-          <h2 className="flex items-center gap-1.5 text-xs font-semibold text-red-600">
+          <h2 className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
             <AlertTriangle className="h-3.5 w-3.5" strokeWidth={1.5} />
             危险操作
           </h2>
@@ -647,7 +647,7 @@ export default function AdminUserManagePage() {
           <Button
             variant="outline"
             size="sm"
-            className="mt-2.5 gap-1.5 border-red-300 text-xs text-red-600 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950/30"
+            className="mt-2.5 gap-1.5 border-red-300 text-xs text-red-600 dark:text-red-400 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-950/30"
             onClick={handleDeleteUser}
             disabled={deleting || profile.id === selfId}
           >

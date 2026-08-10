@@ -40,13 +40,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  buying: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  selling: "bg-green-500/10 text-green-600 border-green-500/20",
-  loan: "bg-purple-500/10 text-purple-600 border-purple-500/20",
-  insurance: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  dmv: "bg-red-500/10 text-red-600 border-red-500/20",
-  maintenance: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20",
-  general: "bg-gray-500/10 text-gray-600 border-gray-500/20",
+  buying: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
+  selling: "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400",
+  loan: "bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400",
+  insurance: "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400",
+  dmv: "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400",
+  maintenance: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 dark:text-yellow-500",
+  general: "bg-gray-500/10 text-gray-600 border-gray-500/20 dark:text-gray-400",
 };
 
 export default function QaBoardPage() {

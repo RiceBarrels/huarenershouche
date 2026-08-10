@@ -711,7 +711,7 @@ function PostCard({
         if (overlayEnabled) {
           e.preventDefault();
           const r = e.currentTarget.getBoundingClientRect();
-          openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
+          openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML, e.currentTarget);
         }
       }}
       className="block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"
@@ -815,7 +815,7 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
         if (overlayEnabled) {
           e.preventDefault();
           const r = e.currentTarget.getBoundingClientRect();
-          openCar(car, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML);
+          openCar(car, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML, e.currentTarget);
         }
       }}
       className="block overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"

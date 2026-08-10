@@ -78,7 +78,7 @@
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 0.75rem;
+  --radius: 1rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -87,47 +87,65 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  /* iOS push 转场:阴影与前页压暗随主题 */
+  --push-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+  --push-dim: 0.08;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  /* 深色模式:延续浅色端"画布 + 卡片"分层逻辑 —— 深灰画布、
+     卡片略浮起、弹层再亮一档;同一 286 色相微调,避免死黑 */
+  --background: oklch(0.16 0.002 286);
+  --foreground: oklch(0.93 0 0);
+  --card: oklch(0.205 0.002 286);
+  --card-foreground: oklch(0.93 0 0);
+  --popover: oklch(0.235 0.002 286);
+  --popover-foreground: oklch(0.93 0 0);
   --primary: #07c160;
   --primary-foreground: oklch(1 0 0);
   /* Brand accent on dark surfaces */
   --brand: oklch(0.8 0.16 158);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.371 0 0);
-  --accent-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.26 0.002 286);
+  --secondary-foreground: oklch(0.93 0 0);
+  --muted: oklch(0.26 0.002 286);
+  --muted-foreground: oklch(0.72 0 0);
+  --accent: oklch(0.3 0.002 286);
+  --accent-foreground: oklch(0.93 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --border: oklch(1 0 0 / 12%);
+  --input: oklch(1 0 0 / 16%);
+  /* Focus ring 用品牌绿弱化版,而非中性灰 */
+  --ring: oklch(0.65 0.1 158);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: oklch(0.205 0.002 286);
+  --sidebar-foreground: oklch(0.93 0 0);
+  --sidebar-primary: #07c160;
+  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-accent: oklch(0.26 0.002 286);
+  --sidebar-accent-foreground: oklch(0.93 0 0);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.65 0.1 158);
+  /* 深色下阴影要更深更宽才可见,前页压暗也加重(接近真 iOS 深色行为) */
+  --push-shadow: -12px 0 32px rgba(0, 0, 0, 0.6);
+  --push-dim: 0.3;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+  /* 所有圆角统一用苹果同款弧度:iOS 图标/连续圆角 ≈ 超椭圆指数 5,
+     corner-shape 参数为 log2(指数) → superellipse(2.32)。
+     (squircle 关键字 = superellipse(2) = 指数 4,略平于苹果)
+     不支持的浏览器忽略、退回普通圆角 */
+  *,
+  *::before,
+  *::after {
+    corner-shape: superellipse(2.32);
   }
   body {
     @apply bg-background text-foreground;
@@ -177,10 +195,10 @@
 @keyframes ios-push-in {
   0% {
     transform: translateX(100%);
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--push-shadow);
   }
   85% {
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--push-shadow);
   }
   100% {
     transform: translateX(0);
@@ -203,21 +221,21 @@
 @keyframes ios-pop-out {
   from {
     transform: translateX(0);
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--push-shadow);
   }
   to {
     transform: translateX(100%);
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
+    box-shadow: var(--push-shadow);
   }
 }
 
 @keyframes dim-in {
   from { opacity: 0; }
-  to { opacity: 0.08; }
+  to { opacity: var(--push-dim); }
 }
 
 @keyframes dim-out {
-  from { opacity: 0.08; }
+  from { opacity: var(--push-dim); }
   to { opacity: 0; }
 }
 
@@ -295,11 +313,22 @@ html.capacitor-native {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 完全隐藏滚动条(横滑分页/横向胶囊条等) */
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none !important;
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 /* Thin scrollbar for desktop */
 @media (hover: hover) {
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--border)) transparent;
+    scrollbar-color: var(--border) transparent;
   }
   *::-webkit-scrollbar {
     width: 6px;
@@ -309,11 +338,11 @@ html.capacitor-native {
     background: transparent;
   }
   *::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
+    background: var(--border);
     border-radius: 3px;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
+    background: var(--muted-foreground);
   }
 }
 
@@ -335,6 +364,11 @@ html.capacitor-native {
 /* Brand-tinted selection */
 ::selection {
   background: color-mix(in srgb, #07c160 28%, transparent);
+}
+
+/* 深色下加重选区着色,否则几乎看不见 */
+.dark ::selection {
+  background: color-mix(in srgb, #07c160 45%, transparent);
 }
 
 /* Visible keyboard focus on plain links/buttons */

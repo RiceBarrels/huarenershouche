@@ -6,11 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { X, GitCompare, Trash2, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-} from "@/components/ui/drawer";
+import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { CompareContent } from "@/components/compare-content";
 import { getCompareIds, removeFromCompare, clearCompare } from "@/lib/compare";
 import { useCarOverlay } from "@/components/car-overlay-provider";
@@ -29,6 +25,8 @@ export function CompareBar() {
   const [ids, setIds] = useState<string[]>([]);
   const [cars, setCars] = useState<Map<string, DbCar>>(new Map());
   const [navHeight, setNavHeight] = useState(0);
+  // 底部导航是 iOS 原生 liquid glass 胶囊时,对比条改为悬浮圆角卡片
+  const [nativeNav, setNativeNav] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
 
   useEffect(() => {
@@ -47,6 +45,9 @@ export function CompareBar() {
     function measure() {
       const nav = document.querySelector("[data-bottom-nav]");
       setNavHeight(nav instanceof HTMLElement ? nav.offsetHeight : 0);
+      setNativeNav(
+        nav instanceof HTMLElement && nav.dataset.bottomNav === "native",
+      );
     }
     measure();
     const t = setTimeout(measure, 300);
@@ -83,8 +84,10 @@ export function CompareBar() {
   if (!mounted) return null;
 
   const visible = ids.length > 0 && pathname !== "/compare";
+  // 原生 liquid glass 胶囊上方:悬浮卡片样式,并与胶囊留 8px 间距
+  const floating = nativeNav && !overlayOpen && navHeight > 0;
   // 浮层打开时导航被盖住,贴屏幕底部即可
-  const bottomOffset = overlayOpen ? 0 : navHeight;
+  const bottomOffset = overlayOpen ? 0 : navHeight + (floating ? 8 : 0);
 
   return createPortal(
     <>
@@ -95,12 +98,17 @@ export function CompareBar() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 24, opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className={`fixed inset-x-0 md:px-4 ${overlayOpen ? "z-[70]" : "z-40"}`}
+          className={`fixed inset-x-0 md:px-4 ${overlayOpen ? "z-[70]" : "z-40"} ${floating ? "px-3" : ""}`}
           style={{ bottom: bottomOffset }}
         >
-          {/* 手机端通栏贴底;桌面端悬浮居中卡片 */}
+          {/* 手机端通栏贴底(DOM 导航)/ 悬浮圆角卡片(原生 liquid glass 胶囊);
+              桌面端悬浮居中卡片 */}
           <div
-            className="mx-auto flex w-full items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:rounded-xl md:border md:shadow-sm"
+            className={`mx-auto flex w-full items-center gap-2 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:rounded-xl md:border md:shadow-sm ${
+              floating
+                ? "rounded-xl border border-border bg-background/85 shadow-lg"
+                : "border-t border-border bg-background/95"
+            }`}
             style={
               bottomOffset === 0
                 ? { paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }
@@ -182,26 +190,28 @@ export function CompareBar() {
       )}
     </AnimatePresence>
 
-    {/* 移动端:对比内容在 drawer 里打开(浮层/任意页面上都可见) */}
-    <Drawer open={compareOpen} onOpenChange={setCompareOpen}>
-      <DrawerContent className="max-h-[85vh]">
-        <div className="flex items-center justify-between px-4 pb-2 pt-4">
-          <DrawerClose asChild>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <X className="h-4 w-4" strokeWidth={1.5} />
-            </button>
-          </DrawerClose>
-          <span className="font-mono text-sm font-semibold">车辆对比</span>
-          <div className="h-8 w-8" />
-        </div>
-        <div className="overflow-y-auto px-4 pb-8">
-          <CompareContent />
-        </div>
-      </DrawerContent>
-    </Drawer>
+    {/* 移动端:对比内容在 drawer 里打开(浮层/任意页面上都可见);
+        非 modal,避免锁死悬浮层手势 */}
+    <NonModalDrawer
+      open={compareOpen}
+      onOpenChange={setCompareOpen}
+      contentClassName="max-h-[85vh]"
+    >
+      <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        <button
+          type="button"
+          onClick={() => setCompareOpen(false)}
+          className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <X className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+        <span className="font-mono text-sm font-semibold">车辆对比</span>
+        <div className="h-8 w-8" />
+      </div>
+      <div className="overflow-y-auto px-4 pb-8">
+        <CompareContent />
+      </div>
+    </NonModalDrawer>
     </>,
     document.body
   );

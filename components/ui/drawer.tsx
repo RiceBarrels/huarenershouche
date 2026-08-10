@@ -4,26 +4,17 @@ import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
 import { cn } from "@/lib/utils"
+import { triggerHaptic } from "@/lib/haptics"
 import { NativeBarHideLock } from "@/components/native-bar-hide-lock"
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height"
 
-function triggerHaptic() {
-  // Native (Capacitor)
-  import("@capacitor/haptics")
-    .then(({ Haptics, ImpactStyle }) =>
-      Haptics.impact({ style: ImpactStyle.Light })
-    )
-    .catch(() => {
-      // Web fallback — navigator.vibrate
-      navigator?.vibrate?.(8);
-    });
-}
-
-function withHapticClose(
+// 打开/关闭都给一次轻触觉(非受控 drawer:vaul 的 onOpenChange 覆盖
+// Trigger 打开与拖拽/点外关闭)
+function withHaptic(
   onOpenChange?: (open: boolean) => void
 ): (open: boolean) => void {
   return (open: boolean) => {
-    if (!open) triggerHaptic();
+    triggerHaptic();
     onOpenChange?.(open);
   };
 }
@@ -35,14 +26,30 @@ function Drawer({
   onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
-  return <DrawerPrimitive.Root data-slot="drawer" shouldScaleBackground={shouldScaleBackground} onOpenChange={withHapticClose(onOpenChange)} {...props} />
+  // 受控 drawer:程序化 setOpen(true) 不经过 vaul 的 onOpenChange,
+  // 统一由 open prop 的变化触发开/关触觉(首帧不触发)
+  const controlled = props.open !== undefined
+  const prevOpen = React.useRef(props.open)
+  React.useEffect(() => {
+    if (!controlled || prevOpen.current === props.open) return
+    prevOpen.current = props.open
+    triggerHaptic()
+  }, [controlled, props.open])
+  return (
+    <DrawerPrimitive.Root
+      data-slot="drawer"
+      shouldScaleBackground={shouldScaleBackground}
+      onOpenChange={controlled ? onOpenChange : withHaptic(onOpenChange)}
+      {...props}
+    />
+  )
 }
 
 function DrawerNested({
   onOpenChange,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) {
-  return <DrawerPrimitive.NestedRoot data-slot="drawer-nested" onOpenChange={withHapticClose(onOpenChange)} {...props} />
+  return <DrawerPrimitive.NestedRoot data-slot="drawer-nested" onOpenChange={withHaptic(onOpenChange)} {...props} />
 }
 
 function DrawerTrigger({

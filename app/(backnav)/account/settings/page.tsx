@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NotificationSettings } from "@/components/notification-settings";
+import { ACTING_KEY } from "@/components/identity-provider";
 import type { DbProfile, DbDealerStore } from "@/lib/types";
 
 const StoreMap = dynamic(
@@ -46,6 +47,11 @@ export default function SettingsPage() {
   const [newStore, setNewStore] = useState({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "", wechat: "" });
   const [addingStore, setAddingStore] = useState(false);
   const [submittingVerification, setSubmittingVerification] = useState<string | null>(null);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const profileFormRef = useRef(profileForm);
@@ -206,6 +212,22 @@ export default function SettingsPage() {
     setSubmittingVerification(null);
   }
 
+  async function handleDeleteAccount() {
+    if (deleteConfirmText !== "删除" || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    const { error } = await supabase.rpc("delete_account");
+    if (error) {
+      setDeleteError(`删除失败: ${error.message}`);
+      setDeleting(false);
+      return;
+    }
+    // 服务端账号已删除,仅需清理本地会话与操作身份
+    try { localStorage.removeItem(ACTING_KEY); } catch {}
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    router.replace("/");
+  }
+
   const mapMarkers = useMemo(
     () => stores.filter((s) => s.lat && s.lng).map((s) => ({ lat: s.lat!, lng: s.lng!, name: s.name, address: s.address })),
     [stores]
@@ -281,7 +303,7 @@ export default function SettingsPage() {
               </Button>
             </div>
             {emailMessage && (
-              <p className={`mt-1.5 font-mono text-[11px] ${emailMessage.includes("验证") ? "text-emerald-600" : "text-red-600"}`}>
+              <p className={`mt-1.5 font-mono text-[11px] ${emailMessage.includes("验证") ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                 {emailMessage}
               </p>
             )}
@@ -338,7 +360,7 @@ export default function SettingsPage() {
                           <div className="flex items-center gap-2">
                             <p className="font-mono text-xs font-medium">{store.name}</p>
                             {store.verification_status === "verified" && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-600">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-600 dark:text-emerald-400">
                                 <ShieldCheck className="h-3 w-3" strokeWidth={1.5} />已认证
                               </span>
                             )}
@@ -348,7 +370,7 @@ export default function SettingsPage() {
                               </span>
                             )}
                             {store.verification_status === "rejected" && (
-                              <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-600">
+                              <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 font-mono text-[10px] text-red-600 dark:text-red-400">
                                 <XCircle className="h-3 w-3" strokeWidth={1.5} />未通过
                               </span>
                             )}
@@ -419,7 +441,7 @@ export default function SettingsPage() {
 
                       {/* Rejection note */}
                       {store.verification_status === "rejected" && store.verification_note && (
-                        <p className="mt-2 border-l-2 border-red-300 pl-2 font-mono text-[11px] text-red-600">
+                        <p className="mt-2 border-l-2 border-red-300 pl-2 font-mono text-[11px] text-red-600 dark:text-red-400">
                           拒绝原因: {store.verification_note}
                         </p>
                       )}
@@ -478,6 +500,70 @@ export default function SettingsPage() {
           <div className="mt-6">
             <h2 className="mb-3 font-mono text-sm font-semibold">通知设置</h2>
             <NotificationSettings />
+          </div>
+        )}
+
+        {/* Danger zone: account deletion (App Store 5.1.1(v)) */}
+        {!loading && (
+          <div className="mt-6 overflow-hidden rounded-xl border border-destructive/30">
+            <div className="border-b border-destructive/30 bg-destructive/5 px-4 py-3">
+              <h2 className="font-mono text-sm font-semibold text-destructive">删除账号</h2>
+              <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                永久删除您的账号及全部数据，包括发布的车源、消息、收藏、评论和上传的图片。此操作立即生效且不可恢复。
+              </p>
+            </div>
+            <div className="p-4">
+              {!deleteOpen ? (
+                <Button
+                  variant="outline"
+                  className="h-10 gap-1.5 border-destructive/40 font-mono text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  删除我的账号
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <Label htmlFor="delete-confirm" className="font-mono text-xs">
+                    请输入「删除」以确认永久删除账号
+                  </Label>
+                  <Input
+                    id="delete-confirm"
+                    className="h-10 font-mono text-sm"
+                    placeholder="删除"
+                    value={deleteConfirmText}
+                    onChange={(e) => setDeleteConfirmText(e.target.value)}
+                    disabled={deleting}
+                  />
+                  {deleteError && (
+                    <p className="font-mono text-[11px] text-red-600 dark:text-red-400">{deleteError}</p>
+                  )}
+                  <div className="flex gap-2">
+                    <Button
+                      variant="destructive"
+                      className="h-10 flex-1 gap-1.5 font-mono text-xs"
+                      onClick={handleDeleteAccount}
+                      disabled={deleteConfirmText !== "删除" || deleting}
+                    >
+                      {deleting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      )}
+                      确认永久删除
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-10 font-mono text-xs"
+                      onClick={() => { setDeleteOpen(false); setDeleteConfirmText(""); setDeleteError(""); }}
+                      disabled={deleting}
+                    >
+                      取消
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </main>

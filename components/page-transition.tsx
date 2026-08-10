@@ -204,6 +204,16 @@ const EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 // 手势松手后的收尾曲线:起步就带着手指的速度走,只做减速,不能先慢后快
 const RELEASE_EASING = "cubic-bezier(0.17, 0.84, 0.44, 1)";
 
+// 前页压暗强度随主题走(--push-dim:浅色 0.08 / 深色更重),拖拽起手时刷新。
+// JS 驱动的帧(跟手/WAAPI)用不了 CSS 变量做乘法,所以读一次缓存成数值
+let _pushDim = 0.08;
+function refreshPushDim() {
+  const v = parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue("--push-dim"),
+  );
+  if (!Number.isNaN(v)) _pushDim = v;
+}
+
 // Tab 间切换(bottomnav ↔ bottomnav)用缩放弹出转场,更快更轻
 const TAB_DURATION = 260;
 
@@ -256,9 +266,13 @@ export function PageTransition({
   const dragVW = useRef(1);
   // 手势提交后滑出动画的结束时刻:导航 commit 太快时也要等动画播完再撤覆盖层
   const dragHoldUntil = useRef(0);
-  // 拖拽取消(未提交返回)时,退出 drag 后要恢复拖拽前的滚动位置
-  // (内容 fixed 期间 body 高度塌缩,window.scrollY 已被浏览器清零)
-  const restoreScrollOnDragEnd = useRef(false);
+  // 退出 drag 时要恢复的滚动位置(内容 fixed 期间 body 高度塌缩,浏览器把
+  // window.scrollY 钳到 0,路由层的滚动恢复也因此失效):取消 = 拖拽前的位置,
+  // 提交 = 目的页离开时的位置(快照栈里存的 scrollY)
+  const restoreScrollTarget = useRef<number | null>(null);
+  // 滑出途中路由已 commit 时,顶层 children 会瞬间变成目的页内容;
+  // 用导航前抓的旧页快照盖在上面,滑出层看起来始终是旧页,不闪变
+  const [dragExit, setDragExit] = useState<string | null>(null);
   // 拖拽底层内容:起手时取快照栈顶(返回一步露出的页面)
   const dragUnder = useRef<{ html: string | null; scrollY: number } | null>(null);
 
@@ -295,7 +309,7 @@ export function PageTransition({
       }
       if (dim) {
         dim.style.transition = transition ? transition.replace(/transform/g, "opacity") : "";
-        dim.style.opacity = String(0.08 * (1 - dx / vw));
+        dim.style.opacity = String(_pushDim * (1 - dx / vw));
       }
     }
 
@@ -335,21 +349,21 @@ export function PageTransition({
             setTimeout(() => {
               if (dragRef.current) {
                 dragRef.current = false;
-                restoreScrollOnDragEnd.current = true;
+                restoreScrollTarget.current = dragScrollY.current;
                 setDrag(false);
               }
             }, 2400);
           } else {
             // 无历史可退(没发生跨路由 popstate):撤掉覆盖层弹回当前页
             dragRef.current = false;
-            restoreScrollOnDragEnd.current = true;
+            restoreScrollTarget.current = dragScrollY.current;
             setDrag(false);
           }
         }, 600);
       } else {
         setTimeout(() => {
           dragRef.current = false;
-          restoreScrollOnDragEnd.current = true;
+          restoreScrollTarget.current = dragScrollY.current;
           setDrag(false);
         }, ms);
       }
@@ -397,6 +411,7 @@ export function PageTransition({
           dragRef.current = true;
           dragScrollY.current = window.scrollY;
           dragVW.current = window.innerWidth;
+          refreshPushDim();
           dragUnder.current = _snapshotStack[_snapshotStack.length - 1] ?? null;
           setDrag(true);
         }
@@ -436,6 +451,7 @@ export function PageTransition({
       dragRef.current = true;
       dragScrollY.current = window.scrollY;
       dragVW.current = window.innerWidth;
+      refreshPushDim();
       dragUnder.current = under;
       setDrag(true);
       // 等覆盖层挂载完成再播滑出
@@ -493,7 +509,7 @@ export function PageTransition({
         opts,
       ),
       handoffDimRef.current?.animate(
-        [{ opacity: 0.08 * (1 - handoff.x / handoff.vw) }, { opacity: 0 }],
+        [{ opacity: _pushDim * (1 - handoff.x / handoff.vw) }, { opacity: 0 }],
         opts,
       ),
     ];
@@ -520,14 +536,16 @@ export function PageTransition({
   // 取消场景下同帧恢复滚动位置,避免闪跳
   useIsoLayoutEffect(() => {
     if (drag) return;
+    setDragExit(null);
     const el = topLayerRef.current;
     if (el) {
       el.style.transform = "";
       el.style.transition = "";
     }
-    if (restoreScrollOnDragEnd.current) {
-      restoreScrollOnDragEnd.current = false;
-      window.scrollTo(0, dragScrollY.current);
+    if (restoreScrollTarget.current != null) {
+      const y = restoreScrollTarget.current;
+      restoreScrollTarget.current = null;
+      window.scrollTo(0, y);
     }
   }, [drag]);
 
@@ -550,6 +568,11 @@ export function PageTransition({
     if (dragRef.current) {
       // 同组返回:本实例自己播完收尾动画,不需要(也不能被)新实例接手
       _gestureHandoff = null;
+      // 路由已切换,顶层的 children 此刻起是目的页——盖上旧页快照继续滑出,
+      // 否则滑到一半的内容会从旧页闪变成新页
+      setDragExit(exitHtmlRef.current);
+      // 结束撤层时手动恢复目的页的滚动位置(此刻 body 塌缩,原生恢复已被钳 0)
+      restoreScrollTarget.current = dragUnder.current?.scrollY ?? 0;
       const wait = dragHoldUntil.current - Date.now();
       if (wait > 0) {
         setTimeout(() => {
@@ -603,7 +626,7 @@ export function PageTransition({
             <div
               ref={dimLayerRef}
               className="fixed inset-0 z-[31] bg-black pointer-events-none"
-              style={{ opacity: 0.08 }}
+              style={{ opacity: _pushDim }}
             />
           </>
         )}
@@ -611,7 +634,7 @@ export function PageTransition({
           <div
             ref={handoffDimRef}
             className="fixed inset-0 z-[31] bg-black pointer-events-none"
-            style={{ opacity: 0.08 * (1 - handoff.x / handoff.vw) }}
+            style={{ opacity: _pushDim * (1 - handoff.x / handoff.vw) }}
           />
         )}
         {/* 顶层:当前页,跟手拖动(transform 由 setLayers 直接写行内样式,
@@ -621,11 +644,19 @@ export function PageTransition({
           id="page-transition-content"
           ref={topLayerRef}
           className={drag ? "fixed inset-0 z-[32] overflow-hidden bg-background" : undefined}
-          style={drag ? { boxShadow: "-4px 0 24px rgba(0,0,0,0.15)" } : undefined}
+          style={drag ? { boxShadow: "var(--push-shadow)" } : undefined}
         >
           <div style={drag ? { transform: `translateY(-${dragScrollY.current}px)` } : undefined}>
             {children}
           </div>
+          {/* commit 后盖住已变成目的页的 children;快照抓自拖拽期的本节点,
+              已含 translateY 滚动包装,原样渲染即与被盖内容逐像素对齐 */}
+          {drag && dragExit && (
+            <div
+              className="absolute inset-0 overflow-hidden bg-background"
+              dangerouslySetInnerHTML={{ __html: dragExit }}
+            />
+          )}
         </div>
         {handoff && (
           // 跨组接手的旧页快照:从断点位置继续滑出屏幕
@@ -634,7 +665,7 @@ export function PageTransition({
             className="fixed inset-0 z-[32] overflow-hidden bg-background pointer-events-none"
             style={{
               transform: `translateX(${handoff.x}px)`,
-              boxShadow: "-4px 0 24px rgba(0,0,0,0.15)",
+              boxShadow: "var(--push-shadow)",
             }}
           >
             {handoff.html && (

@@ -58,7 +58,7 @@ export default function LuckToolPage() {
 
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div className="rounded-xl border border-border bg-card p-4">
-            <p className="font-mono text-sm font-bold text-emerald-600">宜</p>
+            <p className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">宜</p>
             {good.map((g) => (
               <p key={g} className="mt-1.5 font-mono text-sm">{g}</p>
             ))}

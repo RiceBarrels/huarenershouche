@@ -142,12 +142,13 @@ export function MobileTabBar() {
   if (!mounted) return null;
 
   // iOS 原生模式(含探测期):离屏渲染 lucide 图标供栅格化取源;
-  // 该元素同时按原生 bar 高度占位,compare-bar 依赖 [data-bottom-nav] 测高
+  // 该元素同时按原生 bar 高度占位,compare-bar 依赖 [data-bottom-nav] 测高,
+  // 值 "native" 标记 liquid glass 原生 bar(compare-bar 据此换悬浮卡片样式)
   if (mode !== "dom") {
     return (
       <div
         ref={iconsRef}
-        data-bottom-nav=""
+        data-bottom-nav="native"
         aria-hidden
         style={{
           position: "fixed",

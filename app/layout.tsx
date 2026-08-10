@@ -9,6 +9,7 @@ import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
+import { SplashAd } from "@/components/splash-ad";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
 import { CompareBar } from "@/components/compare-bar";
 import { Analytics } from "@vercel/analytics/next";
@@ -40,6 +41,11 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  // 状态栏/浏览器框颜色跟随主题(与 --background 对应)
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8f8f8" },
+    { media: "(prefers-color-scheme: dark)", color: "#0e0e0f" },
+  ],
 };
 
 export const metadata: Metadata = {
@@ -157,6 +163,7 @@ export default function RootLayout({
                   <NotchUI />
                 </div>
                 {children}
+                <SplashAd />
                 <InitHaptic/>
                 <RealtimeNotifications />
                 <CompareBar />

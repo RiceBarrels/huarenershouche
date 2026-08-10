@@ -13,6 +13,7 @@ import {
   MapPin,
   DollarSign,
   Zap,
+  ChevronDown,
   ChevronRight,
   Car,
   SlidersHorizontal,
@@ -21,6 +22,7 @@ import {
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
+import { HomeFeed } from "@/components/home-feed";
 import { SectionHeader } from "@/components/section-header";
 import { Reveal, RevealGroup, RevealItem } from "@/components/reveal";
 import { CountUp } from "@/components/count-up";
@@ -187,19 +189,11 @@ const QUICK_TAGS: { label: string; params: Record<string, string> }[] = [
 
 const PAYMENT_PRESETS = [200, 300, 400, 500];
 
-// 手机版品牌宫格(4 列 × 3 行,最后一格「更多」打开品牌抽屉)
+// 手机版品牌行(与金刚区同一 snap 滑动条,5 个/页,末位「更多」打开品牌抽屉)
 const MOBILE_BRANDS = [
-  "Toyota", "Honda", "BMW", "Mercedes-Benz",
-  "Tesla", "Lexus", "Audi", "Nissan",
-  "Ford", "Subaru", "Hyundai",
-];
-
-// 手机版价格快捷入口
-const MOBILE_PRICE_LINKS: { label: string; params: Record<string, string> }[] = [
-  { label: "$10K以下", params: { maxPrice: "10000" } },
-  { label: "$10-20K", params: { minPrice: "10000", maxPrice: "20000" } },
-  { label: "$20-30K", params: { minPrice: "20000", maxPrice: "30000" } },
-  { label: "全部车源", params: {} },
+  "Toyota", "Honda", "BMW", "Mercedes-Benz", "Tesla",
+  "Lexus", "Audi", "Nissan", "Ford", "Subaru",
+  "Hyundai", "Kia", "Mazda", "Volkswagen",
 ];
 
 // 简洁单色车型剪影(线条风格,配合 currentColor 使用)
@@ -389,9 +383,9 @@ export default function Home() {
           viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
         }
 
-        // 不把已经看过的车再推给用户
+        // 不把已经看过的车再推给用户;多排一些供手机端 tab 流无限滑
         const excludeIds = new Set(recentIds);
-        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 6 });
+        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 30 });
         setRecommended(recommendedNext);
       }
 
@@ -446,6 +440,11 @@ export default function Home() {
     return () => window.removeEventListener("clc-location-granted", onLocationGranted);
   }, []);
 
+  // 手机搜索行的地区短标签:已选筛选地区 > 定位到的城市 > 全美
+  const mobileLocLabel = searchFilters.location
+    ? getLocationLabel(searchFilters)
+    : userLocation?.zhName?.split(" · ").pop() || "全美";
+
   // 更多筛选已选条件数(不含关键词与默认距离)
   const searchActiveCount = Object.entries(searchFilters).filter(
     ([k, v]) => v && k !== "keyword" && !(k === "maxDistance" && v === "50")
@@ -464,7 +463,7 @@ export default function Home() {
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-muted/30 font-mono md:bg-background"
+      className="flex min-h-screen flex-col bg-muted/30 font-mono md:bg-background gap-6 dark:bg-background"
     >
       <Header />
 
@@ -499,7 +498,7 @@ export default function Home() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 shrink-0 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-4 font-mono text-xs text-white hover:opacity-90"
+                className="h-9 shrink-0 rounded-full bg-primary px-4 font-mono text-xs text-primary-foreground hover:opacity-90"
               >
                 搜索
               </Button>
@@ -510,7 +509,7 @@ export default function Home() {
 
       {/* Hero — typographic, grid backdrop */}
       <section 
-        className="relative overflow-hidden px-4 pb-6 pt-4 bg-linear-160 from-primary/50 via-background"
+        className="relative overflow-hidden px-4 pt-4 bg-linear-160 from-primary/50 via-background dark:from-primary/15"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
       >
         {/* Grid backdrop with subtle parallax */}
@@ -530,7 +529,7 @@ export default function Home() {
               <Image src="/logo.png" alt="常來車網" width={22} height={22} className="h-[22px] w-[22px] object-contain" />
               <span className="font-logo text-lg">常來車網</span>
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="hidden items-center gap-1.5 md:flex">
               <MapPin className="h-3 w-3 text-muted-foreground/60" strokeWidth={1.5} />
               {locationLoading ? (
                 <span className="font-mono text-[11px] text-muted-foreground/50">定位中...</span>
@@ -577,7 +576,7 @@ export default function Home() {
 
           {/* Structured search — 地区/品牌/更多筛选 drawer + 关键词 */}
           <div ref={heroSearchRef} className="mt-4 md:mt-10">
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid-cols-3 gap-2 hidden md:grid">
               <Drawer>
                 <DrawerTrigger asChild>
                   <button
@@ -689,6 +688,35 @@ export default function Home() {
               }}
               className="mt-2 flex overflow-hidden rounded-full border border-border bg-background md:rounded-md"
             >
+              {/* 手机:地区选择挂在搜索行左侧(瓜子式「城市▾ | 搜索 | 按钮」) */}
+              <Drawer>
+                <DrawerTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex shrink-0 items-center gap-0.5 pl-3.5 pr-1.5 font-mono text-sm font-medium transition-opacity active:opacity-60 md:hidden"
+                  >
+                    <span className="max-w-16 truncate">{mobileLocLabel}</span>
+                    <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                  </button>
+                </DrawerTrigger>
+                <DrawerContent className="max-h-[85vh]">
+                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                    <DrawerClose asChild>
+                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </DrawerClose>
+                    <span className="font-mono text-sm font-semibold">地区</span>
+                    <div className="h-8 w-8" />
+                  </div>
+                  <div className="overflow-y-auto px-4 pb-6">
+                    <LocationDrawerContent
+                      filters={searchFilters}
+                      onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
+                    />
+                  </div>
+                </DrawerContent>
+              </Drawer>
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
                 <Input
@@ -700,7 +728,7 @@ export default function Home() {
               </div>
               <Button
                 type="submit"
-                className="h-12 gap-2 rounded-r-full bg-gradient-to-r from-emerald-500 to-teal-500 px-6 font-mono text-sm text-white hover:opacity-90 md:bg-none md:bg-primary md:px-8 md:text-primary-foreground"
+                className="h-12 gap-2 rounded-r-full bg-primary px-6 font-mono text-sm text-primary-foreground hover:opacity-90 md:px-8"
               >
                 搜索
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
@@ -708,72 +736,38 @@ export default function Home() {
             </form>
           </div>
 
-          {/* 手机版:买车/卖车 + 价格段 + 品牌宫格 */}
+          {/* 手机版:金刚区 + 品牌行,合并为同一个 snap 分页滑动条(瓜子式) */}
           <div className="md:hidden">
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              <Link
-                href="/browse"
-                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 font-mono text-base font-bold text-white shadow-sm transition-opacity active:opacity-85"
-              >
-                <Car className="h-5 w-5" strokeWidth={1.8} />
-                买车
-              </Link>
-              <Link
-                href="/post"
-                className="flex h-12 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-orange-500 font-mono text-base font-bold text-white shadow-sm transition-opacity active:opacity-85"
-              >
-                <DollarSign className="h-5 w-5" strokeWidth={1.8} />
-                卖车
-              </Link>
-            </div>
-
-            {/* 金刚区:功能入口(按最近使用排序,末位全部功能) */}
-            <FeatureRow />
-
-            {/* 价格快捷入口 */}
-            <div className="mt-3 grid grid-cols-4">
-              {MOBILE_PRICE_LINKS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => router.push(buildUrl(p.params))}
-                  className="py-2 text-center font-mono text-xs font-medium text-foreground transition-colors active:text-muted-foreground"
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
-
-            {/* 品牌宫格 */}
-            <div className="mt-1 grid grid-cols-4 gap-y-1">
-              {MOBILE_BRANDS.map((m) => {
-                const logo = getBrandLogoUrl(m);
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => router.push(buildUrl({ make: m }))}
-                    className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 transition-colors active:bg-muted/50"
-                  >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center">
-                      {logo ? (
-                        <img src={logo} alt={m} className="h-5 w-5 object-contain" />
-                      ) : (
-                        <Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                      )}
-                    </span>
-                    <span className="font-mono text-[11px]">{MAKES_ZH[m] || m}</span>
-                  </button>
-                );
-              })}
-              {/* 更多 → 品牌抽屉 */}
-              <Drawer>
+            <FeatureRow
+              brandTiles={[
+                ...MOBILE_BRANDS.map((m) => {
+                  const logo = getBrandLogoUrl(m);
+                  return (
+                    <button
+                      key={m}
+                      type="button"
+                      onClick={() => router.push(buildUrl({ make: m }))}
+                      className="flex flex-col items-center gap-1.5 py-2 transition-opacity active:opacity-60"
+                    >
+                      <span className="flex h-7 w-7 items-center justify-center">
+                        {logo ? (
+                          <img src={logo} alt={m} className="h-6 w-6 object-contain" />
+                        ) : (
+                          <Car className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
+                        )}
+                      </span>
+                      <span className="font-mono text-[11px]">{MAKES_ZH[m] || m}</span>
+                    </button>
+                  );
+                }),
+                /* 更多 → 品牌抽屉 */
+                <Drawer key="brand-more">
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 transition-colors active:bg-muted/50"
+                    className="flex flex-col items-center gap-1.5 py-2 transition-opacity active:opacity-60"
                   >
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-muted/50 font-mono text-[10px] text-muted-foreground">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-muted/50 font-mono text-xs text-muted-foreground">
                       ⋯
                     </span>
                     <span className="font-mono text-[11px]">更多</span>
@@ -807,8 +801,9 @@ export default function Home() {
                     </DrawerClose>
                   </div>
                 </DrawerContent>
-              </Drawer>
-            </div>
+                </Drawer>,
+              ]}
+            />
           </div>
 
           {/* Popular makes chips(桌面;手机用下方品牌宫格) */}
@@ -823,7 +818,7 @@ export default function Home() {
               </button>
             ))}
           </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 hidden flex-wrap items-center gap-1.5 md:flex">
             {QUICK_TAGS.map((t) => (
               <button
                 key={t.label}
@@ -879,13 +874,13 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <Link
               href="/browse?listedWithin=3"
-              className="rounded-2xl border border-border/60 bg-gradient-to-b from-emerald-500/15 to-card p-3"
+              className="rounded-2xl border border-border/60 bg-gradient-to-b from-primary/15 to-card p-3"
             >
               <p className="flex items-center justify-between font-mono text-[15px] font-bold">
                 新上好车
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
               </p>
-              <p className="font-mono text-[10px] text-emerald-600 dark:text-emerald-400">最近 3 天上架</p>
+              <p className="font-mono text-[10px] text-brand">最近 3 天上架</p>
               <div className="mt-2 space-y-2">
                 {featured.slice(0, 2).map((c) => (
                   <div key={c.id} className="flex items-center gap-1.5">
@@ -959,10 +954,19 @@ export default function Home() {
         </section>
       )}
 
+      {/* 手机版:精选车源 tab 流(多分类 + 无限滚动 + 切换动画),取代逐楼层排布 */}
+      {featured.length > 0 && (
+        <HomeFeed
+          featured={featured}
+          recommended={recommended}
+          showRecommended={showRecommended}
+        />
+      )}
+
       {/* Recommended for you */}
       {showRecommended && recommended.length > 0 && (
-        <section className="px-3 pt-3 md:px-4 md:py-10">
-          <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+        <section className="hidden md:block md:px-4 md:py-10">
+          <div className="">
             <Reveal>
               <SectionHeader
                 index="01"
@@ -973,7 +977,8 @@ export default function Home() {
               />
             </Reveal>
             <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {recommended.map((car) => (
+              {/* 候选池按 30 排(供手机端无限滑),桌面楼层只展示前 6 */}
+              {recommended.slice(0, 6).map((car) => (
                 <RevealItem key={car.id}>
                   <CarCard car={car} />
                 </RevealItem>
@@ -985,8 +990,8 @@ export default function Home() {
 
       {/* Featured listings */}
       {featured.length > 0 && (
-        <section className="px-3 pt-3 md:px-4 md:py-10">
-          <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+        <section className="hidden md:block md:px-4 md:py-10">
+          <div className="">
             <Reveal>
               <SectionHeader
                 index={showRecommended && recommended.length > 0 ? "02" : "01"}
@@ -1008,8 +1013,8 @@ export default function Home() {
       )}
 
       {/* Price drops */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <PriceDroppedCars />
           </Reveal>
@@ -1017,8 +1022,8 @@ export default function Home() {
       </section>
 
       {/* Browse by body style */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <SectionHeader index="03" label="Body Style" title="按车身类型找车" className="mb-6" />
           </Reveal>
@@ -1043,8 +1048,8 @@ export default function Home() {
       </section>
 
       {/* Shop by monthly payment */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <SectionHeader index="04" label="Monthly Budget" title="月供预算购车" className="mb-2" />
           </Reveal>
@@ -1103,8 +1108,8 @@ export default function Home() {
       </section>
 
       {/* Trending searches */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <TrendingSearches />
           </Reveal>
@@ -1112,8 +1117,8 @@ export default function Home() {
       </section>
 
       {/* Region entry */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <RegionBrandEntry />
           </Reveal>
@@ -1121,8 +1126,8 @@ export default function Home() {
       </section>
 
       {/* Community & QA entry */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <SectionHeader
               index="05"
@@ -1196,8 +1201,8 @@ export default function Home() {
       </section>
 
       {/* Trust reviews */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+        <div className="">
           <Reveal>
             <TrustReviews />
           </Reveal>
@@ -1205,8 +1210,8 @@ export default function Home() {
       </section>
 
       {/* Why choose us */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-14">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-14">
+        <div className="">
           <Reveal>
             <SectionHeader index="06" label="Why Us" title="为什么选择常來車網" className="mb-2" />
           </Reveal>
@@ -1231,12 +1236,12 @@ export default function Home() {
       </section>
 
       {/* How it works */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:bg-muted/30 md:px-4 md:py-14">
-        <div className="mx-auto max-w-5xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 xl:max-w-6xl">
+      <section className="hidden md:block md:border-t md:border-border md:bg-muted/30 md:px-4 md:py-14">
+        <div className="">
           <Reveal>
             <SectionHeader index="07" label="How It Works" title="买车三步走" className="mb-8" />
           </Reveal>
-          <RevealGroup stagger={0.1} className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <RevealGroup stagger={0.1} className="grid grid-cols-1 gap-3 md:grid-cols-3">
             {[
               { n: "01", title: "搜索筛选", desc: "按品牌、价格、里程、地区等条件，快速找到心仪的车辆" },
               { n: "02", title: "查看详情", desc: "VIN 认证、安全召回查询、车辆配置一目了然，做出明智决定" },
@@ -1258,7 +1263,7 @@ export default function Home() {
       </section>
 
       {/* For sellers */}
-      <section className="px-3 pt-3 md:border-t md:border-border md:px-4 md:py-14">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-14">
         <Reveal className="mx-auto flex max-w-3xl flex-col items-center rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-6 text-center md:rounded-none md:border-0 md:bg-transparent md:p-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">For Sellers</p>
           <h2 className="mt-3 font-mono text-2xl font-bold md:text-3xl">想卖车？</h2>
@@ -1281,7 +1286,7 @@ export default function Home() {
       </section>
 
       {/* About / SEO content */}
-      <section className="px-3 py-3 md:border-t md:border-border md:px-4 md:py-12">
+      <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-12">
         <div className="mx-auto max-w-3xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0">
           <h2 className="font-logo text-xl">关于常來車網</h2>
           <div className="mt-4 space-y-3 font-mono text-xs leading-relaxed text-muted-foreground">

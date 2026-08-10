@@ -1,18 +1,28 @@
 "use client";
 
 // 通用移动端浮层:在当前页面(不跳链接)以浮层打开内容。
-// 打开:从被点卡片放大,~50% 时由卡片图渐变成浮层内容(originRect + heroImage)。
+// 动画借鉴 iOS 主屏打开/关闭 App:弹簧曲线、缩放中窗口带圆角;
+// 打开时卡片放大、内容早早淡入(图标→App);
+// 关闭时内容保持可见随窗口缩小,临近落回卡片才溶解回卡片(App→图标)。
 // 返回:始终缩回原来的卡片位置(共享元素);拖动到阈值松手时,从当前位置连续缩回。
 //   · 横向拖动(左/右)任意位置;纵向在滚到顶下拉 / 滚到底上推时,否则正常滚动。
 // 需放在 <AnimatePresence> 内,并带唯一 key。
 
 import { type ReactNode, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
+import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
 const DISMISS_PX = 90; // 位移阈值
 const DISMISS_V = 0.5; // 速度阈值 px/ms
-const ZOOM = { duration: 0.42, ease: [0.22, 1, 0.36, 1] as const };
+// iOS 打开/关闭 App 式的弹簧(近临界阻尼,无明显回弹,~0.45s 收敛)
+const ZOOM = { type: "spring", stiffness: 400, damping: 40, mass: 0.9 } as const;
+// 内容与卡片的交叉溶解:打开时内容早早淡入(图标→App);
+// 关闭时内容保持可见随窗口缩小,窗口 clip 已收敛到卡片矩形后才溶解回卡片
+// (App→图标),所以可以溶解得很晚
+const CONTENT_IN = { duration: 0.1, delay: 0.05 };
+const CONTENT_OUT = { duration: 0.14, delay: 0.18 };
 
 export interface OriginRect {
   top: number;
@@ -28,6 +38,7 @@ export function SwipeSheet({
   heroHtml,
   topBarExtra,
   zIndex = 60,
+  heroZIndex = zIndex - 1,
 }: {
   children: ReactNode;
   onClose: () => void;
@@ -39,6 +50,9 @@ export function SwipeSheet({
   topBarExtra?: ReactNode;
   // 逐层递增的层级(浮层栈里后开的盖前面的),须 <70(对比条)/<80(工具 drawer)
   zIndex?: number;
+  // hero 卡片层单独的层级(portal 到 body,须低于 zIndex):首层设为低于
+  // 底部 nav(z-50),放大/缩回时卡片从 nav 底下钻过;sheet 本身层级不受影响
+  heroZIndex?: number;
 }) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -49,13 +63,33 @@ export function SwipeSheet({
   const dragScale = useTransform(
     () => 1 - Math.min(0.12, Math.hypot(x.get(), y.get()) / 320 * 0.12),
   );
+  // 开始关闭手势即给窗口上圆角(iOS 关 App 同款):随拖动距离渐入,
+  // 封顶 32px;松手回弹时随位移归零自动退回直角
+  const dragRadius = useTransform(() =>
+    Math.min(32, Math.hypot(x.get(), y.get()) / 2),
+  );
 
   const hero = !!(originRect && heroHtml);
   const vw = typeof window !== "undefined" ? window.innerWidth : 1;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 1;
   // 等比缩放(按宽度):卡片与内容都不变形。起点 = 卡片宽/屏宽
   const startScale = originRect ? originRect.width / Math.max(1, vw) : 1;
+  // 卡片按宽度放大到全屏后高度不足一屏,落点纵向居中(而非贴顶)
+  const heroScale = originRect ? vw / Math.max(1, originRect.width) : 1;
+  const heroEndY = originRect
+    ? -originRect.top + (vh - originRect.height * heroScale) / 2
+    : 0;
+  // iOS 式「窗口从卡片矩形长出来」:sheet 除了等比缩放,还用 clip-path 裁成
+  // 卡片矩形(高度对齐卡片,而非整屏的瘦长条),随动画展开成全屏。
+  // clip 的数值在元素本地(未缩放)坐标系,故除以 startScale 补偿;
+  // round 圆角同理补偿,缩到卡片大小时视觉 ≈ 卡片的 rounded-xl(22px)
   const rectVariant = originRect
-    ? { x: originRect.left, y: originRect.top, scale: startScale }
+    ? {
+        x: originRect.left,
+        y: originRect.top,
+        scale: startScale,
+        clipPath: `inset(0px 0px ${Math.max(0, vh - originRect.height / Math.max(0.05, startScale))}px 0px round ${22 / Math.max(0.05, startScale)}px)`,
+      }
     : { y: "100%" as const };
 
   // 锁定 body 滚动
@@ -66,6 +100,9 @@ export function SwipeSheet({
       document.body.style.overflow = prev;
     };
   }, []);
+
+  // 打开期间隐藏 iOS 原生底部导航(锁计数,独立调用时也生效)
+  useEffect(() => acquireNativeBarHideLock(), []);
 
   useEffect(() => {
     const el = panelRef.current;
@@ -203,48 +240,60 @@ export function SwipeSheet({
     <motion.div className="fixed inset-0 md:hidden" style={{ zIndex }} data-app-overlay="">
       {/* 下层:被点卡片的真实 DOM,始终不透明,从原位连续放大到全屏、退场反向缩回。
           进场前 ~50% 由它露出(内容还透明),之后被内容盖上;返回时内容淡出重新露出它。
-          它一直不透明,内容在其上淡入淡出,故交叉过程不会漏出背景、不闪。 */}
-      {hero && originRect && (
-        <motion.div
-          aria-hidden="true"
-          className="pointer-events-none fixed origin-top-left overflow-hidden rounded-xl border border-border bg-card"
-          style={{
-            top: originRect.top,
-            left: originRect.left,
-            width: originRect.width,
-            height: originRect.height,
-          }}
-          initial={{ x: 0, y: 0, scale: 1 }}
-          animate={{
-            x: -originRect.left,
-            y: -originRect.top,
-            scale: vw / Math.max(1, originRect.width),
-          }}
-          exit={{ x: 0, y: 0, scale: 1, transition: ZOOM }}
-          transition={ZOOM}
-          dangerouslySetInnerHTML={{ __html: heroHtml! }}
-        />
-      )}
+          它一直不透明,内容在其上淡入淡出,故交叉过程不会漏出背景、不闪。
+          portal 到 body 并单独持较低的 z(heroZIndex):卡片钻到底部 nav(z-50)
+          之下,而放大后的 sheet 内容(根节点 zIndex)层级保持不变。 */}
+      {hero &&
+        originRect &&
+        createPortal(
+          // 外层跟随拖拽位移/缩放(与内容面板同一组 motion value),返回手势时
+          // 卡片与内容一体跟手;内层维持原有的 原位 ↔ 全屏 缩放动画
+          <motion.div
+            aria-hidden="true"
+            className="pointer-events-none fixed inset-0 md:hidden"
+            style={{ x, y, scale: dragScale, zIndex: heroZIndex }}
+          >
+            <motion.div
+              className="fixed origin-top-left overflow-hidden rounded-xl bg-card"
+              style={{
+                top: originRect.top,
+                left: originRect.left,
+                width: originRect.width,
+                height: originRect.height,
+              }}
+              initial={{ x: 0, y: 0, scale: 1 }}
+              animate={{
+                x: -originRect.left,
+                y: heroEndY,
+                scale: heroScale,
+              }}
+              exit={{ x: 0, y: 0, scale: 1, transition: ZOOM }}
+              transition={ZOOM}
+              dangerouslySetInnerHTML={{ __html: heroHtml! }}
+            />
+          </motion.div>,
+          document.body,
+        )}
 
-      {/* 上层:浮层内容,与卡片同轨放大 / 缩小;内层透明度在整段 ~10% 处交叉:
-          进场时卡片放大到 10% 即溶解成浮层内容,返回时浮层缩到 10% 即溶解回卡片。 */}
+      {/* 上层:浮层内容,与卡片同轨放大 / 缩小(带圆角的「App 窗口」);
+          进场时内容早早淡入盖住卡片,退场时内容缩到临近卡片才溶解回卡片。 */}
       <motion.div
         className="absolute inset-0 origin-top-left"
         initial={rectVariant}
-        animate={{ x: 0, y: 0, scale: 1 }}
+        animate={{ x: 0, y: 0, scale: 1, clipPath: "inset(0px 0px 0px 0px round 0px)" }}
         exit={contentExit}
         transition={ZOOM}
       >
         <motion.div
           className="absolute inset-0"
           initial={hero ? { opacity: 0 } : false}
-          animate={hero ? { opacity: 1, transition: { duration: 0.08, delay: 0.05 } } : {}}
-          exit={hero ? { opacity: 0, transition: { duration: 0.08, delay: 0.05 } } : {}}
+          animate={hero ? { opacity: 1, transition: CONTENT_IN } : {}}
+          exit={hero ? { opacity: 0, transition: CONTENT_OUT } : {}}
         >
           <motion.div
             ref={panelRef}
             className="relative flex h-full w-full flex-col overflow-hidden bg-background shadow-2xl"
-            style={{ x, y, scale: dragScale, touchAction: "pan-y" }}
+            style={{ x, y, scale: dragScale, borderRadius: dragRadius, touchAction: "pan-y" }}
           >
             {/* 顶部返回栏:左侧返回,右侧快捷操作(垫出刘海安全区) */}
             <div

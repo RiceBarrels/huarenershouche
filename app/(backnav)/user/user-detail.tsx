@@ -17,7 +17,7 @@ import { DealerReviews } from "@/components/dealer-reviews";
 import { ChatThread } from "@/components/chat-thread";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Drawer, DrawerContent } from "@/components/ui/drawer";
+import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OpenInMaps } from "@/components/open-in-maps";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
@@ -156,6 +156,10 @@ export default function UserProfilePage({
       router.push("/login");
       return;
     }
+    // 手机:先开 drawer 立即反馈,会话在后台确保存在
+    // (否则首次点击要等 1-2 个网络往返 drawer 才出现)
+    const mobile = window.matchMedia("(max-width: 767px)").matches;
+    if (mobile) setChatOpen(true);
     setChatLoading(true);
     // 双向查任一已有会话(最近活跃优先)
     const { data: existing } = await supabase
@@ -173,6 +177,7 @@ export default function UserProfilePage({
       const carId = cars[0]?.id;
       if (!carId) {
         setChatLoading(false);
+        if (mobile) setChatOpen(false);
         router.push(`/messages/${userId}`);
         return;
       }
@@ -184,11 +189,11 @@ export default function UserProfilePage({
       convId = created?.id;
     }
     setChatLoading(false);
-    if (convId && window.matchMedia("(max-width: 767px)").matches) {
+    if (mobile && convId) {
       // 手机:drawer 里直接聊
       setChatConvId(convId);
-      setChatOpen(true);
     } else {
+      if (mobile) setChatOpen(false);
       router.push(`/messages/${userId}`);
     }
   }
@@ -477,20 +482,22 @@ export default function UserProfilePage({
       {showChrome && <Footer />}
 
       {/* 手机端:与卖家的对话直接在 drawer 里进行 */}
-      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
-        <DrawerContent>
-          <div className="flex h-[70dvh] flex-col overflow-hidden">
-            {chatConvId && authId && (
-              <ChatThread
-                conversationId={chatConvId}
-                currentUserId={authId}
-                otherUsername={profile?.username || "卖家"}
-                onBack={() => setChatOpen(false)}
-              />
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <NonModalDrawer open={chatOpen} onOpenChange={setChatOpen}>
+        <div className="flex h-[70dvh] flex-col overflow-hidden">
+          {chatConvId && authId ? (
+            <ChatThread
+              conversationId={chatConvId}
+              currentUserId={authId}
+              otherUsername={profile?.username || "卖家"}
+              onBack={() => setChatOpen(false)}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center font-mono text-xs text-muted-foreground">
+              正在打开对话…
+            </div>
+          )}
+        </div>
+      </NonModalDrawer>
     </div>
   );
 }

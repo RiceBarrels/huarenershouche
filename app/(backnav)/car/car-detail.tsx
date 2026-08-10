@@ -39,12 +39,7 @@ import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
 import { timeAgo, estimateMonthlyPayment, LOAN_ASSUMPTION } from "@/lib/format";
 import { SITE_URL } from "@/lib/seo-pages";
-import {
-  Drawer,
-  DrawerClose,
-  DrawerContent,
-  DrawerTrigger,
-} from "@/components/ui/drawer";
+import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Reveal } from "@/components/reveal";
@@ -148,6 +143,8 @@ export default function CarDetailPage({
   // 移动端:发消息在 drawer 里直接聊(不跳 /messages,浮层下跳页看不见)
   const [chatOpen, setChatOpen] = useState(false);
   const [chatConvId, setChatConvId] = useState<string | null>(null);
+  // 月供计算器 drawer(受控:NonModalDrawer 无 Trigger)
+  const [loanOpen, setLoanOpen] = useState(false);
 
   useEffect(() => {
     setInCompare(isInCompare(carId));
@@ -1028,7 +1025,10 @@ export default function CarDetailPage({
                         variant="outline"
                         className="w-full gap-1.5 font-mono text-xs"
                         onClick={async () => {
-                          // 确保会话存在;移动端直接在 drawer 里聊,桌面端跳消息页
+                          // 移动端:先开 drawer 立即反馈,会话在后台确保存在
+                          // (否则首次点击要等 1-2 个网络往返 drawer 才出现);
+                          // 桌面端保持先建会话再跳消息页
+                          if (overlayEnabled) setChatOpen(true);
                           const { data: existing } = await supabase
                             .from("conversations")
                             .select("id")
@@ -1049,9 +1049,9 @@ export default function CarDetailPage({
                               .single();
                             convId = created?.id;
                           }
-                          if (overlayEnabled && convId) {
-                            setChatConvId(convId);
-                            setChatOpen(true);
+                          if (overlayEnabled) {
+                            if (convId) setChatConvId(convId);
+                            else setChatOpen(false);
                           } else {
                             router.push(`/messages/${car.seller_id}`);
                           }
@@ -1228,30 +1228,28 @@ export default function CarDetailPage({
                       按 {(LOAN_ASSUMPTION.apr * 100).toFixed(1)}% APR 估算*
                     </p>
                   </div>
-                  <Drawer>
-                    <DrawerTrigger asChild>
-                      <Button className="mt-4 w-full font-mono text-xs">
-                        计算
-                      </Button>
-                    </DrawerTrigger>
-                    <DrawerContent>
-                      <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                        <DrawerClose asChild>
-                          <button
-                            type="button"
-                            className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
-                          >
-                            <X className="h-4 w-4" strokeWidth={1.5} />
-                          </button>
-                        </DrawerClose>
-                        <span className="font-mono text-sm font-semibold">月供计算器</span>
-                        <div className="h-8 w-8" />
-                      </div>
-                      <div className="overflow-y-auto px-4 pb-8">
-                        <LoanCalculator price={car.price} />
-                      </div>
-                    </DrawerContent>
-                  </Drawer>
+                  <Button
+                    className="mt-4 w-full font-mono text-xs"
+                    onClick={() => setLoanOpen(true)}
+                  >
+                    计算
+                  </Button>
+                  <NonModalDrawer open={loanOpen} onOpenChange={setLoanOpen}>
+                    <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                      <button
+                        type="button"
+                        onClick={() => setLoanOpen(false)}
+                        className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                      <span className="font-mono text-sm font-semibold">月供计算器</span>
+                      <div className="h-8 w-8" />
+                    </div>
+                    <div className="overflow-y-auto px-4 pb-8">
+                      <LoanCalculator price={car.price} />
+                    </div>
+                  </NonModalDrawer>
                   <p className="mt-2 font-mono text-[10px] text-muted-foreground/70">
                     *按 0 首付 / {LOAN_ASSUMPTION.months} 期估算,实际以贷款机构批核为准
                   </p>
@@ -1439,20 +1437,22 @@ export default function CarDetailPage({
       />
 
       {/* 移动端:与卖家的对话直接在 drawer 里进行 */}
-      <Drawer open={chatOpen} onOpenChange={setChatOpen}>
-        <DrawerContent>
-          <div className="flex h-[70dvh] flex-col overflow-hidden">
-            {chatConvId && user && (
-              <ChatThread
-                conversationId={chatConvId}
-                currentUserId={user}
-                otherUsername={car.seller_name}
-                onBack={() => setChatOpen(false)}
-              />
-            )}
-          </div>
-        </DrawerContent>
-      </Drawer>
+      <NonModalDrawer open={chatOpen} onOpenChange={setChatOpen}>
+        <div className="flex h-[70dvh] flex-col overflow-hidden">
+          {chatConvId && user ? (
+            <ChatThread
+              conversationId={chatConvId}
+              currentUserId={user}
+              otherUsername={car.seller_name}
+              onBack={() => setChatOpen(false)}
+            />
+          ) : (
+            <div className="flex flex-1 items-center justify-center font-mono text-xs text-muted-foreground">
+              正在打开对话…
+            </div>
+          )}
+        </div>
+      </NonModalDrawer>
     </div>
   );
 }

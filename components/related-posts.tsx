@@ -122,6 +122,7 @@ export function RelatedPosts({
                     post,
                     { top: r.top, left: r.left, width: r.width, height: r.height },
                     e.currentTarget.outerHTML,
+                    e.currentTarget,
                   );
                 }
               }}

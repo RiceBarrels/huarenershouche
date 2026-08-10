@@ -632,7 +632,7 @@ export default function AdminPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="gap-1 text-xs text-red-600 hover:text-red-700"
+                        className="gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700"
                         onClick={() => rejectStore(store.id)}
                         disabled={actionLoading === store.id || !rejectNote[store.id]?.trim()}
                       >
@@ -683,7 +683,7 @@ export default function AdminPage() {
                               <span className="shrink-0 rounded-full bg-foreground px-1 py-0.5 text-[10px] text-background">管理员</span>
                             )}
                             {u.banned && (
-                              <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已封禁</span>
+                              <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">已封禁</span>
                             )}
                           </div>
                           <p className="truncate text-[10px] text-muted-foreground">
@@ -692,7 +692,7 @@ export default function AdminPage() {
                         </div>
                       </Link>
                       {u.banned && u.banned_reason && (
-                        <p className="mt-1 text-[10px] text-red-600">封禁原因: {u.banned_reason}</p>
+                        <p className="mt-1 text-[10px] text-red-600 dark:text-red-400">封禁原因: {u.banned_reason}</p>
                       )}
                     </div>
                     <div className="ml-2 flex shrink-0 gap-1">
@@ -744,7 +744,7 @@ export default function AdminPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 gap-1 px-2 text-[11px] text-red-600 hover:text-red-700"
+                              className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
                               onClick={() => {
                                 const reason = prompt("封禁原因:");
                                 if (reason) banUser(u.id, reason);
@@ -791,10 +791,10 @@ export default function AdminPage() {
                       <div className="flex items-center gap-1.5">
                         <p className="truncate text-xs font-medium">{car.title_zh || car.title}</p>
                         <span className={`shrink-0 rounded-full px-1 py-0.5 text-[10px] ${
-                          car.status === "active" ? "bg-emerald-500/10 text-emerald-600"
+                          car.status === "active" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                             : car.status === "sold" ? "bg-blue-500/10 text-blue-600"
                             : carExpired(car) ? "bg-orange-500/10 text-orange-600"
-                            : car.status === "removed" ? "bg-red-500/10 text-red-600"
+                            : car.status === "removed" ? "bg-red-500/10 text-red-600 dark:text-red-400"
                             : "bg-amber-500/10 text-amber-600"
                         }`}>
                           {car.status === "active" ? "在售" : car.status === "sold" ? "已售" : carExpired(car) ? "已过期" : car.status === "removed" ? "已下架" : "待审"}
@@ -838,7 +838,7 @@ export default function AdminPage() {
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700"
+                          className="h-7 w-7 p-0 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
                           onClick={() => restoreCar(car.id)}
                           disabled={actionLoading === car.id}
                           title="重新上架"
@@ -849,7 +849,7 @@ export default function AdminPage() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700"
+                        className="h-7 w-7 p-0 text-red-600 dark:text-red-400 hover:text-red-700"
                         onClick={() => deleteCarPermanent(car.id)}
                         disabled={actionLoading === car.id}
                         title="永久删除"
@@ -881,7 +881,7 @@ export default function AdminPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-xs font-medium">{r.cars?.title_zh || "未知车辆"}</p>
                       <div className="mt-0.5 flex items-center gap-1.5">
-                        <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">
                           <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />
                           {r.reason}
                         </span>
@@ -896,7 +896,7 @@ export default function AdminPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-7 gap-1 px-2 text-[11px] text-red-600 hover:text-red-700"
+                      className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
                       onClick={() => r.cars && removeCarFromReport(r.id, r.cars.id)}
                       disabled={actionLoading === r.id || !r.cars}
                     >
@@ -1029,7 +1029,7 @@ export default function AdminPage() {
                           <p className="truncate text-xs font-medium">{s.name}</p>
                           <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{s.key}</span>
                           {!s.enabled && (
-                            <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600">已停用</span>
+                            <span className="shrink-0 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">已停用</span>
                           )}
                         </div>
                         <a
@@ -1055,7 +1055,7 @@ export default function AdminPage() {
                           <Loader2 className="h-2.5 w-2.5 animate-spin" />同步中
                         </span>
                       ) : s.last_sync_status === "success" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-[10px] text-emerald-600 dark:text-emerald-400">
                           <Check className="h-2.5 w-2.5" strokeWidth={2} />成功
                         </span>
                       ) : s.last_sync_status === "partial" ? (
@@ -1063,7 +1063,7 @@ export default function AdminPage() {
                           <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />部分成功
                         </span>
                       ) : s.last_sync_status === "error" ? (
-                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600">
+                        <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">
                           <XCircle className="h-2.5 w-2.5" strokeWidth={2} />失败
                         </span>
                       ) : (
@@ -1089,7 +1089,7 @@ export default function AdminPage() {
                       {d?.errors && d.errors.length > 0 && (
                         <>
                           <button
-                            className="mt-0.5 text-left text-[10px] text-red-600 hover:underline"
+                            className="mt-0.5 text-left text-[10px] text-red-600 dark:text-red-400 hover:underline"
                             title={d.errors.slice(0, 3).join("\n")}
                             onClick={() => setExpandedErrors((prev) => ({ ...prev, [s.id]: !prev[s.id] }))}
                           >
@@ -1098,7 +1098,7 @@ export default function AdminPage() {
                           {expandedErrors[s.id] && (
                             <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto rounded-lg border border-red-300 bg-red-50 p-2 dark:bg-red-950/20">
                               {d.errors.map((err, i) => (
-                                <p key={i} className="break-all text-[10px] text-red-600">{err}</p>
+                                <p key={i} className="break-all text-[10px] text-red-600 dark:text-red-400">{err}</p>
                               ))}
                             </div>
                           )}
@@ -1120,7 +1120,7 @@ export default function AdminPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className={`h-7 gap-1 px-2 text-[11px] ${s.enabled ? "text-red-600 hover:text-red-700" : "text-emerald-600 hover:text-emerald-700"}`}
+                        className={`h-7 gap-1 px-2 text-[11px] ${s.enabled ? "text-red-600 dark:text-red-400 hover:text-red-700" : "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"}`}
                         onClick={() => toggleSource(s.id, !s.enabled)}
                         disabled={actionLoading === s.id || syncing}
                       >
@@ -1135,7 +1135,7 @@ export default function AdminPage() {
                       </Button>
                     </div>
                     {result && (
-                      <p className={`mt-1.5 text-[10px] ${result.ok ? "text-emerald-600" : "text-red-600"}`}>
+                      <p className={`mt-1.5 text-[10px] ${result.ok ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                         {result.text}
                       </p>
                     )}

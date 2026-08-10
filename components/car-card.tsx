@@ -108,6 +108,7 @@ export function CarCard({
             car,
             { top: r.top, left: r.left, width: r.width, height: r.height },
             e.currentTarget.outerHTML,
+            e.currentTarget,
           );
         }
       }}
@@ -119,7 +120,7 @@ export function CarCard({
         className="group flex cursor-pointer rounded-xl overflow-hidden bg-card transition hover:border-foreground/30 active:bg-muted/30 md:block"
       >
         {/* 图片:手机在左(约 2/5 宽,随文字高度拉伸),桌面在上(16:10) */}
-        <div className="relative w-[38%] shrink-0 self-stretch overflow-hidden bg-muted md:aspect-[16/10] md:w-auto md:self-auto">
+        <div className="relative w-[40%] shrink-0 self-stretch overflow-hidden bg-muted md:aspect-[16/10] md:w-auto md:self-auto">
           {car.image_url ? (
             <img
               src={car.image_url}
@@ -173,7 +174,7 @@ export function CarCard({
             ) : isHotListing(car) ? (
               <Badge
                 variant="outline"
-                className="gap-0.5 bg-background/80 px-1 font-mono text-[9px] font-medium text-orange-600 backdrop-blur-sm md:px-2 md:text-[10px]"
+                className="gap-0.5 bg-background/80 px-1 font-mono text-[9px] font-medium text-orange-600 backdrop-blur-sm md:px-2 md:text-[10px] dark:text-orange-400"
               >
                 <Flame className="h-2.5 w-2.5" strokeWidth={1.5} />
                 热门
@@ -228,7 +229,7 @@ export function CarCard({
           </div>
         </div>
 
-        <div className="min-w-0 flex-1 p-2.5 md:p-3">
+        <div className="min-w-0 flex-1 p-4 md:p-3">
           <h3 className="truncate font-mono text-[13px] font-semibold leading-tight tracking-tight md:whitespace-normal md:text-sm">
             {car.title_zh}
           </h3>
@@ -241,7 +242,7 @@ export function CarCard({
               {formatPrice(car.price)}
             </span>
             {car.original_price && car.original_price > car.price && (
-              <span className="rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+              <span className="rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600 dark:text-green-400">
                 -{Math.round((1 - car.price / car.original_price) * 100)}%
               </span>
             )}
@@ -267,7 +268,7 @@ export function CarCard({
           {priceInsight &&
             (priceInsight.level === "great" || priceInsight.level === "good") &&
             priceInsight.delta >= 300 && (
-              <p className="mt-1 hidden font-mono text-[10px] text-green-600 md:block">
+              <p className="mt-1 hidden font-mono text-[10px] text-green-600 md:block dark:text-green-400">
                 比同类均价低 {formatPrice(priceInsight.delta)}
                 <span className="text-muted-foreground">
                   {" "}· {priceInsight.sampleSize} 台同类对比

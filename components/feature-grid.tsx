@@ -1,9 +1,11 @@
 "use client";
 
-// 首页金刚区:功能入口一栏(按最近使用排序),末位「全部功能」打开 drawer
-// (顶部搜索框 + 最近使用 8 个 + 按拼音字母序的全部功能列表)。
+// 首页金刚区:功能入口(按最近使用排序,第 5 格「全部功能」打开 drawer:
+// 顶部搜索框 + 最近使用 8 个 + 按拼音字母序的全部功能列表)。
+// 与品牌行(brandTiles 由页面传入)合并为同一个 snap 分页滑动条:
+// 每页上排 5 个功能、下排 5 个品牌,整页横滑,底部页点指示。
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { match } from "pinyin-pro";
 import { Search, X, LayoutGrid } from "lucide-react";
@@ -100,14 +102,18 @@ function FeatureIcon({ f, size = "lg" }: { f: Feature; size?: "lg" | "sm" }) {
   );
 }
 
-export function FeatureRow() {
+export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
   const router = useRouter();
   const { openPage } = useCarOverlay();
   const [recent, setRecent] = useState<string[]>(DEFAULT_ORDER);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
+  // snap 滑动条当前页(页点指示)
+  const [page, setPage] = useState(0);
+  const scrollerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage 信号,仅首帧一次
     setRecent(getRecentIds());
   }, []);
 
@@ -119,8 +125,13 @@ export function FeatureRow() {
     router.push(f.href);
   }
 
-  const rowFeatures = recent
-    .slice(0, 4)
+  // 功能位:最近使用优先,不足按目录顺序补齐到 14 个;末位是「全部功能」
+  const rowIds = [...recent];
+  for (const f of FEATURES) {
+    if (!rowIds.includes(f.id)) rowIds.push(f.id);
+  }
+  const rowFeatures = rowIds
+    .slice(0, 14)
     .map((id) => FEATURE_MAP.get(id))
     .filter(Boolean) as Feature[];
 
@@ -128,6 +139,18 @@ export function FeatureRow() {
     .slice(0, 8)
     .map((id) => FEATURE_MAP.get(id))
     .filter(Boolean) as Feature[];
+
+  const featureTile = (f: Feature) => (
+    <button
+      key={f.id}
+      type="button"
+      onClick={() => go(f)}
+      className="flex flex-col items-center gap-1.5 rounded-xl py-2 transition-colors active:bg-muted/50"
+    >
+      <FeatureIcon f={f} />
+      <span className="font-mono text-[11px]">{f.name}</span>
+    </button>
+  );
 
   const q = query.trim().toLowerCase();
   const filtered = FEATURES.filter(
@@ -139,22 +162,9 @@ export function FeatureRow() {
       (/^[a-z]+$/.test(q) && match(f.name + f.desc, q) !== null),
   ).sort((a, b) => a.py.localeCompare(b.py));
 
-  return (
-    <div className="mt-3 grid grid-cols-5">
-      {rowFeatures.map((f) => (
-        <button
-          key={f.id}
-          type="button"
-          onClick={() => go(f)}
-          className="flex flex-col items-center gap-1.5 rounded-xl py-2 transition-colors active:bg-muted/50"
-        >
-          <FeatureIcon f={f} />
-          <span className="font-mono text-[11px]">{f.name}</span>
-        </button>
-      ))}
-
-      {/* 全部功能 */}
-      <Drawer open={open} onOpenChange={setOpen}>
+  // 「全部功能」磁贴:排在滑动条最后一页的末位
+  const allFeaturesTile = (
+    <Drawer key="all-features" open={open} onOpenChange={setOpen}>
         <DrawerTrigger asChild>
           <button
             type="button"
@@ -264,7 +274,55 @@ export function FeatureRow() {
             )}
           </div>
         </DrawerContent>
-      </Drawer>
+    </Drawer>
+  );
+
+  // 功能磁贴 + 全部功能,与品牌行按 5 个/页切片,页数取两者较多的一方
+  const featureTiles = [...rowFeatures.map(featureTile), allFeaturesTile];
+  const pages = Math.max(
+    Math.ceil(featureTiles.length / 5),
+    Math.ceil(brandTiles.length / 5),
+    1,
+  );
+
+  return (
+    <div className="mt-3">
+      <div
+        ref={scrollerRef}
+        onScroll={() => {
+          const el = scrollerRef.current;
+          if (el) setPage(Math.round(el.scrollLeft / el.clientWidth));
+        }}
+        className="flex snap-x snap-mandatory overflow-x-auto scrollbar-none"
+      >
+        {Array.from({ length: pages }, (_, i) => {
+          const pageBrands = brandTiles.slice(i * 5, i * 5 + 5);
+          return (
+            <div key={i} className="w-full shrink-0 snap-start">
+              <div className="grid grid-cols-5">
+                {featureTiles.slice(i * 5, i * 5 + 5)}
+              </div>
+              {pageBrands.length > 0 && (
+                <div className="mt-1 grid grid-cols-5">{pageBrands}</div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 页点指示 */}
+      {pages > 1 && (
+        <div className="mt-1.5 flex items-center justify-center gap-1">
+          {Array.from({ length: pages }, (_, i) => (
+            <span
+              key={i}
+              className={`h-1 rounded-full transition-all duration-200 ${
+                page === i ? "w-3 bg-primary" : "w-1 bg-border"
+              }`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
