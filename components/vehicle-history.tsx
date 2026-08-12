@@ -46,7 +46,7 @@ function RatingStars({ rating }: { rating: string }) {
 function RecallCard({ recall }: { recall: RecallItem }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-lg border border-border p-3">
+    <div className="rounded-xl bg-card p-3">
       <button
         type="button"
         className="flex w-full items-start gap-2 text-left"
@@ -103,7 +103,7 @@ function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
   const [expanded, setExpanded] = useState(false);
   const hasSeverity = complaint.crash || complaint.injuries > 0 || complaint.deaths > 0;
   return (
-    <div className="rounded-lg border border-border p-3">
+    <div className="rounded-xl bg-card p-3">
       <button
         type="button"
         className="flex w-full items-start gap-2 text-left"
@@ -220,7 +220,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
     >
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <FileWarning className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">安全召回</span>
@@ -229,14 +229,14 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
             {data.recalls.length}
           </p>
         </div>
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <CircleAlert className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">投诉记录</span>
           </div>
           <p className="mt-1 font-mono text-lg font-bold">{data.complaints.length}</p>
         </div>
-        <div className="rounded-lg border border-border p-3">
+        <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <CarFront className="h-3.5 w-3.5 text-red-500" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">涉及碰撞</span>
@@ -249,7 +249,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
 
       {/* Safety rating */}
       {data.safetyRating && (
-        <div className="rounded-xl border border-border p-4">
+        <div className="rounded-xl bg-card p-4">
           <h3 className="flex items-center gap-1.5 font-mono text-xs font-semibold">
             <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
             NHTSA 安全评级

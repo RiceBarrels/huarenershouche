@@ -1,4 +1,5 @@
 import type { CapacitorConfig } from "@capacitor/cli";
+import { KeyboardResize } from "@capacitor/keyboard";
 import { config as dotenvConfig } from "dotenv";
 
 // Load .env.local (Capacitor CLI doesn't read Next.js env files)
@@ -39,7 +40,10 @@ const config: CapacitorConfig = {
       overlaysWebView: true,
     },
     Keyboard: {
-      resize: "body" as any,
+      // 键盘弹起时不缩放 webview:键盘避让全部由 JS 侧完成
+      // (drawer 垫高层 / KeyboardToolbar / 全屏聊天的 padding 补偿)。
+      // "body" 会让原生先压缩一遍、JS 再抬一遍,双重位移导致 UI 跳动
+      resize: KeyboardResize.None,
       resizeOnFullScreen: true,
     },
     PushNotifications: {

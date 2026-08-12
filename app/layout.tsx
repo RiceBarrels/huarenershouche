@@ -6,9 +6,10 @@ import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 import { IdentityProvider } from "@/components/identity-provider";
 import { CarOverlayProvider } from "@/components/car-overlay-provider";
-import { NotchUI } from "@/components/notch-ui";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
+import { CornerShapePolyfill } from "@/components/corner-shape-polyfill";
+import { CommunityPrefetch } from "@/components/community-prefetch";
 import { SplashAd } from "@/components/splash-ad";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
 import { CompareBar } from "@/components/compare-bar";
@@ -154,17 +155,18 @@ export default function RootLayout({
             <CapacitorProvider>
               <IdentityProvider>
                 <CarOverlayProvider>
+                {/* 状态栏遮罩:仅刘海机型显示,保证状态栏文字在滚动内容上可读 */}
                 <div
-                  className="pointer-events-none z-50 fixed top-0 left-0 right-0 bg-linear-to-b from-background from-20% to-transparent flex justify-center items-center safe-area-pill-container"
+                  className="pointer-events-none z-50 fixed top-0 left-0 right-0 bg-linear-to-b from-background from-20% to-transparent safe-area-pill-container"
                   style={{
                     height: "env(safe-area-inset-top, 0px)",
                   }}
-                >
-                  <NotchUI />
-                </div>
+                />
                 {children}
+                <CommunityPrefetch />
                 <SplashAd />
                 <InitHaptic/>
+                <CornerShapePolyfill />
                 <RealtimeNotifications />
                 <CompareBar />
                 <Analytics />

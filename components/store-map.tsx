@@ -43,7 +43,7 @@ export function StoreMap({
   return (
     <AppMap
       markers={appMarkers}
-      className={className ?? "h-48 w-full border border-border"}
+      className={className ?? "h-48 w-full"}
       zoom={zoom}
       mode="embed"
       forceWeb

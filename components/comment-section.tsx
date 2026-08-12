@@ -115,7 +115,7 @@ export function CommentSection({ carId }: { carId: string }) {
           <div className="flex gap-2">
             <textarea
               ref={inputRef}
-              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+              className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               placeholder="写评论..."
               rows={2}
               value={content}
@@ -159,7 +159,7 @@ export function CommentSection({ carId }: { carId: string }) {
         ) : (
           comments.map((comment) => (
             <div key={comment.id} className="flex gap-3">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                 <img
                   src={avatarUrl(comment.profiles?.avatar_url, comment.profiles?.username)}
                   alt=""

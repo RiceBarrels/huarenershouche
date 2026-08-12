@@ -24,7 +24,7 @@ export default function BudgetToolPage() {
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           用能接受的月供反推可以买多贵的车
         </p>
-        <div className="mt-4 space-y-4 rounded-xl border border-border bg-card p-4">
+        <div className="mt-4 space-y-4 rounded-xl bg-card p-4">
           <div>
             <label className="font-mono text-xs font-medium">每月预算 ($/月)</label>
             <Input

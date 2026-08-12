@@ -24,8 +24,8 @@ const slide = {
 } as const;
 
 // 大号输入框(text-base=16px,避免 iOS 聚焦自动放大)与大号按钮
-const bigInput = "mt-1.5 h-12 rounded-xl font-mono text-base";
-const bigBtn = "h-12 w-full rounded-xl font-mono text-sm";
+const bigInput = "mt-1.5 h-12 font-mono text-base";
+const bigBtn = "h-12 w-full font-mono text-base";
 
 type Step = "username" | "email" | "password";
 const STEPS: Step[] = ["username", "email", "password"];
@@ -87,7 +87,7 @@ export default function RegisterPage() {
         <button
           type="button"
           onClick={() => goTo("username")}
-          className="flex max-w-full items-center gap-2 rounded-full border border-border px-4 py-2 transition-colors hover:border-foreground/40"
+          className="flex max-w-full items-center gap-2 rounded-full bg-muted px-4 py-2 transition-colors hover:bg-muted/70"
         >
           <span className="truncate font-mono text-xs text-foreground">{username}</span>
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground">修改</span>
@@ -97,7 +97,7 @@ export default function RegisterPage() {
         <button
           type="button"
           onClick={() => goTo("email")}
-          className="flex max-w-full items-center gap-2 rounded-full border border-border px-4 py-2 transition-colors hover:border-foreground/40"
+          className="flex max-w-full items-center gap-2 rounded-full bg-muted px-4 py-2 transition-colors hover:bg-muted/70"
         >
           <span className="truncate font-mono text-xs text-foreground">{email}</span>
           <span className="shrink-0 font-mono text-[11px] text-muted-foreground">修改</span>
@@ -108,18 +108,14 @@ export default function RegisterPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background font-mono">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-grid [mask-image:linear-gradient(to_bottom,black,60%,transparent)]"
-      />
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-12">
         <div className="flex flex-col items-center">
           <Image src="/logo.png" alt="常來車網" width={48} height={48} className="h-12 w-12 object-contain" />
-          <h1 className="mt-4 font-logo text-xl tracking-tight">
+          <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
             注册
           </h1>
-          <p className="mt-1 font-mono text-xs text-muted-foreground">
+          <p className="mt-1 font-mono text-sm text-muted-foreground">
             创建你的常來車網账号 · {stepIndex + 1}/{STEPS.length}
           </p>
         </div>
@@ -132,7 +128,7 @@ export default function RegisterPage() {
                 <div className="space-y-2.5">
                   <Button
                     type="button"
-                    variant="outline"
+                    variant="secondary"
                     className={`${bigBtn} gap-2`}
                     onClick={async () => {
                       const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
@@ -169,7 +165,7 @@ export default function RegisterPage() {
                     <div className="w-full border-t border-border" />
                   </div>
                   <div className="relative flex justify-center">
-                    <span className="bg-background px-3 font-mono text-[11px] text-muted-foreground">
+                    <span className="bg-background px-3 font-mono text-[11px] text-muted-foreground/60">
                       或使用邮箱注册
                     </span>
                   </div>
@@ -253,7 +249,7 @@ export default function RegisterPage() {
                   </div>
 
                   {error && (
-                    <p className="font-mono text-xs text-destructive">{error}</p>
+                    <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
                   )}
 
                   <Button type="submit" className={bigBtn} disabled={loading}>

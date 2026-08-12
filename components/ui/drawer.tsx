@@ -106,14 +106,14 @@ function DrawerContent({
         // (vaul 会往 content 写内联 transition,这里不能依赖 content 自身的过渡类)
         style={{ "--kb": `${kbHeight}px` } as React.CSSProperties}
         className={cn(
-          "group/drawer-content fixed z-[80] flex h-auto flex-col bg-card text-sm data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[min(80vh,calc(100dvh-var(--kb,0px)-1.5rem))] data-[vaul-drawer-direction=bottom]:rounded-t-[32px] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-xl data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-xl data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-xl data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
+          "group/drawer-content fixed z-[80] flex h-auto flex-col border-border/40 bg-card text-sm shadow-2xl data-[vaul-drawer-direction=bottom]:inset-x-0 data-[vaul-drawer-direction=bottom]:bottom-0 data-[vaul-drawer-direction=bottom]:mt-24 data-[vaul-drawer-direction=bottom]:max-h-[min(80vh,calc(100dvh-var(--kb,0px)-1.5rem))] data-[vaul-drawer-direction=bottom]:rounded-t-[var(--device-corner)] data-[vaul-drawer-direction=left]:inset-y-0 data-[vaul-drawer-direction=left]:left-0 data-[vaul-drawer-direction=left]:w-3/4 data-[vaul-drawer-direction=left]:rounded-r-[var(--device-corner)] data-[vaul-drawer-direction=left]:border-r data-[vaul-drawer-direction=right]:inset-y-0 data-[vaul-drawer-direction=right]:right-0 data-[vaul-drawer-direction=right]:w-3/4 data-[vaul-drawer-direction=right]:rounded-l-[var(--device-corner)] data-[vaul-drawer-direction=right]:border-l data-[vaul-drawer-direction=top]:inset-x-0 data-[vaul-drawer-direction=top]:top-0 data-[vaul-drawer-direction=top]:mb-24 data-[vaul-drawer-direction=top]:max-h-[80vh] data-[vaul-drawer-direction=top]:rounded-b-[var(--device-corner)] data-[vaul-drawer-direction=top]:border-b data-[vaul-drawer-direction=left]:sm:max-w-sm data-[vaul-drawer-direction=right]:sm:max-w-sm",
           className
         )}
         {...props}
       >
         {/* 打开期间隐藏 iOS 原生底部导航(children 才随 open 挂载,wrapper 本身常驻) */}
         <NativeBarHideLock />
-        <div className="mx-auto mt-4 hidden h-1 w-[100px] shrink-0 cursor-grab rounded-full bg-muted active:cursor-grabbing group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
+        <div className="mx-auto mt-4 hidden h-1.5 w-10 shrink-0 cursor-grab rounded-full bg-muted-foreground/20 active:cursor-grabbing group-data-[vaul-drawer-direction=bottom]/drawer-content:block" />
         {children}
         {/* 键盘垫高层:常驻渲染,height 0 <-> 键盘高度之间过渡,曲线贴近 iOS 键盘动画 */}
         <div

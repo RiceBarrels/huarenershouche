@@ -18,7 +18,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group overflow-hidden rounded-xl border border-border" open>
+    <details className="group overflow-hidden rounded-xl bg-card" open>
       <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-mono text-sm font-semibold hover:bg-muted/30">
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
         <span>{title}</span>
@@ -90,10 +90,10 @@ export default function InsuranceGuidePage() {
             </p>
 
             <div className="mt-4 space-y-3">
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">Liability Insurance (责任险)</h4>
-                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-semibold text-red-600 dark:text-red-400">必买</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-red-600 dark:text-red-400">必买</span>
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   你撞了别人时赔对方。包含 Bodily Injury (人身伤害) 和 Property Damage (财产损害)。
@@ -104,10 +104,10 @@ export default function InsuranceGuidePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">Collision Coverage (碰撞险)</h4>
-                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-semibold">推荐</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold">推荐</span>
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   你的车在碰撞中受损时修理自己的车。不管是撞了别人还是撞了电线杆。
@@ -118,10 +118,10 @@ export default function InsuranceGuidePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">Comprehensive Coverage (全面险)</h4>
-                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-semibold">推荐</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold">推荐</span>
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   非碰撞造成的损失：盗窃、冰雹、洪水、火灾、动物撞击、挡风玻璃破裂等。
@@ -129,10 +129,10 @@ export default function InsuranceGuidePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-semibold">Uninsured/Underinsured Motorist (未投保/投保不足驾驶人险)</h4>
-                  <span className="rounded-full border border-border px-1.5 py-0.5 text-[9px] font-semibold text-red-600 dark:text-red-400">强烈推荐</span>
+                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold text-red-600 dark:text-red-400">强烈推荐</span>
                 </div>
                 <p className="mt-1 text-muted-foreground">
                   对方没保险或保险不够时保护你。美国约 13% 的司机没有保险。
@@ -140,7 +140,7 @@ export default function InsuranceGuidePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold">PIP / Medical Payments (人身伤害保护)</h4>
                 <p className="mt-1 text-muted-foreground">
                   支付你和乘客的医疗费用，不管谁的错。部分 No-Fault 州 (如 FL、MI、NY) 强制要求 PIP。
@@ -148,7 +148,7 @@ export default function InsuranceGuidePage() {
                 </p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold">其他可选保障</h4>
                 <ul className="mt-1 list-inside list-disc space-y-1 text-muted-foreground">
                   <li><span className="font-semibold text-foreground">Rental Reimbursement</span> — 车在修理期间租车费用，通常 $30-$50/天</li>
@@ -168,7 +168,7 @@ export default function InsuranceGuidePage() {
 
             <div className="mt-4 space-y-3">
               {INSURERS.map((ins) => (
-                <div key={ins.name} className="overflow-hidden rounded-xl border border-border">
+                <div key={ins.name} className="overflow-hidden rounded-xl bg-muted/40">
                   <div className="border-b border-border bg-muted/30 px-3 py-2">
                     <h4 className="font-semibold">{ins.name}</h4>
                     <p className="mt-0.5 text-[10px] text-muted-foreground">
@@ -197,7 +197,7 @@ export default function InsuranceGuidePage() {
               ))}
             </div>
 
-            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-xl bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">如何获取报价</p>
               <p className="mt-1 text-[10px] text-muted-foreground">
                 直接访问各保险公司官网获取在线报价。需要提供：驾照号码、VIN 号、住址、驾驶历史。
@@ -325,7 +325,7 @@ export default function InsuranceGuidePage() {
           </Section>
         </div>
 
-        <div className="mt-8 rounded-xl border border-border bg-muted/20 p-4">
+        <div className="mt-8 rounded-xl bg-muted/20 p-4">
           <div className="flex items-start gap-2">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <div>

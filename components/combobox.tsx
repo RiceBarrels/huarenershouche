@@ -67,7 +67,7 @@ export function Combobox({
 
   const trigger = (
     <Button
-      variant="outline"
+      variant="secondary"
       role="combobox"
       aria-expanded={open}
       className={cn(

@@ -25,6 +25,8 @@ import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 import { RelatedPosts } from "@/components/related-posts";
+import { HashtagText } from "@/components/hashtag-text";
+import { FollowButton } from "@/components/follow-button";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { Badge } from "@/components/ui/badge";
@@ -40,9 +42,9 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  review: "bg-blue-500/10 text-blue-600 border-blue-500/20",
-  showoff: "bg-orange-500/10 text-orange-600 border-orange-500/20",
-  discussion: "bg-green-500/10 text-green-600 border-green-500/20",
+  review: "bg-blue-500/10 text-blue-600 border-transparent",
+  showoff: "bg-orange-500/10 text-orange-600 border-transparent",
+  discussion: "bg-green-500/10 text-green-600 border-transparent",
 };
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
@@ -459,12 +461,12 @@ export default function CommunityDetailPage({
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4">
         {showChrome && <DesktopBack fallback="/community" />}
 
-        {/* Author row + share */}
-        <div className="flex items-center gap-2.5">
+        {/* X 式作者行:大头像 + 加粗名字,右侧分享 */}
+        <div className="flex items-center gap-3">
           <Link
             href={userLink(post.user_id)}
             onClick={userClick(post.user_id)}
-            className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted transition-opacity hover:opacity-70"
+            className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted transition-opacity hover:opacity-80"
           >
             <img
               src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
@@ -476,14 +478,11 @@ export default function CommunityDetailPage({
             <Link
               href={userLink(post.user_id)}
               onClick={userClick(post.user_id)}
-              className="block truncate font-mono text-xs font-medium transition-colors hover:text-muted-foreground"
+              className="block truncate font-mono text-[15px] font-bold hover:underline"
             >
               {post.profiles?.username || "匿名"}
             </Link>
             <div className="mt-0.5 flex items-center gap-2">
-              <span className="font-mono text-[10px] text-muted-foreground">
-                {timeAgo(post.created_at)}
-              </span>
               <Badge
                 variant="outline"
                 className={`font-mono text-[10px] ${
@@ -494,19 +493,39 @@ export default function CommunityDetailPage({
               </Badge>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="ml-auto flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
-          >
-            <Share className="h-3.5 w-3.5" strokeWidth={1.5} />
-            {shareCopied ? "已复制" : "分享"}
-          </button>
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <FollowButton userId={post.user_id} />
+            <button
+              type="button"
+              onClick={handleShare}
+              className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+            >
+              <Share className="h-3.5 w-3.5" strokeWidth={1.5} />
+              {shareCopied ? "已复制" : "分享"}
+            </button>
+          </div>
         </div>
 
-        {/* Media carousel(XHS 式:媒体在正文之前,整宽轮播 + 指示点)*/}
+        {/* X 式:标题/正文在媒体之前,大字号全色 */}
+        <h1 className="mt-3 font-mono text-lg font-bold leading-snug">
+          {post.title}
+        </h1>
+        <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground">
+          <HashtagText text={post.content} />
+        </div>
+
+        {/* Hashtags:可点击,跳社区搜索该话题(HashtagText 会先清浮层栈) */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 font-mono text-sm">
+            {post.tags.map((tag) => (
+              <HashtagText key={tag} text={`#${tag}`} />
+            ))}
+          </div>
+        )}
+
+        {/* Media carousel:X 式圆角细描边,整宽轮播 + 指示点 */}
         {media.length > 0 && (
-          <div className="-mx-4 mt-3 overflow-hidden md:mx-0 md:rounded-xl md:border md:border-border">
+          <div className="mt-3 overflow-hidden rounded-2xl ring-1 ring-border/60">
             <div
               ref={trackRef}
               onScroll={() => {
@@ -568,33 +587,22 @@ export default function CommunityDetailPage({
           </div>
         )}
 
-        {/* Title */}
-        <h1 className="mt-3 font-mono text-base font-semibold leading-snug">
-          {post.title}
-        </h1>
-
-        {/* Content */}
-        <div className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/90">
-          {post.content}
-        </div>
-
-        {/* Hashtags */}
-        {post.tags && post.tags.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1">
-            {post.tags.map((tag) => (
-              <span
-                key={tag}
-                className="font-mono text-xs text-blue-600 dark:text-blue-400"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* X 式绝对时间行 */}
+        <p className="mt-3 font-mono text-[13px] text-muted-foreground">
+          {new Date(post.created_at).toLocaleString("zh-CN", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+          <span className="mx-1.5">·</span>
+          {timeAgo(post.created_at)}
+        </p>
 
         {/* Car info for reviews */}
         {post.type === "review" && (post.make || post.model || post.year) && (
-          <div className="mt-3 rounded-lg border border-border bg-muted/30 px-3 py-2">
+          <div className="mt-3 rounded-xl bg-muted/30 px-3 py-2">
             <span className="font-mono text-[11px] text-muted-foreground">
               车型：
               {[post.year, post.make, post.model].filter(Boolean).join(" ")}
@@ -733,7 +741,7 @@ export default function CommunityDetailPage({
             {userId ? (
               <textarea
                 ref={inputRef}
-                className="min-h-9 flex-1 resize-none rounded-lg border border-border bg-muted/30 px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:bg-background focus:outline-none"
+                className="min-h-9 flex-1 resize-none rounded-xl bg-muted/50 px-3 py-2 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 placeholder={
                   replyTo ? `回复 @${replyTo.name}...` : "说点什么..."
                 }
@@ -754,7 +762,7 @@ export default function CommunityDetailPage({
             ) : (
               <Link
                 href="/login"
-                className="flex h-9 flex-1 items-center rounded-lg border border-dashed border-border px-3 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                className="flex h-9 flex-1 items-center rounded-xl bg-muted/50 px-3 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 登录后参与讨论
               </Link>
@@ -765,7 +773,7 @@ export default function CommunityDetailPage({
                 type="button"
                 onClick={handleComment}
                 disabled={sending}
-                className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-border bg-foreground px-3 font-mono text-xs text-background transition-opacity hover:opacity-85 disabled:opacity-50"
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-primary px-3.5 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-85 disabled:opacity-50"
               >
                 {sending ? (
                   <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
@@ -846,7 +854,7 @@ function CommentRow({
       <Link
         href={userLink(comment.user_id)}
         onClick={onUser}
-        className={`${avatarSize} flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted transition-opacity hover:opacity-70`}
+        className={`${avatarSize} flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted transition-opacity hover:opacity-70`}
       >
         <img
           src={avatarUrl(comment.profiles?.avatar_url, comment.profiles?.username)}

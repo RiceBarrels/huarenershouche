@@ -1,15 +1,19 @@
 "use client";
 
+// 我的账户(iOS 26 风格):个人资料头卡 + 数据条 + 白色分组
+// 菜单。原「设置」中间页已拆进本页 —— 账号与安全 / 通知 / 个性化 /
+// 门店认证 / 客服 / 协议 均为本页分组行,子页保留原路由。
+
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useTheme } from "next-themes";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
-  FileText, ChevronRight, Car, Settings, LogOut, Moon, Sun, ScrollText, ShieldCheck,
-  Headset, Handshake, UserCircle, BarChart3,
+  FileText, ChevronRight, Car, Palette, ShieldCheck,
+  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
@@ -17,7 +21,10 @@ import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CountUp } from "@/components/count-up";
+import { AvatarViewer } from "@/components/avatar-viewer";
+import { NonModalDrawer } from "@/components/non-modal-drawer";
+import { SettingsGroup, SettingsRow, GroupFooter } from "@/components/ios-settings";
+import { triggerHaptic } from "@/lib/haptics";
 import { useCachedData } from "@/lib/use-cached-data";
 import { useIdentity, ACTING_KEY } from "@/components/identity-provider";
 import type { DbCar, DbProfile } from "@/lib/types";
@@ -30,60 +37,11 @@ interface PostDraft {
   features: string[];
 }
 
-// Menu row — flat 1px-bordered list item
-function MenuRow({
-  icon, label, value, href, onClick, destructive,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  value?: string | React.ReactNode;
-  href?: string;
-  onClick?: () => void;
-  destructive?: boolean;
-}) {
-  const inner = (
-    <div className={`flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/50 active:bg-muted ${destructive ? "text-destructive" : ""}`}>
-      <span className="flex h-5 w-5 shrink-0 items-center justify-center">{icon}</span>
-      <span className="flex-1 font-mono text-sm">{label}</span>
-      {value && <span className="font-mono text-xs tabular-nums text-muted-foreground">{value}</span>}
-      <ChevronRight className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-    </div>
-  );
-  if (href) return <Link href={href}>{inner}</Link>;
-  return <button type="button" className="w-full text-left" onClick={onClick}>{inner}</button>;
-}
-
-// Uppercase micro-label group title above a 1px rule
-function GroupTitle({ label }: { label: string }) {
-  return (
-    <div className="flex items-center gap-3 px-1">
-      <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
-      <div className="h-px flex-1 bg-border" />
-    </div>
-  );
-}
-
-// Stat cell for the data strip
-function StatCell({
-  href, value, label, brand, animate,
-}: {
-  href: string;
-  value: number;
-  label: string;
-  brand?: boolean;
-  animate: boolean;
-}) {
-  return (
-    <Link href={href} className="flex flex-col items-center justify-center gap-1 py-3.5 transition-colors hover:bg-muted/50 active:bg-muted">
-      {animate ? (
-        <CountUp value={value} className={`font-mono text-xl font-semibold tabular-nums ${brand ? "text-brand" : ""}`} />
-      ) : (
-        <span className={`font-mono text-xl font-semibold tabular-nums ${brand ? "text-brand" : ""}`}>{value}</span>
-      )}
-      <span className="font-mono text-[10px] tracking-[0.2em] text-muted-foreground">{label}</span>
-    </Link>
-  );
-}
+const THEME_LABELS: Record<string, string> = {
+  light: "浅色",
+  dark: "深色",
+  system: "跟随系统",
+};
 
 export default function AccountPage() {
   return <Suspense><AccountContent /></Suspense>;
@@ -91,12 +49,16 @@ export default function AccountPage() {
 
 function AccountContent() {
   const router = useRouter();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const [mounted, setMounted] = useState(false);
   // undefined = 鉴权中，null = 未登录
   const [user, setUser] = useState<string | null | undefined>(undefined);
+  const [email, setEmail] = useState("");
   const [draft, setDraft] = useState<PostDraft | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarViewOpen, setAvatarViewOpen] = useState(false);
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   // 身份切换:切换成车行时,资料/车源/收藏都按 acct(操作身份)展示
@@ -108,13 +70,16 @@ function AccountContent() {
   });
   const acct = actingId ?? localActing ?? (user || null);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- 挂载检测,仅首帧一次
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
     // getSession 读本地会话(不走网络),首屏直接用 localStorage 缓存渲染
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user?.id ?? null);
+      setEmail(data.session?.user?.email ?? "");
     });
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage 草稿,仅首帧一次
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
   }, []);
 
@@ -136,7 +101,7 @@ function AccountContent() {
     [acct],
   );
 
-  const { data: favCount, loading: favLoading, mutate: mutateFavCount } = useCachedData<number>(
+  const { data: favCount, mutate: mutateFavCount } = useCachedData<number>(
     acct ? `account_favcount_${acct}` : null,
     async () => {
       const { count } = await supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", acct!);
@@ -145,21 +110,35 @@ function AccountContent() {
     [acct],
   );
 
+  // 门店数(设置拆进本页后,「门店与车行认证」行需要展示当前值)
+  const { data: storeCount, mutate: mutateStoreCount } = useCachedData<number>(
+    user ? `account_storecount_${user}` : null,
+    async () => {
+      const { count } = await supabase.from("dealer_stores").select("id", { count: "exact", head: true }).eq("owner_id", user!);
+      return count || 0;
+    },
+    [user],
+  );
+
   const loading =
     user === undefined || (user !== null && profileLoading && carsLoading);
 
   // 下拉刷新：真正重新拉取，而不是原样回写缓存
   const loadAccount = useCallback(async () => {
     if (!acct) return;
-    const [profileRes, carsRes, favRes] = await Promise.all([
+    const [profileRes, carsRes, favRes, storeRes] = await Promise.all([
       supabase.from("profiles").select("*").eq("id", acct).maybeSingle(),
       supabase.from("cars").select("*").eq("seller_id", acct).order("created_at", { ascending: false }),
       supabase.from("favorites").select("*", { count: "exact", head: true }).eq("user_id", acct),
+      user
+        ? supabase.from("dealer_stores").select("id", { count: "exact", head: true }).eq("owner_id", user)
+        : Promise.resolve({ count: null }),
     ]);
     if (profileRes.data !== undefined) mutateProfile((profileRes.data as DbProfile) || null);
     if (carsRes.data) mutateCars(carsRes.data as DbCar[]);
     if (favRes.count !== null) mutateFavCount(favRes.count || 0);
-  }, [acct, mutateProfile, mutateCars, mutateFavCount]);
+    if (storeRes.count !== null && storeRes.count !== undefined) mutateStoreCount(storeRes.count || 0);
+  }, [acct, user, mutateProfile, mutateCars, mutateFavCount, mutateStoreCount]);
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -179,14 +158,29 @@ function AccountContent() {
   }
 
   async function handleLogout() {
-    await supabase.auth.signOut();
+    if (loggingOut) return;
+    setLoggingOut(true);
+    // 需要登录态的清理先做(RLS 依赖会话):删本机推送 token,其他设备不受影响
+    try {
+      const token = localStorage.getItem("clc_push_token");
+      if (token) await supabase.from("push_tokens").delete().eq("token", token);
+    } catch {}
+    // 清掉车行操作身份,避免下次登录残留
+    try { localStorage.removeItem(ACTING_KEY); } catch {}
+    switchToSelf();
+    // 仅退出本设备,不影响其他已登录设备
+    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    triggerHaptic();
     setUser(null);
+    setEmail("");
     setDraft(null);
+    setLoggingOut(false);
+    setLogoutOpen(false);
     router.refresh();
   }
 
-  const activeCars = (myCars || []).filter((c) => c.status === "active").length;
   const joinedYear = profile?.created_at ? new Date(profile.created_at).getFullYear() : null;
+  const iconCls = "h-5 w-5";
 
   return (
     <PullToRefresh onRefresh={loadAccount}>
@@ -198,31 +192,23 @@ function AccountContent() {
     }}
     >
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:max-w-5xl md:px-6 md:py-8">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 md:max-w-5xl md:px-6 md:py-8">
         {/* Header band: profile + data strip */}
         {loading ? (
-          <div className="overflow-hidden rounded-xl border border-border md:flex md:items-stretch">
-            <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6">
+          <SettingsGroup>
+            <div className="flex items-center gap-4 p-4 md:px-6">
               <Skeleton className="h-16 w-16 rounded-full" />
               <div className="flex-1 space-y-3">
                 <Skeleton className="h-4 w-28" />
                 <Skeleton className="h-3 w-20" />
               </div>
             </div>
-            <div className="grid grid-cols-3 divide-x divide-border border-t border-border md:w-80 md:border-l md:border-t-0 lg:w-96">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="flex flex-col items-center gap-2.75 py-3.5">
-                  <Skeleton className="h-6 w-8" />
-                  <Skeleton className="h-3 w-8" />
-                </div>
-              ))}
-            </div>
-          </div>
+          </SettingsGroup>
         ) : (
-        <div className="overflow-hidden rounded-xl border border-border md:flex md:items-stretch">
+        <SettingsGroup>
           {!user ? (
-            <div className="flex flex-col items-center justify-center px-6 py-10 text-center md:flex-1">
-              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-muted">
+            <div className="flex flex-col items-center justify-center px-6 py-10 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
                 <UserCircle className="h-7 w-7 text-muted-foreground" strokeWidth={1.5} />
               </div>
               <p className="mt-4 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">未登录 / Guest</p>
@@ -237,13 +223,12 @@ function AccountContent() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-4 p-4 md:flex-1 md:px-6 md:py-5">
+            <div className="flex items-center gap-4 p-4 md:px-6 md:py-5">
               <button
                 type="button"
-                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full border border-border bg-muted"
-                onClick={() => { if (!isActingAsClaimed) avatarInputRef.current?.click(); }}
-                aria-label="更换头像"
-                disabled={isActingAsClaimed}
+                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-muted"
+                onClick={() => setAvatarViewOpen(true)}
+                aria-label="查看头像"
               >
                 <img src={avatarUrl(profile?.avatar_url, acct || undefined)} alt="" className="h-full w-full object-cover" />
                 {avatarUploading ? (
@@ -257,44 +242,49 @@ function AccountContent() {
                 ) : null}
               </button>
               <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="truncate font-mono text-base font-semibold tracking-tight">
-                    {profile?.username || "未设置昵称"}
-                  </p>
-                  {profile?.account_type === "dealer" ? (
-                    <Badge variant="secondary" className="shrink-0 gap-1 font-mono text-[10px]">
-                      <Store className="h-3 w-3" strokeWidth={1.5} />认证车行
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="shrink-0 font-mono text-[10px]">个人</Badge>
-                  )}
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  {joinedYear && <span>Since {joinedYear}</span>}
-                  {profile?.location && (
-                    <span className="flex items-center gap-1 normal-case tracking-normal">
-                      <MapPin className="h-3 w-3" strokeWidth={1.5} />{profile.location}
+              {/* 头像放大查看:菜单可保存;本人(非车行代操作)可更换 */}
+              <AvatarViewer
+                src={avatarUrl(profile?.avatar_url, acct || undefined)}
+                alt={profile?.username || "头像"}
+                open={avatarViewOpen}
+                onClose={() => setAvatarViewOpen(false)}
+                onEdit={!isActingAsClaimed ? () => avatarInputRef.current?.click() : undefined}
+              />
+              <Link href="/account/settings/profile" className="flex min-w-0 flex-1 items-center gap-2">
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate font-mono text-[17px] font-semibold tracking-tight">
+                      {profile?.username || "未设置昵称"}
                     </span>
-                  )}
-                </div>
-              </div>
+                    {profile?.account_type === "dealer" ? (
+                      <Badge variant="secondary" className="shrink-0 gap-1 font-mono text-[10px]">
+                        <Store className="h-3 w-3" strokeWidth={2} />认证车行
+                      </Badge>
+                    ) : (
+                      <Badge variant="secondary" className="shrink-0 font-mono text-[10px]">个人</Badge>
+                    )}
+                  </span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[12px] text-muted-foreground">
+                    {joinedYear && <span>{joinedYear} 年加入</span>}
+                    {profile?.location && (
+                      <span className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" strokeWidth={2} />{profile.location}
+                      </span>
+                    )}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2} />
+              </Link>
             </div>
           )}
 
-          {/* Data strip */}
-          <div className="grid grid-cols-3 divide-x divide-border border-t border-border md:w-80 md:border-l md:border-t-0 lg:w-96">
-            <StatCell href={user ? "/account/listings" : "/login"} value={activeCars} label="在售" brand animate={!!user} />
-            <StatCell href={user ? "/account/listings" : "/login"} value={(myCars || []).length} label="发布" animate={!!user} />
-            <StatCell href={user ? "/account/favorites" : "/login"} value={favCount || 0} label="收藏" animate={!!user} />
-          </div>
-        </div>
+        </SettingsGroup>
         )}
 
         {/* 身份切换：认领过系统车行账号时可切换操作身份 */}
         {user && claimedAccounts.length > 0 && (
-          <div className="mt-4 overflow-hidden rounded-xl border border-border">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2.5">
+          <SettingsGroup className="mt-5">
+            <div className="flex items-center gap-2 border-b border-border/50 px-4 py-2.5">
               <Store className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
               <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 切换身份
@@ -306,7 +296,7 @@ function AccountContent() {
             <button
               type="button"
               onClick={switchToSelf}
-              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/50 ${!isActingAsClaimed ? "bg-muted/40" : ""}`}
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-muted/60 ${!isActingAsClaimed ? "bg-muted/40" : ""}`}
             >
               <UserCircle className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
               <span className="flex-1 font-mono text-sm">本人账号</span>
@@ -317,9 +307,9 @@ function AccountContent() {
                 key={a.id}
                 type="button"
                 onClick={() => switchTo(a.id)}
-                className={`flex w-full items-center gap-3 border-t border-border px-4 py-3 text-left transition-colors hover:bg-muted/50 ${actingId === a.id ? "bg-muted/40" : ""}`}
+                className={`flex w-full items-center gap-3 border-t border-border/50 px-4 py-3 text-left transition-colors active:bg-muted/60 ${actingId === a.id ? "bg-muted/40" : ""}`}
               >
-                <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 rounded-full border border-border object-cover" />
+                <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
                 <span className="flex-1 truncate font-mono text-sm">{a.username}</span>
                 {actingId === a.id ? (
                   <span className="font-mono text-[10px] text-brand">当前</span>
@@ -328,116 +318,192 @@ function AccountContent() {
                 )}
               </button>
             ))}
-          </div>
+          </SettingsGroup>
         )}
 
-        {/* Menu sections */}
-        <div className="mt-6 space-y-6 md:grid md:grid-cols-2 md:items-start md:gap-8 md:space-y-0">
-          <div>
-            <GroupTitle label="车辆管理" />
-            <div className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border">
-              <MenuRow
-                icon={<Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+        {/* 分组菜单:设置中间页已拆进本页,行内彩色线条图标 */}
+        <div className="mt-5 space-y-5 md:grid md:grid-cols-2 md:items-start md:gap-6 md:space-y-0">
+          <div className="space-y-5">
+            <SettingsGroup>
+              <SettingsRow
+                icon={<Car className={`${iconCls} text-blue-500`} strokeWidth={1.5} />}
                 label="我的发布"
                 value={user ? `${(myCars || []).length} 辆` : undefined}
                 href={user ? "/account/listings" : "/login"}
               />
-              <MenuRow
-                icon={<BarChart3 className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="数据面板"
-                href={user ? "/account/dashboard" : "/login"}
-              />
-              <MenuRow
-                icon={<Heart className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              <SettingsRow
+                icon={<Heart className={`${iconCls} text-red-500`} strokeWidth={1.5} />}
                 label="我的收藏"
                 value={user ? `${favCount || 0} 辆` : undefined}
                 href={user ? "/account/favorites" : "/login"}
               />
-              <MenuRow
-                icon={<MessageSquare className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="消息"
-                href={user ? "/messages" : "/login"}
-              />
-              <MenuRow
-                icon={<Plus className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="发布新车"
-                href={user ? "/post" : "/login"}
+              <SettingsRow
+                icon={<BarChart3 className={`${iconCls} text-emerald-500`} strokeWidth={1.5} />}
+                label="数据面板"
+                href={user ? "/account/dashboard" : "/login"}
               />
               {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
-                <MenuRow
-                  icon={<FileText className="h-4 w-4 text-amber-500" strokeWidth={1.5} />}
+                <SettingsRow
+                  icon={<FileText className={`${iconCls} text-slate-400`} strokeWidth={1.5} />}
                   label="继续编辑草稿"
                   href="/post"
                 />
               )}
-            </div>
-          </div>
+            </SettingsGroup>
 
-          <div>
-            <GroupTitle label="账号" />
-            <div className="mt-2 divide-y divide-border overflow-hidden rounded-xl border border-border">
-              <MenuRow
-                icon={<Settings className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="账号设置"
-                href={user ? "/account/settings" : "/login"}
+            <SettingsGroup>
+              <SettingsRow
+                icon={<MessageSquare className={`${iconCls} text-green-500`} strokeWidth={1.5} />}
+                label="消息"
+                href={user ? "/messages" : "/login"}
               />
-              {mounted && (
-                <MenuRow
-                  icon={theme === "dark"
-                    ? <Sun className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                    : <Moon className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-                  }
-                  label={theme === "dark" ? "浅色模式" : "深色模式"}
-                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-                />
-              )}
-              {profile?.role === "admin" && (
-                <MenuRow
-                  icon={<ShieldCheck className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                  label="管理后台"
-                  href="/admin"
-                />
-              )}
-              <MenuRow
-                icon={<Headset className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                label="联系客服"
-                href="/contact"
+              <SettingsRow
+                icon={<Plus className={`${iconCls} text-orange-500`} strokeWidth={1.5} />}
+                label="发布新车"
+                href={user ? "/post" : "/login"}
               />
-              <MenuRow
-                icon={<Store className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+            </SettingsGroup>
+
+            <SettingsGroup>
+              <SettingsRow
+                icon={<Store className={`${iconCls} text-indigo-500`} strokeWidth={1.5} />}
                 label="车行入驻"
                 value={profile?.account_type === "dealer" ? "已认证" : undefined}
                 href={user ? "/dealer-apply" : "/login"}
               />
-              <MenuRow
-                icon={<Handshake className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+              <SettingsRow
+                icon={<Handshake className={`${iconCls} text-teal-500`} strokeWidth={1.5} />}
                 label="商业合作"
                 href="/business"
               />
-              <MenuRow
-                icon={<ScrollText className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
+            </SettingsGroup>
+          </div>
+
+          <div className="space-y-5">
+            {/* 原「设置」页分组,直接拆到这里 */}
+            <SettingsGroup>
+              <SettingsRow
+                icon={<Lock className={`${iconCls} text-sky-500`} strokeWidth={1.5} />}
+                label="账号与安全"
+                value={user ? email || undefined : undefined}
+                href={user ? "/account/settings/security" : "/login"}
+              />
+              <SettingsRow
+                icon={<Bell className={`${iconCls} text-rose-500`} strokeWidth={1.5} />}
+                label="通知设置"
+                href={user ? "/account/settings/notifications" : "/login"}
+              />
+              {mounted && (
+                <SettingsRow
+                  icon={<Palette className={`${iconCls} text-purple-500`} strokeWidth={1.5} />}
+                  label="个性化"
+                  value={THEME_LABELS[theme ?? "system"]}
+                  href="/account/settings/appearance"
+                />
+              )}
+            </SettingsGroup>
+
+            {user && (
+              <>
+                <SettingsGroup capsule>
+                  <SettingsRow
+                    icon={<Store className={`${iconCls} text-amber-500`} strokeWidth={1.5} />}
+                    label="门店与车行认证"
+                    value={
+                      profile?.account_type === "dealer"
+                        ? "认证车行"
+                        : storeCount
+                          ? `${storeCount} 家门店`
+                          : undefined
+                    }
+                    href="/account/settings/stores"
+                  />
+                </SettingsGroup>
+                {profile?.account_type !== "dealer" && (
+                  <GroupFooter>添加门店并通过认证后,可升级为认证车行账号。</GroupFooter>
+                )}
+              </>
+            )}
+
+            <SettingsGroup>
+              <SettingsRow
+                icon={<Headset className={`${iconCls} text-cyan-500`} strokeWidth={1.5} />}
+                label="联系客服"
+                href="/contact"
+              />
+              <SettingsRow
+                icon={<ScrollText className={`${iconCls} text-stone-400`} strokeWidth={1.5} />}
                 label="用户协议"
                 href="/terms"
               />
-              {user ? (
-                <MenuRow
-                  icon={<LogOut className="h-4 w-4 text-destructive" strokeWidth={1.5} />}
-                  label="退出登录"
-                  onClick={handleLogout}
-                  destructive
-                />
-              ) : (
-                <MenuRow
-                  icon={<UserCircle className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />}
-                  label="登录 / 注册"
-                  href="/login"
-                />
-              )}
-            </div>
+            </SettingsGroup>
+
+            {(profile?.role === "admin" || !user) && (
+              <SettingsGroup capsule>
+                {profile?.role === "admin" && (
+                  <SettingsRow
+                    icon={<ShieldCheck className={`${iconCls} text-zinc-600`} strokeWidth={1.5} />}
+                    label="管理后台"
+                    href="/admin"
+                  />
+                )}
+                {!user && (
+                  <SettingsRow
+                    icon={<UserCircle className={`${iconCls} text-violet-500`} strokeWidth={1.5} />}
+                    label="登录 / 注册"
+                    href="/login"
+                  />
+                )}
+              </SettingsGroup>
+            )}
           </div>
         </div>
+
+        {/* 退出登录:独立整宽白卡按钮(微信式,置于页面最底) */}
+        {user && (
+          <button
+            type="button"
+            onClick={() => setLogoutOpen(true)}
+            className="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-full bg-card text-center font-mono text-[15px] text-destructive transition-colors active:bg-muted/60"
+          >
+            退出登录
+          </button>
+        )}
+
+        <p className="mt-8 text-center font-mono text-[11px] text-muted-foreground/60">
+          常來車網 · CLCAuto.com
+        </p>
       </main>
       <Footer />
+
+      {/* 退出登录确认 */}
+      <NonModalDrawer open={logoutOpen} onOpenChange={setLogoutOpen}>
+        <div className="px-6 pb-2 pt-3 text-center">
+          <p className="font-mono text-base font-semibold">退出登录</p>
+          <p className="mt-1.5 font-mono text-xs leading-relaxed text-muted-foreground">
+            退出后将收不到私信和降价提醒,确定退出当前账号吗?
+          </p>
+        </div>
+        <div className="space-y-2.5 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-4">
+          <Button
+            variant="destructive"
+            className="h-12 w-full font-mono text-[15px] font-semibold transition-transform active:scale-[0.98]"
+            disabled={loggingOut}
+            onClick={handleLogout}
+          >
+            {loggingOut && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />}
+            {loggingOut ? "正在退出…" : "退出登录"}
+          </Button>
+          <Button
+            variant="secondary"
+            className="h-12 w-full font-mono text-[15px] transition-transform active:scale-[0.98]"
+            disabled={loggingOut}
+            onClick={() => setLogoutOpen(false)}
+          >
+            取消
+          </Button>
+        </div>
+      </NonModalDrawer>
     </div>
     </PullToRefresh>
   );

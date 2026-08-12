@@ -31,7 +31,7 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
   const avgLabelPct = Math.min(82, Math.max(18, avgPct));
 
   return (
-    <div className="mt-3 rounded-xl border border-border p-4">
+    <div className="mt-3 rounded-xl bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-mono text-sm font-semibold">市场价位</h2>
         <span
@@ -54,7 +54,7 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
             </span>
             <div className="h-0 w-0 border-x-4 border-t-[5px] border-x-transparent border-t-foreground" />
           </div>
-          <div className="relative h-2 w-full border border-border bg-muted">
+          <div className="relative h-2 w-full bg-muted">
             {/* 均价刻度 */}
             <div
               className="absolute -top-1 h-[16px] w-px -translate-x-1/2 bg-muted-foreground/60"

@@ -71,6 +71,9 @@ interface OverlayCtx {
   openUser: (userId: string) => void;
   /** 手机端把注册过的普通页面以浮层栈打开(上一页保持挂载);不可嵌入时返回 false */
   openPage: (href: string) => boolean;
+  /** 清空整个浮层栈(浮层内做「pathname 不变、仅 query 变」的跳转前调用,
+      如点 hashtag 跳 /community?q=…;pathname 变化的跳转会自动清栈) */
+  closeAll: () => void;
 }
 
 const Ctx = createContext<OverlayCtx>({
@@ -80,6 +83,7 @@ const Ctx = createContext<OverlayCtx>({
   openPost: () => {},
   openUser: () => {},
   openPage: () => false,
+  closeAll: () => {},
 });
 
 export const useOverlay = () => useContext(Ctx);
@@ -285,6 +289,10 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
     else setStack((s) => s.slice(0, -1));
   }, []);
 
+  // 清空浮层栈:与 pathname 清栈同款(残留的 overlay 历史条目由 popstate
+  // 处理器落上去时自动再退一步消费)
+  const closeAll = useCallback(() => setStack([]), []);
+
   // popstate 的 e.state 是「落到的那条历史」的 state
   const stackLen = useRef(0);
   useEffect(() => {
@@ -306,7 +314,7 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <Ctx.Provider value={{ enabled, overlayOpen, openCar, openPost, openUser, openPage }}>
+    <Ctx.Provider value={{ enabled, overlayOpen, openCar, openPost, openUser, openPage, closeAll }}>
       <OverlayLayerRegistryCtx.Provider value={registry}>
       <OverlayLayerZCtx.Provider value={layerZ}>
       {children}

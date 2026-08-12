@@ -97,6 +97,8 @@ export async function generateMetadata({
   const cover = post.images?.find((u) => !VIDEO_RE.test(u));
   const url = `${SITE_URL}/community/${post.id}`;
 
+  const author = post.profiles?.username || "匿名用户";
+
   return {
     title: `${post.title} - ${TYPE_LABELS[post.type] || "社区"}`,
     description,
@@ -108,15 +110,26 @@ export async function generateMetadata({
       "二手车",
       "汽车社区",
     ].filter(Boolean) as string[],
+    authors: [{ name: author, url: `${SITE_URL}/user/${post.user_id}` }],
     alternates: { canonical: `/community/${post.id}` },
+    robots: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
     openGraph: {
       type: "article",
       title: post.title,
       description,
       url,
       siteName: SITE_NAME,
+      locale: "zh_CN",
       publishedTime: post.created_at,
       modifiedTime: post.updated_at,
+      authors: [`${SITE_URL}/user/${post.user_id}`],
+      section: TYPE_LABELS[post.type] || "社区",
+      tags: post.tags || [],
       ...(cover && { images: [{ url: cover }] }),
     },
     twitter: {
@@ -171,12 +184,31 @@ export default async function Page({
       }
     : null;
 
+  // 面包屑结构化数据:首页 → 社区 → 帖子(与车源页同款,利于搜索结果层级展示)
+  const breadcrumbLd = post
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "社区", item: `${SITE_URL}/community` },
+          { "@type": "ListItem", position: 3, name: post.title, item: `${SITE_URL}/community/${post.id}` },
+        ],
+      }
+    : null;
+
   return (
     <>
       {jsonLd && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
         />
       )}
       <CommunityDetail initialPost={post} initialRelated={related} />

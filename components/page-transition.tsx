@@ -204,6 +204,13 @@ const EASING = "cubic-bezier(0.32, 0.72, 0, 1)";
 // 手势松手后的收尾曲线:起步就带着手指的速度走,只做减速,不能先慢后快
 const RELEASE_EASING = "cubic-bezier(0.17, 0.84, 0.44, 1)";
 
+// 外部做 history.replaceState 浅更新 URL(如主页 tab 同步 /user/[id]/posts)时调用:
+// 告知 PageTransition 跳过本次 pathname 变化的转场——否则会进 push 相位,
+// children 挂进另一棵容器树导致页面组件重挂载、内部状态被重置
+export function skipNextTransition() {
+  _skipAnimation = true;
+}
+
 // 前页压暗强度随主题走(--push-dim:浅色 0.08 / 深色更重),拖拽起手时刷新。
 // JS 驱动的帧(跟手/WAAPI)用不了 CSS 变量做乘法,所以读一次缓存成数值
 let _pushDim = 0.08;
@@ -643,7 +650,7 @@ export function PageTransition({
         <div
           id="page-transition-content"
           ref={topLayerRef}
-          className={drag ? "fixed inset-0 z-[32] overflow-hidden bg-background" : undefined}
+          className={drag ? "fixed inset-0 z-[32] overflow-hidden rounded-[var(--page-corner)] bg-background" : undefined}
           style={drag ? { boxShadow: "var(--push-shadow)" } : undefined}
         >
           <div style={drag ? { transform: `translateY(-${dragScrollY.current}px)` } : undefined}>
@@ -662,7 +669,7 @@ export function PageTransition({
           // 跨组接手的旧页快照:从断点位置继续滑出屏幕
           <div
             ref={handoffTopRef}
-            className="fixed inset-0 z-[32] overflow-hidden bg-background pointer-events-none"
+            className="fixed inset-0 z-[32] overflow-hidden rounded-[var(--page-corner)] bg-background pointer-events-none"
             style={{
               transform: `translateX(${handoff.x}px)`,
               boxShadow: "var(--push-shadow)",

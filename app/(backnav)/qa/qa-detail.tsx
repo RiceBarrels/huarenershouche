@@ -35,13 +35,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  buying: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
-  selling: "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400",
-  loan: "bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400",
-  insurance: "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400",
-  dmv: "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400",
-  maintenance: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 dark:text-yellow-500",
-  general: "bg-gray-500/10 text-gray-600 border-gray-500/20 dark:text-gray-400",
+  buying: "bg-blue-500/10 text-blue-600 border-transparent dark:text-blue-400",
+  selling: "bg-green-500/10 text-green-600 border-transparent dark:text-green-400",
+  loan: "bg-purple-500/10 text-purple-600 border-transparent dark:text-purple-400",
+  insurance: "bg-orange-500/10 text-orange-600 border-transparent dark:text-orange-400",
+  dmv: "bg-red-500/10 text-red-600 border-transparent dark:text-red-400",
+  maintenance: "bg-yellow-500/10 text-yellow-700 border-transparent dark:text-yellow-500",
+  general: "bg-gray-500/10 text-gray-600 border-transparent dark:text-gray-400",
 };
 
 export default function QaDetailPage() {
@@ -251,7 +251,7 @@ export default function QaDetailPage() {
           </p>
           <Link href="/qa">
             <Button
-              variant="outline"
+              variant="secondary"
               size="sm"
               className="mt-4 gap-1.5 font-mono text-xs"
             >
@@ -292,7 +292,7 @@ export default function QaDetailPage() {
             {question.is_resolved && (
               <Badge
                 variant="outline"
-                className="gap-1 border-green-500/20 bg-green-500/10 font-mono text-[10px] text-green-600"
+                className="gap-1 border-transparent bg-green-500/10 font-mono text-[10px] text-green-600"
               >
                 <CheckCircle className="h-3 w-3" strokeWidth={1.5} />
                 已解决
@@ -307,7 +307,7 @@ export default function QaDetailPage() {
           {/* Author + stats */}
           <div className="mt-2 flex items-center gap-3">
             <div className="flex items-center gap-1.5">
-              <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+              <div className="flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                 <img
                   src={avatarUrl(question.profiles?.avatar_url, question.profiles?.username)}
                   alt=""
@@ -333,7 +333,7 @@ export default function QaDetailPage() {
               {question.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                  className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                 >
                   {tag}
                 </span>
@@ -357,7 +357,7 @@ export default function QaDetailPage() {
           {answersLoading ? (
             <div className="mt-4 space-y-4">
               {Array.from({ length: 2 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-border p-4">
+                <div key={i} className="rounded-xl bg-card p-4">
                   <Skeleton className="h-3 w-24" />
                   <Skeleton className="mt-2 h-16 w-full" />
                 </div>
@@ -372,10 +372,10 @@ export default function QaDetailPage() {
               {answers.map((answer) => (
                 <div
                   key={answer.id}
-                  className={`rounded-xl border p-4 ${
+                  className={`rounded-xl p-4 ${
                     answer.is_accepted
-                      ? "border-green-500/30 bg-green-500/5"
-                      : "border-border"
+                      ? "bg-green-500/10"
+                      : "bg-card"
                   }`}
                 >
                   {answer.is_accepted && (
@@ -387,7 +387,7 @@ export default function QaDetailPage() {
 
                   {/* Answer author */}
                   <div className="flex items-center gap-2">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                       <img
                         src={avatarUrl(answer.profiles?.avatar_url, answer.profiles?.username)}
                         alt=""
@@ -448,7 +448,7 @@ export default function QaDetailPage() {
                 <div className="flex flex-col gap-2">
                   <textarea
                     ref={inputRef}
-                    className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+                    className="w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                     placeholder="分享你的经验和建议..."
                     rows={4}
                     value={content}
@@ -476,7 +476,7 @@ export default function QaDetailPage() {
               ) : (
                 <Link
                   href="/login"
-                  className="block w-full rounded-xl border border-dashed border-border px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+                  className="block w-full rounded-xl bg-muted px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 >
                   登录后回答问题
                 </Link>

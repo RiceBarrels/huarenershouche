@@ -13,6 +13,7 @@ import {
   checkNotificationPermission,
   registerPushNotifications,
 } from "@/lib/capacitor";
+import { initDeviceCorner } from "@/lib/device-corner";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { PermissionPrompt } from "@/components/permission-prompt";
 
@@ -39,7 +40,7 @@ function OfflinePage() {
           }, 1000);
         }}
         disabled={retrying}
-        className="mt-8 flex items-center gap-2 border border-border px-6 py-2.5 text-sm transition-colors hover:bg-muted active:bg-muted disabled:opacity-50"
+        className="mt-8 flex items-center gap-2 bg-muted px-6 py-2.5 text-sm transition-colors hover:bg-muted/70 active:bg-muted/70 disabled:opacity-50"
       >
         <RefreshCw className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} strokeWidth={1.5} />
         {retrying ? "正在重试..." : "重试"}
@@ -69,6 +70,30 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // 原生壳:外部域名链接统一走 AppLauncher(UIApplication.open)。
+  // WKWebView 会吞掉 target="_blank"/window.open 的弹窗导航,导致
+  // 地图、车行网站等外链点了没反应;universal link 经系统打开还能
+  // 直接唤起对应 App(Apple/Google 地图等)
+  useEffect(() => {
+    if (!isNative()) return;
+    const onClick = (e: MouseEvent) => {
+      const a = (e.target as HTMLElement).closest?.("a[href]") as HTMLAnchorElement | null;
+      if (!a) return;
+      const href = a.getAttribute("href") || "";
+      // 只拦 http(s) 外部域名;站内相对链接、tel:/mailto: 等保持原生为
+      if (!/^https?:\/\//i.test(href)) return;
+      try {
+        if (new URL(href).origin === window.location.origin) return;
+      } catch {
+        return;
+      }
+      e.preventDefault();
+      import("@/lib/open-external").then(({ openExternal }) => openExternal(href));
+    };
+    document.addEventListener("click", onClick, { capture: true });
+    return () => document.removeEventListener("click", onClick, { capture: true });
+  }, []);
+
   useEffect(() => {
     if (!isNative()) return;
 
@@ -76,6 +101,8 @@ export function CapacitorProvider({ children }: { children: React.ReactNode }) {
     setupStatusBar();
     setupKeyboard();
     setupBackButton();
+    // 把设备屏幕圆角写入 --device-corner(抽屉/浮层/返回转场的圆角随之对齐)
+    initDeviceCorner();
 
     // 已授权过通知的设备:每次启动都重新注册,刷新并同步推送 token
     checkNotificationPermission().then((state) => {

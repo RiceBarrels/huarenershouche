@@ -1,8 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, Send, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { avatarUrl } from "@/lib/avatar";
+import { userLink } from "@/lib/static-link";
 import { Button } from "@/components/ui/button";
 import type { DbMessage } from "@/lib/types";
 
@@ -28,14 +31,46 @@ interface ChatThreadProps {
 }
 
 export function ChatThread({ conversationId, currentUserId, otherUsername, onBack }: ChatThreadProps) {
+  const router = useRouter();
   const [messages, setMessages] = useState<DbMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // 双方头像(含自己):按会话的 buyer/seller 拉资料,点头像进对应主页
+  const [avatars, setAvatars] = useState<
+    Record<string, { username: string; avatar_url: string | null }>
+  >({});
+  const [otherUserId, setOtherUserId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    async function loadProfiles() {
+      const { data: conv } = await supabase
+        .from("conversations")
+        .select("buyer_id, seller_id")
+        .eq("id", conversationId)
+        .maybeSingle();
+      if (!conv) return;
+      setOtherUserId(conv.buyer_id === currentUserId ? conv.seller_id : conv.buyer_id);
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .in("id", [conv.buyer_id, conv.seller_id]);
+      if (profiles) {
+        const map: Record<string, { username: string; avatar_url: string | null }> = {};
+        for (const p of profiles) map[p.id] = { username: p.username, avatar_url: p.avatar_url };
+        setAvatars(map);
+      }
+    }
+    loadProfiles();
+  }, [conversationId, currentUserId]);
+
+  function goProfile(id: string) {
+    router.push(userLink(id));
+  }
 
   // Load messages + mark unread as read
   useEffect(() => {
@@ -138,7 +173,22 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
         >
           <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
         </button>
-        <span className="font-mono text-sm font-medium">{otherUsername}</span>
+        <button
+          type="button"
+          onClick={() => otherUserId && goProfile(otherUserId)}
+          className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80"
+        >
+          {otherUserId && (
+            <span className="h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+              <img
+                src={avatarUrl(avatars[otherUserId]?.avatar_url, avatars[otherUserId]?.username || otherUsername)}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </span>
+          )}
+          <span className="truncate font-mono text-sm font-medium">{otherUsername}</span>
+        </button>
       </div>
 
       {/* Messages */}
@@ -155,18 +205,32 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           <div className="space-y-3">
             {messages.map((msg) => {
               const isMine = msg.sender_id === currentUserId;
+              const sender = avatars[msg.sender_id];
               return (
                 <div
                   key={msg.id}
-                  className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                  className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
                 >
+                  {/* 头像:自己/对方都显示,点击进主页 */}
+                  <button
+                    type="button"
+                    onClick={() => goProfile(msg.sender_id)}
+                    aria-label="查看主页"
+                    className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted transition-opacity hover:opacity-80"
+                  >
+                    <img
+                      src={avatarUrl(sender?.avatar_url, sender?.username || (isMine ? "我" : otherUsername))}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
                   <div
                     className={`max-w-[75%] rounded-2xl ${
                       CHAT_MEDIA_RE.test(msg.content) ? "overflow-hidden p-1" : "px-3 py-2"
                     } ${
                       isMine
                         ? "bg-foreground text-background"
-                        : "border border-border bg-muted"
+                        : "bg-muted"
                     }`}
                   >
                     {CHAT_MEDIA_RE.test(msg.content) ? (
@@ -231,7 +295,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
             aria-label="发送图片或视频"
-            className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full border border-border text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground disabled:opacity-50"
+            className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             {uploading ? (
               <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
@@ -241,7 +305,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           </button>
           <textarea
             ref={inputRef}
-            className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:border-foreground/30 focus:outline-none"
+            className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
             placeholder="输入消息..."
             rows={1}
             value={content}

@@ -60,7 +60,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
       <h3 className="font-mono text-xs font-semibold">月供计算器</h3>
 
       {/* Monthly payment highlight */}
-      <div className="rounded-lg border border-border p-3 text-center">
+      <div className="rounded-xl bg-card p-3 text-center">
         <p className="font-mono text-[10px] text-muted-foreground">预估月供</p>
         <p className="mt-1 font-mono text-xl font-bold">
           {fmt(monthlyPayment)}
@@ -98,7 +98,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
           {TERM_OPTIONS.map((t) => (
             <Button
               key={t}
-              variant={loanTerm === t ? "default" : "outline"}
+              variant={loanTerm === t ? "default" : "secondary"}
               size="sm"
               className="font-mono text-[10px]"
               onClick={() => setLoanTerm(t)}

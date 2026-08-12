@@ -54,7 +54,7 @@ import { MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
 import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
+import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import { getCurrentPosition, reverseGeocode } from "@/lib/geocode";
 
 import type { DbCar, DbCommunityPost } from "@/lib/types";
@@ -284,9 +284,9 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-// 首页数据会话缓存:重进不再重复请求,过期后台静默刷新
+// 首页数据双层缓存(社区同款):session 命中直接复用不重拉,
+// localStorage 冷启动兜底,先展示后台刷新
 const HOME_CACHE_KEY = "clc_home_v1";
-const HOME_CACHE_TTL = 10 * 60 * 1000;
 interface HomeCache {
   featured: DbCar[];
   recommended: DbCar[];
@@ -399,7 +399,7 @@ export default function Home() {
       setCommunityPosts(postsNext);
 
       if (featuredNext.length > 0) {
-        writeSessionCache<HomeCache>(HOME_CACHE_KEY, {
+        writeDualCache<HomeCache>(HOME_CACHE_KEY, {
           featured: featuredNext,
           recommended: recommendedNext,
           carCount: countNext,
@@ -408,14 +408,14 @@ export default function Home() {
       }
     }
 
-    // 会话缓存:本会话拉过一次就直接复用,不重复请求;过期(10 分钟)后台静默刷新
-    const cached = readSessionCache<HomeCache>(HOME_CACHE_KEY);
+    // 双层缓存(社区同款):本会话拉过就直接复用;localStorage 兜底数据先展示、后台刷新
+    const cached = readDualCache<HomeCache>(HOME_CACHE_KEY);
     if (cached && cached.data.featured.length > 0) {
       setFeatured(cached.data.featured);
       setRecommended(cached.data.recommended || []);
       setCarCount(cached.data.carCount);
       setCommunityPosts(cached.data.communityPosts || []);
-      if (Date.now() - cached.at > HOME_CACHE_TTL) load(hasHistory).catch(() => {});
+      if (cached.stale) load(hasHistory).catch(() => {});
     } else {
       load(hasHistory).catch(() => {});
     }
@@ -490,7 +490,7 @@ export default function Home() {
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
                 <Input
                   placeholder="搜索品牌、车型..."
-                  className="h-9 rounded-full border-border pl-9 font-mono text-sm"
+                  className="h-9 rounded-full bg-muted pl-9 font-mono text-sm"
                   value={searchFilters.keyword}
                   onChange={(e) => setSearchFilters((prev) => ({ ...prev, keyword: e.target.value }))}
                 />
@@ -498,7 +498,7 @@ export default function Home() {
               <Button
                 type="submit"
                 size="sm"
-                className="h-9 shrink-0 rounded-full bg-primary px-4 font-mono text-xs text-primary-foreground hover:opacity-90"
+                className="h-9 shrink-0 px-4 font-mono text-xs"
               >
                 搜索
               </Button>
@@ -581,7 +581,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:border md:border-border md:bg-background md:hover:border-foreground/30"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
                   >
                     <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -615,7 +615,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:border md:border-border md:bg-background md:hover:border-foreground/30"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
                   >
                     <Car className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -649,7 +649,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:border md:border-border md:bg-background md:hover:border-foreground/30"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
                   >
                     <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -686,7 +686,7 @@ export default function Home() {
                 e.preventDefault();
                 handleSearch();
               }}
-              className="mt-2 flex overflow-hidden rounded-full border border-border bg-background md:rounded-md"
+              className="mt-2 flex overflow-hidden rounded-full bg-background md:rounded-md"
             >
               {/* 手机:地区选择挂在搜索行左侧(瓜子式「城市▾ | 搜索 | 按钮」) */}
               <Drawer>
@@ -721,7 +721,7 @@ export default function Home() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
                 <Input
                   placeholder="搜索品牌、车型、关键词..."
-                  className="h-12 rounded-none border-0 pl-10 font-mono text-sm shadow-none focus-visible:ring-0"
+                  className="h-12 rounded-none bg-transparent pl-10 font-mono text-sm shadow-none focus:bg-transparent focus:ring-0 focus-visible:ring-0"
                   value={searchFilters.keyword}
                   onChange={(e) => setSearchFilters((prev) => ({ ...prev, keyword: e.target.value }))}
                 />
@@ -767,7 +767,7 @@ export default function Home() {
                     type="button"
                     className="flex flex-col items-center gap-1.5 py-2 transition-opacity active:opacity-60"
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border bg-muted/50 font-mono text-xs text-muted-foreground">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/60 font-mono text-xs text-muted-foreground">
                       ⋯
                     </span>
                     <span className="font-mono text-[11px]">更多</span>
@@ -812,7 +812,7 @@ export default function Home() {
               <button
                 key={m}
                 onClick={() => router.push(buildUrl({ make: m }))}
-                className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
               >
                 {MAKES_ZH[m]}
               </button>
@@ -874,7 +874,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <Link
               href="/browse?listedWithin=3"
-              className="rounded-2xl border border-border/60 bg-gradient-to-b from-primary/15 to-card p-3"
+              className="rounded-2xl bg-gradient-to-b from-primary/15 to-card p-3"
             >
               <p className="flex items-center justify-between font-mono text-[15px] font-bold">
                 新上好车
@@ -912,7 +912,7 @@ export default function Home() {
               return (
                 <Link
                   href={useDropped ? "/browse?priceDropped=true" : "/browse"}
-                  className={`rounded-2xl border border-border/60 bg-gradient-to-b p-3 ${useDropped ? "from-orange-500/15" : "from-sky-500/15"} to-card`}
+                  className={`rounded-2xl bg-gradient-to-b p-3 ${useDropped ? "from-orange-500/15" : "from-sky-500/15"} to-card`}
                 >
                   <p className="flex items-center justify-between font-mono text-[15px] font-bold">
                     {useDropped ? "降价捡漏" : "为你推荐"}
@@ -1032,7 +1032,7 @@ export default function Home() {
               <RevealItem key={opt.value} variants={scaleIn} className="w-32 shrink-0 md:w-auto">
                 <Link
                   href={`/browse?bodyStyle=${opt.value}`}
-                  className="group flex flex-col items-center rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/50"
+                  className="group flex flex-col items-center rounded-xl bg-card px-4 py-3 transition-colors hover:bg-muted/50"
                 >
                   <BodyStyleSilhouette
                     style={opt.value}
@@ -1059,13 +1059,13 @@ export default function Home() {
             </span>
           </div>
           <Reveal>
-          <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 md:flex-row md:items-center">
+          <div className="flex flex-col gap-3 rounded-xl bg-card p-3 md:flex-row md:items-center">
             <div className="flex flex-wrap items-center gap-1.5">
               {PAYMENT_PRESETS.map((p) => (
                 <Link
                   key={p}
                   href={`/browse?maxPayment=${p}`}
-                  className="rounded-full border border-border px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
+                  className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
                 >
                   ${p}/月
                 </Link>
@@ -1145,7 +1145,7 @@ export default function Home() {
                 <RevealItem key={post.id}>
                   <Link
                     href={`/community/${post.id}`}
-                    className="block h-full overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/30"
+                    className="block h-full overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
                   >
                     {post.images?.[0] && (
                       <img
@@ -1160,7 +1160,7 @@ export default function Home() {
                         {post.title}
                       </p>
                       <div className="mt-2 flex items-center gap-1.5">
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                        <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                           <img
                             src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
                             alt=""
@@ -1190,7 +1190,7 @@ export default function Home() {
               { href: "/guide/loan", title: "贷款预审", desc: "在线比价、秒批" },
             ].map((item) => (
               <RevealItem key={item.href}>
-                <Link href={item.href} className="block rounded-xl border border-border p-4 transition-colors hover:border-foreground/20">
+                <Link href={item.href} className="block rounded-xl bg-card p-4 transition-colors hover:bg-muted/40">
                   <p className="font-mono text-xs font-semibold">{item.title}</p>
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.desc}</p>
                 </Link>
@@ -1224,7 +1224,7 @@ export default function Home() {
               { Icon: MapPin, title: "覆盖全美", desc: "纽约、洛杉矶、旧金山、芝加哥等华人聚集城市，按距离找到身边的车" },
             ].map(({ Icon, title, desc }) => (
               <RevealItem key={title}>
-                <div className="h-full rounded-xl border border-border p-4 transition-colors hover:border-foreground/20">
+                <div className="h-full rounded-xl bg-card p-4 transition-colors hover:bg-muted/40">
                   <Icon className="h-5 w-5 text-foreground" strokeWidth={1.5} />
                   <h3 className="mt-3 font-mono text-sm font-semibold">{title}</h3>
                   <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground">{desc}</p>
@@ -1248,7 +1248,7 @@ export default function Home() {
               { n: "03", title: "联系卖家", desc: "在线私信或电话联系，中文沟通无障碍，约看车、谈价格" },
             ].map((step) => (
               <RevealItem key={step.n}>
-                <div className="relative h-full overflow-hidden rounded-xl border border-border bg-background p-5">
+                <div className="relative h-full overflow-hidden rounded-xl bg-background p-5">
                   <span className="pointer-events-none absolute -right-2 -top-4 select-none font-mono text-6xl font-bold text-foreground/[0.06]">
                     {step.n}
                   </span>
@@ -1264,7 +1264,7 @@ export default function Home() {
 
       {/* For sellers */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-14">
-        <Reveal className="mx-auto flex max-w-3xl flex-col items-center rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-6 text-center md:rounded-none md:border-0 md:bg-transparent md:p-0">
+        <Reveal className="mx-auto flex max-w-3xl flex-col items-center rounded-2xl bg-card p-6 text-center md:rounded-none md:bg-transparent md:p-0">
           <p className="font-mono text-[11px] uppercase tracking-[0.25em] text-muted-foreground">For Sellers</p>
           <h2 className="mt-3 font-mono text-2xl font-bold md:text-3xl">想卖车？</h2>
           <p className="mt-3 font-mono text-xs leading-relaxed text-muted-foreground">
@@ -1287,7 +1287,7 @@ export default function Home() {
 
       {/* About / SEO content */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-12">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-black/5 bg-card shadow-sm dark:border-white/5 p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0">
+        <div className="mx-auto max-w-3xl rounded-2xl bg-card p-4 md:rounded-none md:bg-transparent md:p-0">
           <h2 className="font-logo text-xl">关于常來車網</h2>
           <div className="mt-4 space-y-3 font-mono text-xs leading-relaxed text-muted-foreground">
             <p>

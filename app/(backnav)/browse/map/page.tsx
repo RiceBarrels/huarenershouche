@@ -809,7 +809,7 @@ function BrowseMapContent() {
           if (snapIdxRef.current !== SNAPS.length - 1) snapTo(SNAPS.length - 1);
         }}
         placeholder="搜索品牌 / 车型 / 关键词"
-        className="h-9 w-full rounded-full border border-border bg-muted/50 pl-9 pr-8 font-mono text-[13px] outline-none transition-colors focus:border-primary/60 focus:bg-background"
+        className="h-9 w-full rounded-full bg-muted/50 pl-9 pr-8 font-mono text-[13px] outline-none transition-colors focus:bg-background focus:ring-2 focus:ring-primary/30"
       />
       {keywordInput && (
         <button
@@ -870,13 +870,13 @@ function BrowseMapContent() {
           <DrawerClose asChild key={opt.value}>
             <button
               type="button"
-              className={`flex w-full items-center justify-between px-3 py-3 font-mono text-sm transition-colors ${
-                sort === opt.value ? "bg-muted font-medium" : "hover:bg-muted/50"
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-3 font-mono text-sm transition-colors ${
+                sort === opt.value ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"
               }`}
               onClick={() => changeSort(opt.value)}
             >
               {opt.label}
-              {sort === opt.value && <span className="text-foreground">✓</span>}
+              {sort === opt.value && <span className="text-primary">✓</span>}
             </button>
           </DrawerClose>
         ))}
@@ -1009,7 +1009,7 @@ function BrowseMapContent() {
 
         {/* 视口检索中:顶部居中指示条 */}
         {fetching && (
-          <div className="pointer-events-none absolute left-1/2 top-3.5 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-background/95 px-3 py-1.5 font-mono text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
+          <div className="pointer-events-none absolute left-1/2 top-3.5 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-background/95 px-3 py-1.5 font-mono text-[11px] text-muted-foreground shadow-sm backdrop-blur-sm">
             <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />
             加载中
           </div>
@@ -1020,7 +1020,7 @@ function BrowseMapContent() {
           <Link
             href={listHref}
             data-native-map-ui=""
-            className="pointer-events-auto flex items-center gap-1.5 rounded-full border border-border bg-background/95 px-3.5 py-2 font-mono text-xs font-medium shadow-sm backdrop-blur-sm"
+            className="pointer-events-auto flex items-center gap-1.5 rounded-full bg-background/95 px-3.5 py-2 font-mono text-xs font-medium shadow-sm backdrop-blur-sm"
           >
             <List className="h-3.5 w-3.5" strokeWidth={1.5} />
             列表
@@ -1031,7 +1031,7 @@ function BrowseMapContent() {
               <DrawerTrigger asChild>
                 <button
                   type="button"
-                  className="relative hidden items-center gap-1.5 rounded-full border border-border bg-background/95 px-3.5 py-2 font-mono text-xs font-medium shadow-sm backdrop-blur-sm md:flex"
+                  className="relative hidden items-center gap-1.5 rounded-full bg-background/95 px-3.5 py-2 font-mono text-xs font-medium shadow-sm backdrop-blur-sm md:flex"
                 >
                   <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
                   筛选
@@ -1048,7 +1048,7 @@ function BrowseMapContent() {
               type="button"
               onClick={locateMe}
               aria-label="定位到我"
-              className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-background/95 shadow-sm backdrop-blur-sm"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-background/95 shadow-sm backdrop-blur-sm"
             >
               <LocateFixed className="h-4 w-4" strokeWidth={1.5} />
             </button>
@@ -1073,7 +1073,7 @@ function BrowseMapContent() {
           onDragEnd={onDragEnd}
         >
           <motion.div
-            className="flex flex-col overflow-hidden border border-border shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
+            className="flex flex-col overflow-hidden shadow-[0_-8px_30px_rgba(0,0,0,0.12)]"
             style={{
               height: cardHeight,
               marginLeft: cardMx,
@@ -1108,7 +1108,7 @@ function BrowseMapContent() {
                   <DrawerTrigger asChild>
                     <button
                       type="button"
-                      className="relative flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1.5 font-mono text-xs font-medium"
+                      className="relative flex items-center gap-1.5 rounded-full bg-muted/50 px-3 py-1.5 font-mono text-xs font-medium"
                     >
                       <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
                       筛选
@@ -1125,7 +1125,7 @@ function BrowseMapContent() {
                   <DrawerTrigger asChild>
                     <button
                       type="button"
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-muted/50 px-3 py-1.5 font-mono text-xs font-medium"
+                      className="flex items-center gap-1.5 rounded-full bg-muted/50 px-3 py-1.5 font-mono text-xs font-medium"
                     >
                       <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />
                       {SORT_OPTIONS.find((o) => o.value === sort)?.label || "排序"}

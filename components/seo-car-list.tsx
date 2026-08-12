@@ -90,7 +90,7 @@ export function SeoCarList({
         </p>
         <Link
           href="/browse"
-          className="mt-3 inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted"
+          className="mt-3 inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted/70"
         >
           浏览全部车源
           <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
@@ -113,7 +113,7 @@ export function SeoCarList({
         <div className="mt-4 text-center">
           <Link
             href={browseHref}
-            className="inline-flex items-center gap-1 rounded-full border border-border px-4 py-2 font-mono text-xs transition-colors hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded-full bg-muted px-4 py-2 font-mono text-xs transition-colors hover:bg-muted/70"
           >
             查看全部 {cars.length}{cars.length >= 200 ? "+" : ""} 辆
             <ArrowRight className="h-3 w-3" strokeWidth={1.5} />

@@ -82,7 +82,7 @@ export function TrendingSearches() {
                 <Link
                   key={make}
                   href={`/browse?make=${encodeURIComponent(make)}`}
-                  className="rounded-full border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                  className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
                 >
                   {MAKES_ZH[make] || make}
                   <span className="ml-1 text-muted-foreground">
@@ -104,7 +104,7 @@ export function TrendingSearches() {
               <Link
                 key={tag.label}
                 href={`/browse?${tag.params}`}
-                className="rounded-full border border-border px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
               >
                 {tag.label}
               </Link>

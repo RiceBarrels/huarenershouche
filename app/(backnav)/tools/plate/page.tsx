@@ -67,7 +67,7 @@ export default function PlateToolPage() {
         </div>
 
         {result && (
-          <div className="mt-4 rounded-xl border border-border bg-card p-5 text-center">
+          <div className="mt-4 rounded-xl bg-card p-5 text-center">
             <p className="font-mono text-5xl font-bold text-primary">{result.score}</p>
             <p className="mt-2 font-mono text-sm font-medium">{result.comment}</p>
             {result.tags.length > 0 && (

@@ -127,7 +127,7 @@ export default function GuidePage() {
             const Icon = guide.icon;
             const content = (
               <div className="flex gap-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted">
                   <Icon
                     className="h-5 w-5 text-muted-foreground"
                     strokeWidth={1.5}
@@ -150,7 +150,7 @@ export default function GuidePage() {
                     {guide.tags.map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                       >
                         {tag}
                       </span>
@@ -163,7 +163,7 @@ export default function GuidePage() {
             if (guide.href) {
               return (
                 <Link key={guide.title} href={guide.href}>
-                  <article className="group cursor-pointer rounded-xl border border-border p-4 transition-colors hover:border-foreground/20">
+                  <article className="group cursor-pointer rounded-xl bg-card p-4 transition-colors hover:bg-muted/40">
                     {content}
                   </article>
                 </Link>
@@ -173,7 +173,7 @@ export default function GuidePage() {
             return (
               <article
                 key={guide.title}
-                className="group cursor-pointer rounded-xl border border-border p-4 transition-colors hover:border-foreground/20"
+                className="group cursor-pointer rounded-xl bg-card p-4 transition-colors hover:bg-muted/40"
               >
                 {content}
               </article>

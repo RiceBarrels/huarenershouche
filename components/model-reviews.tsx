@@ -79,7 +79,7 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
           <Link
             key={post.id}
             href={communityPostLink(post.id)}
-            className="block rounded-lg border border-border p-3 transition-colors hover:border-foreground/40"
+            className="block rounded-xl bg-card p-3 transition-colors hover:bg-muted/40"
           >
             <h3 className="line-clamp-1 font-mono text-xs font-semibold leading-tight">
               {post.title}

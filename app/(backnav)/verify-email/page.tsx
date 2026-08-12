@@ -159,8 +159,8 @@ function VerifyEmailContent() {
         <Header />
         <main className="mx-auto flex w-full max-w-sm flex-1 flex-col items-center justify-center px-4 py-12">
           <CheckCircle className="h-12 w-12 text-green-500" strokeWidth={1.5} />
-          <h1 className="mt-4 font-logo text-xl">验证成功</h1>
-          <p className="mt-2 font-mono text-xs text-muted-foreground">
+          <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">验证成功</h1>
+          <p className="mt-2 font-mono text-sm text-muted-foreground">
             {showProfileSetup ? "请完成账户设置" : "正在跳转..."}
           </p>
         </main>
@@ -187,10 +187,10 @@ function VerifyEmailContent() {
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
         <div className="flex flex-col items-center">
           <Mail className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-          <h1 className="mt-4 font-logo text-xl tracking-tight">
+          <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
             验证邮箱
           </h1>
-          <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
+          <p className="mt-2 text-center font-mono text-sm text-muted-foreground">
             我们已向{" "}
             <span className="font-medium text-foreground">{email}</span>{" "}
             发送了一个 {CODE_LENGTH} 位验证码
@@ -210,19 +210,19 @@ function VerifyEmailContent() {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={i === 0 ? handlePaste : undefined}
-              className="h-12 w-10 rounded-lg border border-border bg-background text-center font-mono text-lg font-semibold outline-none transition-colors focus:border-foreground"
+              className="h-12 w-10 rounded-xl bg-muted text-center font-mono text-lg font-semibold outline-none ring-2 ring-transparent transition-all focus:bg-background focus:ring-primary/40"
             />
           ))}
         </div>
 
         {error && (
-          <p className="mt-4 text-center font-mono text-[11px] text-destructive">
+          <p className="mt-4 rounded-xl bg-destructive/10 px-3 py-2.5 text-center font-mono text-xs text-destructive">
             {error}
           </p>
         )}
 
         <Button
-          className="mt-6 w-full font-mono text-xs"
+          className="mt-6 h-12 w-full font-mono text-base"
           onClick={() => handleVerify()}
           disabled={loading || code.some((c) => !c)}
         >

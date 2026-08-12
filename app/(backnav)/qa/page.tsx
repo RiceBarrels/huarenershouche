@@ -40,13 +40,13 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS: Record<string, string> = {
-  buying: "bg-blue-500/10 text-blue-600 border-blue-500/20 dark:text-blue-400",
-  selling: "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400",
-  loan: "bg-purple-500/10 text-purple-600 border-purple-500/20 dark:text-purple-400",
-  insurance: "bg-orange-500/10 text-orange-600 border-orange-500/20 dark:text-orange-400",
-  dmv: "bg-red-500/10 text-red-600 border-red-500/20 dark:text-red-400",
-  maintenance: "bg-yellow-500/10 text-yellow-700 border-yellow-500/20 dark:text-yellow-500",
-  general: "bg-gray-500/10 text-gray-600 border-gray-500/20 dark:text-gray-400",
+  buying: "bg-blue-500/10 text-blue-600 border-transparent dark:text-blue-400",
+  selling: "bg-green-500/10 text-green-600 border-transparent dark:text-green-400",
+  loan: "bg-purple-500/10 text-purple-600 border-transparent dark:text-purple-400",
+  insurance: "bg-orange-500/10 text-orange-600 border-transparent dark:text-orange-400",
+  dmv: "bg-red-500/10 text-red-600 border-transparent dark:text-red-400",
+  maintenance: "bg-yellow-500/10 text-yellow-700 border-transparent dark:text-yellow-500",
+  general: "bg-gray-500/10 text-gray-600 border-transparent dark:text-gray-400",
 };
 
 export default function QaBoardPage() {
@@ -107,7 +107,7 @@ export default function QaBoardPage() {
         </p>
 
         {/* Category tabs */}
-        <div className="mt-4 flex gap-1 overflow-x-auto border-b border-border pb-px">
+        <div className="mt-4 flex gap-1.5 overflow-x-auto pb-1">
           {CATEGORIES.map((cat) => (
             <button
               key={cat.key}
@@ -115,10 +115,10 @@ export default function QaBoardPage() {
                 setActiveTab(cat.key);
                 setLoading(true);
               }}
-              className={`shrink-0 px-2.5 py-2 font-mono text-xs transition-colors ${
+              className={`shrink-0 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${
                 activeTab === cat.key
-                  ? "border-b-2 border-foreground font-medium text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-primary/10 font-medium text-primary"
+                  : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
               }`}
             >
               {cat.label}
@@ -130,7 +130,7 @@ export default function QaBoardPage() {
         {loading ? (
           <div className="mt-4 space-y-3">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-xl border border-border p-4">
+              <div key={i} className="rounded-xl bg-card p-4">
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-4 w-12" />
                   <Skeleton className="h-4 w-3/4" />
@@ -176,7 +176,7 @@ export default function QaBoardPage() {
               <Link
                 key={q.id}
                 href={`/qa/${q.id}`}
-                className="block rounded-xl border border-border p-4 transition-colors hover:bg-muted/30"
+                className="block rounded-xl bg-card p-4 transition-colors hover:bg-muted/30"
               >
                 <div className="flex items-start gap-2">
                   <Badge
@@ -211,7 +211,7 @@ export default function QaBoardPage() {
                     {q.tags.slice(0, 3).map((tag) => (
                       <span
                         key={tag}
-                        className="rounded-full border border-border px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+                        className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
                       >
                         {tag}
                       </span>
@@ -249,7 +249,7 @@ export default function QaBoardPage() {
       {/* Floating ask button */}
       <Link
         href="/qa/ask"
-        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className="fixed bottom-20 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 active:scale-95"
       >
         <Plus className="h-5 w-5" strokeWidth={1.5} />
       </Link>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { carLink, carEditLink } from "@/lib/static-link";
 import {
-  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Loader2, Pencil, Globe,
+  Plus, Trash2, Eye, CheckCircle, XCircle, Car, Pencil, Globe,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useIdentity } from "@/components/identity-provider";
@@ -14,6 +14,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LargeTitle } from "@/components/ios-settings";
 import { useCachedData } from "@/lib/use-cached-data";
 import { MAKES_ZH } from "@/lib/mock-data";
 import type { DbCar } from "@/lib/types";
@@ -81,6 +82,7 @@ export default function ListingsPage() {
     // 重新上架时续期 30 天
     const patch: Partial<DbCar> = { status: newStatus as DbCar["status"] };
     if (newStatus === "active") {
+      // eslint-disable-next-line react-hooks/purity -- 事件回调里取当前时间,并非渲染期
       patch.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
     }
     await supabase.from("cars").update(patch).eq("id", carId);
@@ -108,27 +110,39 @@ export default function ListingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-4">
-        <div className="flex items-center justify-between">
-          <h1 className="font-mono text-lg font-semibold">我的发布</h1>
-          <Link href="/post">
-            <Button size="sm" className="gap-1.5 font-mono text-xs">
-              <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-              发布新车
-            </Button>
-          </Link>
-        </div>
+      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4">
+        <LargeTitle
+          title="我的发布"
+          trailing={
+            <Link href="/post">
+              <Button size="sm" className="h-9 gap-1.5 px-4 font-mono text-xs font-medium">
+                <Plus className="h-4 w-4" strokeWidth={2} />
+                发布新车
+              </Button>
+            </Link>
+          }
+        />
 
         {loading ? (
           <div className="mt-4 space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="rounded-xl bg-card flex gap-3 p-3">
+                <Skeleton className="h-20 w-28 rounded-[14px]" />
+                <div className="flex-1 space-y-2 py-1">
+                  <Skeleton className="h-4 w-2/3" />
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-7 w-40 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : (
         <>
         {/* Draft */}
         {draft && (draft.form?.make || draft.imageUrls?.length > 0) && (
-          <div className="mt-4 rounded-xl border border-dashed border-border p-3">
+          <div className="rounded-xl bg-card mt-4 p-3">
             <div className="flex items-start gap-3">
-              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
+              <div className="h-16 w-24 shrink-0 overflow-hidden rounded-[14px] bg-muted">
                 {draft.imageUrls?.[0] ? (
                   <img src={draft.imageUrls[0]} alt="" className="h-full w-full object-cover" />
                 ) : (
@@ -141,8 +155,8 @@ export default function ListingsPage() {
                   {[draft.form?.year, draft.form?.make ? (MAKES_ZH[draft.form.make] || draft.form.make) : null, draft.form?.model].filter(Boolean).join(" ") || "未填写"}
                 </p>
                 <div className="mt-2 flex gap-2">
-                  <Link href="/post"><Button size="sm" className="h-8 font-mono text-xs">继续编辑</Button></Link>
-                  <Button variant="outline" size="sm" className="h-8 font-mono text-xs text-destructive" onClick={() => { try { localStorage.removeItem(DRAFT_KEY); } catch {} setDraft(null); }}>
+                  <Link href="/post"><Button size="sm" className="h-8 px-4 font-mono text-xs">继续编辑</Button></Link>
+                  <Button variant="secondary" size="sm" className="h-8 px-4 font-mono text-xs text-destructive" onClick={() => { try { localStorage.removeItem(DRAFT_KEY); } catch {} setDraft(null); }}>
                     删除草稿
                   </Button>
                 </div>
@@ -154,15 +168,15 @@ export default function ListingsPage() {
         <div className="mt-4 space-y-3">
           {myCars.length === 0 && !draft ? (
             <div className="flex flex-col items-center py-16">
-              <Car className="h-10 w-10 text-muted-foreground" strokeWidth={1} />
+              <Car className="h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-sm text-muted-foreground">还没有发布过车辆</p>
-              <Link href="/post"><Button size="sm" className="mt-4 font-mono text-xs">立即发布</Button></Link>
+              <Link href="/post"><Button size="sm" className="mt-4 h-9 px-5 font-mono text-xs">立即发布</Button></Link>
             </div>
           ) : (
             myCars.map((car) => (
-              <div key={car.id} className="flex gap-3 rounded-xl border border-border p-3">
+              <div key={car.id} className="rounded-xl bg-card flex gap-3 p-3">
                 <Link href={carLink(car.id)} className="shrink-0">
-                  <div className="h-20 w-28 overflow-hidden rounded-lg bg-muted">
+                  <div className="h-20 w-28 overflow-hidden rounded-[14px] bg-muted">
                     {car.image_url ? (
                       <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                     ) : (
@@ -196,7 +210,7 @@ export default function ListingsPage() {
                   <div className="flex flex-wrap gap-2">
                     {car.source_id ? (
                       // 自动检索(转载)车辆:不可编辑/删除/标记已售,仅可停用/启用。
-                      <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleDisabled(car)}>
+                      <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]" onClick={() => toggleDisabled(car)}>
                         {car.owner_hidden
                           ? <><Eye className="h-3 w-3" strokeWidth={1.5} />启用</>
                           : <><XCircle className="h-3 w-3" strokeWidth={1.5} />停用</>}
@@ -204,19 +218,19 @@ export default function ListingsPage() {
                     ) : (
                       <>
                         <Link href={carEditLink(car.id)}>
-                          <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]">
+                          <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]">
                             <Pencil className="h-3 w-3" strokeWidth={1.5} />编辑
                           </Button>
                         </Link>
                         {car.status === "active" && (
-                          <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => markSold(car.id)}>
+                          <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]" onClick={() => markSold(car.id)}>
                             <CheckCircle className="h-3 w-3" strokeWidth={1.5} />已售
                           </Button>
                         )}
-                        <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
+                        <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
                           {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />下架</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{isExpired(car) ? "续期上架" : "上架"}</> : null}
                         </Button>
-                        <Button variant="outline" size="sm" className="h-8 gap-1 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
+                        <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
                           <Trash2 className="h-3 w-3" strokeWidth={1.5} />删除
                         </Button>
                       </>

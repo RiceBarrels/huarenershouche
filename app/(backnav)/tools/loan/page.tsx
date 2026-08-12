@@ -18,7 +18,7 @@ export default function LoanToolPage() {
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           输入车价,调整首付与期数,估算每月还款
         </p>
-        <div className="mt-4 rounded-xl border border-border bg-card p-4">
+        <div className="mt-4 rounded-xl bg-card p-4">
           <label className="font-mono text-xs font-medium">车价 ($)</label>
           <Input
             className="mt-1.5 font-mono"
@@ -29,7 +29,7 @@ export default function LoanToolPage() {
           />
         </div>
         {priceNum > 0 && (
-          <div className="mt-3 rounded-xl border border-border bg-card p-4">
+          <div className="mt-3 rounded-xl bg-card p-4">
             <LoanCalculator price={priceNum} />
           </div>
         )}

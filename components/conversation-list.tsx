@@ -5,6 +5,7 @@ import { MessageSquare, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { ChatThread, CHAT_MEDIA_RE } from "@/components/chat-thread";
+import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import type { DbConversation } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -32,10 +33,8 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
   const [loading, setLoading] = useState(true);
   const [activeConversation, setActiveConversation] = useState<string | null>(initialConvId || null);
   const [activeOtherName, setActiveOtherName] = useState("");
-
-  useEffect(() => {
-    loadConversations();
-  }, [userId, initialConvId, initialOtherUserId]);
+  // 原生壳 resize:"none" 下 webview 不缩放,全屏聊天由这里垫出键盘高度
+  const kbHeight = useKeyboardHeight();
 
   // 手机端聊天全屏时锁定背景页面滚动
   useEffect(() => {
@@ -127,14 +126,19 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- loadConversations 每次渲染都是新引用,仅按入参重跑
+  useEffect(() => {
+    loadConversations();
+  }, [userId, initialConvId, initialOtherUserId]);
+
   if (activeConversation) {
     return (
       <div
         // 手机:全屏接管(盖住页头,聊天占满视口,键盘弹起不跳);桌面:内嵌卡片
-        className="fixed inset-0 z-[70] flex flex-col bg-background font-mono md:static md:z-auto md:h-[600px] md:overflow-hidden md:rounded-xl md:border md:border-border"
+        className="fixed inset-0 z-[70] flex flex-col bg-background font-mono transition-[padding-bottom] duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none md:static md:z-auto md:h-[600px] md:overflow-hidden md:rounded-xl md:bg-card"
         style={{
           paddingTop: "env(safe-area-inset-top, 0px)",
-          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          paddingBottom: kbHeight > 0 ? `${kbHeight}px` : "env(safe-area-inset-bottom, 0px)",
         }}
       >
         <div className="min-h-0 flex-1">
@@ -173,7 +177,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
   }
 
   return (
-    <div className="divide-y divide-border border-y border-border md:overflow-hidden md:rounded-xl md:border-x">
+    <div className="divide-y divide-border bg-card md:overflow-hidden md:rounded-xl">
       {conversations.map((conv) => {
         const isBuyer = conv.buyer_id === userId;
         const otherProfile = isBuyer ? conv.seller_profile : conv.buyer_profile;
@@ -198,7 +202,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
           >
             {/* Avatar + unread dot */}
             <div className="relative shrink-0">
-              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+              <span className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-muted">
                 <img
                   src={avatarUrl(otherProfile?.avatar_url, otherProfile?.username)}
                   alt=""
@@ -241,7 +245,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
 
             {/* Car thumbnail */}
             {conv.cars?.image_url && (
-              <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+              <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
                 <img src={conv.cars.image_url} alt="" className="h-full w-full object-cover" />
               </div>
             )}

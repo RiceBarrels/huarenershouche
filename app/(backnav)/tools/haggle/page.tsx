@@ -48,7 +48,7 @@ export default function HaggleToolPage() {
             <button
               key={l}
               type="button"
-              className="flex w-full items-start justify-between gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors active:bg-muted/50"
+              className="flex w-full items-start justify-between gap-3 rounded-xl bg-card p-4 text-left transition-colors active:bg-muted/50"
               onClick={() => {
                 navigator.clipboard.writeText(l);
                 setCopied(l);
@@ -66,7 +66,7 @@ export default function HaggleToolPage() {
         </div>
 
         <Button
-          variant="outline"
+          variant="secondary"
           className="mt-4 w-full gap-1.5 font-mono text-sm"
           onClick={() => setLines(pick(3, lines))}
         >

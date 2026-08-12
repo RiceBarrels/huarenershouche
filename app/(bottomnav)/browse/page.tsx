@@ -6,10 +6,12 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
 import Image from "next/image";
 
-import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car, Map as MapIcon } from "lucide-react";
+import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car, Map as MapIcon, TrendingUp } from "lucide-react";
+import { match as pinyinMatch } from "pinyin-pro";
+import { getSuggestionPool, logSearchTerm } from "@/lib/search-suggestions";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
-import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
+import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
@@ -53,9 +55,9 @@ import {
 } from "@/components/ui/drawer";
 import type { DbCar } from "@/lib/types";
 
-// 车源列表会话缓存:重进不再重复请求,过期后台静默刷新
+// 车源列表双层缓存(社区同款):session 命中直接复用不重拉,
+// localStorage 冷启动兜底,先展示后台刷新
 const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
-const BROWSE_CACHE_TTL = 10 * 60 * 1000;
 
 // 响应式列数(与社区瀑布流一致):2 / md 3 / xl 4
 function useColumnCount(): number {
@@ -134,6 +136,43 @@ function BrowseContent() {
     setSearchHistory(getSearchHistory());
   }, []);
 
+  // 猜你想搜:与社区共用全站搜索词热度池(supabase),打开搜索时拉一次
+  const [suggestPool, setSuggestPool] = useState<string[]>([]);
+  useEffect(() => {
+    if (!mobileSearchOpen) return;
+    let cancelled = false;
+    getSuggestionPool().then((pool) => {
+      if (!cancelled) setSuggestPool(pool);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mobileSearchOpen]);
+
+  // 展示时按当前输入过滤重排(子串 + 拼音);未输入时排除已在历史里的词
+  const suggestedKeywords = useMemo(() => {
+    const kw = filters.keyword.trim().toLowerCase();
+    if (kw) {
+      const hits = suggestPool.filter((t) => {
+        const tl = t.toLowerCase();
+        if (tl === kw) return false;
+        return tl.includes(kw) || Boolean(pinyinMatch(t, kw));
+      });
+      return hits.slice(0, 6);
+    }
+    const historySet = new Set(searchHistory);
+    return suggestPool.filter((t) => !historySet.has(t)).slice(0, 6);
+  }, [suggestPool, filters.keyword, searchHistory]);
+
+  // 保存历史(社区同款规则:只在 input 失焦时保存)+ 上报全站词频
+  const commitSearchTerm = useCallback((term: string) => {
+    const t = term.trim();
+    if (!t) return;
+    addSearchHistory(t);
+    setSearchHistory(getSearchHistory());
+    logSearchTerm(t);
+  }, []);
+
   // Close dropdown on click outside
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -175,16 +214,16 @@ function BrowseContent() {
     const allCars = (data as DbCar[]) || [];
     applyCars(allCars);
     setFetchedAt(Date.now());
-    if (allCars.length > 0) writeSessionCache(BROWSE_CACHE_KEY, allCars);
+    if (allCars.length > 0) writeDualCache(BROWSE_CACHE_KEY, allCars);
   }
 
   useEffect(() => {
-    // 会话缓存:本会话拉过一次车源就直接复用;过期(10 分钟)后台静默刷新
-    const cached = readSessionCache<DbCar[]>(BROWSE_CACHE_KEY);
+    // 双层缓存(社区同款):本会话拉过就直接复用;localStorage 兜底数据先展示、后台刷新
+    const cached = readDualCache<DbCar[]>(BROWSE_CACHE_KEY);
     if (cached && cached.data.length > 0) {
       applyCars(cached.data);
       setFetchedAt(cached.at);
-      if (Date.now() - cached.at > BROWSE_CACHE_TTL) fetchCars();
+      if (cached.stale) fetchCars();
     } else {
       fetchCars();
     }
@@ -493,11 +532,14 @@ function BrowseContent() {
                       const next = { ...filters, keyword: e.target.value };
                       setFilters(next);
                     }}
+                    onBlur={() => {
+                      commitSearchTerm(filters.keyword);
+                      setSearchFocused(false);
+                    }}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && filters.keyword.trim()) {
-                        addSearchHistory(filters.keyword.trim());
-                        setSearchHistory(getSearchHistory());
-                        setSearchFocused(false);
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
                       }
                     }}
                   />
@@ -527,7 +569,7 @@ function BrowseContent() {
                     setMobileSearchOpen(true);
                     setSearchFocused(true);
                   }}
-                  className="flex h-9 w-full items-center gap-2 rounded-[0.3rem] border border-input bg-transparent px-3 text-left"
+                  className="flex h-9 w-full items-center gap-2 rounded-xl bg-muted/50 px-3 text-left"
                 >
                   <motion.span layoutId="browse-search-icon" className="flex shrink-0">
                     <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
@@ -538,44 +580,77 @@ function BrowseContent() {
                 </motion.button>
               )}
             </AnimatePresence>
-            {/* Search history dropdown */}
-            {mobileSearchOpen && searchFocused && !filters.keyword && searchHistory.length > 0 && (
-              <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-background shadow-md">
-                <div className="flex items-center justify-between px-3 py-1.5">
-                  <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearSearchHistory();
-                      setSearchHistory([]);
-                    }}
-                    className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-                  >
-                    <Trash2 className="h-2.5 w-2.5" strokeWidth={1.5} />
-                    清除
-                  </button>
-                </div>
-                {searchHistory.map((term) => (
-                  <button
-                    key={term}
-                    type="button"
-                    className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    onClick={() => {
-                      setFilters({ ...filters, keyword: term });
-                      setSearchFocused(false);
-                    }}
-                  >
-                    <Clock className="h-3 w-3" strokeWidth={1.5} />
-                    {term}
-                  </button>
-                ))}
+            {/* 搜索面板:历史(未输入时)+ 猜你想搜(输入时按输入过滤)。
+                onMouseDown preventDefault:点面板项不触发 input blur,点击才能生效 */}
+            {mobileSearchOpen &&
+              searchFocused &&
+              ((!filters.keyword && searchHistory.length > 0) || suggestedKeywords.length > 0) && (
+              <div
+                onMouseDown={(e) => e.preventDefault()}
+                className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background shadow-lg"
+              >
+                {!filters.keyword && searchHistory.length > 0 && (
+                  <>
+                    <div className="flex items-center justify-between px-3 py-1.5">
+                      <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          clearSearchHistory();
+                          setSearchHistory([]);
+                        }}
+                        className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
+                      >
+                        <Trash2 className="h-2.5 w-2.5" strokeWidth={1.5} />
+                        清除
+                      </button>
+                    </div>
+                    {searchHistory.map((term) => (
+                      <button
+                        key={term}
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={() => {
+                          setFilters({ ...filters, keyword: term });
+                          commitSearchTerm(term);
+                          setSearchFocused(false);
+                        }}
+                      >
+                        <Clock className="h-3 w-3" strokeWidth={1.5} />
+                        {term}
+                      </button>
+                    ))}
+                  </>
+                )}
+                {suggestedKeywords.length > 0 && (
+                  <>
+                    <div className="px-3 py-1.5">
+                      <span className="font-mono text-[10px] text-muted-foreground">猜你想搜</span>
+                    </div>
+                    {suggestedKeywords.map((term) => (
+                      <button
+                        key={term}
+                        type="button"
+                        className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        onClick={() => {
+                          setFilters({ ...filters, keyword: term });
+                          commitSearchTerm(term);
+                          setSearchFocused(false);
+                        }}
+                      >
+                        <TrendingUp className="h-3 w-3" strokeWidth={1.5} />
+                        {term}
+                      </button>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>
           <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
             <DrawerTrigger asChild>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="relative gap-1 font-mono text-xs"
               >
@@ -612,7 +687,7 @@ function BrowseContent() {
           <Drawer>
             <DrawerTrigger asChild>
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="gap-1 font-mono text-xs"
               >
@@ -635,12 +710,12 @@ function BrowseContent() {
                   <button
                     key={opt.value}
                     type="button"
-                    className={`flex w-full items-center justify-between px-3 py-3 font-mono text-sm transition-colors ${sort === opt.value ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+                    className={`flex w-full items-center justify-between rounded-xl px-3 py-3 font-mono text-sm transition-colors ${sort === opt.value ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
                     onClick={() => setSort(opt.value)}
                   >
                     {opt.label}
                     {sort === opt.value && (
-                      <span className="text-foreground">✓</span>
+                      <span className="text-primary">✓</span>
                     )}
                   </button>
                 ))}
@@ -656,7 +731,7 @@ function BrowseContent() {
               <button
                 key={chip.key}
                 onClick={() => clearFilter(chip.key)}
-                className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
               >
                 {chip.label}
                 <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -704,10 +779,10 @@ function BrowseContent() {
                     if (!searchSaved) saveSearch(savedSearchParams);
                   }}
                   disabled={searchSaved}
-                  className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${
+                  className={`flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${
                     searchSaved
-                      ? "border-border bg-muted text-muted-foreground"
-                      : "border-border hover:border-foreground hover:text-foreground"
+                      ? "bg-muted text-muted-foreground"
+                      : "bg-muted hover:bg-muted/70 hover:text-foreground"
                   }`}
                 >
                   <Bookmark
@@ -735,7 +810,7 @@ function BrowseContent() {
                   </SelectContent>
                 </Select>
                 <Link href={mapHref}>
-                  <Button size="sm" className="h-8 gap-1.5 font-mono text-xs font-semibold shadow-sm">
+                  <Button size="sm" className="h-8 gap-1.5 font-mono text-xs font-semibold">
                     <MapIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
                     地图找车
                   </Button>
@@ -749,7 +824,7 @@ function BrowseContent() {
                   <button
                     key={`${chip.key}-${i}`}
                     onClick={() => clearFilter(chip.key)}
-                    className="flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                    className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
                   >
                     {chip.label}
                     <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -810,7 +885,7 @@ function BrowseContent() {
             )}
             </>
           ) : (
-            <div className="flex flex-col items-center rounded-xl border border-dashed border-border px-6 py-16">
+            <div className="flex flex-col items-center rounded-xl bg-muted/30 px-6 py-16">
               <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 No Results
@@ -820,7 +895,7 @@ function BrowseContent() {
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="font-mono text-xs"
                   onClick={() => setFilters(INITIAL_FILTERS)}

@@ -186,7 +186,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
             <StarRating value={rating} onChange={setRating} />
           </div>
           <textarea
-            className="mt-3 w-full rounded-lg border border-border bg-transparent px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:border-foreground focus:outline-none"
+            className="mt-3 w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
             rows={3}
             placeholder="分享你与这家车行的交易体验..."
             value={content}
@@ -224,7 +224,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
 
       {/* My review (read-only) */}
       {canReview && myReview && !editing && (
-        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
+        <div className="mt-4 rounded-xl bg-muted/30 p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="font-mono text-xs font-medium">我的评价</span>
@@ -273,7 +273,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
       {loading ? (
         <div className="mt-4 space-y-3">
           {[1, 2].map((i) => (
-            <div key={i} className="h-20 animate-pulse rounded-xl border border-border bg-muted/30" />
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-muted/30" />
           ))}
         </div>
       ) : reviews.length === 0 ? (
@@ -285,9 +285,9 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
           {reviews
             .filter((r) => r.id !== myReview?.id)
             .map((review) => (
-              <div key={review.id} className="rounded-xl border border-border p-4">
+              <div key={review.id} className="rounded-xl bg-card p-4">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                     <img
                       src={avatarUrl(review.profiles?.avatar_url, review.profiles?.username)}
                       alt=""

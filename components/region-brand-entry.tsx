@@ -69,7 +69,7 @@ export function RegionBrandEntry() {
             {Array.from({ length: 10 }).map((_, i) => (
               <Skeleton
                 key={i}
-                className="h-16 w-28 shrink-0 rounded-lg md:w-auto"
+                className="h-16 w-28 shrink-0 rounded-xl md:w-auto"
               />
             ))}
           </div>
@@ -79,7 +79,7 @@ export function RegionBrandEntry() {
               <Link
                 key={region.nameZh}
                 href={`/browse?location=${encodeURIComponent(region.locationMatch)}`}
-                className="group flex shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-card px-6 py-3 transition-colors hover:border-foreground/20 hover:bg-muted/50 md:px-4"
+                className="group flex shrink-0 flex-col items-center justify-center rounded-xl bg-card px-6 py-3 transition-colors hover:bg-muted/50 md:px-4"
               >
                 <span className="font-mono text-sm font-medium group-hover:text-foreground">
                   {region.nameZh}

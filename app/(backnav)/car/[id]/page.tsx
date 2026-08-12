@@ -5,7 +5,8 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { SITE_URL, SITE_NAME, makeSlug } from "@/lib/seo-pages";
+import { MAKES } from "@/lib/mock-data";
 import type { DbCar } from "@/lib/types";
 import CarDetail from "../car-detail";
 
@@ -159,6 +160,16 @@ export default async function Page({
                   : "https://schema.org/OutOfStock",
               itemCondition: "https://schema.org/UsedCondition",
               url: `${SITE_URL}/car/${car.id}`,
+              ...(car.seller_name && {
+                seller: {
+                  "@type":
+                    car.profiles?.account_type === "dealer" || car.profiles?.is_system
+                      ? "AutoDealer"
+                      : "Person",
+                  name: car.seller_name,
+                  url: `${SITE_URL}/user/${car.seller_id}`,
+                },
+              }),
               ...(car.location && {
                 availableAtOrFrom: {
                   "@type": "Place",
@@ -171,12 +182,48 @@ export default async function Page({
         }
       : null;
 
+  // 面包屑:首页 → 二手车 → 品牌落地页 → 本车,利于搜索结果展示层级
+  const hasMakePage =
+    !!car && car.make !== "Other" && (MAKES as readonly string[]).includes(car.make);
+  const breadcrumbLd = jsonLd
+    ? {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "首页", item: SITE_URL },
+          { "@type": "ListItem", position: 2, name: "二手车", item: `${SITE_URL}/cars` },
+          ...(hasMakePage
+            ? [
+                {
+                  "@type": "ListItem",
+                  position: 3,
+                  name: car!.make,
+                  item: `${SITE_URL}/cars/${makeSlug(car!.make)}`,
+                },
+              ]
+            : []),
+          {
+            "@type": "ListItem",
+            position: hasMakePage ? 4 : 3,
+            name: `${car!.year} ${car!.make} ${car!.model}`,
+            item: `${SITE_URL}/car/${car!.id}`,
+          },
+        ],
+      }
+    : null;
+
   return (
     <>
       {jsonLd && (
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
+      )}
+      {breadcrumbLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
         />
       )}
       <CarDetail initialCar={car} />

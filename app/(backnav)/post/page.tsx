@@ -1042,10 +1042,10 @@ export default function PostCarPage() {
     <div className="flex min-h-screen flex-col bg-background">
       {!user ? (
         <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
-          <div className="mt-8 flex flex-col items-center rounded-2xl border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-2xl bg-card p-8">
             <p className="text-sm text-muted-foreground">请先登录后再发布车辆</p>
             <Link href="/login">
-              <Button size="sm" className="mt-4 rounded-full text-xs">
+              <Button size="sm" className="mt-4 text-xs">
                 登录 / 注册
               </Button>
             </Link>
@@ -1053,8 +1053,8 @@ export default function PostCarPage() {
         </main>
       ) : (
         <>
-          {/* 进度:细进度条 + 计数 */}
-          <div className="mx-auto w-full max-w-2xl px-5 pt-3">
+          {/* 进度(手机):细进度条 + 计数;桌面由左侧步骤导航展示进度 */}
+          <div className="mx-auto w-full max-w-2xl px-5 pt-3 md:hidden">
             <div className="flex items-center gap-3">
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
@@ -1068,7 +1068,60 @@ export default function PostCarPage() {
             </div>
           </div>
 
-          <main className="mx-auto w-full max-w-2xl flex-1 overflow-x-hidden px-5 pb-44 pt-6">
+          {/* 桌面:左侧步骤导航 + 右侧内容两栏;手机保持单列 */}
+          <div className="mx-auto flex w-full max-w-5xl flex-1 items-start gap-12 md:px-8 md:pt-12">
+            {/* 步骤导航:已完成/当前/未到;必填步全部完成前不可跳到其后 */}
+            <aside className="sticky top-24 hidden w-52 shrink-0 md:block">
+              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+                发布进度 {step + 1}/{STEPS.length}
+              </p>
+              <ol className="mt-4 space-y-0.5">
+                {STEPS.map((s, i) => {
+                  const reachable = i <= firstIncompleteStep(form, imageUrls);
+                  const done = i < step && stepComplete(s.id);
+                  return (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        disabled={!reachable}
+                        onClick={() => {
+                          if (i === step) return;
+                          setError("");
+                          setDir(i > step ? 1 : -1);
+                          setStep(i);
+                        }}
+                        className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors ${
+                          i === step
+                            ? "bg-primary/10 font-medium text-primary"
+                            : reachable
+                              ? "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                              : "cursor-not-allowed text-muted-foreground/40"
+                        }`}
+                      >
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums ${
+                            done
+                              ? "bg-primary/10 text-primary"
+                              : i === step
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted text-muted-foreground/70"
+                          }`}
+                        >
+                          {done ? <Check className="h-3 w-3" strokeWidth={2} /> : i + 1}
+                        </span>
+                        <span className="truncate">{s.title}</span>
+                        {s.optional && (
+                          <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/50">选填</span>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
+            </aside>
+
+            <div className="min-w-0 flex-1 md:pb-20">
+          <main className="mx-auto w-full max-w-2xl flex-1 overflow-x-hidden px-5 pb-44 pt-6 md:px-0 md:pb-8 md:pt-0">
             <AnimatePresence mode="wait" custom={dir} initial={false}>
               <motion.div
                 key={current.id}
@@ -1083,7 +1136,7 @@ export default function PostCarPage() {
                 }}
               >
                 {/* 大字提问 */}
-                <h1 className="text-2xl font-semibold tracking-tight">{current.title}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{current.title}</h1>
                 {current.sub && (
                   <p className="mt-1.5 text-sm text-muted-foreground">{current.sub}</p>
                 )}
@@ -1094,7 +1147,7 @@ export default function PostCarPage() {
                     <div>
                       {/* 草稿箱:有历史草稿时,第一页可直接选一份继续(也可删除) */}
                       {drafts.filter((d) => d.id !== draftId).length > 0 && (
-                        <div className="mb-5 rounded-2xl border border-border bg-card p-4">
+                        <div className="mb-5 rounded-2xl bg-card p-4">
                           <p className="text-sm font-medium text-foreground">继续上次的草稿</p>
                           <div className="mt-3 space-y-2">
                             {drafts.filter((d) => d.id !== draftId).map((d) => (
@@ -1149,7 +1202,7 @@ export default function PostCarPage() {
                         {imageUrls.map((url, i) => (
                           <div
                             key={i}
-                            className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted"
+                            className="relative h-24 w-24 shrink-0 overflow-hidden rounded-xl bg-muted md:h-32 md:w-32"
                           >
                             <img src={url} alt="" className="h-full w-full object-cover" />
                             <button
@@ -1166,7 +1219,7 @@ export default function PostCarPage() {
                             )}
                           </div>
                         ))}
-                        <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-border bg-muted/50 active:bg-muted">
+                        <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-muted/50 active:bg-muted md:h-32 md:w-32 md:hover:bg-muted">
                           {uploading ? (
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" strokeWidth={1.5} />
                           ) : (
@@ -1212,7 +1265,7 @@ export default function PostCarPage() {
 
                       {/* Admin: fake listing generator */}
                       {isAdmin && (
-                        <div className="mt-6 rounded-xl border border-dashed border-yellow-500/50 bg-yellow-500/5 p-4">
+                        <div className="mt-6 rounded-xl bg-yellow-500/10 p-4">
                           <div className="flex items-center gap-2">
                             <ShieldCheck className="h-4 w-4 text-yellow-600" strokeWidth={1.5} />
                             <span className="text-xs font-semibold text-yellow-700 dark:text-yellow-400">管理员工具</span>
@@ -1308,14 +1361,14 @@ export default function PostCarPage() {
                       />
                       {form.make === "Other" && (
                         <input
-                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                           placeholder="请输入品牌名称 *"
                           value={form.customMake || ""}
                           onChange={(e) => update("customMake", e.target.value)}
                         />
                       )}
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                         placeholder="车型 * 如 Camry, CR-V"
                         value={form.model}
                         onChange={(e) => update("model", e.target.value)}
@@ -1330,7 +1383,7 @@ export default function PostCarPage() {
                           emptyText="未找到"
                         />
                         <input
-                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                           placeholder="配置等级 如 SE"
                           value={form.trim}
                           onChange={(e) => update("trim", e.target.value)}
@@ -1359,10 +1412,10 @@ export default function PostCarPage() {
                                 setStep((s) => Math.min(s + 1, STEPS.length - 1));
                               }, 180);
                             }}
-                            className={`flex flex-col items-center gap-1 rounded-2xl border-2 py-8 transition-colors ${
+                            className={`flex flex-col items-center gap-1 rounded-2xl py-8 transition-colors ${
                               active
-                                ? "border-primary bg-primary/5"
-                                : "border-border bg-card active:bg-muted"
+                                ? "bg-primary/10"
+                                : "bg-card active:bg-muted"
                             }`}
                           >
                             <span className={`text-xl font-semibold ${active ? "text-primary" : "text-foreground"}`}>
@@ -1409,7 +1462,7 @@ export default function PostCarPage() {
                         <span className="text-sm text-muted-foreground">电议(不显示价格)</span>
                       </label>
                       {showCallWarning && !priceCallOnly && (
-                        <div className="mt-3 rounded-xl border border-yellow-500/50 bg-yellow-500/5 p-3">
+                        <div className="mt-3 rounded-xl bg-yellow-500/10 p-3">
                           <p className="text-sm text-yellow-600 dark:text-yellow-400">
                             注意：选择电议可能会影响曝光率
                           </p>
@@ -1588,7 +1641,7 @@ export default function PostCarPage() {
                       ) : (
                         <div className="mt-4 space-y-3">
                           <input
-                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                             placeholder="街道地址 123 Main St"
                             value={form.address}
                             onChange={(e) => {
@@ -1597,20 +1650,20 @@ export default function PostCarPage() {
                             }}
                           />
                           <input
-                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                             placeholder="Apt, Suite, Unit(选填)"
                             value={form.address2}
                             onChange={(e) => update("address2", e.target.value)}
                           />
                           <div className="grid grid-cols-2 gap-3">
                             <input
-                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                               placeholder="City"
                               value={form.city}
                               onChange={(e) => update("city", e.target.value)}
                             />
                             <input
-                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground placeholder:normal-case placeholder:text-muted-foreground/50 focus:outline-none"
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground transition-colors placeholder:normal-case placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                               placeholder="State 如 CA"
                               maxLength={2}
                               value={form.state}
@@ -1626,14 +1679,14 @@ export default function PostCarPage() {
                   {current.id === "contact" && (
                     <div className="space-y-3">
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                         placeholder="你的名字或车行名 *"
                         value={form.seller_name}
                         onChange={(e) => update("seller_name", e.target.value)}
                       />
                       <input
                         type="tel"
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                         placeholder="联系电话 (626) 555-0123 *"
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
@@ -1645,7 +1698,7 @@ export default function PostCarPage() {
                   {current.id === "carfax" && (
                     <div>
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                         placeholder="https://www.carfax.com/vehicle/..."
                         value={form.carfax_url}
                         onChange={(e) => {
@@ -1706,7 +1759,7 @@ export default function PostCarPage() {
                     <div>
                       <div className="flex gap-2">
                         <input
-                          className="min-w-0 flex-1 rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          className="min-w-0 flex-1 rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                           placeholder="如：倒车影像、全景天窗"
                           value={featureInput}
                           onChange={(e) => setFeatureInput(e.target.value)}
@@ -1767,7 +1820,7 @@ export default function PostCarPage() {
 
                 {/* 错误提示 */}
                 {error && (
-                  <div className="mt-4 rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+                  <div className="mt-4 rounded-xl bg-destructive/10 p-3">
                     <p className="text-sm text-destructive">{error}</p>
                   </div>
                 )}
@@ -1775,9 +1828,9 @@ export default function PostCarPage() {
             </AnimatePresence>
           </main>
 
-          {/* 底部操作栏:上一步 + 继续/跳过/发布;键盘弹起时随键盘顶起 */}
+          {/* 底部操作栏:上一步 + 继续/跳过/发布;手机固定底部随键盘顶起,桌面内联在内容下方 */}
           <div
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm transition-transform duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm transition-transform duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none md:static md:z-auto md:border-0 md:bg-transparent md:px-0 md:pt-0 md:backdrop-blur-none"
             style={{
               paddingBottom: kbHeight > 0 ? "0.75rem" : "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
               transform: kbHeight > 0 ? `translateY(-${kbHeight}px)` : "translateY(0)",
@@ -1789,7 +1842,7 @@ export default function PostCarPage() {
                   type="button"
                   onClick={goPrev}
                   aria-label="上一步"
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors active:bg-muted"
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors active:bg-muted md:hover:bg-muted"
                 >
                   <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />
                 </button>
@@ -1798,11 +1851,13 @@ export default function PostCarPage() {
                 type="button"
                 onClick={goNext}
                 disabled={!canProceed || loading || vinDecoding}
-                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-40"
+                className="flex h-12 flex-1 items-center justify-center gap-1.5 rounded-full bg-primary text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-40 md:flex-none md:min-w-48 md:px-10 md:text-sm md:hover:opacity-90"
               >
                 {(loading || vinDecoding) && <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />}
                 {mainLabel}
               </button>
+            </div>
+          </div>
             </div>
           </div>
         </>
@@ -1818,7 +1873,7 @@ export default function PostCarPage() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" className="text-xs" onClick={() => setFakeDialogOpen(false)}>
+            <Button variant="secondary" size="sm" className="text-xs" onClick={() => setFakeDialogOpen(false)}>
               取消
             </Button>
             <Button

@@ -75,7 +75,7 @@ function MapAppRow({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-3 rounded-xl border border-border p-3.5 transition-colors active:bg-muted"
+        className="flex items-center gap-3 rounded-xl bg-card p-3.5 transition-colors active:bg-muted"
       >
         <span className="h-9 w-9 shrink-0">{icon}</span>
         <span className="min-w-0 flex-1">

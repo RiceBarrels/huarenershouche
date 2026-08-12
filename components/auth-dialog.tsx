@@ -118,7 +118,7 @@ export function AuthDialog({
         <DialogTrigger asChild>{children}</DialogTrigger>
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
-            <DialogTitle className="font-logo text-base">
+            <DialogTitle className="font-logo text-2xl font-bold tracking-tight">
               {mode === "login" ? "登录" : "注册"}
             </DialogTitle>
           </DialogHeader>
@@ -126,8 +126,8 @@ export function AuthDialog({
           {/* Google login */}
           <Button
             type="button"
-            variant="outline"
-            className="w-full gap-2 font-mono text-xs"
+            variant="secondary"
+            className="h-12 w-full gap-2 font-mono text-base"
             disabled={googleLoading}
             onClick={handleGoogleLogin}
           >
@@ -144,7 +144,7 @@ export function AuthDialog({
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-popover px-3 font-mono text-[10px] text-muted-foreground">
+              <span className="bg-background px-3 font-mono text-[10px] text-muted-foreground/60">
                 或使用邮箱
               </span>
             </div>
@@ -157,7 +157,7 @@ export function AuthDialog({
                   用户名
                 </Label>
                 <Input
-                  className="mt-1 font-mono text-sm"
+                  className="mt-1.5 h-12 font-mono text-base"
                   placeholder="你的用户名"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
@@ -170,7 +170,7 @@ export function AuthDialog({
                 邮箱
               </Label>
               <Input
-                className="mt-1 font-mono text-sm"
+                className="mt-1.5 h-12 font-mono text-base"
                 type="email"
                 placeholder="email@example.com"
                 value={email}
@@ -183,7 +183,7 @@ export function AuthDialog({
                 密码
               </Label>
               <Input
-                className="mt-1 font-mono text-sm"
+                className="mt-1.5 h-12 font-mono text-base"
                 type="password"
                 placeholder="至少6位"
                 value={password}
@@ -193,11 +193,11 @@ export function AuthDialog({
               />
             </div>
             {error && (
-              <p className="font-mono text-[11px] text-destructive">{error}</p>
+              <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
             )}
             <Button
               type="submit"
-              className="w-full font-mono text-xs"
+              className="h-12 w-full font-mono text-base"
               disabled={loading}
             >
               {loading

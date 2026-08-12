@@ -562,10 +562,10 @@ export default function AdminPage() {
             <button
               key={t.key}
               onClick={() => handleTabChange(t.key)}
-              className={`relative flex shrink-0 items-center gap-1 rounded-lg border px-3 py-2 text-xs transition-colors ${
+              className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs transition-colors ${
                 tab === t.key
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border hover:border-foreground/30"
+                  ? "bg-primary/10 text-primary"
+                  : "bg-muted hover:bg-muted/70"
               }`}
             >
               {t.icon}
@@ -588,7 +588,7 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无待审核的认证申请</p>
             ) : (
               pendingStores.map((store) => (
-                <div key={store.id} className="rounded-xl border border-border p-3">
+                <div key={store.id} className="rounded-xl bg-card p-3">
                   <div className="flex items-start justify-between">
                     <div>
                       <p className="text-xs font-medium">{store.name}</p>
@@ -610,7 +610,7 @@ export default function AdminPage() {
                   {store.store_photos.length > 0 && (
                     <div className="mt-2 flex gap-2 overflow-x-auto">
                       {store.store_photos.map((url, i) => (
-                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block h-20 w-28 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="block h-20 w-28 shrink-0 overflow-hidden rounded-lg bg-muted">
                           <img src={url} alt="" className="h-full w-full object-cover" />
                         </a>
                       ))}
@@ -631,7 +631,7 @@ export default function AdminPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         className="gap-1 text-xs text-red-600 dark:text-red-400 hover:text-red-700"
                         onClick={() => rejectStore(store.id)}
                         disabled={actionLoading === store.id || !rejectNote[store.id]?.trim()}
@@ -667,10 +667,10 @@ export default function AdminPage() {
                 <p className="py-12 text-center text-xs text-muted-foreground">无匹配用户</p>
               ) : (
                 filteredUsers.map((u) => (
-                  <div key={u.id} className={`flex items-center justify-between rounded-lg border p-3 ${u.banned ? "border-red-300 bg-red-50 dark:bg-red-950/20" : "border-border"}`}>
+                  <div key={u.id} className={`flex items-center justify-between rounded-xl p-3 ${u.banned ? "bg-red-50 dark:bg-red-950/20" : "bg-card"}`}>
                     <div className="min-w-0 flex-1">
                       <Link href={adminUserLink(u.id)} className="flex items-center gap-2 hover:opacity-80">
-                        <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full border border-border object-cover" />
+                        <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full bg-muted object-cover" />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <p className="truncate text-xs font-medium hover:underline">{u.username || "未设置"}</p>
@@ -699,7 +699,7 @@ export default function AdminPage() {
                       <Link href={adminUserLink(u.id)}>
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           className="h-7 gap-1 px-2 text-[11px]"
                         >
                           <Settings2 className="h-3 w-3" strokeWidth={1.5} />
@@ -709,7 +709,7 @@ export default function AdminPage() {
                       {u.role === "admin" ? (
                         <Button
                           size="sm"
-                          variant="outline"
+                          variant="secondary"
                           className="h-7 gap-1 px-2 text-[11px]"
                           onClick={() => setAdmin(u.id, false)}
                           disabled={actionLoading === u.id}
@@ -721,7 +721,7 @@ export default function AdminPage() {
                         <>
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="secondary"
                             className="h-7 gap-1 px-2 text-[11px]"
                             onClick={() => setAdmin(u.id, true)}
                             disabled={actionLoading === u.id}
@@ -732,7 +732,7 @@ export default function AdminPage() {
                           {u.banned ? (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="secondary"
                               className="h-7 gap-1 px-2 text-[11px]"
                               onClick={() => unbanUser(u.id)}
                               disabled={actionLoading === u.id}
@@ -743,7 +743,7 @@ export default function AdminPage() {
                           ) : (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="secondary"
                               className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
                               onClick={() => {
                                 const reason = prompt("封禁原因:");
@@ -779,8 +779,8 @@ export default function AdminPage() {
                 <p className="py-12 text-center text-xs text-muted-foreground">无匹配车辆</p>
               ) : (
                 filteredCars.map((car) => (
-                  <div key={car.id} className={`flex items-center gap-3 rounded-lg border p-2 ${car.status === "removed" ? "border-red-300 opacity-60" : "border-border"}`}>
-                    <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                  <div key={car.id} className={`flex items-center gap-3 rounded-xl p-2 ${car.status === "removed" ? "bg-red-500/10 opacity-60" : "bg-card"}`}>
+                    <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
                       {car.image_url ? (
                         <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                       ) : (
@@ -871,10 +871,10 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无举报</p>
             ) : (
               reports.map((r) => (
-                <div key={r.id} className="rounded-xl border border-border p-3">
+                <div key={r.id} className="rounded-xl bg-card p-3">
                   <div className="flex items-start gap-3">
                     {r.cars?.image_url && (
-                      <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-border bg-muted">
+                      <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg bg-muted">
                         <img src={r.cars.image_url} alt="" className="h-full w-full object-cover" />
                       </div>
                     )}
@@ -895,7 +895,7 @@ export default function AdminPage() {
                   <div className="mt-2 flex gap-2">
                     <Button
                       size="sm"
-                      variant="outline"
+                      variant="secondary"
                       className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
                       onClick={() => r.cars && removeCarFromReport(r.id, r.cars.id)}
                       disabled={actionLoading === r.id || !r.cars}
@@ -938,7 +938,7 @@ export default function AdminPage() {
               <p className="py-12 text-center text-xs text-muted-foreground">暂无工单</p>
             ) : (
               tickets.map((t) => (
-                <div key={t.id} className="rounded-xl border border-border p-3">
+                <div key={t.id} className="rounded-xl bg-card p-3">
                   <div className="flex items-start justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
@@ -982,7 +982,7 @@ export default function AdminPage() {
                     {t.email && (
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         className="h-7 gap-1 px-2 text-[11px]"
                         onClick={() => window.open(`mailto:${t.email}`)}
                       >
@@ -1022,7 +1022,7 @@ export default function AdminPage() {
                 const syncing = syncingKey === s.key;
                 const result = syncResults[s.id];
                 return (
-                  <div key={s.id} className={`rounded-xl border border-border p-3 ${s.enabled ? "" : "opacity-60"}`}>
+                  <div key={s.id} className={`rounded-xl bg-card p-3 ${s.enabled ? "" : "opacity-60"}`}>
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
@@ -1096,7 +1096,7 @@ export default function AdminPage() {
                             错误 {d.errors.length} 条 {expandedErrors[s.id] ? "收起" : "展开"}
                           </button>
                           {expandedErrors[s.id] && (
-                            <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto rounded-lg border border-red-300 bg-red-50 p-2 dark:bg-red-950/20">
+                            <div className="mt-1 max-h-32 space-y-0.5 overflow-y-auto rounded-xl bg-red-50 p-2 dark:bg-red-950/20">
                               {d.errors.map((err, i) => (
                                 <p key={i} className="break-all text-[10px] text-red-600 dark:text-red-400">{err}</p>
                               ))}
@@ -1119,7 +1119,7 @@ export default function AdminPage() {
                       </Button>
                       <Button
                         size="sm"
-                        variant="outline"
+                        variant="secondary"
                         className={`h-7 gap-1 px-2 text-[11px] ${s.enabled ? "text-red-600 dark:text-red-400 hover:text-red-700" : "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"}`}
                         onClick={() => toggleSource(s.id, !s.enabled)}
                         disabled={actionLoading === s.id || syncing}

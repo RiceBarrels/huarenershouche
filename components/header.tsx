@@ -1,14 +1,14 @@
 "use client";
 
-import { LogOut, User, Plus, Moon, Sun, MessageSquare, Store, ChevronDown, Repeat } from "lucide-react";
+import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { useTheme } from "next-themes";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ThemeOptions } from "@/components/theme-options";
 import { avatarUrl } from "@/lib/avatar";
 import { useIdentity } from "@/components/identity-provider";
 
@@ -34,7 +34,6 @@ export function Header() {
   } = useIdentity();
   const [unreadCount, setUnreadCount] = useState(0);
   const [switcherOpen, setSwitcherOpen] = useState(false);
-  const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -109,19 +108,24 @@ export function Header() {
 
         <div className="flex items-center gap-3">
           {mounted && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              aria-label="切换主题"
-            >
-              {theme === "dark" ? (
-                <Sun className="h-3.5 w-3.5" strokeWidth={1.5} />
-              ) : (
-                <Moon className="h-3.5 w-3.5" strokeWidth={1.5} />
-              )}
-            </Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  aria-label="个性化"
+                >
+                  <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-48 p-1.5 font-mono">
+                <p className="px-3 pb-1 pt-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  个性化
+                </p>
+                <ThemeOptions />
+              </PopoverContent>
+            </Popover>
           )}
           {authUser ? (
             <>
@@ -130,7 +134,7 @@ export function Header() {
                 <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
                   <PopoverTrigger asChild>
                     <Button
-                      variant={isActingAsClaimed ? "default" : "outline"}
+                      variant={isActingAsClaimed ? "default" : "secondary"}
                       size="sm"
                       className="h-8 max-w-[180px] gap-1.5 font-mono text-xs"
                     >
@@ -178,7 +182,7 @@ export function Header() {
                         <img
                           src={avatarUrl(acct.avatar_url, acct.id)}
                           alt=""
-                          className="h-4 w-4 shrink-0 rounded-full border border-border object-cover"
+                          className="h-4 w-4 shrink-0 rounded-full object-cover"
                         />
                         <span className="flex-1 truncate">{acct.username}</span>
                         {actingId === acct.id ? (
@@ -254,7 +258,7 @@ export function Header() {
 
       {/* 正在以车行身份操作的提示条 */}
       {isActingAsClaimed && (
-        <div className="border-t border-amber-500/30 bg-amber-500/10">
+        <div className="bg-amber-500/10">
           <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4">
             <span className="flex items-center gap-1.5 font-mono text-[11px] text-amber-700 dark:text-amber-400">
               <Store className="h-3 w-3" strokeWidth={1.5} />

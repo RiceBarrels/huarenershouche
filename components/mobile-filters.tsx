@@ -221,7 +221,7 @@ function PillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
         onClick={() => onChange("")}
       >
         不限
@@ -230,7 +230,7 @@ function PillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
           onClick={() => onChange(toggleInList(value, opt.value))}
         >
           {opt.label}
@@ -259,7 +259,7 @@ function CountPillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
         onClick={() => onChange("")}
       >
         不限
@@ -268,7 +268,7 @@ function CountPillSelect({
         <button
           key={opt.name}
           type="button"
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${selected(opt.name) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${selected(opt.name) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
           onClick={() => onChange(toggle(opt.name))}
         >
           {opt.name}
@@ -293,7 +293,7 @@ function ColorPillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
         onClick={() => onChange("")}
       >
         不限
@@ -302,7 +302,7 @@ function ColorPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
           onClick={() => onChange(toggleInList(value, opt.value))}
         >
           <span
@@ -337,7 +337,7 @@ function FilterRow({
           type="button"
           className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors active:bg-muted"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border bg-muted/50">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/60">
             {icon}
           </span>
           <div className="min-w-0 flex-1">
@@ -423,7 +423,7 @@ export function LocationDrawerContent({
             <button
               key={v}
               type="button"
-              className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
               onClick={() => onUpdate("maxDistance", v)}
             >
               {v === "" ? "不限" : `≤${v} mi`}
@@ -451,7 +451,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
   return (
     <button
       type="button"
-      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-mono text-xs transition-colors ${selected ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${selected ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
       onClick={onToggle}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center">
@@ -498,7 +498,7 @@ export function BrandDrawerContent({
             <button
               key={make}
               type="button"
-              className="flex items-center gap-1 rounded-full border border-foreground bg-foreground px-2 py-1 font-mono text-[11px] text-background transition-colors"
+              className="flex items-center gap-1 rounded-full bg-foreground px-2 py-1 font-mono text-[11px] text-background transition-colors"
               onClick={() => onUpdate("make", toggleInList(filters.make, make))}
             >
               {getBrandLogoUrl(make) && (
@@ -537,7 +537,7 @@ export function BrandDrawerContent({
                 <button
                   key={make}
                   type="button"
-                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-2.5 transition-colors ${selected ? "border-foreground bg-muted" : "border-border hover:border-foreground/30"}`}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl p-2.5 transition-colors ${selected ? "bg-primary/10 text-primary" : "bg-card hover:bg-muted/40"}`}
                   onClick={() => onUpdate("make", toggleInList(filters.make, make))}
                 >
                   <span className="flex h-8 w-8 items-center justify-center">
@@ -554,7 +554,7 @@ export function BrandDrawerContent({
           </div>
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-1 rounded-lg border border-border py-2 font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+            className="flex w-full items-center justify-center gap-1 rounded-xl bg-card py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
             style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
             onClick={() => setShowAll(true)}
           >
@@ -578,7 +578,7 @@ export function BrandDrawerContent({
           )}
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-lg px-3 py-2.5 font-mono text-xs transition-colors ${!filters.make ? "bg-muted font-medium" : "hover:bg-muted/50"}`}
+            className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${!filters.make ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
             onClick={() => onUpdate("make", "")}
           >
             <span>不限品牌</span>
@@ -745,7 +745,7 @@ export function MobileFilterDrawer({
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
-                className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${!filters.maxPayment ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+                className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!filters.maxPayment ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
                 onClick={() => update("maxPayment", "")}
               >
                 不限
@@ -754,7 +754,7 @@ export function MobileFilterDrawer({
                 <button
                   key={v}
                   type="button"
-                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxPayment === v ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+                  className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxPayment === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
                   onClick={() => update("maxPayment", v)}
                 >
                   ≤${v}/月
@@ -943,7 +943,7 @@ export function MobileFilterDrawer({
           <div className="space-y-2">
             <button
               type="button"
-              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 font-mono text-xs transition-colors ${filters.dealRating === "good" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted/50"}`}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters.dealRating === "good" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
               onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
             >
               <span>只看好价（好价及以上）</span>
@@ -951,7 +951,7 @@ export function MobileFilterDrawer({
             </button>
             <button
               type="button"
-              className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 font-mono text-xs transition-colors ${filters.priceDropped === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted/50"}`}
+              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters.priceDropped === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
               onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
             >
               <span>只看降价车源</span>
@@ -961,7 +961,7 @@ export function MobileFilterDrawer({
               <button
                 key={t.key}
                 type="button"
-                className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 font-mono text-xs transition-colors ${filters[t.key] === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted/50"}`}
+                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters[t.key] === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
                 onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
               >
                 <span>{t.label}</span>
@@ -978,7 +978,7 @@ export function MobileFilterDrawer({
                 <button
                   key={opt.value}
                   type="button"
-                  className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${filters.listedWithin === opt.value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+                  className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.listedWithin === opt.value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
                   onClick={() => update("listedWithin", opt.value)}
                 >
                   {opt.label}

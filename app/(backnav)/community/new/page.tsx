@@ -352,10 +352,10 @@ export default function NewPostPage() {
 
       {!userId ? (
         <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
-          <div className="mt-8 flex flex-col items-center rounded-2xl border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-2xl bg-card p-8">
             <p className="text-sm text-muted-foreground">请先登录后再发帖</p>
             <Link href="/login">
-              <Button size="sm" className="mt-4 rounded-full text-xs">
+              <Button size="sm" className="mt-4 text-xs">
                 登录 / 注册
               </Button>
             </Link>
@@ -363,10 +363,13 @@ export default function NewPostPage() {
         </main>
       ) : (
         <>
-          <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-44 pt-4">
+          <main className="mx-auto w-full max-w-2xl flex-1 px-5 pb-44 pt-4 md:max-w-5xl md:px-8 md:pb-16 md:pt-10">
+            {/* 桌面两栏:左侧编辑区,右侧媒体/草稿/发布(DOM 顺序不变,flex-row-reverse 翻转展示) */}
+            <div className="md:flex md:flex-row-reverse md:items-start md:gap-10">
+            <aside className="md:sticky md:top-24 md:w-72 md:shrink-0">
             {/* 草稿箱:有历史草稿时可直接选一份继续(也可删除) */}
             {drafts.filter((d) => d.id !== draftId).length > 0 && (
-              <div className="mb-4 rounded-2xl border border-border bg-card p-4">
+              <div className="mb-4 rounded-2xl bg-card p-4">
                 <p className="text-sm font-medium text-foreground">继续上次的草稿</p>
                 <div className="mt-3 space-y-2">
                   {drafts.filter((d) => d.id !== draftId).map((d) => (
@@ -411,9 +414,9 @@ export default function NewPostPage() {
               </div>
             )}
 
-            {/* 媒体上传:方形缩略图 + 加号块(支持拖拽) */}
+            {/* 媒体上传:方形缩略图 + 加号块(支持拖拽);桌面在右栏换行平铺 */}
             <div
-              className={`flex gap-3 overflow-x-auto pb-1 scrollbar-none rounded-xl transition-colors ${
+              className={`flex gap-3 overflow-x-auto pb-1 scrollbar-none rounded-xl transition-colors md:flex-wrap md:overflow-visible ${
                 dragging ? "bg-muted/80 ring-2 ring-primary/30" : ""
               }`}
               onDragOver={(e) => {
@@ -454,7 +457,7 @@ export default function NewPostPage() {
                 </div>
               ))}
               {imageUrls.length < 9 && (
-                <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-border bg-muted/50 active:bg-muted">
+                <label className="flex h-24 w-24 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-muted/50 active:bg-muted">
                   {uploading ? (
                     <Loader2
                       className="h-6 w-6 animate-spin text-muted-foreground"
@@ -478,10 +481,45 @@ export default function NewPostPage() {
               )}
             </div>
 
+            {/* 底部操作栏:存草稿 + 发布;手机固定底部,桌面内联在右栏媒体下方 */}
+            <div
+              className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm md:static md:z-auto md:mt-6 md:border-0 md:bg-transparent md:px-0 md:pt-0 md:backdrop-blur-none"
+              style={{
+                paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
+              }}
+            >
+              <div className="mx-auto flex max-w-2xl items-center gap-3">
+                <button
+                  type="button"
+                  onClick={saveDraft}
+                  className="shrink-0 rounded-full bg-muted px-6 py-3 text-sm text-muted-foreground transition-colors active:bg-muted/70 md:hover:bg-muted/70"
+                >
+                  {draftSaved ? "已保存" : "存草稿"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={loading}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary py-3 text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-60 md:text-sm md:hover:opacity-90"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+                      发布中...
+                    </>
+                  ) : (
+                    "发布"
+                  )}
+                </button>
+              </div>
+            </div>
+            </aside>
+
+            <div className="min-w-0 md:flex-1">
             {/* 标题:无边框大字号输入 */}
-            <div className="mt-4 flex items-center gap-3">
+            <div className="mt-4 flex items-center gap-3 md:mt-0">
               <input
-                className="w-full bg-transparent text-xl font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                className="w-full bg-transparent text-xl font-semibold text-foreground placeholder:text-muted-foreground/50 focus:outline-none md:text-2xl"
                 placeholder="添加标题"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
@@ -611,7 +649,7 @@ export default function NewPostPage() {
                         <input
                           key={label}
                           type={inputType}
-                          className="rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                          className="rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                           aria-label={label}
                           placeholder={`${label} ${ph}`}
                           value={value}
@@ -626,44 +664,13 @@ export default function NewPostPage() {
 
             {/* 错误提示 */}
             {error && (
-              <div className="mt-2 rounded-xl border border-destructive/50 bg-destructive/5 p-3">
+              <div className="mt-2 rounded-xl bg-destructive/10 p-3">
                 <p className="text-xs text-destructive">{error}</p>
               </div>
             )}
-          </main>
-
-          {/* 底部操作栏:存草稿 + 发布 */}
-          <div
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-5 pt-3 backdrop-blur-sm"
-            style={{
-              paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom, 0px))",
-            }}
-          >
-            <div className="mx-auto flex max-w-2xl items-center gap-3">
-              <button
-                type="button"
-                onClick={saveDraft}
-                className="shrink-0 rounded-full border border-border px-6 py-3 text-sm text-muted-foreground transition-colors active:bg-muted"
-              >
-                {draftSaved ? "已保存" : "存草稿"}
-              </button>
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-primary py-3 text-base font-medium text-primary-foreground transition-opacity active:opacity-90 disabled:opacity-60"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
-                    发布中...
-                  </>
-                ) : (
-                  "发布"
-                )}
-              </button>
             </div>
-          </div>
+            </div>
+          </main>
 
           {/* 键盘弹起时吸附在键盘上方的工具条(表情 / #话题 / 完成) */}
           <KeyboardToolbar />

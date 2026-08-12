@@ -28,7 +28,7 @@ function Pair({
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
+    <div className="rounded-xl bg-card p-4">
       <p className="font-mono text-xs font-medium">{title}</p>
       <div className="mt-2 flex items-center gap-2">
         <div className="flex-1">

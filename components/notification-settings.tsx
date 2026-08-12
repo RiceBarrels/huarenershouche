@@ -1,8 +1,11 @@
 "use client";
 
+// 通知设置(iOS 26 风格):白色分组卡 + 彩色线条图标 + 绿色开关。
+// 总开关一组;开启后细分项一组,分隔线行内缩进。
+
 import { useEffect, useState } from "react";
-import { Bell, BellOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Bell, BellOff, Tag, Sparkles, MessageSquare, RefreshCw } from "lucide-react";
+import { SettingsGroup, SettingsRow, GroupFooter, IOSSwitch } from "@/components/ios-settings";
 import {
   getNotificationPrefs,
   saveNotificationPrefs,
@@ -12,12 +15,31 @@ import {
   type NotificationPrefs,
 } from "@/lib/notifications";
 
+const PREF_ROWS: {
+  key: keyof Omit<NotificationPrefs, "enabled">;
+  label: string;
+  icon: React.ReactNode;
+}[] = [
+  { key: "priceDrops", label: "降价提醒", icon: <Tag className="h-5 w-5 text-orange-500" strokeWidth={1.5} /> },
+  { key: "newListings", label: "新车源提醒", icon: <Sparkles className="h-5 w-5 text-violet-500" strokeWidth={1.5} /> },
+  { key: "newMessages", label: "新消息", icon: <MessageSquare className="h-5 w-5 text-green-500" strokeWidth={1.5} /> },
+  { key: "statusChanges", label: "状态变更", icon: <RefreshCw className="h-5 w-5 text-sky-500" strokeWidth={1.5} /> },
+];
+
+const PREF_HINTS: Record<string, string> = {
+  priceDrops: "关注车辆降价时通知",
+  newListings: "保存的搜索有新车源时通知",
+  newMessages: "收到私信时通知",
+  statusChanges: "收藏车辆状态变化时通知",
+};
+
 export function NotificationSettings() {
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
   const [permission, setPermission] = useState<string>("default");
   const [supported, setSupported] = useState(true);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage/Notification API,仅客户端首帧一次
     setPrefs(getNotificationPrefs());
     setSupported(isNotificationSupported());
     setPermission(getPermissionStatus());
@@ -25,29 +47,35 @@ export function NotificationSettings() {
 
   if (!supported) {
     return (
-      <div className="rounded-xl border border-border p-4">
-        <div className="flex items-center gap-2">
-          <BellOff className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-          <span className="font-mono text-sm">通知不可用</span>
-        </div>
-        <p className="mt-1 font-mono text-[11px] text-muted-foreground">
-          当前浏览器不支持推送通知
-        </p>
-      </div>
+      <>
+        <SettingsGroup capsule>
+          <SettingsRow
+            icon={<BellOff className="h-5 w-5 text-slate-400" strokeWidth={1.5} />}
+            label="通知不可用"
+          />
+        </SettingsGroup>
+        <GroupFooter>当前浏览器不支持推送通知。</GroupFooter>
+      </>
     );
   }
 
   if (!prefs) return null;
 
-  async function handleEnable() {
-    const granted = await requestPermission();
-    if (granted) {
-      const updated = { ...prefs!, enabled: true };
+  async function handleMasterToggle(next: boolean) {
+    if (next) {
+      const granted = await requestPermission();
+      if (granted) {
+        const updated = { ...prefs!, enabled: true };
+        setPrefs(updated);
+        saveNotificationPrefs(updated);
+        setPermission("granted");
+      } else {
+        setPermission(getPermissionStatus());
+      }
+    } else {
+      const updated = { ...prefs!, enabled: false };
       setPrefs(updated);
       saveNotificationPrefs(updated);
-      setPermission("granted");
-    } else {
-      setPermission(getPermissionStatus());
     }
   }
 
@@ -57,67 +85,38 @@ export function NotificationSettings() {
     saveNotificationPrefs(updated);
   }
 
-  function handleDisable() {
-    const updated = { ...prefs!, enabled: false };
-    setPrefs(updated);
-    saveNotificationPrefs(updated);
-  }
-
   return (
-    <div className="rounded-xl border border-border p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Bell className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-          <span className="font-mono text-sm font-medium">推送通知</span>
-        </div>
-        {prefs.enabled ? (
-          <Button variant="outline" size="sm" className="h-7 font-mono text-[11px]" onClick={handleDisable}>
-            关闭
-          </Button>
-        ) : (
-          <Button size="sm" className="h-7 font-mono text-[11px]" onClick={handleEnable}>
-            {permission === "denied" ? "已被浏览器拒绝" : "开启"}
-          </Button>
-        )}
-      </div>
+    <>
+      <SettingsGroup capsule>
+        <SettingsRow
+          icon={<Bell className="h-5 w-5 text-red-500" strokeWidth={1.5} />}
+          label="推送通知"
+          trailing={<IOSSwitch checked={prefs.enabled} onChange={handleMasterToggle} disabled={permission === "denied"} />}
+        />
+      </SettingsGroup>
+      <GroupFooter>
+        {permission === "denied"
+          ? "通知权限已被浏览器拒绝,请在系统设置中重新允许后再开启。"
+          : "开启后可接收降价、新车源、私信等提醒。"}
+      </GroupFooter>
 
       {prefs.enabled && (
-        <div className="mt-3 space-y-2">
-          <ToggleRow label="降价提醒" description="关注车辆降价时通知" checked={prefs.priceDrops} onChange={() => togglePref("priceDrops")} />
-          <ToggleRow label="新车源提醒" description="保存的搜索有新车源时通知" checked={prefs.newListings} onChange={() => togglePref("newListings")} />
-          <ToggleRow label="新消息" description="收到私信时通知" checked={prefs.newMessages} onChange={() => togglePref("newMessages")} />
-          <ToggleRow label="状态变更" description="收藏车辆状态变化时通知" checked={prefs.statusChanges} onChange={() => togglePref("statusChanges")} />
-        </div>
+        <>
+          <SettingsGroup className="mt-5">
+            {PREF_ROWS.map((row) => (
+              <SettingsRow
+                key={row.key}
+                icon={row.icon}
+                label={row.label}
+                trailing={<IOSSwitch checked={prefs[row.key]} onChange={() => togglePref(row.key)} />}
+              />
+            ))}
+          </SettingsGroup>
+          <GroupFooter>
+            {PREF_ROWS.map((r) => PREF_HINTS[r.key]).join(";")}。
+          </GroupFooter>
+        </>
       )}
-
-      {permission === "denied" && (
-        <p className="mt-2 font-mono text-[10px] text-destructive">
-          通知权限已被浏览器拒绝，请在浏览器设置中重新允许
-        </p>
-      )}
-    </div>
-  );
-}
-
-function ToggleRow({ label, description, checked, onChange }: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className="flex w-full items-center justify-between py-1.5 text-left"
-      onClick={onChange}
-    >
-      <div>
-        <p className="font-mono text-xs">{label}</p>
-        <p className="font-mono text-[10px] text-muted-foreground">{description}</p>
-      </div>
-      <div className={`h-5 w-9 rounded-full transition-colors ${checked ? "bg-foreground" : "bg-muted"}`}>
-        <div className={`h-4 w-4 translate-y-0.5 rounded-full bg-background transition-transform ${checked ? "translate-x-4.5" : "translate-x-0.5"}`} />
-      </div>
-    </button>
+    </>
   );
 }

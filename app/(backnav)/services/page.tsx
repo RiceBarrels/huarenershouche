@@ -104,7 +104,7 @@ export default function ServicesPage() {
         </div>
 
         {!location ? (
-          <div className="mb-8 flex flex-col items-center gap-3 rounded-xl border border-border p-8">
+          <div className="mb-8 flex flex-col items-center gap-3 rounded-xl bg-card p-8">
             <MapPin
               className="h-6 w-6 text-muted-foreground"
               strokeWidth={1.5}
@@ -129,7 +129,9 @@ export default function ServicesPage() {
               获取位置
             </Button>
             {error && (
-              <p className="font-mono text-[11px] text-red-500">{error}</p>
+              <div className="rounded-xl bg-destructive/10 px-3 py-2.5">
+                <p className="font-mono text-[11px] text-destructive">{error}</p>
+              </div>
             )}
           </div>
         ) : (
@@ -158,7 +160,7 @@ export default function ServicesPage() {
             return (
               <div
                 key={cat.name}
-                className="flex flex-col gap-3 rounded-xl border border-border p-4"
+                className="flex flex-col gap-3 rounded-xl bg-card p-4"
               >
                 <div className="flex items-center gap-3">
                   <Icon

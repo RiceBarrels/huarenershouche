@@ -18,6 +18,7 @@ import {
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { openExternal } from "@/lib/open-external";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
 interface SplashAdRow {
@@ -128,7 +129,7 @@ export function SplashAd() {
     if (!ad?.link_url) return;
     setDismissed(true);
     if (ad.link_url.startsWith("/")) router.push(ad.link_url);
-    else window.open(ad.link_url, "_blank", "noopener");
+    else openExternal(ad.link_url);
   };
 
   const remain = left ?? Math.max(1, ad?.duration_seconds || 5);

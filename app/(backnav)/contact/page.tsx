@@ -1,13 +1,15 @@
 "use client";
 
+// 联系客服(iOS 26 风格):大标题 + 联系方式分组卡 + FAQ 折叠
+// 分组卡 + 分组卡留言表单,提交后白卡成功态。
+
 import { useState } from "react";
-import { Mail, MessageCircle, Clock, Send, Loader2, CheckCircle } from "lucide-react";
+import { Mail, MessageCircle, Clock, Send, Loader2, CheckCircle, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
+import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
 
 const FAQ = [
   { q: "如何发布车辆？", a: "登录后点击底部「发布」按钮，填写车辆信息即可免费发布。支持 VIN 自动识别车辆信息。" },
@@ -15,6 +17,11 @@ const FAQ = [
   { q: "如何联系卖家？", a: "在车辆详情页点击「发消息」按钮，即可与卖家实时沟通。" },
   { q: "发布的车辆多久会显示？", a: "车辆发布后立即显示在平台上，无需审核等待。" },
   { q: "如何举报不良信息？", a: "在车辆详情页点击右上角菜单中的「举报」，选择原因后提交，我们会尽快处理。" },
+];
+
+const CONTACT_INFO = [
+  { icon: <MessageCircle className="h-5 w-5" strokeWidth={1.5} />, label: "微信客服", value: "clcauto_support" },
+  { icon: <Clock className="h-5 w-5" strokeWidth={1.5} />, label: "工作时间", value: "周一至周五 9:00 - 18:00 (EST)" },
 ];
 
 export default function ContactPage() {
@@ -83,122 +90,91 @@ export default function ContactPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
         <DesktopBack />
-        <h1 className="text-lg font-semibold">联系客服</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          有任何问题或建议，欢迎联系我们
-        </p>
+        <LargeTitle title="联系客服" subtitle="有任何问题或建议，欢迎联系我们" />
 
         {/* Contact info */}
-        <div className="mt-6 space-y-3">
-          <a
-            href="mailto:contact@clcauto.com"
-            className="flex items-center gap-3 rounded-xl border border-border p-3 transition-colors hover:border-foreground/30"
-          >
-            <Mail className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-            <div>
-              <p className="text-xs font-medium">邮件联系</p>
-              <p className="text-[11px] text-muted-foreground">contact@clcauto.com</p>
-            </div>
+        <SettingsGroup className="mt-5">
+          <a href="mailto:contact@clcauto.com" className="group/row flex items-center gap-3 pl-4 transition-colors active:bg-muted/60">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center">
+              <Mail className="h-5 w-5" strokeWidth={1.5} />
+            </span>
+            <span className="flex min-h-[56px] min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-4 group-last/row:border-0">
+              <span className="min-w-0 flex-1 font-mono text-[15px]">邮件联系</span>
+              <span className="shrink-0 font-mono text-[13px] text-muted-foreground">contact@clcauto.com</span>
+            </span>
           </a>
-          <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-            <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-            <div>
-              <p className="text-xs font-medium">微信客服</p>
-              <p className="text-[11px] text-muted-foreground">clcauto_support</p>
+          {CONTACT_INFO.map((c) => (
+            <div key={c.label} className="group/row flex items-center gap-3 pl-4">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">{c.icon}</span>
+              <span className="flex min-h-[56px] min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-4 group-last/row:border-0">
+                <span className="min-w-0 flex-1 font-mono text-[15px]">{c.label}</span>
+                <span className="shrink-0 font-mono text-[13px] text-muted-foreground">{c.value}</span>
+              </span>
             </div>
-          </div>
-          <div className="flex items-center gap-3 rounded-xl border border-border p-3">
-            <Clock className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-            <div>
-              <p className="text-xs font-medium">工作时间</p>
-              <p className="text-[11px] text-muted-foreground">周一至周五 9:00 - 18:00 (EST)</p>
-            </div>
-          </div>
-        </div>
+          ))}
+        </SettingsGroup>
 
         {/* FAQ */}
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold">常见问题</h2>
-          <div className="mt-3 space-y-2">
-            {FAQ.map((item, i) => (
-              <details key={i} className="group overflow-hidden rounded-lg border border-border">
-                <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-xs font-medium transition-colors hover:bg-muted/50">
-                  {item.q}
-                  <span className="text-muted-foreground transition-transform group-open:rotate-90">›</span>
-                </summary>
-                <p className="border-t border-border px-3 py-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                  {item.a}
-                </p>
-              </details>
-            ))}
-          </div>
-        </div>
+        <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">常见问题</h2>
+        <SettingsGroup className="mt-2">
+          {FAQ.map((item, i) => (
+            <details key={i} className="group ml-4 border-b border-border/50 last:border-0">
+              <summary className="flex min-h-[52px] cursor-pointer list-none items-center justify-between gap-3 py-2 pr-4 font-mono text-[15px] transition-opacity active:opacity-60 [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform group-open:rotate-90" strokeWidth={2} />
+              </summary>
+              <p className="pb-3.5 pr-4 font-mono text-[13px] leading-relaxed text-muted-foreground">{item.a}</p>
+            </details>
+          ))}
+        </SettingsGroup>
 
         {/* Contact form */}
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold">在线留言</h2>
-          {sent ? (
-            <div className="mt-4 flex flex-col items-center rounded-xl border border-border py-8">
-              <CheckCircle className="h-8 w-8 text-emerald-500" strokeWidth={1.5} />
-              <p className="mt-3 text-xs font-medium">消息已发送</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">我们会尽快回复您</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-xs"
-                onClick={() => setSent(false)}
-              >
-                再次留言
-              </Button>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="mt-3 space-y-3">
-              <div>
-                <Label className="text-[11px]">姓名</Label>
-                <Input
-                  className="mt-1 h-9 text-xs"
-                  placeholder="您的称呼"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label className="text-[11px]">邮箱</Label>
-                <Input
-                  className="mt-1 h-9 text-xs"
-                  type="email"
-                  placeholder="your@email.com"
-                  value={form.email}
-                  onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label className="text-[11px]">留言内容</Label>
-                <textarea
-                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
-                  rows={4}
-                  placeholder="请描述您的问题或建议..."
-                  value={form.message}
-                  onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  required
-                />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                className="w-full gap-1.5 text-xs"
-                disabled={sending || !form.name.trim() || !form.email.trim() || !form.message.trim()}
-              >
-                {sending ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} /> : <Send className="h-3 w-3" strokeWidth={1.5} />}
-                发送留言
-              </Button>
-            </form>
-          )}
-        </div>
+        {sent ? (
+          <div className="mt-6 flex flex-col items-center rounded-[26px] bg-card py-10">
+            <CheckCircle className="h-8 w-8 text-brand" strokeWidth={1.5} />
+            <p className="mt-3 font-mono text-sm font-semibold">消息已发送</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">我们会尽快回复您</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-5 h-9 rounded-full bg-muted px-5 font-mono text-xs hover:bg-muted"
+              onClick={() => setSent(false)}
+            >
+              再次留言
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">在线留言</h2>
+            <SettingsGroup className="mt-2">
+              <FieldRow id="name" label="姓名" placeholder="您的称呼" value={form.name} onChange={(v) => setForm((f) => ({ ...f, name: v }))} required />
+              <FieldRow id="email" label="邮箱" type="email" placeholder="your@email.com" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
+            </SettingsGroup>
+
+            <SettingsGroup className="mt-3">
+              <textarea
+                className="block w-full resize-none bg-transparent px-5 py-4 font-mono text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/50"
+                rows={4}
+                placeholder="请描述您的问题或建议..."
+                value={form.message}
+                onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+                required
+              />
+            </SettingsGroup>
+            <GroupFooter>我们通常会在 1 个工作日内通过邮件回复。</GroupFooter>
+
+            <Button
+              type="submit"
+              className="mt-6 h-12 w-full gap-1.5 rounded-full font-mono text-[15px] font-semibold transition-transform active:scale-[0.98]"
+              disabled={sending || !form.name.trim() || !form.email.trim() || !form.message.trim()}
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Send className="h-4 w-4" strokeWidth={1.5} />}
+              发送留言
+            </Button>
+          </form>
+        )}
       </main>
     </div>
   );

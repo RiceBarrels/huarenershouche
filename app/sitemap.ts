@@ -37,12 +37,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: p.slug.includes("/") ? 0.6 : 0.8,
   }));
 
-  // 每辆在售车源详情页(核心内容页,SEO 主力)
+  // 每辆在售车源详情页(核心内容页,SEO 主力)+ 有在售车的卖家主页
   let carRoutes: MetadataRoute.Sitemap = [];
+  let userRoutes: MetadataRoute.Sitemap = [];
   try {
     const { data } = await supabase
       .from("cars")
-      .select("id, updated_at, source_id")
+      .select("id, updated_at, source_id, seller_id")
       .eq("status", "active")
       .eq("owner_hidden", false)
       .order("created_at", { ascending: false })
@@ -53,6 +54,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "daily" as const,
       // 用户自发车源权重略高于转载车源
       priority: c.source_id ? 0.7 : 0.8,
+    }));
+
+    // 卖家/车行主页:去重 seller_id,lastModified 取其最新车源更新时间
+    const sellers = new Map<string, Date>();
+    for (const c of data ?? []) {
+      if (!c.seller_id) continue;
+      const t = c.updated_at ? new Date(c.updated_at) : now;
+      const prev = sellers.get(c.seller_id);
+      if (!prev || t > prev) sellers.set(c.seller_id, t);
+    }
+    userRoutes = [...sellers.entries()].map(([id, lastModified]) => ({
+      url: `${SITE_URL}/user/${id}`,
+      lastModified,
+      changeFrequency: "weekly" as const,
+      priority: 0.6,
     }));
   } catch {
     // 构建环境无法访问 Supabase 时降级
@@ -77,5 +93,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
   }
 
-  return [...staticRoutes, ...seoRoutes, ...carRoutes, ...postRoutes];
+  return [...staticRoutes, ...seoRoutes, ...carRoutes, ...userRoutes, ...postRoutes];
 }

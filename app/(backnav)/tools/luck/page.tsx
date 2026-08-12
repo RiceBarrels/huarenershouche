@@ -57,13 +57,13 @@ export default function LuckToolPage() {
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3">
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-xl bg-card p-4">
             <p className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">宜</p>
             {good.map((g) => (
               <p key={g} className="mt-1.5 font-mono text-sm">{g}</p>
             ))}
           </div>
-          <div className="rounded-xl border border-border bg-card p-4">
+          <div className="rounded-xl bg-card p-4">
             <p className="font-mono text-sm font-bold text-red-500">忌</p>
             {bad.map((b) => (
               <p key={b} className="mt-1.5 font-mono text-sm">{b}</p>
@@ -72,11 +72,11 @@ export default function LuckToolPage() {
         </div>
 
         <div className="mt-3 flex gap-3">
-          <div className="flex-1 rounded-xl border border-border bg-card p-4">
+          <div className="flex-1 rounded-xl bg-card p-4">
             <p className="font-mono text-[11px] text-muted-foreground">幸运车色</p>
             <p className="mt-1 font-mono text-sm font-semibold">{color}</p>
           </div>
-          <div className="flex-1 rounded-xl border border-border bg-card p-4">
+          <div className="flex-1 rounded-xl bg-card p-4">
             <p className="font-mono text-[11px] text-muted-foreground">幸运数字</p>
             <p className="mt-1 font-mono text-sm font-semibold">{luckyNum}</p>
           </div>

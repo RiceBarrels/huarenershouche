@@ -13,6 +13,7 @@ import { createPortal } from "react-dom";
 import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
+import { getDeviceCornerPx } from "@/lib/device-corner";
 
 const DISMISS_PX = 90; // 位移阈值
 const DISMISS_V = 0.5; // 速度阈值 px/ms
@@ -64,9 +65,11 @@ export function SwipeSheet({
     () => 1 - Math.min(0.12, Math.hypot(x.get(), y.get()) / 320 * 0.12),
   );
   // 开始关闭手势即给窗口上圆角(iOS 关 App 同款):随拖动距离渐入,
-  // 封顶 32px;松手回弹时随位移归零自动退回直角
+  // 封顶到设备屏幕圆角(直角屏/web 退回 48px = rounded-lg);
+  // 松手回弹时随位移归零自动退回直角
+  const maxDragRadius = getDeviceCornerPx(48);
   const dragRadius = useTransform(() =>
-    Math.min(32, Math.hypot(x.get(), y.get()) / 2),
+    Math.min(maxDragRadius, Math.hypot(x.get(), y.get()) * 2),
   );
 
   const hero = !!(originRect && heroHtml);

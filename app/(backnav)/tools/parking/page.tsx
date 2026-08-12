@@ -140,7 +140,7 @@ export default function ParkingToolPage() {
                 </div>
 
                 <Input
-                  className="mt-3 rounded-lg font-mono text-sm"
+                  className="mt-3 font-mono text-sm"
                   placeholder="备注:如 3 楼 B 区 21 号柱子旁"
                   value={note}
                   onChange={(e) => saveNote(e.target.value)}
@@ -162,7 +162,7 @@ export default function ParkingToolPage() {
                     </Button>
                   </OpenInMaps>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     className="gap-1.5 font-mono text-xs"
                     disabled={saving}
                     onClick={save}
@@ -176,7 +176,7 @@ export default function ParkingToolPage() {
                     更新
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     size="icon"
                     className="shrink-0 text-muted-foreground"
                     aria-label="清除车位"
@@ -209,7 +209,9 @@ export default function ParkingToolPage() {
                   记录当前位置
                 </Button>
                 {error && (
-                  <p className="mt-2 font-mono text-[11px] text-destructive">{error}</p>
+                  <div className="mt-2 rounded-xl bg-destructive/10 px-3 py-2.5">
+                    <p className="font-mono text-[11px] text-destructive">{error}</p>
+                  </div>
                 )}
               </>
             )}

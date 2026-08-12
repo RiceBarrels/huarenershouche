@@ -53,7 +53,7 @@
 
 :root {
   /* 中国 App 风格:页面浅灰画布,卡片纯白,主色微信绿 */
-  --background: oklch(0.975 0.002 286);
+  --background: oklch(95.4% 0.007 295.4);
   --foreground: oklch(0.16 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.16 0 0);
@@ -78,7 +78,7 @@
   --chart-3: oklch(0.546 0.245 262.881);
   --chart-4: oklch(0.488 0.243 264.376);
   --chart-5: oklch(0.424 0.199 265.638);
-  --radius: 1rem;
+  --radius: 3rem;
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -90,6 +90,11 @@
   /* iOS push 转场:阴影与前页压暗随主题 */
   --push-shadow: -4px 0 24px rgba(0, 0, 0, 0.15);
   --push-dim: 0.08;
+  /* 设备屏幕物理圆角:原生壳启动时由 lib/device-corner.ts 写入真机值;
+     直角屏/web 用默认 rounded-lg(= var(--radius)) */
+  --device-corner: var(--radius);
+  /* 转场中移动页面层的圆角(随设备圆角),落定前渐归 0 */
+  --page-corner: var(--device-corner);
 }
 
 .dark {
@@ -155,6 +160,21 @@
   }
 }
 
+/* Safari/Firefox 的 superellipse 回退(hyperellipse polyfill,见
+   components/corner-shape-polyfill.tsx):只标注大圆角表面——小圆角上
+   squircle 与圆角肉眼无差,不值得付 JS 回退(clip-path/SVG)的开销。
+   Chrome 原生支持走上面的 corner-shape 规则,不加载 polyfill。
+   注意:--corner-shape 是 inherits:false,须逐元素命中,故用类名子串匹配
+   (兼容 md: 等变体前缀)。vaul 抽屉不纳入:clip-path 会裁掉它的 ::after
+   过滚动补底层 */
+[class*="rounded-lg"],
+[class*="rounded-xl"],
+[class*="rounded-2xl"],
+[class*="rounded-3xl"],
+[class*="rounded-4xl"] {
+  --corner-shape: superellipse(2.32);
+}
+
 /* Shimmer skeleton animation */
 @keyframes shimmer {
   0% { background-position: -200% 0; }
@@ -196,13 +216,16 @@
   0% {
     transform: translateX(100%);
     box-shadow: var(--push-shadow);
+    border-radius: var(--page-corner);
   }
   85% {
     box-shadow: var(--push-shadow);
+    border-radius: var(--page-corner);
   }
   100% {
     transform: translateX(0);
     box-shadow: none;
+    border-radius: 0;
   }
 }
 
@@ -219,13 +242,18 @@
 /* iOS-style pop (back) transition:当前页带投影滑出,不做整页淡出
    (与手势拖拽的顶层一致,真 iOS 也不淡出) */
 @keyframes ios-pop-out {
-  from {
+  0% {
     transform: translateX(0);
     box-shadow: var(--push-shadow);
+    border-radius: 0;
   }
-  to {
+  15% {
+    border-radius: var(--page-corner);
+  }
+  100% {
     transform: translateX(100%);
     box-shadow: var(--push-shadow);
+    border-radius: var(--page-corner);
   }
 }
 
@@ -254,10 +282,12 @@
   from {
     transform: scale(1);
     opacity: 1;
+    border-radius: 0;
   }
   to {
     transform: scale(0.97);
     opacity: 0;
+    border-radius: var(--page-corner);
   }
 }
 
@@ -266,14 +296,17 @@
   0% {
     transform: scale(0.97);
     opacity: 0;
+    border-radius: var(--page-corner);
   }
   70% {
     transform: scale(1.004);
     opacity: 1;
+    border-radius: var(--page-corner);
   }
   100% {
     transform: scale(1);
     opacity: 1;
+    border-radius: 0;
   }
 }
 
@@ -299,6 +332,19 @@ html {
 
 html.capacitor-native {
   --keyboard-height: 0px;
+}
+
+/* Native app feel: no text selection / long-press callout, except editable fields */
+html.capacitor-native body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.capacitor-native input,
+html.capacitor-native textarea,
+html.capacitor-native [contenteditable] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 /* Bottom tab bar spacing on mobile */

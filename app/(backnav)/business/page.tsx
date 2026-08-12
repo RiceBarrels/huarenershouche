@@ -1,14 +1,16 @@
 "use client";
 
+// 商业合作(iOS 26 风格):大标题 + 服务分组卡 + 分组卡表单
+// (无边框 FieldRow,自定义胶囊类型选择),提交后白卡成功态。
+
 import { useState } from "react";
 import { Building2, BadgeDollarSign, Megaphone, Send, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { Header } from "@/components/header";
 import { DesktopBack } from "@/components/desktop-back";
+import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
 
 const SERVICES = [
   {
@@ -27,6 +29,8 @@ const SERVICES = [
     desc: "汽车金融、保险、检测等第三方服务合作",
   },
 ];
+
+const COOP_TYPES = ["广告投放", "车行入驻", "金融合作", "保险合作", "检测服务", "其他"];
 
 export default function BusinessPage() {
   const [form, setForm] = useState({
@@ -103,132 +107,93 @@ export default function BusinessPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
         <DesktopBack />
-        <h1 className="text-lg font-semibold">商业合作</h1>
-        <p className="mt-1 text-xs text-muted-foreground">
-          常來車網面向车行、金融、保险等行业伙伴开放合作。车行入驻请前往
-          <Link href="/dealer-apply" className="underline underline-offset-2 hover:text-foreground">
+        <LargeTitle title="商业合作" subtitle="面向车行、金融、保险等行业伙伴" />
+
+        {/* Services */}
+        <SettingsGroup className="mt-5">
+          {SERVICES.map((s, i) => (
+            <div key={i} className="group/row flex items-center gap-3 pl-4">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center">{s.icon}</span>
+              <span className="flex min-h-[56px] min-w-0 flex-1 flex-col justify-center border-b border-border/50 py-2.5 pr-4 group-last/row:border-0">
+                <span className="font-mono text-[15px]">{s.title}</span>
+                <span className="mt-0.5 font-mono text-xs text-muted-foreground">{s.desc}</span>
+              </span>
+            </div>
+          ))}
+        </SettingsGroup>
+        <GroupFooter>
+          车行入驻请前往{" "}
+          <Link href="/dealer-apply" className="text-primary underline underline-offset-2 active:opacity-60">
             车行入驻申请
           </Link>
           。
-        </p>
+        </GroupFooter>
 
-        {/* Services */}
-        <div className="mt-6 space-y-3">
-          {SERVICES.map((s, i) => (
-            <div key={i} className="flex items-start gap-3 rounded-xl border border-border p-3">
-              <div className="shrink-0 text-muted-foreground">{s.icon}</div>
-              <div>
-                <p className="text-xs font-medium">{s.title}</p>
-                <p className="mt-0.5 text-[11px] text-muted-foreground">{s.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        {sent ? (
+          <div className="mt-6 flex flex-col items-center rounded-[26px] bg-card py-10">
+            <CheckCircle className="h-8 w-8 text-brand" strokeWidth={1.5} />
+            <p className="mt-3 font-mono text-sm font-semibold">申请已提交</p>
+            <p className="mt-1 font-mono text-xs text-muted-foreground">我们会在 1-3 个工作日内联系您</p>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-5 h-9 rounded-full bg-muted px-5 font-mono text-xs hover:bg-muted"
+              onClick={() => setSent(false)}
+            >
+              再次提交
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit}>
+            <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">合作咨询</h2>
+            <SettingsGroup className="mt-2">
+              <FieldRow id="company" label="公司名称" placeholder="公司/品牌名" value={form.company} onChange={(v) => setForm((f) => ({ ...f, company: v }))} required />
+              <FieldRow id="contact" label="联系人" placeholder="您的姓名" value={form.contact} onChange={(v) => setForm((f) => ({ ...f, contact: v }))} />
+              <FieldRow id="email" label="邮箱" type="email" placeholder="your@company.com" value={form.email} onChange={(v) => setForm((f) => ({ ...f, email: v }))} required />
+              <FieldRow id="phone" label="电话" placeholder="(xxx) xxx-xxxx" value={form.phone} onChange={(v) => setForm((f) => ({ ...f, phone: v }))} />
+            </SettingsGroup>
+            <GroupFooter>公司名称与邮箱为必填。</GroupFooter>
 
-        {/* Form */}
-        <div className="mt-8">
-          <h2 className="text-sm font-semibold">合作咨询</h2>
-          {sent ? (
-            <div className="mt-4 flex flex-col items-center rounded-xl border border-border py-8">
-              <CheckCircle className="h-8 w-8 text-emerald-500" strokeWidth={1.5} />
-              <p className="mt-3 text-xs font-medium">申请已提交</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">我们会在 1-3 个工作日内联系您</p>
-              <Button
-                variant="outline"
-                size="sm"
-                className="mt-4 text-xs"
-                onClick={() => setSent(false)}
-              >
-                再次提交
-              </Button>
+            <h2 className="mt-5 px-1 font-mono text-xs font-medium text-muted-foreground">合作类型</h2>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {COOP_TYPES.map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setForm((f) => ({ ...f, type: t }))}
+                  className={`rounded-full px-3.5 py-2 font-mono text-xs transition-colors ${
+                    form.type === t ? "bg-primary/10 font-medium text-primary" : "bg-card active:bg-muted/60"
+                  }`}
+                >
+                  {t}
+                </button>
+              ))}
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="mt-3 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-[11px]">公司名称 *</Label>
-                  <Input
-                    className="mt-1 h-9 text-xs"
-                    placeholder="公司/品牌名"
-                    value={form.company}
-                    onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label className="text-[11px]">联系人</Label>
-                  <Input
-                    className="mt-1 h-9 text-xs"
-                    placeholder="您的姓名"
-                    value={form.contact}
-                    onChange={(e) => setForm((f) => ({ ...f, contact: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-[11px]">邮箱 *</Label>
-                  <Input
-                    className="mt-1 h-9 text-xs"
-                    type="email"
-                    placeholder="your@company.com"
-                    value={form.email}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label className="text-[11px]">电话</Label>
-                  <Input
-                    className="mt-1 h-9 text-xs"
-                    placeholder="(xxx) xxx-xxxx"
-                    value={form.phone}
-                    onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px]">合作类型</Label>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {["广告投放", "车行入驻", "金融合作", "保险合作", "检测服务", "其他"].map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors ${
-                        form.type === t ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"
-                      }`}
-                      onClick={() => setForm((f) => ({ ...f, type: t }))}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div>
-                <Label className="text-[11px]">合作详情 *</Label>
-                <textarea
-                  className="mt-1 w-full resize-none rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs outline-none focus:border-foreground"
-                  rows={4}
-                  placeholder="请描述您的合作需求..."
-                  value={form.message}
-                  onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
-                  required
-                />
-              </div>
-              <Button
-                type="submit"
-                size="sm"
-                className="w-full gap-1.5 text-xs"
-                disabled={sending || !form.company.trim() || !form.email.trim() || !form.message.trim()}
-              >
-                {sending ? <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} /> : <Send className="h-3 w-3" strokeWidth={1.5} />}
-                提交申请
-              </Button>
-            </form>
-          )}
-        </div>
+
+            <h2 className="mt-5 px-1 font-mono text-xs font-medium text-muted-foreground">合作详情</h2>
+            <SettingsGroup className="mt-2">
+              <textarea
+                className="block w-full resize-none bg-transparent px-5 py-4 font-mono text-[15px] leading-relaxed outline-none placeholder:text-muted-foreground/50"
+                rows={4}
+                placeholder="请描述您的合作需求..."
+                value={form.message}
+                onChange={(e) => setForm((f) => ({ ...f, message: e.target.value }))}
+                required
+              />
+            </SettingsGroup>
+
+            <Button
+              type="submit"
+              className="mt-6 h-12 w-full gap-1.5 rounded-full font-mono text-[15px] font-semibold transition-transform active:scale-[0.98]"
+              disabled={sending || !form.company.trim() || !form.email.trim() || !form.message.trim()}
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : <Send className="h-4 w-4" strokeWidth={1.5} />}
+              提交申请
+            </Button>
+          </form>
+        )}
       </main>
     </div>
   );

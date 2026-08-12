@@ -109,7 +109,7 @@ export default async function SeoLandingPage({
         <div className="mt-4">
           <Link
             href={browseUrl}
-            className="inline-flex items-center rounded-full border border-border px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted"
+            className="inline-flex items-center rounded-full bg-muted px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted/70"
           >
             在买车页按更多条件筛选 →
           </Link>
@@ -127,7 +127,7 @@ export default async function SeoLandingPage({
                 <Link
                   key={p.slug}
                   href={seoPageHref(p)}
-                  className="rounded-full border border-border px-2 py-1 font-mono text-[11px] transition-colors hover:bg-muted"
+                  className="rounded-full bg-muted px-2 py-1 font-mono text-[11px] transition-colors hover:bg-muted/70"
                 >
                   {p.label}
                 </Link>

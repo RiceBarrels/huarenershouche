@@ -243,7 +243,7 @@ export function HomeFeed({
       {!hasMore && display.length > 0 && (
         <Link
           href={activeDef.browseHref}
-          className="mt-4 flex h-11 items-center justify-center gap-1 rounded-full border border-border bg-card font-mono text-sm font-medium transition-colors active:bg-muted"
+          className="mt-4 flex h-11 items-center justify-center gap-1 rounded-full bg-card font-mono text-sm font-medium transition-colors active:bg-muted"
         >
           查看全部车源
           <ChevronRight className="h-4 w-4" strokeWidth={1.5} />

@@ -43,7 +43,7 @@ export default function FuelToolPage() {
         <p className="mt-1 font-mono text-xs text-muted-foreground">
           按油价、油耗和月里程,估算每月油钱
         </p>
-        <div className="mt-4 space-y-4 rounded-xl border border-border bg-card p-4">
+        <div className="mt-4 space-y-4 rounded-xl bg-card p-4">
           <Row label="当地油价" value={gasPrice} onChange={setGasPrice} suffix="$/加仑" />
           <Row label="车辆油耗" value={mpg} onChange={setMpg} suffix="MPG" />
           <Row label="每月里程" value={miles} onChange={setMiles} suffix="miles" />

@@ -122,7 +122,7 @@ export function CompareContent() {
       {/* 已选车辆 */}
       <div className="grid grid-cols-3 gap-3">
         {selected.map((car) => (
-          <div key={car.id} className="relative overflow-hidden rounded-xl border border-border">
+          <div key={car.id} className="relative overflow-hidden rounded-xl bg-card">
             <div className="aspect-[16/10] overflow-hidden bg-muted">
               {car.image_url ? (
                 <img

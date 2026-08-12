@@ -126,7 +126,7 @@ export function RelatedPosts({
                   );
                 }
               }}
-              className="block border border-border bg-card transition-colors hover:border-foreground/30"
+              className="block overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
             >
               {cover ? (
                 <div className="relative">
@@ -140,7 +140,7 @@ export function RelatedPosts({
                         className="aspect-[3/4] w-full object-cover"
                       />
                       <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                        <span className="flex h-8 w-8 items-center justify-center border border-border bg-background/80 backdrop-blur-sm">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm">
                           <Play
                             className="ml-0.5 h-3.5 w-3.5 text-foreground"
                             strokeWidth={1.5}
@@ -156,14 +156,14 @@ export function RelatedPosts({
                       loading="lazy"
                     />
                   )}
-                  <span className="absolute left-1.5 top-1.5 border border-border bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
+                  <span className="absolute left-1.5 top-1.5 rounded-md bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
                     {TYPE_LABELS[post.type] || post.type}
                   </span>
                 </div>
               ) : null}
               <div className="p-2.5">
                 {!cover && (
-                  <span className="mb-1.5 inline-block border border-border px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
+                  <span className="mb-1.5 inline-block rounded-md bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
                     {TYPE_LABELS[post.type] || post.type}
                   </span>
                 )}
@@ -176,7 +176,7 @@ export function RelatedPosts({
                   </p>
                 )}
                 <div className="mt-2 flex items-center gap-1.5">
-                  <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden border border-border bg-muted">
+                  <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                     <img
                       src={avatarUrl(
                         post.profiles?.avatar_url,

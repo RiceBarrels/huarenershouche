@@ -24,7 +24,7 @@ export function QrShare({ url, title }: QrShareProps) {
   return (
     <>
       <Button
-        variant="outline"
+        variant="secondary"
         className="w-full gap-1.5 font-mono text-xs"
         onClick={() => setOpen(true)}
       >
@@ -38,7 +38,7 @@ export function QrShare({ url, title }: QrShareProps) {
           onClick={() => setOpen(false)}
         >
           <div
-            className="relative mx-4 w-full max-w-xs rounded-xl border border-border bg-white p-6 dark:bg-zinc-950"
+            className="relative mx-4 w-full max-w-xs rounded-xl bg-card p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <button
@@ -67,7 +67,7 @@ export function QrShare({ url, title }: QrShareProps) {
               </p>
 
               <Button
-                variant="outline"
+                variant="secondary"
                 className="w-full gap-1.5 font-mono text-xs"
                 onClick={handleCopy}
               >

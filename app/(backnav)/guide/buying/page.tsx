@@ -21,7 +21,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <details className="group overflow-hidden rounded-xl border border-border" open>
+    <details className="group overflow-hidden rounded-xl bg-card" open>
       <summary className="flex cursor-pointer items-center gap-2 px-4 py-3 font-mono text-sm font-semibold hover:bg-muted/30">
         <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
         <span>{title}</span>
@@ -72,7 +72,7 @@ export default function BuyingGuidePage() {
             </ol>
 
             <h4 className="mt-4 font-semibold">预算计算示例</h4>
-            <div className="mt-2 rounded-lg border border-border p-3">
+            <div className="mt-2 rounded-xl bg-muted/40 p-3">
               <p className="text-[10px] text-muted-foreground">假设购买 $20,000 的二手车 (加州)</p>
               <div className="mt-2 space-y-1">
                 <div className="flex justify-between"><span>车价</span><span>$20,000</span></div>
@@ -98,7 +98,7 @@ export default function BuyingGuidePage() {
           {/* 选车建议 */}
           <Section title="选车建议" icon={Search}>
             <h4 className="font-semibold">可靠性品牌排名 (Consumer Reports / J.D. Power 综合)</h4>
-            <div className="mt-2 border border-border">
+            <div className="mt-2">
               <div className="grid grid-cols-3 border-b border-border bg-muted/30 px-3 py-1.5 text-[10px] font-semibold">
                 <span>等级</span><span>品牌</span><span>5年维修成本</span>
               </div>
@@ -131,7 +131,7 @@ export default function BuyingGuidePage() {
             </ul>
 
             <h4 className="mt-4 font-semibold">CPO (Certified Pre-Owned) vs 私人卖家</h4>
-            <div className="mt-2 border border-border">
+            <div className="mt-2">
               <div className="grid grid-cols-3 border-b border-border bg-muted/30 px-3 py-1.5 text-[10px] font-semibold">
                 <span>对比项</span><span>CPO 认证二手车</span><span>私人卖家</span>
               </div>
@@ -216,7 +216,7 @@ export default function BuyingGuidePage() {
               <li>停车后检查底部有无新的漏液</li>
             </ol>
 
-            <div className="mt-4 rounded-lg border border-border bg-muted/20 p-3">
+            <div className="mt-4 rounded-xl bg-muted/20 p-3">
               <p className="text-[10px] font-semibold">专业提示</p>
               <ul className="mt-1 list-inside list-disc space-y-0.5 text-[10px] text-muted-foreground">
                 <li>尽量在白天、干燥天气看车（雨天和夜晚会掩盖漆面问题）</li>
@@ -250,15 +250,15 @@ export default function BuyingGuidePage() {
 
             <h4 className="mt-4 font-semibold">实用谈判话术</h4>
             <div className="mt-2 space-y-2">
-              <div className="rounded-lg border border-border p-2">
+              <div className="rounded-xl bg-muted/40 p-2">
                 <p className="text-[10px] font-semibold text-muted-foreground">场景：对方开价 $18,000</p>
                 <p className="mt-1">&quot;I really like the car, but based on KBB value and the fact that it needs new tires and has a small dent, I was thinking more around $15,500. Would that work for you?&quot;</p>
               </div>
-              <div className="rounded-lg border border-border p-2">
+              <div className="rounded-xl bg-muted/40 p-2">
                 <p className="text-[10px] font-semibold text-muted-foreground">场景：对方拒绝你的开价</p>
                 <p className="mt-1">&quot;I understand. What&apos;s the lowest you&apos;d be willing to go? I&apos;m looking at another [同款车] listed at $16,000 nearby.&quot;</p>
               </div>
-              <div className="rounded-lg border border-border p-2">
+              <div className="rounded-xl bg-muted/40 p-2">
                 <p className="text-[10px] font-semibold text-muted-foreground">场景：卖家不松口</p>
                 <p className="mt-1">&quot;Let me think about it and get back to you. Thanks for your time.&quot; （然后等一两天，很多人会主动联系你降价）</p>
               </div>
@@ -318,37 +318,37 @@ export default function BuyingGuidePage() {
           {/* 常见骗局防范 */}
           <Section title="常见骗局防范" icon={AlertTriangle}>
             <div className="space-y-4">
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">1. Title Washing (产权洗白)</h4>
                 <p className="mt-1">将 Salvage Title 的车跨州注册变成 Clean Title。</p>
                 <p className="mt-1 text-muted-foreground"><span className="font-semibold">防范：</span>查 NMVTIS 全国记录，看是否在多个州注册过。如果车频繁跨州过户，红旗。</p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">2. Odometer Fraud (里程表篡改)</h4>
                 <p className="mt-1">回调里程表让车看起来跑得少。每年约 45 万辆车被篡改里程。</p>
                 <p className="mt-1 text-muted-foreground"><span className="font-semibold">防范：</span>查 CarFax 里程记录是否有跳跃式下降。检查踏板、方向盘、座椅磨损是否与里程匹配。电子仪表盘被篡改后可能显示不均匀亮度。</p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">3. Curbstoning (黑车商冒充个人)</h4>
                 <p className="mt-1">无牌照车商冒充私人卖家，卖问题车。他们同时在卖多辆车。</p>
                 <p className="mt-1 text-muted-foreground"><span className="font-semibold">防范：</span>搜索卖家电话号码，如果关联多个车辆广告就是 curbstoner。要求看卖家的驾照，名字必须和 Title 一致。</p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">4. Flood/Water Damage (水淹车)</h4>
                 <p className="mt-1">飓风/洪水后大量水淹车流入市场，外表修好但电子系统随时会出问题。</p>
                 <p className="mt-1 text-muted-foreground"><span className="font-semibold">防范：</span>闻内饰是否有霉味。检查座椅下方、后备箱角落是否有水渍或泥沙。查看车灯内是否有水雾。检查线路接头是否有绿色腐蚀。</p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">5. VIN Cloning (VIN 克隆)</h4>
                 <p className="mt-1">将合法车辆的 VIN 贴在被盗车上。</p>
                 <p className="mt-1 text-muted-foreground"><span className="font-semibold">防范：</span>对比挡风玻璃、门框、发动机舱三处 VIN 是否一致。VIN 标签是否有被撬动/重新粘贴的痕迹。</p>
               </div>
 
-              <div className="rounded-lg border border-border p-3">
+              <div className="rounded-xl bg-muted/40 p-3">
                 <h4 className="font-semibold text-red-600 dark:text-red-400">6. 针对华人的常见骗局</h4>
                 <ul className="mt-1 list-inside list-disc space-y-1">
                   <li>&quot;老乡价&quot; — 利用同胞信任感，实际卖高价或问题车</li>
@@ -390,7 +390,7 @@ export default function BuyingGuidePage() {
           </Section>
         </div>
 
-        <div className="mt-8 rounded-xl border border-border bg-muted/20 p-4">
+        <div className="mt-8 rounded-xl bg-muted/20 p-4">
           <p className="font-mono text-[10px] font-semibold">免责声明</p>
           <p className="mt-1 font-mono text-[10px] text-muted-foreground">
             本指南仅供参考，不构成法律或财务建议。各州法规不同，

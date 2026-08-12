@@ -166,7 +166,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
 
   if (error) {
     return (
-      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950/30">
+      <div className="mt-3 rounded-xl bg-red-50 p-3 dark:bg-red-950/30">
         <div className="flex items-center gap-2">
           <ShieldX className="h-4 w-4 shrink-0 text-red-500" strokeWidth={1.5} />
           <span className="font-mono text-xs text-red-600 dark:text-red-400">
@@ -190,10 +190,10 @@ export function VinCheck({ vin, car }: VinCheckProps) {
 
   return (
     <div
-      className={`mt-3 rounded-xl border p-3 ${
+      className={`mt-3 rounded-xl p-3 ${
         verification.matched
-          ? "border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30"
-          : "border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"
+          ? "bg-green-50 dark:bg-green-950/30"
+          : "bg-amber-50 dark:bg-amber-950/30"
       }`}
     >
       {/* Status header */}

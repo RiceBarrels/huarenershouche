@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback } from "react";
 import { getCached, setCache } from "./cache";
 
 /**
- * Stale-while-revalidate data hook backed by localStorage.
+ * 双层缓存 data hook(与社区 feed 同款逻辑):
+ * sessionStorage 命中 = 本会话新鲜,直接复用不再重拉;
+ * localStorage 命中 = 冷启动兜底,先展示、后台刷新。
  *
  * - `loading`    = true only when no cache exists and fetch is in progress
- * - `refreshing` = true when cached data is shown and a background fetch is running
+ * - `refreshing` = true when stale cached data is shown and a background fetch is running
  * - `mutate`     = update state + cache in one call (use after add/edit/delete)
  */
 export function useCachedData<T>(
@@ -34,8 +36,13 @@ export function useCachedData<T>(
 
     const cached = getCached<T>(key);
     if (cached !== null) {
-      setDataState(cached);
+      setDataState(cached.data);
       setLoading(false);
+      // 本会话已拉过(sessionStorage 命中)就直接复用,不重复请求
+      if (!cached.stale) {
+        setRefreshing(false);
+        return;
+      }
       setRefreshing(true);
     } else {
       setLoading(true);

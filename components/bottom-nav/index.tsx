@@ -187,7 +187,7 @@ export function MobileTabBar() {
               animate={{ opacity: 1, y: 0, x: "-50%", scale: 1 }}
               exit={{ opacity: 0, y: 8, x: "-50%", scale: 0.96 }}
               transition={{ duration: 0.18, ease: [0.2, 0.9, 0.3, 1] }}
-              className="absolute bottom-full left-1/2 mb-3 w-56 overflow-hidden rounded-2xl border border-border bg-background shadow-xl"
+              className="absolute bottom-full left-1/2 mb-3 w-56 overflow-hidden rounded-2xl bg-background shadow-xl"
             >
               <button
                 onClick={() => router.push("/post")}
@@ -219,7 +219,7 @@ export function MobileTabBar() {
                   onClick={() => setPostMenuOpen((v) => !v)}
                   className="relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 transition-colors"
                 >
-                  <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-foreground bg-foreground text-background">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                     <Plus
                       className={`h-5 w-5 transition-transform duration-200 ${postMenuOpen ? "rotate-45" : ""}`}
                       strokeWidth={2}

@@ -26,7 +26,7 @@ export function PriceHistoryChart({ carId }: { carId: string }) {
   if (records.length <= 1) return null;
 
   return (
-    <div className="mt-3 rounded-lg border border-border p-3">
+    <div className="mt-3 rounded-xl bg-card p-3">
       <p className="font-mono text-xs font-semibold">价格变动记录</p>
       <div className="mt-2 space-y-1">
         {records.map((rec, i) => {

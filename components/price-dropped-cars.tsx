@@ -73,7 +73,7 @@ export function PriceDroppedCars() {
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="w-[220px] shrink-0 overflow-hidden rounded-xl border border-border"
+                className="w-[220px] shrink-0 overflow-hidden rounded-xl bg-card"
               >
                 <Skeleton className="aspect-[16/10] w-full rounded-none" />
                 <div className="p-2.5">
@@ -98,7 +98,7 @@ export function PriceDroppedCars() {
                 <Link
                   key={car.id}
                   href={carLink(car.id)}
-                  className="group w-[220px] shrink-0 overflow-hidden rounded-xl border border-border bg-card transition-colors hover:border-foreground/20"
+                  className="group w-[220px] shrink-0 overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
                 >
                   {/* Image */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-muted">

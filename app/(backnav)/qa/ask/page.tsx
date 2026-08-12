@@ -119,7 +119,7 @@ export default function AskQuestionPage() {
         </p>
 
         {!userId ? (
-          <div className="mt-8 flex flex-col items-center rounded-xl border border-border p-8">
+          <div className="mt-8 flex flex-col items-center rounded-xl bg-card p-8">
             <p className="font-mono text-sm text-muted-foreground">
               请先登录后再提问
             </p>
@@ -142,10 +142,10 @@ export default function AskQuestionPage() {
                     key={cat.key}
                     type="button"
                     onClick={() => setCategory(cat.key)}
-                    className={`rounded-full border px-3 py-1.5 font-mono text-xs transition-colors ${
+                    className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${
                       category === cat.key
-                        ? "border-foreground bg-foreground text-background"
-                        : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                        ? "bg-primary/10 text-primary"
+                        : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                     }`}
                   >
                     {cat.label}
@@ -178,7 +178,7 @@ export default function AskQuestionPage() {
                 问题描述 <span className="text-destructive">*</span>
               </Label>
               <textarea
-                className="mt-1 w-full rounded-lg border border-border bg-background px-3 py-2 font-mono text-xs leading-relaxed text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 w-full rounded-xl bg-muted px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
                 rows={8}
                 placeholder="详细描述你的问题，包括相关背景信息..."
                 value={content}
@@ -197,7 +197,7 @@ export default function AskQuestionPage() {
                 {tags.map((tag) => (
                   <span
                     key={tag}
-                    className="flex items-center gap-1 rounded-full border border-border px-2 py-1 font-mono text-[11px]"
+                    className="flex items-center gap-1 rounded-full bg-muted px-2 py-1 font-mono text-[11px]"
                   >
                     {tag}
                     <button
@@ -226,7 +226,7 @@ export default function AskQuestionPage() {
                 />
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   size="sm"
                   className="h-8 gap-1 font-mono text-xs"
                   onClick={addTag}
@@ -239,7 +239,7 @@ export default function AskQuestionPage() {
 
             {/* Error */}
             {error && (
-              <div className="rounded-lg border border-destructive/50 bg-destructive/5 p-3">
+              <div className="rounded-xl bg-destructive/10 px-3 py-2.5">
                 <p className="font-mono text-xs text-destructive">{error}</p>
               </div>
             )}
@@ -268,7 +268,7 @@ export default function AskQuestionPage() {
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 className="font-mono text-xs"
                 onClick={() => router.back()}
               >

@@ -22,8 +22,8 @@ const slide = {
 } as const;
 
 // 大号输入框(text-base=16px,避免 iOS 聚焦自动放大)与大号按钮
-const bigInput = "mt-1.5 h-12 rounded-xl font-mono text-base";
-const bigBtn = "h-12 w-full rounded-xl font-mono text-sm";
+const bigInput = "mt-1.5 h-12 font-mono text-base";
+const bigBtn = "h-12 w-full font-mono text-base";
 
 export default function ForgotPasswordPage() {
   // 一步一个输入:邮箱 → 验证码 → 新密码 → 确认密码
@@ -109,27 +109,23 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background font-mono">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 -z-10 bg-grid [mask-image:linear-gradient(to_bottom,black,60%,transparent)]"
-      />
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-4 py-12">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.25 }}
-          className="overflow-x-clip rounded-xl border border-border bg-background p-6"
+          className="overflow-x-clip rounded-xl bg-background p-6"
         >
         <AnimatePresence mode="popLayout" initial={false}>
         {step === "email" && (
           <motion.div key="email" {...slide}>
             <div className="flex flex-col items-center">
               <KeyRound className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-              <h1 className="mt-4 font-logo text-xl tracking-tight">
+              <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
                 忘记密码
               </h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
+              <p className="mt-1 font-mono text-sm text-muted-foreground">
                 输入注册邮箱，我们会发送验证码
               </p>
             </div>
@@ -149,7 +145,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               {error && (
-                <p className="font-mono text-xs text-destructive">{error}</p>
+                <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
               )}
               <Button type="submit" className={bigBtn} disabled={loading}>
                 {loading ? (
@@ -165,10 +161,10 @@ export default function ForgotPasswordPage() {
           <motion.div key="code" {...slide}>
             <div className="flex flex-col items-center">
               <KeyRound className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-              <h1 className="mt-4 font-logo text-xl tracking-tight">
+              <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
                 输入验证码
               </h1>
-              <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
+              <p className="mt-2 text-center font-mono text-sm text-muted-foreground">
                 已向{" "}
                 <span className="font-medium text-foreground">{email}</span>{" "}
                 发送 6 位验证码
@@ -190,7 +186,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               {error && (
-                <p className="font-mono text-xs text-destructive">{error}</p>
+                <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
               )}
               <Button type="submit" className={bigBtn} disabled={loading || code.length !== 6}>
                 {loading ? (
@@ -213,10 +209,10 @@ export default function ForgotPasswordPage() {
           <motion.div key="reset" {...slide}>
             <div className="flex flex-col items-center">
               <KeyRound className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-              <h1 className="mt-4 font-logo text-xl tracking-tight">
+              <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
                 重置密码
               </h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
+              <p className="mt-1 font-mono text-sm text-muted-foreground">
                 输入你的新密码
               </p>
             </div>
@@ -237,7 +233,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               {error && (
-                <p className="font-mono text-xs text-destructive">{error}</p>
+                <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
               )}
               <Button type="submit" className={bigBtn}>
                 下一步
@@ -250,10 +246,10 @@ export default function ForgotPasswordPage() {
           <motion.div key="confirm" {...slide}>
             <div className="flex flex-col items-center">
               <KeyRound className="h-8 w-8 text-muted-foreground" strokeWidth={1.5} />
-              <h1 className="mt-4 font-logo text-xl tracking-tight">
+              <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
                 确认新密码
               </h1>
-              <p className="mt-1 font-mono text-xs text-muted-foreground">
+              <p className="mt-1 font-mono text-sm text-muted-foreground">
                 再输入一次刚才的新密码
               </p>
             </div>
@@ -274,7 +270,7 @@ export default function ForgotPasswordPage() {
                 />
               </div>
               {error && (
-                <p className="font-mono text-xs text-destructive">{error}</p>
+                <p className="rounded-xl bg-destructive/10 px-3 py-2.5 font-mono text-xs text-destructive">{error}</p>
               )}
               <Button type="submit" className={bigBtn} disabled={loading}>
                 {loading ? (
@@ -296,10 +292,10 @@ export default function ForgotPasswordPage() {
         {step === "done" && (
           <motion.div key="done" {...slide} className="flex flex-col items-center">
             <CheckCircle className="h-12 w-12 text-green-500" strokeWidth={1.5} />
-            <h1 className="mt-4 font-logo text-xl">
+            <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
               密码已重置
             </h1>
-            <p className="mt-2 font-mono text-xs text-muted-foreground">
+            <p className="mt-2 font-mono text-sm text-muted-foreground">
               你现在可以用新密码登录了
             </p>
             <Link href="/login" className="mt-6 w-full">

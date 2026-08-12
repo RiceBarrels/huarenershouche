@@ -9,6 +9,7 @@ import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SettingsGroup, LargeTitle } from "@/components/ios-settings";
 import type { DbCar } from "@/lib/types";
 
 function formatNumber(n: number): string {
@@ -81,16 +82,13 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-4xl flex-1 px-4 py-4">
-        <h1 className="font-mono text-lg font-semibold">数据面板</h1>
-        <p className="mt-1 font-mono text-xs text-muted-foreground">
-          查看你的车辆曝光和互动数据
-        </p>
+      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4">
+        <LargeTitle title="数据面板" subtitle="车辆曝光与互动数据" />
 
         {loading ? (
           <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="rounded-xl border border-border p-4">
+              <div key={i} className="rounded-xl bg-card p-4">
                 <Skeleton className="h-3 w-12" />
                 <Skeleton className="mt-2 h-6 w-16" />
               </div>
@@ -122,24 +120,22 @@ export default function DashboardPage() {
               />
             </div>
 
-            {/* Conversion funnel */}
+            {/* Conversion funnel(进度条式,一眼看出转化率) */}
             {totalViews > 0 && (
-              <div className="mt-6 rounded-xl border border-border p-4">
+              <div className="rounded-xl bg-card mt-4 p-4">
                 <h2 className="font-mono text-xs font-medium text-muted-foreground">转化漏斗</h2>
-                <div className="mt-3 flex items-center gap-4">
-                  <FunnelStep label="浏览" value={totalViews} pct={100} />
-                  <FunnelArrow />
-                  <FunnelStep label="收藏" value={totalFavorites} pct={Math.round((totalFavorites / totalViews) * 100)} />
-                  <FunnelArrow />
-                  <FunnelStep label="询盘" value={totalMessages} pct={Math.round((totalMessages / totalViews) * 100)} />
+                <div className="mt-3 space-y-2.5">
+                  <FunnelBar label="浏览" value={totalViews} pct={100} />
+                  <FunnelBar label="收藏" value={totalFavorites} pct={Math.round((totalFavorites / totalViews) * 100)} />
+                  <FunnelBar label="询盘" value={totalMessages} pct={Math.round((totalMessages / totalViews) * 100)} />
                 </div>
               </div>
             )}
 
             {/* Per-listing breakdown */}
             <div className="mt-6">
-              <h2 className="font-mono text-sm font-medium">各车辆数据</h2>
-              <div className="mt-3 space-y-2">
+              <h2 className="px-1 font-mono text-xs font-medium text-muted-foreground">各车辆数据</h2>
+              <SettingsGroup capsule={stats.length === 1} className="mt-2">
                 {stats.length === 0 ? (
                   <p className="py-8 text-center font-mono text-xs text-muted-foreground">
                     还没有发布过车辆
@@ -149,15 +145,17 @@ export default function DashboardPage() {
                     <Link
                       key={car.id}
                       href={carLink(car.id)}
-                      className="flex items-center gap-3 rounded-lg border border-border p-3 transition-colors hover:border-foreground/20"
+                      className="group/row flex items-center gap-3 pl-3 transition-colors active:bg-muted/60"
                     >
-                      <div className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                      {/* 同心圆角:卡 26px − 边距 12px = 14px */}
+                      <div className="h-12 w-16 shrink-0 overflow-hidden rounded-[14px] bg-muted">
                         {car.image_url ? (
                           <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                         ) : (
                           <div className="flex h-full items-center justify-center font-mono text-[9px] text-muted-foreground">无图</div>
                         )}
                       </div>
+                      <div className="flex min-w-0 flex-1 items-center gap-3 self-stretch border-b border-border/60 py-3 pr-3 group-last/row:border-0">
                       <div className="flex-1 overflow-hidden">
                         <p className="truncate font-mono text-xs font-medium">{car.title_zh}</p>
                         <div className="mt-1 flex items-center gap-4">
@@ -176,10 +174,11 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <PerformanceIndicator views={car.views_count || 0} favorites={car.favorites_count || 0} />
+                      </div>
                     </Link>
                   ))
                 )}
-              </div>
+              </SettingsGroup>
             </div>
           </>
         )}
@@ -191,28 +190,31 @@ export default function DashboardPage() {
 
 function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border p-4">
+    <div className="rounded-xl bg-card p-4">
       <div className="flex items-center gap-1.5 text-muted-foreground">
         {icon}
-        <span className="font-mono text-[11px]">{label}</span>
+        <span className="font-mono text-xs">{label}</span>
       </div>
-      <p className="mt-2 font-mono text-xl font-bold">{formatNumber(value)}</p>
+      <p className="mt-1.5 font-mono text-2xl font-bold tabular-nums">{formatNumber(value)}</p>
     </div>
   );
 }
 
-function FunnelStep({ label, value, pct }: { label: string; value: number; pct: number }) {
+function FunnelBar({ label, value, pct }: { label: string; value: number; pct: number }) {
   return (
-    <div className="flex flex-col items-center gap-1">
-      <span className="font-mono text-lg font-bold">{formatNumber(value)}</span>
-      <span className="font-mono text-[10px] text-muted-foreground">{label}</span>
-      <span className="font-mono text-[10px] text-muted-foreground">{pct}%</span>
+    <div className="flex items-center gap-3">
+      <span className="w-8 shrink-0 font-mono text-[11px] text-muted-foreground">{label}</span>
+      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted/70">
+        <div
+          className="h-full rounded-full bg-brand transition-[width] duration-500"
+          style={{ width: `${Math.max(pct, value > 0 ? 3 : 0)}%` }}
+        />
+      </div>
+      <span className="w-20 shrink-0 text-right font-mono text-[11px] tabular-nums">
+        {formatNumber(value)} · {pct}%
+      </span>
     </div>
   );
-}
-
-function FunnelArrow() {
-  return <span className="font-mono text-xs text-muted-foreground">→</span>;
 }
 
 function PerformanceIndicator({ views, favorites }: { views: number; favorites: number }) {

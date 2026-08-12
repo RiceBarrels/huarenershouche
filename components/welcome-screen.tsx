@@ -141,7 +141,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                 const Icon = slide.icon;
                 return (
                   <>
-                    <div className="flex h-20 w-20 items-center justify-center rounded-xl border border-border bg-muted/50">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-xl bg-muted/50">
                       {Icon ? (
                         <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
                       ) : (
@@ -170,7 +170,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
               transition={{ duration: 0.3, ease: "easeInOut" }}
               className="flex flex-1 flex-col items-center justify-center px-8"
             >
-              <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-border bg-muted/50">
+              <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-muted/50">
                 <Zap className="h-7 w-7 text-foreground" strokeWidth={1.2} />
               </div>
               <h1 className="mt-6 text-center font-mono text-xl font-semibold tracking-tight">
@@ -183,7 +183,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
               <div className="mt-8 w-full max-w-xs space-y-3">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   className="w-full gap-2.5 py-5 font-mono text-sm"
                   disabled={googleLoading}
                   onClick={handleGoogleLogin}
@@ -214,7 +214,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
 
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="secondary"
                   className="w-full py-5 font-mono text-sm"
                   onClick={handleEmailLogin}
                 >
@@ -222,7 +222,9 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                 </Button>
 
                 {error && (
-                  <p className="text-center font-mono text-[11px] text-destructive">{error}</p>
+                  <p className="rounded-xl bg-destructive/10 px-3 py-2 text-center font-mono text-[11px] text-destructive">
+                    {error}
+                  </p>
                 )}
               </div>
             </motion.div>

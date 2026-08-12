@@ -194,7 +194,7 @@ export default function CarDetailPage({
         // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
         const { data: pool } = await supabase
           .from("cars")
-          .select("id, make, model, year, price, mileage, status")
+          .select("id, make, model, year, price, mileage, status, vin")
           .eq("status", "active")
           .eq("owner_hidden", false)
           .eq("make", data.make)
@@ -323,7 +323,7 @@ export default function CarDetailPage({
               </div>
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
                 {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <div key={i} className="rounded-lg border border-border p-3 space-y-2">
+                  <div key={i} className="rounded-xl bg-card p-3 space-y-2">
                     <Skeleton className="h-3 w-12" />
                     <Skeleton className="h-4 w-20" />
                   </div>
@@ -331,7 +331,7 @@ export default function CarDetailPage({
               </div>
             </div>
             <div>
-              <div className="rounded-xl border border-border p-4 space-y-3">
+              <div className="rounded-xl bg-card p-4 space-y-3">
                 <Skeleton className="h-4 w-20" />
                 <div className="flex items-center gap-3">
                   <Skeleton className="h-10 w-10 rounded-full" />
@@ -363,7 +363,7 @@ export default function CarDetailPage({
             </p>
             <Link href="/">
               <Button
-                variant="outline"
+                variant="secondary"
                 size="sm"
                 className="mt-4 font-mono text-xs"
               >
@@ -429,7 +429,7 @@ export default function CarDetailPage({
               <div className="relative flex-1 md:hidden">
                 <div
                   ref={mobileGalleryRef}
-                  className="flex aspect-[16/10] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl border border-border bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  className="flex aspect-[16/10] snap-x snap-mandatory overflow-x-auto overflow-y-hidden overscroll-x-contain rounded-xl bg-muted [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   onScroll={(e) => {
                     const el = e.currentTarget;
                     const idx = Math.round(el.scrollLeft / el.clientWidth);
@@ -487,7 +487,7 @@ export default function CarDetailPage({
               </div>
 
               {/* Desktop: single image + arrows */}
-              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden rounded-xl border border-border bg-muted md:block">
+              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden rounded-xl bg-muted md:block">
                 {allImages.length > 0 ? (
                   isVideo(allImages[currentImage]) ? (
                     <video
@@ -549,8 +549,8 @@ export default function CarDetailPage({
                     <button
                       key={i}
                       onClick={() => setCurrentImage(i)}
-                      className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-lg border bg-muted transition-colors ${
-                        i === currentImage ? "border-foreground" : "border-border hover:border-foreground/40"
+                      className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-muted ring-2 transition-all ${
+                        i === currentImage ? "ring-primary" : "ring-transparent hover:ring-primary/40"
                       }`}
                     >
                       {isVideo(url) ? (
@@ -596,7 +596,7 @@ export default function CarDetailPage({
                 </div>
               ) : (
                 <div className="mt-2 flex justify-center md:hidden">
-                  <span className="rounded-full border border-border bg-background/80 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                  <span className="rounded-full bg-background/80 px-2 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
                     {currentImage + 1} / {allImages.length}
                   </span>
                 </div>
@@ -675,8 +675,8 @@ export default function CarDetailPage({
 
             {/* Specs data sheet */}
             <Reveal>
-              <div className="grid grid-cols-2 border-l border-t border-border sm:grid-cols-3">
-                <div className="border-b border-r border-border p-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Calendar
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -690,7 +690,7 @@ export default function CarDetailPage({
                     {car.year}
                   </p>
                 </div>
-                <div className="border-b border-r border-border p-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Gauge
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -704,7 +704,7 @@ export default function CarDetailPage({
                     {formatMileage(car.mileage)} mi
                   </p>
                 </div>
-                <div className="border-b border-r border-border p-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Fuel
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -718,7 +718,7 @@ export default function CarDetailPage({
                     {car.fuel_type}
                   </p>
                 </div>
-                <div className="border-b border-r border-border p-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Settings
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -732,7 +732,7 @@ export default function CarDetailPage({
                     {car.transmission}
                   </p>
                 </div>
-                <div className="border-b border-r border-border p-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Palette
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -746,7 +746,7 @@ export default function CarDetailPage({
                     {car.exterior_color || "—"}
                   </p>
                 </div>
-                <div className="border-b border-r border-border p-3">
+                <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <MapPin
                       className="h-3.5 w-3.5 text-muted-foreground"
@@ -768,7 +768,7 @@ export default function CarDetailPage({
               <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     车辆配置
                   </h2>
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -791,7 +791,7 @@ export default function CarDetailPage({
               <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     车辆描述
                   </h2>
                   <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
@@ -805,7 +805,7 @@ export default function CarDetailPage({
               <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     VIN 认证
                   </h2>
                   <p className="mt-2 font-mono text-sm text-muted-foreground">
@@ -824,7 +824,7 @@ export default function CarDetailPage({
               <Reveal>
                 <Separator className="my-6" />
                 <div>
-                  <h2 className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     Carfax 报告
                   </h2>
                   {car.carfax_summary && (
@@ -836,7 +836,7 @@ export default function CarDetailPage({
                     href={car.carfax_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted"
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-muted px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted/70"
                   >
                     <ExternalLink className="h-3.5 w-3.5" strokeWidth={1.5} />
                     在 Carfax 查看完整报告
@@ -861,7 +861,7 @@ export default function CarDetailPage({
           <div
             className="lg:sticky lg:top-20 lg:self-start"
           >
-            <div className="rounded-xl border border-border p-4">
+            <div className="rounded-xl bg-card p-4">
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
               <Link
                 href={userLink(car.seller_id)}
@@ -873,7 +873,7 @@ export default function CarDetailPage({
                 }}
                 className="mt-3 flex items-center gap-3 py-2 transition-colors"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-muted">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
                   <img src={avatarUrl(car.profiles?.avatar_url, car.seller_name)} alt="" className="h-full w-full object-cover" />
                 </div>
                 <div>
@@ -961,7 +961,7 @@ export default function CarDetailPage({
                 {!embedded &&
                   (user ? (
                     <Button
-                      variant="outline"
+                      variant="secondary"
                       className="w-full gap-1.5 font-mono text-xs"
                       onClick={toggleFavorite}
                     >
@@ -974,7 +974,7 @@ export default function CarDetailPage({
                   ) : (
                     <Link href="/login">
                       <Button
-                        variant="outline"
+                        variant="secondary"
                         className="w-full gap-1.5 font-mono text-xs"
                       >
                         <Heart className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -985,7 +985,7 @@ export default function CarDetailPage({
 
                 {user && user === car.seller_id && (
                   <Link href={carEditLink(carId)}>
-                    <Button variant="outline" className="w-full gap-1.5 font-mono text-xs">
+                    <Button variant="secondary" className="w-full gap-1.5 font-mono text-xs">
                       <Pencil className="h-3.5 w-3.5" strokeWidth={1.5} />
                       编辑车辆
                     </Button>
@@ -1074,7 +1074,7 @@ export default function CarDetailPage({
                   ))}
 
                 <Button
-                  variant="outline"
+                  variant="secondary"
                   className="w-full gap-1.5 font-mono text-xs"
                   onClick={() => {
                     if (watching) {
@@ -1104,7 +1104,7 @@ export default function CarDetailPage({
 
                 {!embedded && (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     className="w-full gap-1.5 font-mono text-xs"
                     onClick={() => {
                       if (inCompare) removeFromCompare(carId);
@@ -1122,7 +1122,7 @@ export default function CarDetailPage({
 
                 {!embedded && (
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     className="w-full gap-1.5 font-mono text-xs"
                     onClick={async () => {
                       const { nativeShare } = await import("@/lib/capacitor");
@@ -1165,7 +1165,7 @@ export default function CarDetailPage({
 
             {/* 车辆位置:地址 + OpenStreetMap 地图 + 一键导航 */}
             {(storeAddress || (car.lat != null && car.lng != null)) && (
-              <div className="mt-4 rounded-xl border border-border p-4">
+              <div className="mt-4 rounded-xl bg-card p-4">
                 <h3 className="font-mono text-sm font-semibold">
                   {storeAddress ? "门店地址" : "车辆位置"}
                 </h3>
@@ -1185,7 +1185,7 @@ export default function CarDetailPage({
                             address: storeAddress?.address || car.location_zh,
                           },
                         ]}
-                        className="h-44 w-full overflow-hidden rounded-lg border border-border"
+                        className="h-44 w-full overflow-hidden rounded-xl bg-muted"
                       />
                     </div>
                   )}
@@ -1202,7 +1202,7 @@ export default function CarDetailPage({
                   }
                 >
                   <Button
-                    variant="outline"
+                    variant="secondary"
                     className="mt-3 w-full gap-1.5 font-mono text-xs"
                   >
                     <Navigation className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -1214,12 +1214,12 @@ export default function CarDetailPage({
 
             {/* 预估月供:摘要卡片,点「计算」打开完整计算器 drawer */}
             {car.price > 0 && (
-              <div className="mt-4 rounded-xl border border-border p-4">
+              <div className="mt-4 rounded-xl bg-card p-4">
                 <h3 className="font-mono text-sm font-semibold">预估月供</h3>
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">
                   用计算器估算你的每月还款
                 </p>
-                <div className="mt-3 rounded-lg bg-muted/50 p-4">
+                <div className="mt-3 rounded-xl bg-muted/50 p-4">
                   <div className="border-l-2 border-foreground pl-3">
                     <p className="font-mono text-xl font-bold">
                       ${estimateMonthlyPayment(car.price).toLocaleString()}/月*
@@ -1258,7 +1258,7 @@ export default function CarDetailPage({
             )}
 
             {/* Safety tips */}
-            <div className="mt-4 rounded-xl border border-border p-4">
+            <div className="mt-4 rounded-xl bg-card p-4">
               <h3 className="font-mono text-xs font-semibold">交易安全提示</h3>
               <ul className="mt-2 space-y-1.5">
                 <li className="font-mono text-[11px] text-muted-foreground">
@@ -1346,7 +1346,7 @@ export default function CarDetailPage({
         {/* 浮层模式下 收藏/分享 已在顶栏,底部只留 价格 + 联系卖家 */}
         {!embedded && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             className="h-10 w-10 shrink-0"
             onClick={toggleFavorite}
@@ -1359,7 +1359,7 @@ export default function CarDetailPage({
         )}
         {!embedded && (
           <Button
-            variant="outline"
+            variant="secondary"
             size="icon"
             className="h-10 w-10 shrink-0"
             onClick={async () => {
@@ -1414,7 +1414,7 @@ export default function CarDetailPage({
           </DialogHeader>
           <DialogFooter className="flex-row gap-2">
             <DialogClose asChild>
-              <Button variant="outline" size="sm" className="flex-1 font-mono text-xs">
+              <Button variant="secondary" size="sm" className="flex-1 font-mono text-xs">
                 取消
               </Button>
             </DialogClose>

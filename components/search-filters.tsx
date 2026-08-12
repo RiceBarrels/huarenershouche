@@ -240,7 +240,7 @@ function SidebarPillSelect({
     <div className="mt-1 flex flex-wrap gap-1">
       <button
         type="button"
-        className={`rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${!value ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+        className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
         onClick={() => onChange("")}
       >
         不限
@@ -249,7 +249,7 @@ function SidebarPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${selected(opt.value) ? "border-foreground bg-foreground text-background" : "border-border hover:bg-muted"}`}
+          className={`flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${selected(opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
           onClick={() => onChange(toggle(opt.value))}
         >
           {opt.color && (
@@ -372,7 +372,7 @@ export function SearchFilters({
           />
         </div>
         {searchFocused && !filters.keyword && history.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-lg border border-border bg-background shadow-md">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background shadow-lg">
             <div className="flex items-center justify-between px-3 py-1.5">
               <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
               <button
@@ -459,7 +459,7 @@ export function SearchFilters({
             <button
               key={v}
               type="button"
-              className={`rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
               onClick={() => update("maxDistance", v)}
             >
               {v === "" ? "不限" : `≤${v}mi`}
@@ -479,7 +479,7 @@ export function SearchFilters({
               <button
                 key={make}
                 type="button"
-                className={`flex flex-col items-center gap-1 rounded-lg border p-2 transition-colors ${selected ? "border-foreground bg-muted" : "border-border hover:border-foreground/30"}`}
+                className={`flex flex-col items-center gap-1 rounded-xl p-2 transition-colors ${selected ? "bg-primary/10 text-primary" : "bg-card hover:bg-muted/40"}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
                 <span className="flex h-6 w-6 items-center justify-center">
@@ -493,10 +493,10 @@ export function SearchFilters({
           })}
         </div>
         <Label className="mt-3 border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">全部品牌</Label>
-        <div className="mt-1 max-h-[280px] overflow-y-auto rounded-lg border border-border">
+        <div className="mt-1 max-h-[280px] overflow-y-auto rounded-xl bg-card">
           <button
             type="button"
-            className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-muted font-medium" : ""}`}
+            className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-primary/10 font-medium text-primary" : ""}`}
             onClick={() => update("make", "")}
           >
             <span>不限</span>
@@ -508,7 +508,7 @@ export function SearchFilters({
               <button
                 key={make}
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-muted font-medium" : ""}`}
+                className={`flex w-full items-center gap-2 px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-primary/10 font-medium text-primary" : ""}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
@@ -614,7 +614,7 @@ export function SearchFilters({
         <div className="mt-1.5 flex flex-wrap gap-1.5">
           <button
             type="button"
-            className={`rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+            className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
             onClick={() => update("maxPayment", "")}
           >
             不限
@@ -623,7 +623,7 @@ export function SearchFilters({
             <button
               key={v}
               type="button"
-              className={`rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
               onClick={() => update("maxPayment", v)}
             >
               ≤${v}/月
@@ -770,7 +770,7 @@ export function SearchFilters({
         <div className="mt-1 space-y-1">
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
             onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
           >
             <span>只看好价</span>
@@ -778,7 +778,7 @@ export function SearchFilters({
           </button>
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
             onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
           >
             <span>只看降价</span>
@@ -788,7 +788,7 @@ export function SearchFilters({
             <button
               key={t.key}
               type="button"
-              className={`flex w-full items-center justify-between rounded-lg border px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted"}`}
+              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
               onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
             >
               <span>{t.label}</span>
@@ -802,7 +802,7 @@ export function SearchFilters({
             <button
               key={opt.value}
               type="button"
-              className={`rounded-full border px-2 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground/30"}`}
+              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
               onClick={() => update("listedWithin", opt.value)}
             >
               {opt.label}
