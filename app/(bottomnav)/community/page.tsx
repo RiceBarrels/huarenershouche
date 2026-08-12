@@ -1,11 +1,29 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  Suspense,
+  useCallback,
+  useContext,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
 import { useOverlay } from "@/components/car-overlay-provider";
+import { SwipeSheet } from "@/components/swipe-sheet";
+import {
+  OverlayLayerRegistryCtx,
+  OverlayLayerZCtx,
+} from "@/components/overlay-stack";
+import { triggerHaptic } from "@/lib/haptics";
 import {
   Heart,
   Loader2,
@@ -252,6 +270,40 @@ function CommunityFeedPage() {
     else url.searchParams.set("q", q);
     window.history.replaceState(window.history.state, "", url.pathname + url.search);
   }, []);
+
+  // —— 移动端:搜索是独立浮层(SwipeSheet),feed 与滚动位置原地不动 ——
+  // 桌面端保留内联面板。mobileLayer 与详情浮层同一开关(<768px)
+  const { enabled: mobileLayer } = useOverlay();
+  const layerRegistry = useContext(OverlayLayerRegistryCtx);
+  const layerZMap = useContext(OverlayLayerZCtx);
+  const searchLayerId = useId();
+  const searchLayerZ = layerZMap?.get(searchLayerId) ?? 60;
+  const layerMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+
+  // 注册进浮层栈(统一层级 + 系统返回关层),并把 ?q= 挪到浮层自己的
+  // 历史条目上:register 会压一条 overlay 历史,返回/关闭落回的底层条目
+  // 必须不带 q(深链 /community?q=xx 进来时尤其),否则 searchParams
+  // 效应会立刻把搜索层重新打开,形成关不掉的循环
+  useEffect(() => {
+    if (!mobileLayer || !searchOpen || !layerRegistry) return;
+    const q = new URL(window.location.href).searchParams.get("q");
+    syncSearchUrl(null);
+    layerRegistry.register(searchLayerId, () => setSearchOpen(false));
+    syncSearchUrl(q ?? "");
+    return () => layerRegistry.release(searchLayerId);
+  }, [mobileLayer, searchOpen, layerRegistry, searchLayerId, syncSearchUrl]);
+
+  // 开/关搜索层触觉(与其他浮层一致)
+  const prevSearchOpen = useRef(searchOpen);
+  useEffect(() => {
+    if (prevSearchOpen.current === searchOpen) return;
+    prevSearchOpen.current = searchOpen;
+    if (mobileLayer) triggerHaptic();
+  }, [searchOpen, mobileLayer]);
 
   // 搜索记录:只在 input 失焦时保存(输入过程不落盘);回车会主动 blur
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
@@ -704,6 +756,134 @@ function CommunityFeedPage() {
     ? followingPosts.filter((p) => p.user_id === selectedAuthor)
     : followingPosts;
 
+  // —— 搜索 UI 共享片段:桌面内联面板与移动浮层各渲染一处(同一时刻只挂一份)——
+
+  // 类型筛选 chips
+  const typeChips = (
+    <div className="mt-2 flex items-center gap-1.5">
+      {SEARCH_TYPE_CHIPS.map((chip, i) => (
+        <motion.button
+          key={chip.key}
+          initial={reduced ? false : { opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
+          onClick={() => setSearchType(chip.key)}
+          className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${
+            searchType === chip.key
+              ? "bg-foreground text-background"
+              : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+          }`}
+        >
+          {chip.label}
+        </motion.button>
+      ))}
+    </div>
+  );
+
+  // 未输入 = 搜索记录 + 猜你想搜;输入中仍保留猜你想搜(显示在结果上方)
+  const searchSuggestPanel = (
+    <>
+      {!searching && searchHistory.length > 0 && (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-xs text-muted-foreground">搜索记录</p>
+            <button
+              type="button"
+              onClick={clearSearchHistory}
+              className="font-mono text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
+            >
+              清空
+            </button>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {searchHistory.map((h, i) => (
+              <motion.button
+                key={h}
+                initial={reduced ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
+                type="button"
+                onClick={() => pickKeyword(h)}
+                className="rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted/70 active:bg-muted/70"
+              >
+                {h}
+              </motion.button>
+            ))}
+          </div>
+        </>
+      )}
+      {suggestedKeywords.length > 0 && (
+        <>
+          <p
+            className={`font-mono text-xs text-muted-foreground ${
+              !searching && searchHistory.length > 0 ? "mt-5" : ""
+            }`}
+          >
+            猜你想搜
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {suggestedKeywords.map((s, i) => (
+              <motion.button
+                key={s}
+                initial={reduced ? false : { opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.18, ease: EASE, delay: 0.06 + i * 0.03 }}
+                type="button"
+                onClick={() => pickKeyword(s)}
+                className="rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+              >
+                {s}
+              </motion.button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+
+  // 搜索结果列表(含触底哨兵;哨兵与 feed 区互斥,同一 ref 只挂一处)
+  const searchResults = searching && (
+    <div>
+      {loading && posts.length === 0 ? (
+        <div className="flex justify-center py-8">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="mt-8 flex flex-col items-center py-12">
+          <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
+          <p className="mt-3 font-mono text-sm text-muted-foreground">没有找到相关帖子</p>
+          <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">换个关键词试试</p>
+        </div>
+      ) : (
+        <motion.div
+          className="mt-3"
+          animate={{ opacity: loading ? 0.55 : 1 }}
+          transition={{ duration: 0.2, ease: EASE }}
+        >
+          {posts.map((post) => (
+            <div key={post.id} className="mb-3">
+              <PostCard
+                post={post}
+                liked={likedIds.has(post.id)}
+                onLike={() => toggleLike(post)}
+              />
+            </div>
+          ))}
+        </motion.div>
+      )}
+      <div ref={sentinelRef} className="h-px" aria-hidden="true" />
+      {loadingMore && (
+        <div className="flex justify-center py-6">
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
+        </div>
+      )}
+      {!hasMore && !loading && posts.length > 0 && (
+        <p className="py-8 text-center font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground/40">
+          — End · 已经到底了 —
+        </p>
+      )}
+    </div>
+  );
 
   return (
     <PullToRefresh onRefresh={refreshFeed}>
@@ -714,12 +894,12 @@ function CommunityFeedPage() {
             若只把 top 设为安全区高度,刘海/状态栏那条不被覆盖,滚动时内容
             会从底下穿过(Capacitor 里看起来顶部"透明") */}
         <div
-          className="sticky top-0 z-30 -mx-3 bg-background/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-14 md:-mx-4 md:px-4"
+          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-14 md:-mx-4 md:px-4"
           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.25rem)" }}
         >
           <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
             <AnimatePresence initial={false} mode="popLayout">
-              {searchOpen ? (
+              {searchOpen && !mobileLayer ? (
                 <motion.div
                   key="search"
                   layout={!reduced}
@@ -764,24 +944,7 @@ function CommunityFeedPage() {
                     </button>
                   </div>
                   {/* 类型筛选只在搜索时出现 */}
-                  <div className="mt-2 flex items-center gap-1.5">
-                    {SEARCH_TYPE_CHIPS.map((chip, i) => (
-                      <motion.button
-                        key={chip.key}
-                        initial={reduced ? false : { opacity: 0, y: -4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
-                        onClick={() => setSearchType(chip.key)}
-                        className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${
-                          searchType === chip.key
-                            ? "bg-foreground text-background"
-                            : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-                        }`}
-                      >
-                        {chip.label}
-                      </motion.button>
-                    ))}
-                  </div>
+                  {typeChips}
                 </motion.div>
               ) : (
                 <motion.div
@@ -804,7 +967,8 @@ function CommunityFeedPage() {
                       type="button"
                       onClick={() => {
                         setSearchOpen(true);
-                        syncSearchUrl("");
+                        // 移动端 ?q= 由浮层注册 effect 写到浮层历史条目上
+                        if (!mobileLayer) syncSearchUrl("");
                       }}
                       className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                       aria-label="搜索帖子"
@@ -826,9 +990,9 @@ function CommunityFeedPage() {
             </AnimatePresence>
           </motion.div>
 
-          {/* X 式双流 tab:为你推荐 / 正在关注(搜索态隐藏)。
-              下滑时只收起这一条,标题栏保持吸顶;上滑立即展开 */}
-          {!searchOpen && (
+          {/* X 式双流 tab:为你推荐 / 正在关注(桌面搜索态隐藏;移动端搜索
+              是独立浮层,feed 原地不动,tab 条也保持) */}
+          {(!searchOpen || mobileLayer) && (
             <div
               className={`flex overflow-hidden transition-all duration-300 ease-out ${
                 barHidden
@@ -862,83 +1026,30 @@ function CommunityFeedPage() {
           )}
         </div>
 
-        {/* 搜索面板:未输入时 = 搜索记录 + 猜你想搜;输入中仍保留猜你想搜
-            (显示在结果上方)。整块淡入上移,chips 逐个错峰进场 */}
-        {searchOpen && (
+        {/* 桌面搜索面板:搜索记录/猜你想搜 + 结果(移动端在独立浮层里渲染) */}
+        {searchOpen && !mobileLayer && (
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: EASE }}
             className="mt-4"
           >
-            {!searching && searchHistory.length > 0 && (
-              <>
-                <div className="flex items-center justify-between">
-                  <p className="font-mono text-xs text-muted-foreground">搜索记录</p>
-                  <button
-                    type="button"
-                    onClick={clearSearchHistory}
-                    className="font-mono text-[11px] text-muted-foreground/60 transition-colors hover:text-foreground"
-                  >
-                    清空
-                  </button>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {searchHistory.map((h, i) => (
-                    <motion.button
-                      key={h}
-                      initial={reduced ? false : { opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.18, ease: EASE, delay: 0.04 + i * 0.03 }}
-                      type="button"
-                      onClick={() => pickKeyword(h)}
-                      className="rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-foreground transition-colors hover:bg-muted/70 active:bg-muted/70"
-                    >
-                      {h}
-                    </motion.button>
-                  ))}
-                </div>
-              </>
-            )}
-            {suggestedKeywords.length > 0 && (
-              <>
-                <p
-                  className={`font-mono text-xs text-muted-foreground ${
-                    !searching && searchHistory.length > 0 ? "mt-5" : ""
-                  }`}
-                >
-                  猜你想搜
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {suggestedKeywords.map((s, i) => (
-                    <motion.button
-                      key={s}
-                      initial={reduced ? false : { opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.18, ease: EASE, delay: 0.06 + i * 0.03 }}
-                      type="button"
-                      onClick={() => pickKeyword(s)}
-                      className="rounded-full bg-muted px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
-                    >
-                      {s}
-                    </motion.button>
-                  ))}
-                </div>
-              </>
-            )}
+            {searchSuggestPanel}
+            {searchResults}
           </motion.div>
         )}
 
         {/* 内容区:tab 间方向性左右滑动动画(X 式),手势左右滑也可切换;
-            搜索面板展示时隐藏(display:none 保住 feed 状态) */}
+            桌面搜索面板展示时隐藏(display:none 保住 feed 状态);
+            移动端搜索浮层盖在上面,feed 与滚动位置原地不动 */}
         <div
           onTouchStart={onFeedTouchStart}
           onTouchEnd={onFeedTouchEnd}
-          style={searchOpen && !searching ? { display: "none" } : undefined}
+          style={searchOpen && !mobileLayer ? { display: "none" } : undefined}
         >
         <AnimatePresence mode="popLayout" initial={false} custom={tabDir}>
         <motion.div
-          key={searching ? "searching" : feedTab}
+          key={feedTab}
           custom={tabDir}
           variants={reduced ? undefined : TAB_SLIDE}
           initial="enter"
@@ -970,7 +1081,7 @@ function CommunityFeedPage() {
                   <span
                     className={`flex h-14 w-14 items-center justify-center rounded-full bg-muted font-mono text-xs transition-shadow ${
                       !selectedAuthor
-                        ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                        ? "ring-2 ring-brand-ink ring-offset-2 ring-offset-background"
                         : "ring-1 ring-border"
                     }`}
                   >
@@ -990,7 +1101,7 @@ function CommunityFeedPage() {
                     <span
                       className={`h-14 w-14 overflow-hidden rounded-full bg-muted transition-shadow ${
                         selectedAuthor === a.id
-                          ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
+                          ? "ring-2 ring-brand-ink ring-offset-2 ring-offset-background"
                           : "ring-1 ring-border"
                       }`}
                     >
@@ -1115,8 +1226,8 @@ function CommunityFeedPage() {
           </motion.div>
         )}
 
-        {/* 无限滚动哨兵 + 状态(只属于「为你推荐」流) */}
-        {(feedTab === "foryou" || searching) && (
+        {/* 无限滚动哨兵 + 状态(只属于「为你推荐」流;搜索时哨兵挂在结果列表里) */}
+        {feedTab === "foryou" && !searching && (
           <>
             <div ref={sentinelRef} className="h-px" aria-hidden="true" />
             {loadingMore && (
@@ -1137,6 +1248,67 @@ function CommunityFeedPage() {
       </main>
       <Footer />
     </div>
+
+    {/* 移动端搜索浮层:与详情浮层同一套图层模型(SwipeSheet 底部滑入、
+        拖拽/系统返回可关),portal 到 body 避免手势冒泡进 PullToRefresh。
+        feed 留在原地,关闭后滚动位置不变 */}
+    {layerMounted &&
+      mobileLayer &&
+      createPortal(
+        <AnimatePresence>
+          {searchOpen && (
+            <SwipeSheet
+              key="community-search-layer"
+              onClose={() => setSearchOpen(false)}
+              zIndex={searchLayerZ}
+              topBarExtra={
+                <div className="mr-2 flex min-w-0 flex-1 items-center gap-2 rounded-full bg-muted px-3">
+                  <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                  <input
+                    autoFocus
+                    value={keyword}
+                    onChange={(e) => {
+                      setKeyword(e.target.value);
+                      syncSearchUrl(e.target.value);
+                    }}
+                    onBlur={() => saveSearchHistory(keyword)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                      }
+                    }}
+                    placeholder="搜索帖子..."
+                    className="h-9 w-full bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+                  />
+                  {keyword !== "" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setKeyword("");
+                        syncSearchUrl("");
+                      }}
+                      className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="清空关键词"
+                    >
+                      <X className="h-4 w-4" strokeWidth={1.5} />
+                    </button>
+                  )}
+                </div>
+              }
+            >
+              <div className="mx-auto w-full max-w-2xl px-3 pb-12 pt-1">
+                {typeChips}
+                <div className="mt-4">
+                  {searchSuggestPanel}
+                  {searchResults}
+                </div>
+              </div>
+            </SwipeSheet>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </PullToRefresh>
   );
 }
@@ -1270,8 +1442,8 @@ function PostCard({
 
           {/* X 式操作行:评论 / 点赞 / 分享,横向铺开 */}
           <div className="mt-2 flex max-w-xs items-center justify-start gap-4 text-muted-foreground">
-            <span className="group flex items-center font-mono text-[13px] transition-colors hover:text-primary">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/10">
+            <span className="group flex items-center font-mono text-[13px] transition-colors hover:text-brand-ink">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/30">
                 <MessageCircle className="h-[18px] w-[18px]" strokeWidth={1.5} />
               </span>
               {post.comments_count || 0}
@@ -1306,9 +1478,9 @@ function PostCard({
                 }
               }}
               aria-label="分享"
-              className="group flex items-center font-mono text-[13px] transition-colors hover:text-primary"
+              className="group flex items-center font-mono text-[13px] transition-colors hover:text-brand-ink"
             >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/10">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/30">
                 <Share className="h-4 w-4" strokeWidth={1.5} />
               </span>
             </button>
@@ -1375,7 +1547,7 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
             <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
             <span className="truncate">{car.location_zh}</span>
             {distance != null && (
-              <span className="ml-auto shrink-0 text-brand">{formatDistance(distance)}</span>
+              <span className="ml-auto shrink-0 text-brand-ink">{formatDistance(distance)}</span>
             )}
           </div>
         </div>

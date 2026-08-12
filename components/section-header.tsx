@@ -16,7 +16,7 @@ export function SectionHeader({ index, label, title, action, className }: Sectio
     <div className={className}>
       {(index || label) && (
         <div className="mb-2 hidden items-center gap-2 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground md:flex">
-          {index && <span className="text-brand">{index}</span>}
+          {index && <span className="text-brand-ink">{index}</span>}
           {index && label && <span className="text-foreground/20">/</span>}
           {label && <span>{label}</span>}
         </div>

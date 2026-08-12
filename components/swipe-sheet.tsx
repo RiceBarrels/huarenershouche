@@ -8,9 +8,15 @@
 //   · 横向拖动(左/右)任意位置;纵向在滚到顶下拉 / 滚到底上推时,否则正常滚动。
 // 需放在 <AnimatePresence> 内,并带唯一 key。
 
-import { type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { motion, useMotionValue, useTransform, animate } from "framer-motion";
+import {
+  motion,
+  useMotionValue,
+  useTransform,
+  useIsPresent,
+  animate,
+} from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 import { getDeviceCornerPx } from "@/lib/device-corner";
@@ -19,6 +25,30 @@ const DISMISS_PX = 90; // 位移阈值
 const DISMISS_V = 0.5; // 速度阈值 px/ms
 // iOS 打开/关闭 App 式的弹簧(近临界阻尼,无明显回弹,~0.45s 收敛)
 const ZOOM = { type: "spring", stiffness: 400, damping: 40, mass: 0.9 } as const;
+// 无卡片起点时:iOS push 式从右滑入,与 backnav 页面转场同款曲线/时长
+const PUSH = { duration: 0.42, ease: [0.32, 0.72, 0, 1] } as const;
+const PUSH_CSS = "transform 420ms cubic-bezier(0.32, 0.72, 0, 1)";
+
+// push 模式下被推到后面的页面内容(#page-transition-content)的视差管理:
+// 多层 push 叠开时计数,最后一层退场才把内容滑回原位/清内联样式
+let pushUnderLayers = 0;
+
+function releasePushUnder(el: HTMLElement | null, animated: boolean) {
+  pushUnderLayers = Math.max(0, pushUnderLayers - 1);
+  if (!el || pushUnderLayers > 0) return;
+  if (animated) {
+    el.style.transition = PUSH_CSS;
+    el.style.transform = "translateX(0px)";
+    setTimeout(() => {
+      if (pushUnderLayers > 0) return; // 退场期间又开了新的 push 层
+      el.style.transition = "";
+      el.style.transform = "";
+    }, 440);
+  } else {
+    el.style.transition = "";
+    el.style.transform = "";
+  }
+}
 // 内容与卡片的交叉溶解:打开时内容早早淡入(图标→App);
 // 关闭时内容保持可见随窗口缩小,窗口 clip 已收敛到卡片矩形后才溶解回卡片
 // (App→图标),所以可以溶解得很晚
@@ -60,9 +90,12 @@ export function SwipeSheet({
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // 拖动时轻微缩小(跟手,保持实心)
-  const dragScale = useTransform(
-    () => 1 - Math.min(0.12, Math.hypot(x.get(), y.get()) / 320 * 0.12),
+  // 拖动时轻微缩小(跟手,保持实心)——仅卡片模式(缩小是「缩回卡片」的前奏);
+  // push 模式(无卡片)与 backnav 手势一致,只位移不缩放
+  const dragScale = useTransform(() =>
+    originRect
+      ? 1 - Math.min(0.12, (Math.hypot(x.get(), y.get()) / 320) * 0.12)
+      : 1,
   );
   // 开始关闭手势即给窗口上圆角(iOS 关 App 同款):随拖动距离渐入,
   // 封顶到设备屏幕圆角(直角屏/web 退回 48px = rounded-lg);
@@ -93,7 +126,61 @@ export function SwipeSheet({
         scale: startScale,
         clipPath: `inset(0px 0px ${Math.max(0, vh - originRect.height / Math.max(0.05, startScale))}px 0px round ${22 / Math.max(0.05, startScale)}px)`,
       }
-    : { y: "100%" as const };
+    : // 无卡片起点:从右滑入(backnav push 同款),转场中带设备圆角
+      { x: "100%" as const, borderRadius: getDeviceCornerPx(48) };
+
+  // push 模式背后压暗强度(--push-dim 随主题),挂载时读一次
+  const [pushDim] = useState(() =>
+    typeof window === "undefined"
+      ? 0.08
+      : parseFloat(
+          getComputedStyle(document.documentElement).getPropertyValue("--push-dim"),
+        ) || 0.08,
+  );
+
+  // —— push 模式:后面的页面内容跟着往左(-30% 视差,与 backnav 前页一致)——
+  const isPresent = useIsPresent();
+  const underElRef = useRef<HTMLElement | null>(null);
+  const underReleasedRef = useRef(false);
+
+  // 进场滑到 -30%;拖拽关闭时跟手回移(0.3 × dx,同 backnav 手势的底层)
+  useEffect(() => {
+    if (originRect) return;
+    const el = document.getElementById("page-transition-content");
+    underElRef.current = el;
+    if (!el) return;
+    // 每次挂载都重新武装(StrictMode 下 effect 会跑两遍,cleanup 置过 true;
+    // 不复位的话真正退场时会被误判为已释放,内容卡在 -30% 不归位)
+    underReleasedRef.current = false;
+    pushUnderLayers++;
+    const vw = window.innerWidth;
+    el.style.transition = PUSH_CSS;
+    const raf = requestAnimationFrame(() => {
+      el.style.transform = `translateX(${-0.3 * vw}px)`;
+    });
+    const unsub = x.on("change", (v) => {
+      if (underReleasedRef.current) return;
+      const dx = Math.max(0, v);
+      el.style.transition = "none";
+      el.style.transform = `translateX(${-0.3 * vw + 0.3 * dx}px)`;
+    });
+    return () => {
+      cancelAnimationFrame(raf);
+      unsub();
+      // 未经退场动画直接卸载(如路由跳转清栈):立刻归位
+      if (!underReleasedRef.current) {
+        underReleasedRef.current = true;
+        releasePushUnder(el, false);
+      }
+    };
+  }, [originRect, x]);
+
+  // 退场开始(AnimatePresence 移除本层):内容与 sheet 并行滑回原位
+  useEffect(() => {
+    if (isPresent || originRect || underReleasedRef.current) return;
+    underReleasedRef.current = true;
+    releasePushUnder(underElRef.current, true);
+  }, [isPresent, originRect]);
 
   // 锁定 body 滚动
   useEffect(() => {
@@ -235,12 +322,24 @@ export function SwipeSheet({
   }, [x, y, onClose]);
 
   // 内容(上层)始终与卡片同轨放大 / 缩回;进/退场都在整段 ~50% 处由内层透明度交叉。
-  const contentExit = { ...rectVariant, transition: ZOOM };
+  // 无卡片起点时退场沿 push 曲线滑回右侧
+  const contentExit = { ...rectVariant, transition: originRect ? ZOOM : PUSH };
 
   return (
     // 根节点为 motion 组件,AnimatePresence 才能在卸载前播放子层退场动画
     // data-app-overlay:原生地图页据此把整屏触摸放行给 webview(见 app-map)
     <motion.div className="fixed inset-0 md:hidden" style={{ zIndex }} data-app-overlay="">
+      {/* push 模式(无卡片起点):背后页面压暗层,与 backnav 转场一致 */}
+      {!originRect && (
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 bg-black"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: pushDim }}
+          exit={{ opacity: 0, transition: PUSH }}
+          transition={PUSH}
+        />
+      )}
       {/* 下层:被点卡片的真实 DOM,始终不透明,从原位连续放大到全屏、退场反向缩回。
           进场前 ~50% 由它露出(内容还透明),之后被内容盖上;返回时内容淡出重新露出它。
           它一直不透明,内容在其上淡入淡出,故交叉过程不会漏出背景、不闪。
@@ -282,10 +381,16 @@ export function SwipeSheet({
           进场时内容早早淡入盖住卡片,退场时内容缩到临近卡片才溶解回卡片。 */}
       <motion.div
         className="absolute inset-0 origin-top-left"
+        // push 模式:转场中窗口带设备圆角 + 投影(overflow 裁出圆角)
+        style={originRect ? undefined : { overflow: "hidden", boxShadow: "var(--push-shadow)" }}
         initial={rectVariant}
-        animate={{ x: 0, y: 0, scale: 1, clipPath: "inset(0px 0px 0px 0px round 0px)" }}
+        animate={
+          originRect
+            ? { x: 0, y: 0, scale: 1, clipPath: "inset(0px 0px 0px 0px round 0px)" }
+            : { x: 0, borderRadius: 0 }
+        }
         exit={contentExit}
-        transition={ZOOM}
+        transition={originRect ? ZOOM : PUSH}
       >
         <motion.div
           className="absolute inset-0"
@@ -300,7 +405,7 @@ export function SwipeSheet({
           >
             {/* 顶部返回栏:左侧返回,右侧快捷操作(垫出刘海安全区) */}
             <div
-              className="flex h-11 shrink-0 items-center justify-between border-b border-border px-1"
+              className="flex h-11 shrink-0 items-center justify-between border-b border-border px-1 bg-card"
               style={{
                 paddingTop: "env(safe-area-inset-top, 0px)",
                 height: "calc(2.75rem + env(safe-area-inset-top, 0px))",

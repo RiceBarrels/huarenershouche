@@ -144,7 +144,7 @@ export default function AskQuestionPage() {
                     onClick={() => setCategory(cat.key)}
                     className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${
                       category === cat.key
-                        ? "bg-primary/10 text-primary"
+                        ? "bg-primary/30 text-brand-ink"
                         : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                     }`}
                   >
@@ -178,7 +178,7 @@ export default function AskQuestionPage() {
                 问题描述 <span className="text-destructive">*</span>
               </Label>
               <textarea
-                className="mt-1 w-full rounded-xl bg-muted px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 w-full rounded-xl bg-muted px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 rows={8}
                 placeholder="详细描述你的问题，包括相关背景信息..."
                 value={content}

@@ -449,7 +449,7 @@ export default function EditCarPage() {
           <div>
             <Label className="font-mono text-[11px] text-muted-foreground">描述</Label>
             <textarea
-              className="mt-1 w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-1 w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
               rows={4}
               value={form.description_zh}
               onChange={(e) => update("description_zh", e.target.value)}

@@ -1,4 +1,5 @@
 // 社区搜索「猜你想搜」算法(候选池,页面端再按输入过滤):
+// 仅社区使用 —— 买车搜索走独立的 lib/car-search-suggestions.ts,勿混用。
 // 主源:全站搜索词统计(supabase community_search_terms,见 supabase/search-terms.sql)
 //   —— 最近 30 天按天分桶,得分 = Σ 当日次数 × 0.5^(距今天数 / 7),半衰期 7 天
 // 补充:主源不足时用帖子 tags/品牌 的热度榜补齐

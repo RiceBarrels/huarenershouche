@@ -210,7 +210,7 @@ function VerifyEmailContent() {
               onChange={(e) => handleChange(i, e.target.value)}
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={i === 0 ? handlePaste : undefined}
-              className="h-12 w-10 rounded-xl bg-muted text-center font-mono text-lg font-semibold outline-none ring-2 ring-transparent transition-all focus:bg-background focus:ring-primary/40"
+              className="h-12 w-10 rounded-xl bg-muted text-center font-mono text-lg font-semibold outline-none ring-2 ring-transparent transition-all focus:bg-background focus:ring-brand-ink/50"
             />
           ))}
         </div>

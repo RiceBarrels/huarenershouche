@@ -115,9 +115,9 @@ export function CarCard({
     >
       <motion.article
         whileHover={{ y: -2 }}
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: 1.02 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group flex cursor-pointer rounded-xl overflow-hidden bg-card transition-colors hover:bg-muted/30 active:bg-muted/30 md:block"
+        className="group flex cursor-pointer rounded-xl overflow-hidden bg-card transition-colors hover:bg-card/50 active:bg-accent md:block"
       >
         {/* 图片:手机在左(约 2/5 宽,随文字高度拉伸),桌面在上(16:10) */}
         <div className="relative w-[40%] shrink-0 self-stretch overflow-hidden bg-muted md:aspect-[16/10] md:w-auto md:self-auto">

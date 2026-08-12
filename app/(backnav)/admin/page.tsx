@@ -564,7 +564,7 @@ export default function AdminPage() {
               onClick={() => handleTabChange(t.key)}
               className={`relative flex shrink-0 items-center gap-1 rounded-full px-3 py-2 text-xs transition-colors ${
                 tab === t.key
-                  ? "bg-primary/10 text-primary"
+                  ? "bg-primary/30 text-brand-ink"
                   : "bg-muted hover:bg-muted/70"
               }`}
             >

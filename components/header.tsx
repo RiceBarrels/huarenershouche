@@ -82,7 +82,7 @@ export function Header() {
           <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
           <span className="font-logo text-base tracking-tight">
             常來車網
-            <span className="animate-cursor-blink text-brand">_</span>
+            <span className="animate-cursor-blink text-brand-ink">_</span>
           </span>
           <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
         </Link>
@@ -165,7 +165,7 @@ export function Header() {
                     >
                       <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                       <span className="flex-1 truncate">本人账号</span>
-                      {!isActingAsClaimed && <span className="text-[10px] text-brand">当前</span>}
+                      {!isActingAsClaimed && <span className="text-[10px] text-brand-ink">当前</span>}
                     </button>
                     {claimedAccounts.map((acct) => (
                       <button
@@ -186,7 +186,7 @@ export function Header() {
                         />
                         <span className="flex-1 truncate">{acct.username}</span>
                         {actingId === acct.id ? (
-                          <span className="text-[10px] text-brand">当前</span>
+                          <span className="text-[10px] text-brand-ink">当前</span>
                         ) : (
                           <Store className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                         )}

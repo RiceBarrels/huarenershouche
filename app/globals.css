@@ -42,6 +42,7 @@
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
   --color-brand: var(--brand);
+  --color-brand-ink: var(--brand-ink);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -59,17 +60,19 @@
   --card-foreground: oklch(0.16 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.16 0 0);
-  --primary: #07c160;
-  --primary-foreground: oklch(1 0 0);
+  --primary: #89fcd2;
+  --primary-foreground: oklch(0.24 0.04 168);
   /* Brand accent for text/border use */
-  --brand: oklch(0.6 0.15 152);
+  --brand: oklch(0.91 0.12 168);
+  /* 品牌墨水色:品牌薄荷绿太浅,浅色模式下绿字/绿图标一律用这个深绿 */
+  --brand-ink: oklch(0.48 0.09 168);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
+  --muted: oklch(0.9437 0.0027 286.35);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --accent: oklch(0.852 0.0027 286.34);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.58 0.22 27);
+  --destructive: oklch(0.6497 0.2285 25.49);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -106,21 +109,23 @@
   --card-foreground: oklch(0.93 0 0);
   --popover: oklch(0.235 0.002 286);
   --popover-foreground: oklch(0.93 0 0);
-  --primary: #07c160;
-  --primary-foreground: oklch(1 0 0);
+  --primary: #89fcd2;
+  --primary-foreground: oklch(0.24 0.04 168);
   /* Brand accent on dark surfaces */
-  --brand: oklch(0.8 0.16 158);
+  --brand: oklch(0.91 0.12 168);
+  /* 深色面上薄荷绿本身可读,墨水色与品牌色一致 */
+  --brand-ink: oklch(0.91 0.12 168);
   --secondary: oklch(0.26 0.002 286);
   --secondary-foreground: oklch(0.93 0 0);
   --muted: oklch(0.26 0.002 286);
   --muted-foreground: oklch(0.72 0 0);
   --accent: oklch(0.3 0.002 286);
   --accent-foreground: oklch(0.93 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  --destructive: oklch(0.6497 0.2285 25.49);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 16%);
   /* Focus ring 用品牌绿弱化版,而非中性灰 */
-  --ring: oklch(0.65 0.1 158);
+  --ring: oklch(0.65 0.075 168);
   --chart-1: oklch(0.809 0.105 251.813);
   --chart-2: oklch(0.623 0.214 259.815);
   --chart-3: oklch(0.546 0.245 262.881);
@@ -128,12 +133,12 @@
   --chart-5: oklch(0.424 0.199 265.638);
   --sidebar: oklch(0.205 0.002 286);
   --sidebar-foreground: oklch(0.93 0 0);
-  --sidebar-primary: #07c160;
-  --sidebar-primary-foreground: oklch(1 0 0);
+  --sidebar-primary: #89fcd2;
+  --sidebar-primary-foreground: oklch(0.24 0.04 168);
   --sidebar-accent: oklch(0.26 0.002 286);
   --sidebar-accent-foreground: oklch(0.93 0 0);
   --sidebar-border: oklch(1 0 0 / 12%);
-  --sidebar-ring: oklch(0.65 0.1 158);
+  --sidebar-ring: oklch(0.65 0.075 168);
   /* 深色下阴影要更深更宽才可见,前页压暗也加重(接近真 iOS 深色行为) */
   --push-shadow: -12px 0 32px rgba(0, 0, 0, 0.6);
   --push-dim: 0.3;
@@ -409,12 +414,12 @@ html.capacitor-native [contenteditable] {
 
 /* Brand-tinted selection */
 ::selection {
-  background: color-mix(in srgb, #07c160 28%, transparent);
+  background: color-mix(in srgb, #89fcd2 28%, transparent);
 }
 
 /* 深色下加重选区着色,否则几乎看不见 */
 .dark ::selection {
-  background: color-mix(in srgb, #07c160 45%, transparent);
+  background: color-mix(in srgb, #89fcd2 45%, transparent);
 }
 
 /* Visible keyboard focus on plain links/buttons */
@@ -446,19 +451,19 @@ button:focus-visible {
 @media (hover: hover) and (pointer: fine) {
   :root {
     /* 默认箭头:绿色实心 + 粗白描边(卡通感,深浅背景都清晰) */
-    --cursor-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M5 2.5v16.5l4.2-3.6 2.8 6.3 3.1-1.4-2.8-6.2 5.5-.6z' fill='%2307c160' stroke='%23ffffff' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 5 3;
+    --cursor-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M5 2.5v16.5l4.2-3.6 2.8 6.3 3.1-1.4-2.8-6.2 5.5-.6z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 5 3;
     /* 可点击:手绘卡通手套指针(白手套 + 绿描边,指尖为热点) */
-    --cursor-pointer: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='26' viewBox='0 0 24 26'><path d='M8.5 12.6 V3.3 a1.7 1.7 0 0 1 3.4 0 V9 a1.55 1.55 0 0 1 3.1 0.2 a1.55 1.55 0 0 1 3 0.4 a1.5 1.5 0 0 1 2.9 0.6 v5.2 c0 4.3 -3 7.1 -7.3 7.1 h-1.6 c-2.3 0 -4.1 -0.9 -5.5 -2.5 l-2.4 -2.8 c-0.75 -0.9 -0.7 -2.1 0.15 -2.9 c0.9 -0.8 2.2 -0.75 3 0.1 l1.25 1.3 Z' fill='%23ffffff' stroke='%2307c160' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 10 2;
+    --cursor-pointer: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='26' viewBox='0 0 24 26'><path d='M8.5 12.6 V3.3 a1.7 1.7 0 0 1 3.4 0 V9 a1.55 1.55 0 0 1 3.1 0.2 a1.55 1.55 0 0 1 3 0.4 a1.5 1.5 0 0 1 2.9 0.6 v5.2 c0 4.3 -3 7.1 -7.3 7.1 h-1.6 c-2.3 0 -4.1 -0.9 -5.5 -2.5 l-2.4 -2.8 c-0.75 -0.9 -0.7 -2.1 0.15 -2.9 c0.9 -0.8 2.2 -0.75 3 0.1 l1.25 1.3 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 10 2;
     /* 文本/输入:卡通工字光标(绿色实心 + 粗白描边,热点在中心) */
-    --cursor-text: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M7 2 h10 v3 h-3.5 v14 h3.5 v3 h-10 v-3 h3.5 v-14 h-3.5 z' fill='%2307c160' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
+    --cursor-text: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M7 2 h10 v3 h-3.5 v14 h3.5 v3 h-10 v-3 h3.5 v-14 h-3.5 z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
     /* 禁止:白底圆 + 绿描边斜杠(同放大镜配色) */
-    --cursor-not-allowed: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='7.5' fill='%23ffffff' stroke='%2307c160' stroke-width='2.2'/><path d='M7 7 L17 17' stroke='%2307c160' stroke-width='2.2' stroke-linecap='round'/></svg>") 12 12;
+    --cursor-not-allowed: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='7.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2.2'/><path d='M7 7 L17 17' stroke='%2389fcd2' stroke-width='2.2' stroke-linecap='round'/></svg>") 12 12;
     /* 拖拽:白手套开掌 / 握拳(同手套指针配色) */
-    --cursor-grab: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6 13.2 V7.6 a1.2 1.2 0 0 1 2.4 0 V9.5 L8.7 9.5 V5.2 a1.2 1.2 0 0 1 2.4 0 V9.2 L11.4 9.2 V5.8 a1.2 1.2 0 0 1 2.4 0 V9.8 L14.1 9.8 V7.2 a1.1 1.1 0 0 1 2.2 0 V13 c0 4 -2.7 6.5 -6.4 6.5 h-0.8 c-3.2 0 -5.1 -2.1 -5.1 -5.3 Z' fill='%23ffffff' stroke='%2307c160' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 11 12;
-    --cursor-grabbing: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6.2 12.8 V11 a1.4 1.4 0 0 1 2.8 0 V10.6 a1.4 1.4 0 0 1 2.8 0 V10.8 a1.4 1.4 0 0 1 2.8 0 V11.2 a1.3 1.3 0 0 1 2.6 0 V14 c0 3.6 -2.6 5.8 -6 5.8 h-0.9 c-3 0 -4.9 -2 -4.9 -5 Z' fill='%23ffffff' stroke='%2307c160' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 13;
+    --cursor-grab: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6 13.2 V7.6 a1.2 1.2 0 0 1 2.4 0 V9.5 L8.7 9.5 V5.2 a1.2 1.2 0 0 1 2.4 0 V9.2 L11.4 9.2 V5.8 a1.2 1.2 0 0 1 2.4 0 V9.8 L14.1 9.8 V7.2 a1.1 1.1 0 0 1 2.2 0 V13 c0 4 -2.7 6.5 -6.4 6.5 h-0.8 c-3.2 0 -5.1 -2.1 -5.1 -5.3 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 11 12;
+    --cursor-grabbing: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6.2 12.8 V11 a1.4 1.4 0 0 1 2.8 0 V10.6 a1.4 1.4 0 0 1 2.8 0 V10.8 a1.4 1.4 0 0 1 2.8 0 V11.2 a1.3 1.3 0 0 1 2.6 0 V14 c0 3.6 -2.6 5.8 -6 5.8 h-0.9 c-3 0 -4.9 -2 -4.9 -5 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 13;
     /* 左右/上下拖动调整:绿色双向箭头 + 白描边 */
-    --cursor-ew-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M2.5 12 L8 7.5 V10.2 H16 V7.5 L21.5 12 L16 16.5 V13.8 H8 V16.5 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
-    --cursor-ns-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M12 2.5 L16.5 8 H13.8 V16 H16.5 L12 21.5 L7.5 16 H10.2 V8 H7.5 Z' fill='%2307c160' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
+    --cursor-ew-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M2.5 12 L8 7.5 V10.2 H16 V7.5 L21.5 12 L16 16.5 V13.8 H8 V16.5 Z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
+    --cursor-ns-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M12 2.5 L16.5 8 H13.8 V16 H16.5 L12 21.5 L7.5 16 H10.2 V8 H7.5 Z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
   }
 
   html,
@@ -540,10 +545,10 @@ button:focus-visible {
 
   /* 缩放:卡通放大镜(+ / −),热点在镜片中心 */
   .cursor-zoom-in {
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2307c160' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2307c160' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6 M10 7.2 v5.6' stroke='%2307c160' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-in;
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2389fcd2' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6 M10 7.2 v5.6' stroke='%2389fcd2' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-in;
   }
   .cursor-zoom-out {
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2307c160' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2307c160' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6' stroke='%2307c160' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-out;
+    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2389fcd2' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6' stroke='%2389fcd2' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-out;
   }
 }
 

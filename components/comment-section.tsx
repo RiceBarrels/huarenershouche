@@ -115,7 +115,7 @@ export function CommentSection({ carId }: { carId: string }) {
           <div className="flex gap-2">
             <textarea
               ref={inputRef}
-              className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
               placeholder="写评论..."
               rows={2}
               value={content}

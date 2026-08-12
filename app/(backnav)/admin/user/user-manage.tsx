@@ -426,7 +426,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">语言</Label>
               <select
-                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 value={form.preferred_language}
                 onChange={(e) => upd("preferred_language", e.target.value)}
               >
@@ -437,7 +437,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">账号类型</Label>
               <select
-                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 value={toKind(form)}
                 onChange={(e) => {
                   const kind = e.target.value as AccountKind;
@@ -461,7 +461,7 @@ export default function AdminUserManagePage() {
             <div>
               <Label className="text-[11px] text-muted-foreground">角色权限</Label>
               <select
-                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="mt-1 h-9 w-full rounded-xl bg-muted px-2 text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 value={form.role}
                 onChange={(e) => upd("role", e.target.value as EditForm["role"])}
               >

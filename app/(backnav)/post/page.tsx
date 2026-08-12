@@ -1092,7 +1092,7 @@ export default function PostCarPage() {
                         }}
                         className={`flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-[13px] transition-colors ${
                           i === step
-                            ? "bg-primary/10 font-medium text-primary"
+                            ? "bg-primary/30 font-medium text-brand-ink"
                             : reachable
                               ? "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                               : "cursor-not-allowed text-muted-foreground/40"
@@ -1101,7 +1101,7 @@ export default function PostCarPage() {
                         <span
                           className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] tabular-nums ${
                             done
-                              ? "bg-primary/10 text-primary"
+                              ? "bg-primary/30 text-brand-ink"
                               : i === step
                                 ? "bg-primary text-primary-foreground"
                                 : "bg-muted text-muted-foreground/70"
@@ -1193,7 +1193,7 @@ export default function PostCarPage() {
                       )}
                       <div
                         className={`flex flex-wrap gap-3 rounded-xl transition-colors ${
-                          dragging ? "bg-muted/80 ring-2 ring-primary/30" : ""
+                          dragging ? "bg-muted/80 ring-2 ring-brand-ink/40" : ""
                         }`}
                         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
                         onDragLeave={() => setDragging(false)}
@@ -1337,7 +1337,7 @@ export default function PostCarPage() {
                         </button>
                       </div>
                       {vinAutoFilled && (
-                        <p className="mt-3 flex items-center gap-1.5 text-sm text-primary">
+                        <p className="mt-3 flex items-center gap-1.5 text-sm text-brand-ink">
                           <Check className="h-4 w-4" strokeWidth={2} />
                           已自动填写车辆信息,后面几步核对一下就行
                         </p>
@@ -1361,14 +1361,14 @@ export default function PostCarPage() {
                       />
                       {form.make === "Other" && (
                         <input
-                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                           placeholder="请输入品牌名称 *"
                           value={form.customMake || ""}
                           onChange={(e) => update("customMake", e.target.value)}
                         />
                       )}
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                         placeholder="车型 * 如 Camry, CR-V"
                         value={form.model}
                         onChange={(e) => update("model", e.target.value)}
@@ -1383,7 +1383,7 @@ export default function PostCarPage() {
                           emptyText="未找到"
                         />
                         <input
-                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                           placeholder="配置等级 如 SE"
                           value={form.trim}
                           onChange={(e) => update("trim", e.target.value)}
@@ -1414,11 +1414,11 @@ export default function PostCarPage() {
                             }}
                             className={`flex flex-col items-center gap-1 rounded-2xl py-8 transition-colors ${
                               active
-                                ? "bg-primary/10"
+                                ? "bg-primary/30"
                                 : "bg-card active:bg-muted"
                             }`}
                           >
-                            <span className={`text-xl font-semibold ${active ? "text-primary" : "text-foreground"}`}>
+                            <span className={`text-xl font-semibold ${active ? "text-brand-ink" : "text-foreground"}`}>
                               {c.label}
                             </span>
                             <span className="text-xs text-muted-foreground">{c.sub}</span>
@@ -1603,7 +1603,7 @@ export default function PostCarPage() {
                               }}
                               className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-colors ${
                                 selectedStoreId === store.id
-                                  ? "bg-primary/10 font-medium text-primary"
+                                  ? "bg-primary/30 font-medium text-brand-ink"
                                   : "bg-muted text-muted-foreground active:bg-muted/70"
                               }`}
                             >
@@ -1624,7 +1624,7 @@ export default function PostCarPage() {
                       />
                       <div className="mt-2 h-px w-full bg-border" />
                       {(zipCityZh || zipCity) && (
-                        <p className="mt-2 flex items-center gap-1.5 text-sm text-primary">
+                        <p className="mt-2 flex items-center gap-1.5 text-sm text-brand-ink">
                           <Check className="h-4 w-4" strokeWidth={2} />
                           {zipCityZh ? `${zipCityZh} · ${zipCity}` : zipCity}
                         </p>
@@ -1641,7 +1641,7 @@ export default function PostCarPage() {
                       ) : (
                         <div className="mt-4 space-y-3">
                           <input
-                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                             placeholder="街道地址 123 Main St"
                             value={form.address}
                             onChange={(e) => {
@@ -1650,20 +1650,20 @@ export default function PostCarPage() {
                             }}
                           />
                           <input
-                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                            className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                             placeholder="Apt, Suite, Unit(选填)"
                             value={form.address2}
                             onChange={(e) => update("address2", e.target.value)}
                           />
                           <div className="grid grid-cols-2 gap-3">
                             <input
-                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                               placeholder="City"
                               value={form.city}
                               onChange={(e) => update("city", e.target.value)}
                             />
                             <input
-                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground transition-colors placeholder:normal-case placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground transition-colors placeholder:normal-case placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                               placeholder="State 如 CA"
                               maxLength={2}
                               value={form.state}
@@ -1679,14 +1679,14 @@ export default function PostCarPage() {
                   {current.id === "contact" && (
                     <div className="space-y-3">
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                         placeholder="你的名字或车行名 *"
                         value={form.seller_name}
                         onChange={(e) => update("seller_name", e.target.value)}
                       />
                       <input
                         type="tel"
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                         placeholder="联系电话 (626) 555-0123 *"
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
@@ -1698,7 +1698,7 @@ export default function PostCarPage() {
                   {current.id === "carfax" && (
                     <div>
                       <input
-                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                        className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                         placeholder="https://www.carfax.com/vehicle/..."
                         value={form.carfax_url}
                         onChange={(e) => {
@@ -1759,7 +1759,7 @@ export default function PostCarPage() {
                     <div>
                       <div className="flex gap-2">
                         <input
-                          className="min-w-0 flex-1 rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="min-w-0 flex-1 rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                           placeholder="如：倒车影像、全景天窗"
                           value={featureInput}
                           onChange={(e) => setFeatureInput(e.target.value)}
@@ -1789,7 +1789,7 @@ export default function PostCarPage() {
                               onClick={() => toggleFeature(f)}
                               className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
                                 selected
-                                  ? "bg-primary/10 font-medium text-primary"
+                                  ? "bg-primary/30 font-medium text-brand-ink"
                                   : "bg-muted text-muted-foreground active:bg-muted/70"
                               }`}
                             >
@@ -1917,7 +1917,7 @@ export default function PostCarPage() {
               },
             ].map((item, i) => (
               <div key={item.title} className="flex gap-3 rounded-2xl bg-muted px-4 py-3.5">
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/30 text-xs font-semibold text-brand-ink">
                   {i + 1}
                 </span>
                 <div className="min-w-0">

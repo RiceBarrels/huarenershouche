@@ -5,21 +5,21 @@ import { Slot } from "radix-ui"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "group/button inline-flex shrink-0 items-center justify-center rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 outline-none select-none active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-primary/40 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+  "group/button inline-flex shrink-0 items-center justify-center rounded-full text-sm font-medium whitespace-nowrap transition-all duration-200 outline-none select-none active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-brand-ink/50 disabled:pointer-events-none disabled:opacity-50 aria-invalid:ring-2 aria-invalid:ring-destructive/30 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
   {
     variants: {
       variant: {
         default:
           "bg-primary text-primary-foreground hover:bg-primary/90 active:opacity-80",
         outline:
-          "bg-primary/10 text-primary hover:bg-primary/15 active:bg-primary/20 aria-expanded:bg-primary/20 aria-expanded:text-primary",
+          "bg-primary/30 text-brand-ink hover:bg-primary/40 active:bg-primary/45 aria-expanded:bg-primary/45 aria-expanded:text-brand-ink",
         secondary:
           "bg-muted text-foreground hover:bg-muted/80 active:bg-muted/70 aria-expanded:bg-muted aria-expanded:text-foreground",
         ghost:
           "hover:bg-muted/60 hover:text-foreground active:bg-muted aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/15 active:bg-destructive/20 focus-visible:ring-destructive/30 dark:bg-destructive/20 dark:hover:bg-destructive/30",
-        link: "text-primary underline-offset-4 hover:underline",
+        link: "text-brand-ink underline-offset-4 hover:underline",
       },
       size: {
         default:

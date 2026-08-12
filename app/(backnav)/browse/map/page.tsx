@@ -809,7 +809,7 @@ function BrowseMapContent() {
           if (snapIdxRef.current !== SNAPS.length - 1) snapTo(SNAPS.length - 1);
         }}
         placeholder="搜索品牌 / 车型 / 关键词"
-        className="h-9 w-full rounded-full bg-muted/50 pl-9 pr-8 font-mono text-[13px] outline-none transition-colors focus:bg-background focus:ring-2 focus:ring-primary/30"
+        className="h-9 w-full rounded-full bg-muted/50 pl-9 pr-8 font-mono text-[13px] outline-none transition-colors focus:bg-background focus:ring-2 focus:ring-brand-ink/40"
       />
       {keywordInput && (
         <button
@@ -871,12 +871,12 @@ function BrowseMapContent() {
             <button
               type="button"
               className={`flex w-full items-center justify-between rounded-xl px-3 py-3 font-mono text-sm transition-colors ${
-                sort === opt.value ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"
+                sort === opt.value ? "bg-primary/30 font-medium text-brand-ink" : "hover:bg-muted/50"
               }`}
               onClick={() => changeSort(opt.value)}
             >
               {opt.label}
-              {sort === opt.value && <span className="text-primary">✓</span>}
+              {sort === opt.value && <span className="text-brand-ink">✓</span>}
             </button>
           </DrawerClose>
         ))}
@@ -896,7 +896,7 @@ function BrowseMapContent() {
               openUser(selectedStore.owner_id);
             }
           }}
-          className="font-mono text-[11px] font-medium text-primary"
+          className="font-mono text-[11px] font-medium text-brand-ink"
         >
           查看店铺
         </Link>
@@ -905,7 +905,7 @@ function BrowseMapContent() {
         <button
           type="button"
           onClick={clearSelection}
-          className="font-mono text-[11px] font-medium text-primary"
+          className="font-mono text-[11px] font-medium text-brand-ink"
         >
           显示全部
         </button>

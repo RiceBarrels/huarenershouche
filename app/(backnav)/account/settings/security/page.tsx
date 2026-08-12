@@ -95,7 +95,7 @@ export default function SecuritySettingsPage() {
                     type="button"
                     onClick={handleEmailUpdate}
                     disabled={emailSaving}
-                    className="shrink-0 px-1.5 font-mono text-sm font-medium text-primary transition-opacity active:opacity-60 disabled:opacity-40"
+                    className="shrink-0 px-1.5 font-mono text-sm font-medium text-brand-ink transition-opacity active:opacity-60 disabled:opacity-40"
                   >
                     {emailSaving ? <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} /> : "更改"}
                   </button>

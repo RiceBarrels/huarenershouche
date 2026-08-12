@@ -48,9 +48,9 @@ export default function FuelToolPage() {
           <Row label="车辆油耗" value={mpg} onChange={setMpg} suffix="MPG" />
           <Row label="每月里程" value={miles} onChange={setMiles} suffix="miles" />
         </div>
-        <div className="mt-3 rounded-xl bg-primary/10 p-4">
+        <div className="mt-3 rounded-xl bg-primary/30 p-4">
           <p className="font-mono text-xs text-muted-foreground">预计油费</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-primary">
+          <p className="mt-1 font-mono text-2xl font-bold text-brand-ink">
             ${monthly.toFixed(0)}<span className="text-sm font-medium">/月</span>
           </p>
           <p className="mt-1 font-mono text-[11px] text-muted-foreground">

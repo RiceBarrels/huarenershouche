@@ -550,7 +550,7 @@ export default function CarDetailPage({
                       key={i}
                       onClick={() => setCurrentImage(i)}
                       className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-muted ring-2 transition-all ${
-                        i === currentImage ? "ring-primary" : "ring-transparent hover:ring-primary/40"
+                        i === currentImage ? "ring-brand-ink" : "ring-transparent hover:ring-brand-ink/50"
                       }`}
                     >
                       {isVideo(url) ? (

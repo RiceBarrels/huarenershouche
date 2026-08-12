@@ -6,9 +6,9 @@ import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
 import Image from "next/image";
 
-import { ArrowUpDown, Bookmark, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car, Map as MapIcon, TrendingUp } from "lucide-react";
+import { ArrowUpDown, Bookmark, Check, Search, SlidersHorizontal, X, Clock, Trash2, Loader2, Car, Map as MapIcon, TrendingUp } from "lucide-react";
 import { match as pinyinMatch } from "pinyin-pro";
-import { getSuggestionPool, logSearchTerm } from "@/lib/search-suggestions";
+import { getCarSuggestionPool, logCarSearchTerm } from "@/lib/car-search-suggestions";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
@@ -16,10 +16,9 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { Reveal } from "@/components/reveal";
-import { SearchFilters } from "@/components/search-filters";
+import { SearchFilters, IOS_FILL } from "@/components/search-filters";
 import { MobileFilterDrawer } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -136,12 +135,12 @@ function BrowseContent() {
     setSearchHistory(getSearchHistory());
   }, []);
 
-  // 猜你想搜:与社区共用全站搜索词热度池(supabase),打开搜索时拉一次
+  // 猜你想搜:买车独立词频池(supabase car_search_terms,与社区分离),打开搜索时拉一次
   const [suggestPool, setSuggestPool] = useState<string[]>([]);
   useEffect(() => {
     if (!mobileSearchOpen) return;
     let cancelled = false;
-    getSuggestionPool().then((pool) => {
+    getCarSuggestionPool().then((pool) => {
       if (!cancelled) setSuggestPool(pool);
     });
     return () => {
@@ -170,7 +169,7 @@ function BrowseContent() {
     if (!t) return;
     addSearchHistory(t);
     setSearchHistory(getSearchHistory());
-    logSearchTerm(t);
+    logCarSearchTerm(t);
   }, []);
 
   // Close dropdown on click outside
@@ -473,12 +472,7 @@ function BrowseContent() {
 
   return (
     <PullToRefresh onRefresh={fetchCars}>
-    <div
-    className="flex min-h-screen flex-col bg-background font-mono"
-    style={{
-      paddingTop: "env(safe-area-inset-top, 0px)",
-    }}
-    >
+    <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
 
       {/* Banner */}
@@ -501,8 +495,12 @@ function BrowseContent() {
         </div>
       </div>
 
-      {/* Mobile: search bar + filter button — sticky */}
-      <div className="sticky top-0 z-30 border-b border-border bg-background/95 px-4 py-3 backdrop-blur-md md:hidden">
+      {/* Mobile: search bar + filter button — sticky。安全区并入吸顶条自身的
+          padding:只垫外层容器的话,滚动时条钉在 top:0 会顶进状态栏/刘海 */}
+      <div
+        className="sticky top-0 z-30 border-b border-border bg-card/95 px-4 pb-3 backdrop-blur-md md:hidden"
+        style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
+      >
         <div className="flex items-center gap-2">
           <div ref={searchWrapperRef} className="relative flex-1">
             <AnimatePresence initial={false} mode="popLayout">
@@ -522,10 +520,11 @@ function BrowseContent() {
                   >
                     <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                   </motion.span>
-                  <Input
+                  {/* 原生 input:iOS 搜索栏样式(圆角胶囊 + 系统填充色) */}
+                  <input
                     autoFocus
                     placeholder="搜索品牌、车型..."
-                    className="px-9 font-mono text-sm"
+                    className={`h-10 w-full rounded-full pl-9 pr-9 font-mono text-[15px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
                     value={filters.keyword}
                     onFocus={() => setSearchFocused(true)}
                     onChange={(e) => {
@@ -569,12 +568,12 @@ function BrowseContent() {
                     setMobileSearchOpen(true);
                     setSearchFocused(true);
                   }}
-                  className="flex h-9 w-full items-center gap-2 rounded-xl bg-muted/50 px-3 text-left"
+                  className={`flex h-10 w-full items-center gap-2 rounded-full px-4 text-left ${IOS_FILL}`}
                 >
                   <motion.span layoutId="browse-search-icon" className="flex shrink-0">
                     <Search className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
                   </motion.span>
-                  <span className={`truncate font-mono text-sm ${filters.keyword ? "text-foreground" : "text-muted-foreground/70"}`}>
+                  <span className={`truncate font-mono text-[15px] ${filters.keyword ? "text-foreground" : "text-muted-foreground/70"}`}>
                     {filters.keyword || "搜索品牌、车型..."}
                   </span>
                 </motion.button>
@@ -587,11 +586,11 @@ function BrowseContent() {
               ((!filters.keyword && searchHistory.length > 0) || suggestedKeywords.length > 0) && (
               <div
                 onMouseDown={(e) => e.preventDefault()}
-                className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background shadow-lg"
+                className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-[22px] bg-card shadow-lg"
               >
                 {!filters.keyword && searchHistory.length > 0 && (
                   <>
-                    <div className="flex items-center justify-between px-3 py-1.5">
+                    <div className="flex items-center justify-between px-4 py-1.5">
                       <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
                       <button
                         type="button"
@@ -609,7 +608,7 @@ function BrowseContent() {
                       <button
                         key={term}
                         type="button"
-                        className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="flex w-full items-center gap-2 px-4 py-2.5 font-mono text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         onClick={() => {
                           setFilters({ ...filters, keyword: term });
                           commitSearchTerm(term);
@@ -624,14 +623,14 @@ function BrowseContent() {
                 )}
                 {suggestedKeywords.length > 0 && (
                   <>
-                    <div className="px-3 py-1.5">
+                    <div className="px-4 py-1.5">
                       <span className="font-mono text-[10px] text-muted-foreground">猜你想搜</span>
                     </div>
                     {suggestedKeywords.map((term) => (
                       <button
                         key={term}
                         type="button"
-                        className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        className="flex w-full items-center gap-2 px-4 py-2.5 font-mono text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         onClick={() => {
                           setFilters({ ...filters, keyword: term });
                           commitSearchTerm(term);
@@ -649,29 +648,28 @@ function BrowseContent() {
           </div>
           <Drawer open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
             <DrawerTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="relative gap-1 font-mono text-xs"
+              <button
+                type="button"
+                className={`relative flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 font-mono text-[13px] font-medium transition-opacity active:opacity-70 ${IOS_FILL}`}
               >
                 <SlidersHorizontal className="h-3.5 w-3.5" strokeWidth={1.5} />
                 筛选
                 {activeFilterChips.length > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 font-mono text-[10px] text-background">
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 font-mono text-[10px] text-primary-foreground">
                     {activeFilterChips.length}
                   </span>
                 )}
-              </Button>
+              </button>
             </DrawerTrigger>
             <DrawerContent>
-              <div className="flex items-center justify-between px-4 pb-2 pt-4">
+              {/* iOS sheet 头:居中标题 + 右侧「完成」 */}
+              <div className="relative flex items-center justify-center px-4 pb-3 pt-5">
+                <span className="font-mono text-[17px] font-semibold">筛选</span>
                 <DrawerClose asChild>
-                  <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  <button type="button" className="absolute right-4 font-mono text-[15px] font-medium text-brand-ink transition-opacity active:opacity-60">
+                    完成
                   </button>
                 </DrawerClose>
-                <span className="font-mono text-sm font-semibold">筛选</span>
-                <div className="h-8 w-8" />
               </div>
               <div className="overflow-y-auto pb-6">
                 <MobileFilterDrawer
@@ -686,37 +684,39 @@ function BrowseContent() {
           </Drawer>
           <Drawer>
             <DrawerTrigger asChild>
-              <Button
-                variant="secondary"
-                size="sm"
-                className="gap-1 font-mono text-xs"
+              <button
+                type="button"
+                className={`relative flex h-10 shrink-0 items-center gap-1.5 rounded-full px-4 font-mono text-[13px] font-medium transition-opacity active:opacity-70 ${IOS_FILL}`}
               >
                 <ArrowUpDown className="h-3.5 w-3.5" strokeWidth={1.5} />
                 {SORT_OPTIONS.find((o) => o.value === sort)?.label || "排序"}
-              </Button>
+              </button>
             </DrawerTrigger>
             <DrawerContent>
-              <div className="flex items-center justify-between px-4 pb-2 pt-4">
+              {/* iOS sheet 头:居中标题 + 右侧「完成」 */}
+              <div className="relative flex items-center justify-center px-4 pb-3 pt-5">
+                <span className="font-mono text-[17px] font-semibold">排序方式</span>
                 <DrawerClose asChild>
-                  <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                    <X className="h-4 w-4" strokeWidth={1.5} />
+                  <button type="button" className="absolute right-4 font-mono text-[15px] font-medium text-brand-ink transition-opacity active:opacity-60">
+                    完成
                   </button>
                 </DrawerClose>
-                <span className="font-mono text-sm font-semibold">排序方式</span>
-                <div className="h-8 w-8" />
               </div>
-              <div className="px-4 pb-6">
+              {/* iOS 单选列表:整行可点,选中项右侧 brand 对勾,分隔线不贯穿左缩进 */}
+              <div className="pb-6">
                 {SORT_OPTIONS.map((opt) => (
                   <button
                     key={opt.value}
                     type="button"
-                    className={`flex w-full items-center justify-between rounded-xl px-3 py-3 font-mono text-sm transition-colors ${sort === opt.value ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
+                    className="group flex w-full items-center pl-4 text-left transition-colors active:bg-muted/60"
                     onClick={() => setSort(opt.value)}
                   >
-                    {opt.label}
-                    {sort === opt.value && (
-                      <span className="text-primary">✓</span>
-                    )}
+                    <span className="flex min-h-[52px] flex-1 items-center justify-between border-b border-border/50 pr-4 group-last:border-b-0">
+                      <span className="font-mono text-[15px]">{opt.label}</span>
+                      {sort === opt.value && (
+                        <Check className="h-5 w-5 text-brand-ink" strokeWidth={2} />
+                      )}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -731,7 +731,7 @@ function BrowseContent() {
               <button
                 key={chip.key}
                 onClick={() => clearFilter(chip.key)}
-                className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[12px] transition-opacity active:opacity-70 ${IOS_FILL}`}
               >
                 {chip.label}
                 <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -739,7 +739,7 @@ function BrowseContent() {
             ))}
             <button
               onClick={() => setFilters(INITIAL_FILTERS)}
-              className="flex items-center gap-1 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+              className="flex items-center gap-1 px-2 py-1.5 font-mono text-[12px] text-destructive transition-opacity active:opacity-70"
             >
               <X className="h-2.5 w-2.5" strokeWidth={2} />
               清空所有
@@ -779,10 +779,10 @@ function BrowseContent() {
                     if (!searchSaved) saveSearch(savedSearchParams);
                   }}
                   disabled={searchSaved}
-                  className={`flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[11px] font-medium transition-opacity active:opacity-70 ${
                     searchSaved
-                      ? "bg-muted text-muted-foreground"
-                      : "bg-muted hover:bg-muted/70 hover:text-foreground"
+                      ? `${IOS_FILL} text-muted-foreground`
+                      : "bg-brand/30 text-brand-ink"
                   }`}
                 >
                   <Bookmark
@@ -798,7 +798,7 @@ function BrowseContent() {
                   Sort
                 </span>
                 <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
-                  <SelectTrigger className="h-8 w-[130px] font-mono text-xs">
+                  <SelectTrigger className="h-8 w-[130px] rounded-full font-mono text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -810,7 +810,7 @@ function BrowseContent() {
                   </SelectContent>
                 </Select>
                 <Link href={mapHref}>
-                  <Button size="sm" className="h-8 gap-1.5 font-mono text-xs font-semibold">
+                  <Button size="sm" className="h-8 gap-1.5 rounded-full font-mono text-xs font-semibold">
                     <MapIcon className="h-3.5 w-3.5" strokeWidth={1.75} />
                     地图找车
                   </Button>
@@ -824,7 +824,7 @@ function BrowseContent() {
                   <button
                     key={`${chip.key}-${i}`}
                     onClick={() => clearFilter(chip.key)}
-                    className="flex items-center gap-1 rounded-full bg-muted/50 px-2 py-0.5 font-mono text-[11px] transition-colors hover:bg-muted"
+                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[12px] transition-opacity active:opacity-70 ${IOS_FILL}`}
                   >
                     {chip.label}
                     <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
@@ -832,7 +832,7 @@ function BrowseContent() {
                 ))}
                 <button
                   onClick={() => setFilters(INITIAL_FILTERS)}
-                  className="flex items-center gap-1 px-2 py-0.5 font-mono text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                  className="flex items-center gap-1 px-2 py-1.5 font-mono text-[12px] text-destructive transition-opacity active:opacity-70"
                 >
                   <X className="h-2.5 w-2.5" strokeWidth={2} />
                   清空
@@ -885,7 +885,7 @@ function BrowseContent() {
             )}
             </>
           ) : (
-            <div className="flex flex-col items-center rounded-xl bg-muted/30 px-6 py-16">
+            <div className="flex flex-col items-center rounded-[26px] bg-card px-6 py-16">
               <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 No Results
@@ -894,33 +894,30 @@ function BrowseContent() {
                 没有找到符合条件的车辆
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="font-mono text-xs"
+                <button
+                  type="button"
+                  className={`flex h-9 items-center rounded-full px-4 font-mono text-xs font-medium transition-opacity active:opacity-70 ${IOS_FILL}`}
                   onClick={() => setFilters(INITIAL_FILTERS)}
                 >
                   清除所有筛选
-                </Button>
+                </button>
                 {filters.maxPrice && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="font-mono text-xs text-muted-foreground"
+                  <button
+                    type="button"
+                    className="px-3 py-2 font-mono text-xs text-brand-ink transition-opacity active:opacity-60"
                     onClick={() => setFilters({ ...filters, maxPrice: "" })}
                   >
                     去掉价格上限
-                  </Button>
+                  </button>
                 )}
                 {filters.maxDistance && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="font-mono text-xs text-muted-foreground"
+                  <button
+                    type="button"
+                    className="px-3 py-2 font-mono text-xs text-brand-ink transition-opacity active:opacity-60"
                     onClick={() => setFilters({ ...filters, maxDistance: "" })}
                   >
                     扩大搜索范围
-                  </Button>
+                  </button>
                 )}
               </div>
             </div>
@@ -953,7 +950,7 @@ function BrowseContent() {
         href={mapHref}
         className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom,0px))] left-1/2 z-40 -translate-x-1/2 md:hidden"
       >
-        <span className="flex items-center gap-1.5 rounded-full bg-primary px-5 py-2.5 font-mono text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95">
+        <span className="flex items-center gap-1.5 rounded-full bg-brand px-5 py-2.5 font-mono text-sm font-semibold text-primary-foreground shadow-lg shadow-brand/30 transition-transform active:scale-95">
           <MapIcon className="h-4 w-4" strokeWidth={1.75} />
           地图找车
         </span>

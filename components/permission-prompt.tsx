@@ -136,7 +136,7 @@ function PermissionRow({
 
   return (
     <div className="flex items-center gap-3 rounded-xl bg-muted/50 p-3.5">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/30 text-brand-ink">
         {icon}
       </div>
       <div className="min-w-0 flex-1">

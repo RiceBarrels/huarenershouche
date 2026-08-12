@@ -306,7 +306,7 @@ export function TrustReviews() {
               </div>
             </div>
             <textarea
-              className="mt-3 w-full resize-none rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="mt-3 w-full resize-none rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
               placeholder="分享你在平台买车/卖车的真实体验（至少 10 个字）..."
               rows={3}
               maxLength={500}

@@ -186,7 +186,7 @@ export function DealerReviews({ dealerId }: { dealerId: string }) {
             <StarRating value={rating} onChange={setRating} />
           </div>
           <textarea
-            className="mt-3 w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="mt-3 w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
             rows={3}
             placeholder="分享你与这家车行的交易体验..."
             value={content}

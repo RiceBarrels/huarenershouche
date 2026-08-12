@@ -3,9 +3,6 @@
 import { Search, X, Clock, Trash2, Check } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
@@ -221,6 +218,26 @@ export function isInListCI(list: string, value: string): boolean {
     .some((v) => v.trim().toLowerCase() === value.trim().toLowerCase());
 }
 
+// --- iOS 风格共享样式(筛选侧栏 / 移动筛选抽屉共用) ---
+// 选中态:brand 绿实心胶囊;未选中:systemGray6 式半透明填充
+export const PILL_ON = "bg-brand font-medium text-primary-foreground";
+export const PILL_OFF =
+  "bg-black/[0.05] hover:bg-black/[0.08] active:bg-black/[0.08] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]";
+// 输入框 / 分组容器的 iOS 填充底色
+export const IOS_FILL = "bg-black/[0.05] dark:bg-white/[0.08]";
+
+/* 桌面侧栏分组:标题在卡外(iOS 分组表头),内容装进白色圆角卡 */
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <p className="px-4 pb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+        {title}
+      </p>
+      <div className="rounded-[22px] bg-card p-3.5">{children}</div>
+    </section>
+  );
+}
+
 // --- Compact pill select for desktop sidebar ---
 function SidebarPillSelect({
   options,
@@ -237,10 +254,10 @@ function SidebarPillSelect({
   const selected = (v: string) => (insensitive ? isInListCI(value, v) : isInList(value, v));
   const toggle = (v: string) => (insensitive ? toggleInListCI(value, v) : toggleInList(value, v));
   return (
-    <div className="mt-1 flex flex-wrap gap-1">
+    <div className="mt-1 flex flex-wrap gap-1.5">
       <button
         type="button"
-        className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? PILL_ON : PILL_OFF}`}
         onClick={() => onChange("")}
       >
         不限
@@ -249,7 +266,7 @@ function SidebarPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${selected(opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${selected(opt.value) ? PILL_ON : PILL_OFF}`}
           onClick={() => onChange(toggle(opt.value))}
         >
           {opt.color && (
@@ -351,14 +368,14 @@ export function SearchFilters({
     : MILEAGE_STOPS.length - 1;
 
   return (
-    <aside className="w-full space-y-4">
-      {/* Search */}
+    <aside className="w-full space-y-5">
+      {/* Search — iOS 搜索栏:灰底画布上的白色胶囊 */}
       <div ref={searchRef} className="relative">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-          <Input
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
+          <input
             placeholder="搜索品牌、车型..."
-            className="pl-9 font-mono text-sm"
+            className="h-10 w-full rounded-full bg-card pl-9 pr-4 font-mono text-sm outline-none placeholder:text-muted-foreground/60"
             value={filters.keyword}
             onFocus={() => setSearchFocused(true)}
             onChange={(e) => update("keyword", e.target.value)}
@@ -372,8 +389,8 @@ export function SearchFilters({
           />
         </div>
         {searchFocused && !filters.keyword && history.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl bg-background shadow-lg">
-            <div className="flex items-center justify-between px-3 py-1.5">
+          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-[22px] bg-card shadow-lg">
+            <div className="flex items-center justify-between px-4 py-2">
               <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
               <button
                 type="button"
@@ -391,7 +408,7 @@ export function SearchFilters({
               <button
                 key={term}
                 type="button"
-                className="flex w-full items-center gap-2 px-3 py-1.5 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                className="flex w-full items-center gap-2 px-4 py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                 onClick={() => {
                   update("keyword", term);
                   setSearchFocused(false);
@@ -405,26 +422,24 @@ export function SearchFilters({
         )}
       </div>
 
-      {/* Clear all */}
+      {/* Clear all — iOS 红色操作胶囊 */}
       {activeCount > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 w-full gap-1 font-mono text-xs text-muted-foreground"
+        <button
+          type="button"
+          className="flex h-9 w-full items-center justify-center gap-1 rounded-full bg-card font-mono text-xs font-medium text-destructive transition-opacity hover:opacity-80 active:opacity-60"
           onClick={reset}
         >
           <X className="h-3 w-3" strokeWidth={1.5} />
           清除全部筛选 ({activeCount})
-        </Button>
+        </button>
       )}
 
       {/* Location — zipcode + distance */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">位置</Label>
-        <div className="mt-1.5 flex items-center gap-2">
-          <Input
+      <Section title="位置">
+        <div className="flex items-center gap-2">
+          <input
             placeholder="输入 Zipcode"
-            className="h-8 flex-1 font-mono text-xs"
+            className={`h-9 min-w-0 flex-1 rounded-xl px-3 font-mono text-xs outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             maxLength={5}
             inputMode="numeric"
             value={zip}
@@ -448,30 +463,29 @@ export function SearchFilters({
             </button>
           )}
         </div>
-        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
           {/^\d{5}$/.test(filters.location)
             ? `以 Zip ${filters.location} 为中心按距离筛选`
             : "不填则以自动定位的位置计算距离"}
         </p>
-        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="font-mono text-[10px] text-muted-foreground">距离</span>
           {["", "10", "25", "50", "100", "200"].map((v) => (
             <button
               key={v}
               type="button"
-              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+              className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? PILL_ON : PILL_OFF}`}
               onClick={() => update("maxDistance", v)}
             >
               {v === "" ? "不限" : `≤${v}mi`}
             </button>
           ))}
         </div>
-      </div>
+      </Section>
 
       {/* Brand */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">热门品牌</Label>
-        <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+      <Section title="品牌">
+        <div className="grid grid-cols-3 gap-1.5">
           {HOT_MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
             const selected = isInList(filters.make, make);
@@ -479,7 +493,7 @@ export function SearchFilters({
               <button
                 key={make}
                 type="button"
-                className={`flex flex-col items-center gap-1 rounded-xl p-2 transition-colors ${selected ? "bg-primary/10 text-primary" : "bg-card hover:bg-muted/40"}`}
+                className={`flex flex-col items-center gap-1 rounded-2xl p-2 transition-colors ${selected ? "bg-brand/30 text-brand-ink" : `${IOS_FILL} hover:opacity-80`}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
                 <span className="flex h-6 w-6 items-center justify-center">
@@ -492,15 +506,15 @@ export function SearchFilters({
             );
           })}
         </div>
-        <Label className="mt-3 border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">全部品牌</Label>
-        <div className="mt-1 max-h-[280px] overflow-y-auto rounded-xl bg-card">
+        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">全部品牌</p>
+        <div className={`max-h-[280px] overflow-y-auto rounded-2xl ${IOS_FILL}`}>
           <button
             type="button"
-            className={`flex w-full items-center justify-between px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-primary/10 font-medium text-primary" : ""}`}
+            className={`flex w-full items-center justify-between px-3 py-1.5 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-brand/30 font-medium text-brand-ink" : ""}`}
             onClick={() => update("make", "")}
           >
             <span>不限</span>
-            {!filters.make && <Check className="h-3 w-3" strokeWidth={2} />}
+            {!filters.make && <Check className="h-3 w-3 text-brand-ink" strokeWidth={2} />}
           </button>
           {MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
@@ -508,46 +522,43 @@ export function SearchFilters({
               <button
                 key={make}
                 type="button"
-                className={`flex w-full items-center gap-2 px-3 py-1 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-primary/10 font-medium text-primary" : ""}`}
+                className={`flex w-full items-center gap-2 px-3 py-1.5 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-brand/30 font-medium text-brand-ink" : ""}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
                 </span>
                 <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
-                {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0" strokeWidth={2} />}
+                {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0 text-brand-ink" strokeWidth={2} />}
               </button>
             );
           })}
         </div>
-      </div>
+      </Section>
 
       {/* Model — only shown when exactly one make is selected */}
       {modelOptions && modelOptions.length > 0 && (
-        <div>
-          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车型</Label>
+        <Section title="车型">
           <SidebarPillSelect
             options={modelOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.model}
             onChange={(v) => update("model", v)}
             insensitive
           />
-        </div>
+        </Section>
       )}
 
       {/* Body style */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车身类型</Label>
+      <Section title="车身类型">
         <SidebarPillSelect
           options={BODY_STYLE_OPTIONS}
           value={filters.bodyStyle}
           onChange={(v) => update("bodyStyle", v)}
         />
-      </div>
+      </Section>
 
       {/* Seller type */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">卖家类型</Label>
+      <Section title="卖家类型">
         <SidebarPillSelect
           options={[
             { value: "dealer", label: "车行" },
@@ -556,14 +567,13 @@ export function SearchFilters({
           value={filters.sellerType}
           onChange={(v) => update("sellerType", v)}
         />
-      </div>
+      </Section>
 
       {/* Price slider + input */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">价格范围</Label>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <Input
-            className="h-8 font-mono text-[11px]"
+      <Section title="价格范围">
+        <div className="flex items-center gap-1.5">
+          <input
+            className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             placeholder="最低"
             inputMode="numeric"
             value={filters.minPrice}
@@ -575,8 +585,8 @@ export function SearchFilters({
             }}
           />
           <span className="font-mono text-[11px] text-muted-foreground">-</span>
-          <Input
-            className="h-8 font-mono text-[11px]"
+          <input
+            className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             placeholder="最高"
             inputMode="numeric"
             value={filters.maxPrice}
@@ -606,15 +616,14 @@ export function SearchFilters({
             onFilter(next);
           }}
         />
-      </div>
+      </Section>
 
       {/* Monthly payment budget */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">月供预算</Label>
-        <div className="mt-1.5 flex flex-wrap gap-1.5">
+      <Section title="月供预算">
+        <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
-            className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+            className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? PILL_ON : PILL_OFF}`}
             onClick={() => update("maxPayment", "")}
           >
             不限
@@ -623,15 +632,15 @@ export function SearchFilters({
             <button
               key={v}
               type="button"
-              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+              className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? PILL_ON : PILL_OFF}`}
               onClick={() => update("maxPayment", v)}
             >
               ≤${v}/月
             </button>
           ))}
         </div>
-        <Input
-          className="mt-1.5 h-8 font-mono text-[11px]"
+        <input
+          className={`mt-2 h-9 w-full rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
           placeholder="自定义月供 ($/月)"
           inputMode="numeric"
           value={filters.maxPayment}
@@ -640,17 +649,16 @@ export function SearchFilters({
             update("maxPayment", val);
           }}
         />
-        <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+        <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
           按 0 首付 / 6.5% APR / 60 期估算
         </p>
-      </div>
+      </Section>
 
       {/* Year slider + input */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">年份范围</Label>
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <Input
-            className="h-8 font-mono text-[11px]"
+      <Section title="年份范围">
+        <div className="flex items-center gap-1.5">
+          <input
+            className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             placeholder="最早"
             inputMode="numeric"
             maxLength={4}
@@ -663,8 +671,8 @@ export function SearchFilters({
             }}
           />
           <span className="font-mono text-[11px] text-muted-foreground">-</span>
-          <Input
-            className="h-8 font-mono text-[11px]"
+          <input
+            className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             placeholder="最新"
             inputMode="numeric"
             maxLength={4}
@@ -693,32 +701,28 @@ export function SearchFilters({
             onFilter(next);
           }}
         />
-      </div>
+      </Section>
 
       {/* Fuel type */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">燃油类型</Label>
+      <Section title="燃油类型">
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
-      </div>
+      </Section>
 
       {/* Transmission — hidden when exclusively electric */}
       {!isElectric && (
-        <div>
-          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">变速箱</Label>
+        <Section title="变速箱">
           <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
-        </div>
+        </Section>
       )}
 
       {/* Drivetrain */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">驱动方式</Label>
+      <Section title="驱动方式">
         <SidebarPillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
-      </div>
+      </Section>
 
       {/* Mileage slider with breakpoints */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">最高里程</Label>
-        <p className="mt-1 font-mono text-[11px] text-foreground">
+      <Section title="最高里程">
+        <p className="font-mono text-[11px] text-foreground">
           {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
         </p>
         <Slider
@@ -737,79 +741,75 @@ export function SearchFilters({
             onFilter(next);
           }}
         />
-      </div>
+      </Section>
 
       {/* Exterior color */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">外观颜色</Label>
+      <Section title="外观颜色">
         <SidebarPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
-      </div>
+      </Section>
 
       {/* Interior color */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">内饰颜色</Label>
+      <Section title="内饰颜色">
         <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
-      </div>
+      </Section>
 
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
-        <div>
-          <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">车辆配置</Label>
+        <Section title="车辆配置">
           <SidebarPillSelect
             options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.features}
             onChange={(v) => update("features", v)}
           />
-          <p className="mt-1 font-mono text-[10px] text-muted-foreground">需同时满足所选配置</p>
-        </div>
+          <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">需同时满足所选配置</p>
+        </Section>
       )}
 
-      {/* More conditions */}
-      <div>
-        <Label className="border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">更多条件</Label>
-        <div className="mt-1 space-y-1">
+      {/* More conditions — iOS 列表行 + brand 绿勾选 */}
+      <Section title="更多条件">
+        <div className="space-y-1">
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
+            className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
             onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
           >
             <span>只看好价</span>
-            {filters.dealRating === "good" && <Check className="h-3 w-3" strokeWidth={2} />}
+            {filters.dealRating === "good" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
           </button>
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
+            className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
             onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
           >
             <span>只看降价</span>
-            {filters.priceDropped === "true" && <Check className="h-3 w-3" strokeWidth={2} />}
+            {filters.priceDropped === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
           </button>
           {CONDITION_TOGGLES.map((t) => (
             <button
               key={t.key}
               type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
+              className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
               onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
             >
               <span>{t.label}</span>
-              {filters[t.key] === "true" && <Check className="h-3 w-3" strokeWidth={2} />}
+              {filters[t.key] === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
             </button>
           ))}
         </div>
-        <Label className="mt-3 block border-b border-border pb-2 font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">上架时间</Label>
-        <div className="mt-1 flex flex-wrap gap-1.5">
+        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">上架时间</p>
+        <div className="flex flex-wrap gap-1.5">
           {LISTED_WITHIN_OPTIONS.map((opt) => (
             <button
               key={opt.value}
               type="button"
-              className={`rounded-full px-2 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
+              className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? PILL_ON : PILL_OFF}`}
               onClick={() => update("listedWithin", opt.value)}
             >
               {opt.label}
             </button>
           ))}
         </div>
-      </div>
+      </Section>
     </aside>
   );
 }

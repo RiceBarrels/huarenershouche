@@ -28,9 +28,11 @@ interface ChatThreadProps {
   currentUserId: string;
   otherUsername: string;
   onBack: () => void;
+  /** 外壳(如 SwipeSheet 浮层)自带顶栏时隐藏内部头部 */
+  hideHeader?: boolean;
 }
 
-export function ChatThread({ conversationId, currentUserId, otherUsername, onBack }: ChatThreadProps) {
+export function ChatThread({ conversationId, currentUserId, otherUsername, onBack, hideHeader }: ChatThreadProps) {
   const router = useRouter();
   const [messages, setMessages] = useState<DbMessage[]>([]);
   const [content, setContent] = useState("");
@@ -166,30 +168,32 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-        <button
-          onClick={onBack}
-          className="text-muted-foreground transition-colors hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-        </button>
-        <button
-          type="button"
-          onClick={() => otherUserId && goProfile(otherUserId)}
-          className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80"
-        >
-          {otherUserId && (
-            <span className="h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
-              <img
-                src={avatarUrl(avatars[otherUserId]?.avatar_url, avatars[otherUserId]?.username || otherUsername)}
-                alt=""
-                className="h-full w-full object-cover"
-              />
-            </span>
-          )}
-          <span className="truncate font-mono text-sm font-medium">{otherUsername}</span>
-        </button>
-      </div>
+      {!hideHeader && (
+        <div className="flex items-center gap-3 border-b border-border px-4 py-3">
+          <button
+            onClick={onBack}
+            className="text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={() => otherUserId && goProfile(otherUserId)}
+            className="flex min-w-0 items-center gap-2 transition-opacity hover:opacity-80"
+          >
+            {otherUserId && (
+              <span className="h-6 w-6 shrink-0 overflow-hidden rounded-full bg-muted">
+                <img
+                  src={avatarUrl(avatars[otherUserId]?.avatar_url, avatars[otherUserId]?.username || otherUsername)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </span>
+            )}
+            <span className="truncate font-mono text-sm font-medium">{otherUsername}</span>
+          </button>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -305,7 +309,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           </button>
           <textarea
             ref={inputRef}
-            className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
             placeholder="输入消息..."
             rows={1}
             value={content}

@@ -175,7 +175,7 @@ export function SplashAd() {
             className="flex shrink-0 items-center justify-center gap-2 bg-background py-4"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
           >
-            <span className="font-logo text-2xl text-primary">常來車網</span>
+            <span className="font-logo text-2xl text-brand-ink">常來車網</span>
             <span className="font-mono text-[10px] text-muted-foreground">
               北美华人的二手车平台
             </span>

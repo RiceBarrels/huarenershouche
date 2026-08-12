@@ -300,7 +300,7 @@ function AccountContent() {
             >
               <UserCircle className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
               <span className="flex-1 font-mono text-sm">本人账号</span>
-              {!isActingAsClaimed && <span className="font-mono text-[10px] text-brand">当前</span>}
+              {!isActingAsClaimed && <span className="font-mono text-[10px] text-brand-ink">当前</span>}
             </button>
             {claimedAccounts.map((a) => (
               <button
@@ -312,7 +312,7 @@ function AccountContent() {
                 <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
                 <span className="flex-1 truncate font-mono text-sm">{a.username}</span>
                 {actingId === a.id ? (
-                  <span className="font-mono text-[10px] text-brand">当前</span>
+                  <span className="font-mono text-[10px] text-brand-ink">当前</span>
                 ) : (
                   <span className="font-mono text-[10px] text-muted-foreground">车行</span>
                 )}

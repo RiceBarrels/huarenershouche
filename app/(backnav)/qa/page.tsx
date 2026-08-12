@@ -117,7 +117,7 @@ export default function QaBoardPage() {
               }}
               className={`shrink-0 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${
                 activeTab === cat.key
-                  ? "bg-primary/10 font-medium text-primary"
+                  ? "bg-primary/30 font-medium text-brand-ink"
                   : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
               }`}
             >

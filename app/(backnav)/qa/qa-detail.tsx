@@ -448,7 +448,7 @@ export default function QaDetailPage() {
                 <div className="flex flex-col gap-2">
                   <textarea
                     ref={inputRef}
-                    className="w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    className="w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                     placeholder="分享你的经验和建议..."
                     rows={4}
                     value={content}

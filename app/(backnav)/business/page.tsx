@@ -125,7 +125,7 @@ export default function BusinessPage() {
         </SettingsGroup>
         <GroupFooter>
           车行入驻请前往{" "}
-          <Link href="/dealer-apply" className="text-primary underline underline-offset-2 active:opacity-60">
+          <Link href="/dealer-apply" className="text-brand-ink underline underline-offset-2 active:opacity-60">
             车行入驻申请
           </Link>
           。
@@ -133,7 +133,7 @@ export default function BusinessPage() {
 
         {sent ? (
           <div className="mt-6 flex flex-col items-center rounded-[26px] bg-card py-10">
-            <CheckCircle className="h-8 w-8 text-brand" strokeWidth={1.5} />
+            <CheckCircle className="h-8 w-8 text-brand-ink" strokeWidth={1.5} />
             <p className="mt-3 font-mono text-sm font-semibold">申请已提交</p>
             <p className="mt-1 font-mono text-xs text-muted-foreground">我们会在 1-3 个工作日内联系您</p>
             <Button
@@ -164,7 +164,7 @@ export default function BusinessPage() {
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, type: t }))}
                   className={`rounded-full px-3.5 py-2 font-mono text-xs transition-colors ${
-                    form.type === t ? "bg-primary/10 font-medium text-primary" : "bg-card active:bg-muted/60"
+                    form.type === t ? "bg-primary/30 font-medium text-brand-ink" : "bg-card active:bg-muted/60"
                   }`}
                 >
                   {t}

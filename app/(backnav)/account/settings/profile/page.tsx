@@ -154,7 +154,7 @@ export default function ProfileSettingsPage() {
               <button
                 type="button"
                 onClick={() => avatarInputRef.current?.click()}
-                className="mt-2 font-mono text-[13px] text-primary transition-opacity active:opacity-60"
+                className="mt-2 font-mono text-[13px] text-brand-ink transition-opacity active:opacity-60"
               >
                 更换头像
               </button>

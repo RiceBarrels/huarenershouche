@@ -51,7 +51,7 @@ export interface AppMapRegion {
 // Custom minimal marker using inline SVG data URI — 品牌绿图钉,深浅色通用
 // viewBox 四周留 2px 余量,避免描边超出画布被裁切
 function createMarkerIcon() {
-  const fill = "%2307c160";
+  const fill = "%2389fcd2";
   const stroke = "%23ffffff";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 2C8.27 2 2 8.27 2 16c0 10.5 14 22 14 22s14-11.5 14-22C30 8.27 23.73 2 16 2z" fill="${fill}" stroke="${stroke}" stroke-width="2"/><circle cx="16" cy="16" r="5" fill="${stroke}"/></svg>`;
   return L.icon({
@@ -727,7 +727,7 @@ export function AppMap({
             height: 6px;
             margin-right: 6px;
             border-radius: 9999px;
-            background: var(--primary, #07c160);
+            background: var(--primary, #89fcd2);
             vertical-align: 2px;
           }
           .store-popup span {
@@ -755,7 +755,7 @@ export function AppMap({
           }
           .clc-map .leaflet-control-zoom a:hover {
             background: var(--muted, #f5f5f5) !important;
-            color: var(--primary, #07c160) !important;
+            color: var(--primary, #89fcd2) !important;
           }
           .leaflet-control-attribution {
             background: transparent !important;
@@ -784,7 +784,7 @@ export function AppMap({
             white-space: nowrap;
             border-radius: 9999px;
             background: var(--background, #fff);
-            color: var(--primary, #07c160);
+            color: var(--primary, #89fcd2);
             border: 1px solid var(--border, #e5e7eb);
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
             cursor: pointer;
@@ -857,9 +857,9 @@ export function AppMap({
           }
           .car-pill--selected {
             transform: translate(-50%, -50%) scale(1.08);
-            background: var(--primary, #07c160);
+            background: var(--primary, #89fcd2);
             color: #fff;
-            border-color: var(--primary, #07c160);
+            border-color: var(--primary, #89fcd2);
           }
         `}</style>
       )}

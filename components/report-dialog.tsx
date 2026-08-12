@@ -100,7 +100,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
 
               <textarea
                 placeholder="补充说明（可选）"
-                className="w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 rows={3}
                 value={detail}
                 onChange={(e) => setDetail(e.target.value)}

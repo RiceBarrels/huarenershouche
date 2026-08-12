@@ -6,9 +6,11 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { ConversationList } from "@/components/conversation-list";
+import { ConversationList, inboxCacheKey } from "@/components/conversation-list";
+import { clearCache } from "@/lib/cache";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { useIdentity } from "@/components/identity-provider";
+import { LargeTitle } from "@/components/ios-settings";
 
 export default function MessagesWithUserPage() {
   return (
@@ -51,8 +53,10 @@ function MessagesWithUserContent() {
   }, [actingId]);
 
   const handleRefresh = useCallback(async () => {
+    // 清双层缓存再重挂载,强制真正重拉(否则 session 缓存命中不会请求)
+    if (actingId) clearCache(inboxCacheKey(actingId));
     setRefreshKey((k) => k + 1);
-  }, []);
+  }, [actingId]);
 
   if (loading) {
     return (
@@ -68,22 +72,20 @@ function MessagesWithUserContent() {
 
   return (
     <PullToRefresh onRefresh={handleRefresh}>
-      <div
-        className="flex min-h-screen flex-col bg-background font-mono"
-        style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
-      >
+      <div className="flex min-h-screen flex-col bg-background font-mono">
         <Header />
-        <main className="mx-auto w-full max-w-3xl flex-1 py-4 md:px-4">
-          <h1 className="mb-3 px-4 font-logo text-xl tracking-tight md:mb-4 md:px-0">
-            消息
-          </h1>
-          {user && (
-            <ConversationList
-              key={refreshKey}
-              userId={user}
-              initialOtherUserId={otherUserId}
-            />
-          )}
+        {/* iOS 26 风格:大标题 + 白色分组卡列表(顶部安全区由 BackNav 承担) */}
+        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4">
+          <LargeTitle title="消息" />
+          <div className="mt-4">
+            {user && (
+              <ConversationList
+                key={refreshKey}
+                userId={user}
+                initialOtherUserId={otherUserId}
+              />
+            )}
+          </div>
         </main>
         <div className="hidden md:block">
           <Footer />

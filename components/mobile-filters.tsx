@@ -4,19 +4,20 @@ import { useState } from "react";
 import {
   MapPin, Car, CarFront, DollarSign, Gauge, Palette, ChevronRight, X, Check, Users, BadgePercent, ListChecks,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   DrawerNested, DrawerContent, DrawerTrigger, DrawerClose,
 } from "@/components/ui/drawer";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { match } from "pinyin-pro";
-import { Input } from "@/components/ui/input";
+import { triggerHaptic } from "@/lib/haptics";
+import { IOSSwitch } from "@/components/ios-settings";
 
 // Re-export types and constants from search-filters
 import {
   PAYMENT_PRESETS, LISTED_WITHIN_OPTIONS, CONDITION_TOGGLES, INITIAL_FILTERS,
   isInListCI, toggleInListCI,
+  PILL_ON, PILL_OFF, IOS_FILL,
 } from "@/components/search-filters";
 import type { Filters, CountOption } from "@/components/search-filters";
 import { BODY_STYLE_OPTIONS, bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
@@ -207,6 +208,46 @@ function isInList(list: string, value: string): boolean {
   return list.split(",").includes(value);
 }
 
+// --- iOS 胶囊按钮公共样式(选中 brand 绿实心 / 未选中 systemGray6 填充) ---
+function pillCls(on: boolean): string {
+  return `rounded-full px-3.5 py-2 font-mono text-[13px] transition-colors ${on ? PILL_ON : PILL_OFF}`;
+}
+
+// --- iOS 填充式输入框(替代 ui/Input,抽屉白底上用半透明填充) ---
+function FilterInput({ className = "", ...props }: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={`h-11 w-full min-w-0 rounded-2xl px-4 font-mono text-[15px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL} ${className}`}
+    />
+  );
+}
+
+// --- 小节标题(如「价格范围」「距离范围」) ---
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return <p className="font-mono text-[13px] font-semibold">{children}</p>;
+}
+
+// --- iOS 开关行:label + 绿色开关,inset 分隔线,末行无线 ---
+function ToggleRow({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="group/row flex w-full items-center pl-4">
+      <div className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-4 group-last/row:border-0">
+        <span className="min-w-0 flex-1 truncate font-mono text-[15px]">{label}</span>
+        <IOSSwitch checked={checked} onChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
 // --- Pill selector for multi-select options ---
 function PillSelect({
   options,
@@ -221,8 +262,11 @@ function PillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-        onClick={() => onChange("")}
+        className={pillCls(!value)}
+        onClick={() => {
+          triggerHaptic();
+          onChange("");
+        }}
       >
         不限
       </button>
@@ -230,8 +274,11 @@ function PillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-          onClick={() => onChange(toggleInList(value, opt.value))}
+          className={pillCls(isInList(value, opt.value))}
+          onClick={() => {
+            triggerHaptic();
+            onChange(toggleInList(value, opt.value));
+          }}
         >
           {opt.label}
         </button>
@@ -259,8 +306,11 @@ function CountPillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-        onClick={() => onChange("")}
+        className={pillCls(!value)}
+        onClick={() => {
+          triggerHaptic();
+          onChange("");
+        }}
       >
         不限
       </button>
@@ -268,8 +318,11 @@ function CountPillSelect({
         <button
           key={opt.name}
           type="button"
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${selected(opt.name) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-          onClick={() => onChange(toggle(opt.name))}
+          className={`flex items-center gap-1.5 ${pillCls(selected(opt.name))}`}
+          onClick={() => {
+            triggerHaptic();
+            onChange(toggle(opt.name));
+          }}
         >
           {opt.name}
           <span className="opacity-60">{opt.count}</span>
@@ -293,8 +346,11 @@ function ColorPillSelect({
     <div className="flex flex-wrap gap-2">
       <button
         type="button"
-        className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-        onClick={() => onChange("")}
+        className={pillCls(!value)}
+        onClick={() => {
+          triggerHaptic();
+          onChange("");
+        }}
       >
         不限
       </button>
@@ -302,8 +358,11 @@ function ColorPillSelect({
         <button
           key={opt.value}
           type="button"
-          className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${isInList(value, opt.value) ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-          onClick={() => onChange(toggleInList(value, opt.value))}
+          className={`flex items-center gap-1.5 ${pillCls(isInList(value, opt.value))}`}
+          onClick={() => {
+            triggerHaptic();
+            onChange(toggleInList(value, opt.value));
+          }}
         >
           <span
             className="inline-block h-3 w-3 rounded-full border border-border"
@@ -316,15 +375,18 @@ function ColorPillSelect({
   );
 }
 
-// --- Category row in main drawer ---
+// --- Category row in main drawer: iOS 设置行(彩色线条图标 + 单行 label/value + chevron) ---
 function FilterRow({
   icon,
+  color,
   label,
   value,
   active,
   children,
 }: {
   icon: React.ReactNode;
+  /** 图标线条颜色(如 text-blue-500),iOS 设置风格彩色图标 */
+  color: string;
   label: string;
   value: string;
   active: boolean;
@@ -335,29 +397,32 @@ function FilterRow({
       <DrawerTrigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors active:bg-muted"
+          className="group/row flex w-full items-center gap-3 pl-4 text-left transition-colors active:bg-accent"
         >
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-muted/60">
+          <span className={`flex h-6 w-6 shrink-0 items-center justify-center ${color}`}>
             {icon}
           </span>
-          <div className="min-w-0 flex-1">
-            <p className="font-mono text-xs font-medium">{label}</p>
-            <p className={`truncate font-mono text-[11px] ${active ? "text-foreground" : "text-muted-foreground"}`}>
+          <span className="flex min-h-[52px] min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-4 group-last/row:border-0">
+            <span className="shrink-0 font-mono text-[15px]">{label}</span>
+            <span className={`min-w-0 flex-1 truncate text-right font-mono text-[13px] ${active ? "text-brand-ink" : "text-muted-foreground"}`}>
               {value}
-            </p>
-          </div>
-          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+            </span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2} />
+          </span>
         </button>
       </DrawerTrigger>
       <DrawerContent className="max-h-[85vh]">
-        <div className="flex items-center justify-between px-4 pb-2 pt-4">
+        {/* iOS sheet 头:居中标题 + 右侧「完成」 */}
+        <div className="relative flex items-center justify-center px-4 pb-3 pt-5">
+          <span className="font-mono text-[17px] font-semibold">{label}</span>
           <DrawerClose asChild>
-            <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-              <X className="h-4 w-4" strokeWidth={1.5} />
+            <button
+              type="button"
+              className="absolute right-4 font-mono text-[15px] font-medium text-brand-ink active:opacity-60"
+            >
+              完成
             </button>
           </DrawerClose>
-          <span className="font-mono text-sm font-semibold">{label}</span>
-          <div className="h-8 w-8" />
         </div>
         <div className="overflow-y-auto px-4 pb-6">
           {children}
@@ -383,9 +448,9 @@ export function LocationDrawerContent({
     <div>
       {/* Zip code input */}
       <div className="flex items-center gap-2">
-        <Input
+        <FilterInput
           placeholder="输入 Zip Code"
-          className="h-9 flex-1 font-mono text-xs"
+          className="flex-1"
           inputMode="numeric"
           maxLength={5}
           value={zip}
@@ -399,7 +464,7 @@ export function LocationDrawerContent({
         {zip && (
           <button
             type="button"
-            className="font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            className="shrink-0 font-mono text-[13px] text-brand-ink active:opacity-60"
             onClick={() => {
               setZip("");
               onUpdate("location", "");
@@ -409,29 +474,32 @@ export function LocationDrawerContent({
           </button>
         )}
       </div>
-      <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+      <p className="mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
         {/^\d{5}$/.test(filters.location)
           ? `以 Zip ${filters.location} 为中心按距离筛选`
           : "不填则以自动定位的位置计算距离"}
       </p>
 
       {/* 距离范围 */}
-      <div className="mt-4 border-t border-border pt-4">
-        <p className="font-mono text-xs font-medium">距离范围</p>
-        <div className="mt-2 flex flex-wrap gap-2">
+      <div className="mt-5">
+        <SectionTitle>距离范围</SectionTitle>
+        <div className="mt-2.5 flex flex-wrap gap-2">
           {["", "10", "25", "50", "100", "200"].map((v) => (
             <button
               key={v}
               type="button"
-              className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxDistance === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-              onClick={() => onUpdate("maxDistance", v)}
+              className={pillCls(filters.maxDistance === v)}
+              onClick={() => {
+                triggerHaptic();
+                onUpdate("maxDistance", v);
+              }}
             >
               {v === "" ? "不限" : `≤${v} mi`}
             </button>
           ))}
         </div>
-        <Input
-          className="mt-2 h-9 font-mono text-xs"
+        <FilterInput
+          className="mt-2.5"
           placeholder="自定义距离 (miles)"
           inputMode="numeric"
           value={filters.maxDistance}
@@ -451,8 +519,11 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
   return (
     <button
       type="button"
-      className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${selected ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
-      onClick={onToggle}
+      className={`flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-mono text-[13px] transition-colors ${selected ? "bg-brand/30 font-medium text-brand-ink" : "active:bg-muted/60"}`}
+      onClick={() => {
+        triggerHaptic();
+        onToggle();
+      }}
     >
       <span className="flex h-7 w-7 shrink-0 items-center justify-center">
         {logo ? (
@@ -462,7 +533,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
         )}
       </span>
       <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
-      {selected && <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />}
+      {selected && <Check className="h-4 w-4 shrink-0 text-brand-ink" strokeWidth={2} />}
     </button>
   );
 }
@@ -498,19 +569,22 @@ export function BrandDrawerContent({
             <button
               key={make}
               type="button"
-              className="flex items-center gap-1 rounded-full bg-foreground px-2 py-1 font-mono text-[11px] text-background transition-colors"
-              onClick={() => onUpdate("make", toggleInList(filters.make, make))}
+              className="flex items-center gap-1.5 rounded-full bg-brand px-3 py-1.5 font-mono text-xs font-medium text-primary-foreground transition-colors active:opacity-80"
+              onClick={() => {
+                triggerHaptic();
+                onUpdate("make", toggleInList(filters.make, make));
+              }}
             >
               {getBrandLogoUrl(make) && (
                 <img src={getBrandLogoUrl(make)!} alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
               )}
               {MAKES_ZH[make] || make}
-              <X className="h-2.5 w-2.5" strokeWidth={2} />
+              <X className="h-3 w-3" strokeWidth={2} />
             </button>
           ))}
           <button
             type="button"
-            className="px-2 py-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+            className="px-2 py-1.5 font-mono text-xs text-muted-foreground active:text-foreground"
             onClick={() => onUpdate("make", "")}
           >
             清除
@@ -518,9 +592,8 @@ export function BrandDrawerContent({
         </div>
       )}
 
-      <Input
+      <FilterInput
         placeholder="搜索品牌..."
-        className="font-mono text-xs"
         value={brandSearch}
         onChange={(e) => setBrandSearch(e.target.value)}
       />
@@ -528,7 +601,7 @@ export function BrandDrawerContent({
       {/* Hot brands grid */}
       {!isSearching && !showAll && (
         <>
-          <p className="font-mono text-[11px] text-muted-foreground">热门品牌</p>
+          <p className="px-1 font-mono text-[13px] font-semibold">热门品牌</p>
           <div className="grid grid-cols-4 gap-2">
             {HOT_MAKES.map((make) => {
               const logo = getBrandLogoUrl(make);
@@ -537,8 +610,11 @@ export function BrandDrawerContent({
                 <button
                   key={make}
                   type="button"
-                  className={`flex flex-col items-center gap-1.5 rounded-xl p-2.5 transition-colors ${selected ? "bg-primary/10 text-primary" : "bg-card hover:bg-muted/40"}`}
-                  onClick={() => onUpdate("make", toggleInList(filters.make, make))}
+                  className={`flex flex-col items-center gap-1.5 rounded-[18px] p-2.5 transition-colors ${selected ? "bg-brand/30 text-brand-ink" : PILL_OFF}`}
+                  onClick={() => {
+                    triggerHaptic();
+                    onUpdate("make", toggleInList(filters.make, make));
+                  }}
                 >
                   <span className="flex h-8 w-8 items-center justify-center">
                     {logo ? (
@@ -554,7 +630,7 @@ export function BrandDrawerContent({
           </div>
           <button
             type="button"
-            className="flex w-full items-center justify-center gap-1 rounded-xl bg-card py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
+            className={`flex w-full items-center justify-center gap-1 rounded-full py-2.5 font-mono text-[13px] text-muted-foreground transition-colors active:text-foreground ${IOS_FILL}`}
             style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
             onClick={() => setShowAll(true)}
           >
@@ -570,7 +646,7 @@ export function BrandDrawerContent({
           {!isSearching && (
             <button
               type="button"
-              className="mb-1 flex items-center gap-1 font-mono text-[11px] text-muted-foreground hover:text-foreground"
+              className={`mb-2 rounded-full px-3.5 py-2 font-mono text-[13px] text-muted-foreground transition-colors active:text-foreground ${IOS_FILL}`}
               onClick={() => setShowAll(false)}
             >
               ← 返回热门
@@ -578,11 +654,14 @@ export function BrandDrawerContent({
           )}
           <button
             type="button"
-            className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${!filters.make ? "bg-primary/10 font-medium text-primary" : "hover:bg-muted/50"}`}
-            onClick={() => onUpdate("make", "")}
+            className={`flex w-full items-center justify-between rounded-2xl px-3 py-3 font-mono text-[13px] transition-colors ${!filters.make ? "bg-brand/30 font-medium text-brand-ink" : "active:bg-muted/60"}`}
+            onClick={() => {
+              triggerHaptic();
+              onUpdate("make", "");
+            }}
           >
             <span>不限品牌</span>
-            {!filters.make && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+            {!filters.make && <Check className="h-4 w-4 text-brand-ink" strokeWidth={2} />}
           </button>
           {displayMakes.map((make) => (
             <BrandItem
@@ -637,7 +716,8 @@ export function MobileFilterDrawer({
     <div>
       {/* Location */}
       <FilterRow
-        icon={<MapPin className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<MapPin className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-blue-500"
         label="地区"
         value={getLocationLabel(filters)}
         active={!!filters.location}
@@ -647,7 +727,8 @@ export function MobileFilterDrawer({
 
       {/* Brand */}
       <FilterRow
-        icon={<Car className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<Car className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-red-500"
         label="品牌"
         value={getBrandLabel(filters)}
         active={!!filters.make}
@@ -658,7 +739,8 @@ export function MobileFilterDrawer({
       {/* Model — only shown when exactly one make is selected */}
       {modelOptions && modelOptions.length > 0 && (
         <FilterRow
-          icon={<CarFront className="h-4 w-4" strokeWidth={1.5} />}
+          icon={<CarFront className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+          color="text-teal-500"
           label="车型"
           value={getModelLabel(filters)}
           active={!!filters.model}
@@ -674,7 +756,8 @@ export function MobileFilterDrawer({
 
       {/* Body style */}
       <FilterRow
-        icon={<CarFront className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<CarFront className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-indigo-500"
         label="车身类型"
         value={getBodyStyleSummary(filters)}
         active={!!filters.bodyStyle}
@@ -688,7 +771,8 @@ export function MobileFilterDrawer({
 
       {/* Price, monthly payment & Year */}
       <FilterRow
-        icon={<DollarSign className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<DollarSign className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-green-600"
         label="价格 / 月供"
         value={getPriceYearLabel(filters)}
         active={!!(filters.minPrice || filters.maxPrice || filters.maxPayment || filters.minYear || filters.maxYear)}
@@ -696,10 +780,9 @@ export function MobileFilterDrawer({
         <div className="space-y-6">
           {/* Price */}
           <div>
-            <p className="font-mono text-xs font-medium">价格范围</p>
-            <div className="mt-2 flex items-center gap-2">
-              <Input
-                className="h-9 font-mono text-xs"
+            <SectionTitle>价格范围</SectionTitle>
+            <div className="mt-2.5 flex items-center gap-2">
+              <FilterInput
                 placeholder="最低价"
                 inputMode="numeric"
                 value={filters.minPrice}
@@ -709,8 +792,7 @@ export function MobileFilterDrawer({
                 }}
               />
               <span className="font-mono text-xs text-muted-foreground">-</span>
-              <Input
-                className="h-9 font-mono text-xs"
+              <FilterInput
                 placeholder="最高价"
                 inputMode="numeric"
                 value={filters.maxPrice}
@@ -721,7 +803,7 @@ export function MobileFilterDrawer({
               />
             </div>
             <Slider
-              className="mt-3"
+              className="mt-4"
               min={0}
               max={PRICE_STOPS.length - 1}
               step={1}
@@ -741,12 +823,15 @@ export function MobileFilterDrawer({
 
           {/* Monthly payment budget */}
           <div>
-            <p className="font-mono text-xs font-medium">月供预算</p>
-            <div className="mt-2 flex flex-wrap gap-2">
+            <SectionTitle>月供预算</SectionTitle>
+            <div className="mt-2.5 flex flex-wrap gap-2">
               <button
                 type="button"
-                className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!filters.maxPayment ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-                onClick={() => update("maxPayment", "")}
+                className={pillCls(!filters.maxPayment)}
+                onClick={() => {
+                  triggerHaptic();
+                  update("maxPayment", "");
+                }}
               >
                 不限
               </button>
@@ -754,15 +839,18 @@ export function MobileFilterDrawer({
                 <button
                   key={v}
                   type="button"
-                  className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.maxPayment === v ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-                  onClick={() => update("maxPayment", v)}
+                  className={pillCls(filters.maxPayment === v)}
+                  onClick={() => {
+                    triggerHaptic();
+                    update("maxPayment", v);
+                  }}
                 >
                   ≤${v}/月
                 </button>
               ))}
             </div>
-            <Input
-              className="mt-2 h-9 font-mono text-xs"
+            <FilterInput
+              className="mt-2.5"
               placeholder="自定义月供 ($/月)"
               inputMode="numeric"
               value={filters.maxPayment}
@@ -771,17 +859,16 @@ export function MobileFilterDrawer({
                 update("maxPayment", val);
               }}
             />
-            <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
+            <p className="mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
               按 0 首付 / 6.5% APR / 60 期估算
             </p>
           </div>
 
           {/* Year */}
           <div>
-            <p className="font-mono text-xs font-medium">年份范围</p>
-            <div className="mt-2 flex items-center gap-2">
-              <Input
-                className="h-9 font-mono text-xs"
+            <SectionTitle>年份范围</SectionTitle>
+            <div className="mt-2.5 flex items-center gap-2">
+              <FilterInput
                 placeholder="最早年份"
                 inputMode="numeric"
                 maxLength={4}
@@ -792,8 +879,7 @@ export function MobileFilterDrawer({
                 }}
               />
               <span className="font-mono text-xs text-muted-foreground">-</span>
-              <Input
-                className="h-9 font-mono text-xs"
+              <FilterInput
                 placeholder="最新年份"
                 inputMode="numeric"
                 maxLength={4}
@@ -805,7 +891,7 @@ export function MobileFilterDrawer({
               />
             </div>
             <Slider
-              className="mt-3"
+              className="mt-4"
               min={1999}
               max={2026}
               step={1}
@@ -825,18 +911,19 @@ export function MobileFilterDrawer({
 
       {/* Mileage */}
       <FilterRow
-        icon={<Gauge className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<Gauge className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-orange-500"
         label="最高里程"
         value={filters.maxMileage ? `≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi` : "不限"}
         active={!!filters.maxMileage}
       >
         <div>
-          <p className="font-mono text-xs font-medium">最高里程</p>
-          <p className="mt-1 font-mono text-[11px] text-foreground">
+          <SectionTitle>最高里程</SectionTitle>
+          <p className={`mt-1.5 font-mono text-[13px] ${filters.maxMileage ? "text-brand-ink" : "text-muted-foreground"}`}>
             {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
           </p>
           <Slider
-            className="mt-3"
+            className="mt-4"
             min={0}
             max={MILEAGE_STOPS.length - 1}
             step={1}
@@ -855,7 +942,8 @@ export function MobileFilterDrawer({
 
       {/* Vehicle Specs */}
       <FilterRow
-        icon={<Palette className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-purple-500"
         label="车辆参数"
         value={getSpecsLabel(filters)}
         active={!!(filters.fuelType || filters.transmission || filters.drivetrain || filters.exteriorColor || filters.interiorColor)}
@@ -863,33 +951,33 @@ export function MobileFilterDrawer({
         <div className="space-y-5">
           {/* Fuel */}
           <div>
-            <p className="mb-2 font-mono text-xs font-medium">燃油类型</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">燃油类型</p>
             <PillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
           </div>
 
           {/* Transmission — hidden when exclusively electric */}
           {!isElectric && (
             <div>
-              <p className="mb-2 font-mono text-xs font-medium">变速箱</p>
+              <p className="mb-2.5 font-mono text-[13px] font-semibold">变速箱</p>
               <PillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
             </div>
           )}
 
           {/* Drivetrain */}
           <div>
-            <p className="mb-2 font-mono text-xs font-medium">驱动方式</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">驱动方式</p>
             <PillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
           </div>
 
           {/* Exterior Color */}
           <div>
-            <p className="mb-2 font-mono text-xs font-medium">外观颜色</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">外观颜色</p>
             <ColorPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
           </div>
 
           {/* Interior Color */}
           <div>
-            <p className="mb-2 font-mono text-xs font-medium">内饰颜色</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">内饰颜色</p>
             <ColorPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
           </div>
         </div>
@@ -897,7 +985,8 @@ export function MobileFilterDrawer({
 
       {/* Seller type */}
       <FilterRow
-        icon={<Users className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<Users className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-sky-500"
         label="卖家类型"
         value={getSellerLabel(filters)}
         active={!!filters.sellerType}
@@ -915,7 +1004,8 @@ export function MobileFilterDrawer({
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
         <FilterRow
-          icon={<ListChecks className="h-4 w-4" strokeWidth={1.5} />}
+          icon={<ListChecks className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+          color="text-amber-500"
           label="车辆配置"
           value={getFeaturesLabel(filters)}
           active={!!filters.features}
@@ -926,60 +1016,55 @@ export function MobileFilterDrawer({
               value={filters.features}
               onChange={(v) => update("features", v)}
             />
-            <p className="mt-2 font-mono text-[10px] text-muted-foreground">需同时满足所选配置</p>
+            <p className="mt-2 px-1 font-mono text-[11px] text-muted-foreground">需同时满足所选配置</p>
           </div>
         </FilterRow>
       )}
 
       {/* More conditions: deal rating / price drop / history & assurance / listed within */}
       <FilterRow
-        icon={<BadgePercent className="h-4 w-4" strokeWidth={1.5} />}
+        icon={<BadgePercent className="h-[18px] w-[18px]" strokeWidth={1.5} />}
+        color="text-pink-500"
         label="更多条件"
         value={getMoreLabel(filters)}
         active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.hasVideo || filters.hasPrice)}
       >
         <div className="space-y-5">
-          {/* Deal rating & price dropped toggles */}
-          <div className="space-y-2">
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters.dealRating === "good" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
-              onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
-            >
-              <span>只看好价（好价及以上）</span>
-              {filters.dealRating === "good" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-            </button>
-            <button
-              type="button"
-              className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters.priceDropped === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
-              onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
-            >
-              <span>只看降价车源</span>
-              {filters.priceDropped === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-            </button>
+          {/* Deal rating & price dropped toggles — iOS 分组开关卡 */}
+          <div className={`overflow-hidden rounded-[22px] ${IOS_FILL}`}>
+            <ToggleRow
+              label="只看好价（好价及以上）"
+              checked={filters.dealRating === "good"}
+              onChange={(v) => update("dealRating", v ? "good" : "")}
+            />
+            <ToggleRow
+              label="只看降价车源"
+              checked={filters.priceDropped === "true"}
+              onChange={(v) => update("priceDropped", v ? "true" : "")}
+            />
             {CONDITION_TOGGLES.map((t) => (
-              <button
+              <ToggleRow
                 key={t.key}
-                type="button"
-                className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 font-mono text-xs transition-colors ${filters[t.key] === "true" ? "bg-primary/10 font-medium text-primary" : "bg-card hover:bg-muted/50"}`}
-                onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
-              >
-                <span>{t.label}</span>
-                {filters[t.key] === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
-              </button>
+                label={t.label}
+                checked={filters[t.key] === "true"}
+                onChange={(v) => update(t.key, v ? "true" : "")}
+              />
             ))}
           </div>
 
           {/* Listed within */}
           <div>
-            <p className="mb-2 font-mono text-xs font-medium">上架时间</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">上架时间</p>
             <div className="flex flex-wrap gap-2">
               {LISTED_WITHIN_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
                   type="button"
-                  className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${filters.listedWithin === opt.value ? "bg-foreground text-background" : "bg-muted hover:bg-muted/70"}`}
-                  onClick={() => update("listedWithin", opt.value)}
+                  className={pillCls(filters.listedWithin === opt.value)}
+                  onClick={() => {
+                    triggerHaptic();
+                    update("listedWithin", opt.value);
+                  }}
                 >
                   {opt.label}
                 </button>
@@ -989,20 +1074,19 @@ export function MobileFilterDrawer({
         </div>
       </FilterRow>
 
-      {/* Reset */}
+      {/* Reset — iOS 红色操作按钮 */}
       {activeCount > 0 && (
         <div className="px-4 pt-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-full gap-1 font-mono text-xs text-muted-foreground"
+          <button
+            type="button"
+            className={`flex h-12 w-full items-center justify-center rounded-full font-mono text-[15px] font-medium text-destructive transition-opacity active:opacity-70 ${IOS_FILL}`}
             onClick={() => {
+              triggerHaptic();
               onFilter({ ...INITIAL_FILTERS, keyword: filters.keyword });
             }}
           >
-            <X className="h-3 w-3" strokeWidth={1.5} />
             清除全部筛选 ({activeCount})
-          </Button>
+          </button>
         </div>
       )}
     </div>

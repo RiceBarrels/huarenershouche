@@ -109,7 +109,7 @@ export function MobileTabBar() {
           ],
         },
         selectedId: activeHref(pathnameRef.current),
-        tint: "#07c160",
+        tint: "#89fcd2",
       });
       listener = await LiquidGlassNav.addListener("tabSelected", ({ id }) => {
         router.push(id);
@@ -177,7 +177,7 @@ export function MobileTabBar() {
       )}
       <nav
         data-bottom-nav=""
-        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/95 backdrop-blur-sm md:hidden"
+        className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-sm md:hidden"
       >
         {/* 发布选择菜单:发布车辆 / 社区发帖 */}
         <AnimatePresence>
@@ -193,7 +193,7 @@ export function MobileTabBar() {
                 onClick={() => router.push("/post")}
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-muted"
               >
-                <Car className="h-5 w-5 text-primary" strokeWidth={1.8} />
+                <Car className="h-5 w-5 text-brand-ink" strokeWidth={1.8} />
                 <span className="text-sm">发布车辆</span>
               </button>
               <div className="h-px bg-border" />
@@ -201,7 +201,7 @@ export function MobileTabBar() {
                 onClick={() => router.push("/community/new")}
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-muted"
               >
-                <MessageSquare className="h-5 w-5 text-primary" strokeWidth={1.8} />
+                <MessageSquare className="h-5 w-5 text-brand-ink" strokeWidth={1.8} />
                 <span className="text-sm">社区发帖</span>
               </button>
             </motion.div>

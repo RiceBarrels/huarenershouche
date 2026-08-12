@@ -417,7 +417,7 @@ export default function NewPostPage() {
             {/* 媒体上传:方形缩略图 + 加号块(支持拖拽);桌面在右栏换行平铺 */}
             <div
               className={`flex gap-3 overflow-x-auto pb-1 scrollbar-none rounded-xl transition-colors md:flex-wrap md:overflow-visible ${
-                dragging ? "bg-muted/80 ring-2 ring-primary/30" : ""
+                dragging ? "bg-muted/80 ring-2 ring-brand-ink/40" : ""
               }`}
               onDragOver={(e) => {
                 e.preventDefault();
@@ -553,7 +553,7 @@ export default function NewPostPage() {
                     onClick={() => setType(t.key)}
                     className={`rounded-full px-4 py-2 text-sm transition-colors ${
                       active
-                        ? "bg-primary/10 font-medium text-primary"
+                        ? "bg-primary/30 font-medium text-brand-ink"
                         : "bg-muted text-muted-foreground active:bg-muted/70"
                     }`}
                   >
@@ -602,7 +602,7 @@ export default function NewPostPage() {
                           onClick={() => toggleTag(tag)}
                           className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
                             selected
-                              ? "bg-primary/10 text-primary"
+                              ? "bg-primary/30 text-brand-ink"
                               : "bg-muted text-muted-foreground active:bg-muted/70"
                           }`}
                         >
@@ -649,7 +649,7 @@ export default function NewPostPage() {
                         <input
                           key={label}
                           type={inputType}
-                          className="rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          className="rounded-xl bg-muted px-3 py-2.5 text-sm text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                           aria-label={label}
                           placeholder={`${label} ${ph}`}
                           value={value}

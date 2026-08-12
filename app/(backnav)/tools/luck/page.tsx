@@ -51,9 +51,9 @@ export default function LuckToolPage() {
         </h1>
         <p className="mt-1 font-mono text-xs text-muted-foreground">{today}</p>
 
-        <div className="mt-4 rounded-xl bg-primary/10 p-5 text-center">
+        <div className="mt-4 rounded-xl bg-primary/30 p-5 text-center">
           <p className="font-mono text-xs text-muted-foreground">今日提车指数</p>
-          <p className="mt-1 font-mono text-4xl font-bold text-primary">{score}</p>
+          <p className="mt-1 font-mono text-4xl font-bold text-brand-ink">{score}</p>
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-3">

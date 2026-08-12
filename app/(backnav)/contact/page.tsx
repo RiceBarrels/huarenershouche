@@ -133,7 +133,7 @@ export default function ContactPage() {
         {/* Contact form */}
         {sent ? (
           <div className="mt-6 flex flex-col items-center rounded-[26px] bg-card py-10">
-            <CheckCircle className="h-8 w-8 text-brand" strokeWidth={1.5} />
+            <CheckCircle className="h-8 w-8 text-brand-ink" strokeWidth={1.5} />
             <p className="mt-3 font-mono text-sm font-semibold">消息已发送</p>
             <p className="mt-1 font-mono text-xs text-muted-foreground">我们会尽快回复您</p>
             <Button

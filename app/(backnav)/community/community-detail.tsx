@@ -741,7 +741,7 @@ export default function CommunityDetailPage({
             {userId ? (
               <textarea
                 ref={inputRef}
-                className="min-h-9 flex-1 resize-none rounded-xl bg-muted/50 px-3 py-2 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+                className="min-h-9 flex-1 resize-none rounded-xl bg-muted/50 px-3 py-2 font-mono text-sm transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 placeholder={
                   replyTo ? `回复 @${replyTo.name}...` : "说点什么..."
                 }

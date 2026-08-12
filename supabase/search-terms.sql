@@ -1,4 +1,5 @@
--- 全站搜索词统计(手动在 Supabase SQL Editor 执行)
+-- 社区搜索词统计(手动在 Supabase SQL Editor 执行)
+-- 仅社区使用 —— 买车搜索词走独立的 car_search_terms(见 car-search-terms.sql)。
 -- 前端:社区搜索在 input 失焦 / 点击推荐词时调用 log_search_term 记一次;
 -- 「猜你想搜」聚合最近 30 天全站搜索词按热度推荐(lib/search-suggestions.ts)。
 -- 按天分桶便于做时间衰减;只存词频、不存 user_id,无隐私暴露。

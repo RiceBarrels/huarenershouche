@@ -34,7 +34,7 @@ export function ThemeOptions({ onSelect }: { onSelect?: () => void }) {
             <Icon className="h-4 w-4" strokeWidth={1.5} />
             {opt.label}
             {selected && (
-              <Check className="ml-auto h-4 w-4 text-primary" strokeWidth={2} />
+              <Check className="ml-auto h-4 w-4 text-brand-ink" strokeWidth={2} />
             )}
           </button>
         );

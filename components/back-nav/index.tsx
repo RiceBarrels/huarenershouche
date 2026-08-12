@@ -26,7 +26,7 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
 
   return (
     <nav
-      className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-background/95 backdrop-blur-sm px-4 md:hidden"
+      className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 md:hidden"
       style={{
         paddingTop: "env(safe-area-inset-top, 0px)",
       }}

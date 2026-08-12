@@ -167,7 +167,7 @@ export default function DealerApplyPage() {
           ) : verifiedStore || profile?.account_type === "dealer" ? (
             <div className="rounded-[26px] bg-card p-5">
               <div className="flex items-center gap-2">
-                <BadgeCheck className="h-5 w-5 text-brand" strokeWidth={1.5} />
+                <BadgeCheck className="h-5 w-5 text-brand-ink" strokeWidth={1.5} />
                 <p className="font-mono text-[15px] font-semibold">你已是认证车行</p>
               </div>
               <p className="mt-2 font-mono text-xs leading-relaxed text-muted-foreground">

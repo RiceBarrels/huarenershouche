@@ -68,7 +68,7 @@ export default function PlateToolPage() {
 
         {result && (
           <div className="mt-4 rounded-xl bg-card p-5 text-center">
-            <p className="font-mono text-5xl font-bold text-primary">{result.score}</p>
+            <p className="font-mono text-5xl font-bold text-brand-ink">{result.score}</p>
             <p className="mt-2 font-mono text-sm font-medium">{result.comment}</p>
             {result.tags.length > 0 && (
               <div className="mt-3 flex flex-wrap justify-center gap-1.5">

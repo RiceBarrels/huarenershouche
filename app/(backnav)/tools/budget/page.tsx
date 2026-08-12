@@ -44,9 +44,9 @@ export default function BudgetToolPage() {
             />
           </div>
         </div>
-        <div className="mt-3 rounded-xl bg-primary/10 p-4">
+        <div className="mt-3 rounded-xl bg-primary/30 p-4">
           <p className="font-mono text-xs text-muted-foreground">约可购买</p>
-          <p className="mt-1 font-mono text-2xl font-bold text-primary">
+          <p className="mt-1 font-mono text-2xl font-bold text-brand-ink">
             ${price.toLocaleString()} 以内
           </p>
           <p className="mt-1 font-mono text-[11px] text-muted-foreground">

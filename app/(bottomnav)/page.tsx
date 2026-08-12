@@ -475,7 +475,7 @@ export default function Home() {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -56, opacity: 0 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="fixed inset-x-0 top-0 z-40 border-b border-border bg-background/95 backdrop-blur-md md:hidden"
+            className="fixed inset-x-0 top-0 z-40 border-b border-border bg-card/95 backdrop-blur-md md:hidden"
             style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}
           >
             <form
@@ -509,7 +509,7 @@ export default function Home() {
 
       {/* Hero — typographic, grid backdrop */}
       <section 
-        className="relative overflow-hidden px-4 pt-4 bg-linear-160 from-primary/50 via-background dark:from-primary/15"
+        className="relative overflow-hidden p-4 rounded-b-lg bg-linear-160 from-primary/50 via-card dark:from-primary/15"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
       >
         {/* Grid backdrop with subtle parallax */}
@@ -564,7 +564,7 @@ export default function Home() {
             <span className="sr-only">常來車網 - 北美华人二手车交易平台，买车卖车免费发布</span>
             <span aria-hidden="true" className="block">华人买车</span>
             <span aria-hidden="true" className="block">
-              就上常來車網<span className="animate-cursor-blink text-brand">_</span>
+              就上常來車網<span className="animate-cursor-blink text-brand-ink">_</span>
             </span>
           </h1>
           <p className="mt-4 hidden font-mono text-sm text-muted-foreground md:block md:text-base">
@@ -880,7 +880,7 @@ export default function Home() {
                 新上好车
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
               </p>
-              <p className="font-mono text-[10px] text-brand">最近 3 天上架</p>
+              <p className="font-mono text-[10px] text-brand-ink">最近 3 天上架</p>
               <div className="mt-2 space-y-2">
                 {featured.slice(0, 2).map((c) => (
                   <div key={c.id} className="flex items-center gap-1.5">
