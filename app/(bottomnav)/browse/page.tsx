@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useMemo, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { EASE } from "@/lib/motion";
@@ -57,6 +57,9 @@ import type { DbCar } from "@/lib/types";
 // 车源列表双层缓存(社区同款):session 命中直接复用不重拉,
 // localStorage 冷启动兜底,先展示后台刷新
 const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
+
+// 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // 响应式列数(与社区瀑布流一致):2 / md 3 / xl 4
 function useColumnCount(): number {
@@ -132,6 +135,7 @@ function BrowseContent() {
 
   // Load search history on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage,仅首帧一次
     setSearchHistory(getSearchHistory());
   }, []);
 
@@ -185,6 +189,7 @@ function BrowseContent() {
 
   // Sync filters when URL params change (e.g. from homepage search link)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 同步外部 URL 状态
     setFiltersRaw(filtersFromParams(searchParams));
     const s = (searchParams.get("sort") as SortKey) || "newest";
     setSortRaw(s);
@@ -216,7 +221,7 @@ function BrowseContent() {
     if (allCars.length > 0) writeDualCache(BROWSE_CACHE_KEY, allCars);
   }
 
-  useEffect(() => {
+  useIsoLayoutEffect(() => {
     // 双层缓存(社区同款):本会话拉过就直接复用;localStorage 兜底数据先展示、后台刷新
     const cached = readDualCache<DbCar[]>(BROWSE_CACHE_KEY);
     if (cached && cached.data.length > 0) {
@@ -242,7 +247,6 @@ function BrowseContent() {
     }
     window.addEventListener("clc-location-granted", onLocationGranted);
     return () => window.removeEventListener("clc-location-granted", onLocationGranted);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 距离计算基准:优先用「位置」筛选里输入的 Zipcode,没有则用自动定位到的 zip
@@ -254,6 +258,7 @@ function BrowseContent() {
         setUserCoords(coords);
       });
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- zip 失效时清空坐标
       setUserCoords(null);
     }
   }, [effectiveZip]);
@@ -451,6 +456,7 @@ function BrowseContent() {
 
   // 筛选/排序变化时回到第一批
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 条件变化重置分页
     setVisibleCount(24);
   }, [filters, sort]);
 

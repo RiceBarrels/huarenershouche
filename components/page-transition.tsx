@@ -2,13 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useState, useRef } from "react";
-import { Capacitor } from "@capacitor/core";
-
-// iOS 原生壳(Capacitor)内:全屏任意位置左滑均可返回;web 保持仅左缘起手
-const FULL_SWIPE_BACK =
-  typeof window !== "undefined" &&
-  Capacitor.getPlatform() === "ios" &&
-  Capacitor.isNativePlatform();
+import { triggerHaptic } from "@/lib/haptics";
 
 // 起手点在横向交互区(轮播/横向滚动、地图、滑杆、文本输入)内时
 // 不启动全屏返回手势,避免抢占其自身的水平拖拽;可用 data-no-swipe-back 显式豁免
@@ -51,6 +45,13 @@ let _snapshotAt = 0;
 function captureSnapshot() {
   _snapshotScrollY = window.scrollY;
   const el = document.getElementById("page-transition-content");
+  if (el) {
+    // 快照经 dangerouslySetInnerHTML 重新 parse 时 <img> 是全新节点,WebKit 默认
+    // 异步解码,即使命中缓存也可能先画一帧空白。标成同步解码(已加载的活图无感)
+    el.querySelectorAll("img").forEach((img) => {
+      if (img.decoding !== "sync") img.decoding = "sync";
+    });
+  }
   _exitHtml = el ? el.innerHTML : null;
   _snapshotAt = Date.now();
 }
@@ -77,13 +78,15 @@ let _skipAnimation = false;
 let _popstateRouteChangeAt = 0;
 
 // 跨布局组返回((backnav) → (bottomnav))时,正在播滑出动画的 PageTransition
-// 实例会随旧组 layout 一起卸载,动画被掐断。手势提交时把转场进度存到这里
-// (x 每帧从 computed transform 采样),新组实例挂载时接手播完剩余动画。
+// 实例会随旧组 layout 一起卸载,动画被掐断。手势提交时把滑出动画的解析参数
+// 存到这里,新组实例按时间轴在同一条曲线上续播剩余动画。
+// 不能存每帧采样的位移:commit 落在两次采样之间时拿到的是上一帧的值,
+// 接手瞬间画面会倒退一小步(肉眼可见的闪一帧)。
 let _gestureHandoff: {
-  x: number; // 旧页当前滑出位移(px)
+  x0: number; // 松手时顶层位移(px),即滑出动画起点
   vw: number;
-  v: number; // 收尾速度(px/ms,已含基准兜底)
-  at: number; // 最后采样时刻,过期视为无效
+  ms: number; // 滑出动画总时长
+  start: number; // 动画开始时刻;接手时按 elapsed 续播,播完后过期
 } | null = null;
 
 if (typeof window !== "undefined") {
@@ -229,6 +232,16 @@ const TAB_EXACT = new Set(["/", "/browse", "/community", "/account"]);
 const isTabPath = (p: string) =>
   TAB_EXACT.has(p) || p === "/cars" || p.startsWith("/cars/");
 
+// 跨组手势返回接手动画的剩余时长(ms);无进行中的接手返回 0。
+// 供随 (bottomnav) layout 在滑出中途挂载的固定元素(DOM tab bar)同步淡入,
+// 避免 commit 瞬间在还在滑出的旧页上方凭空闪现。须在渲染期调用
+// (PageTransition 的挂载 effect 会清掉断点,effect 里读到的恒为 0)
+export function gestureHandoffRemaining(): number {
+  const h = _gestureHandoff;
+  if (!h) return 0;
+  return Math.max(0, h.start + h.ms - Date.now());
+}
+
 // BackNav 返回按钮触发与手势一致的「当前页滑出」动画;被 edgeBack 实例接管时返回 true
 export function animatedBack(): boolean {
   if (typeof window === "undefined") return false;
@@ -288,9 +301,11 @@ export function PageTransition({
   // 只读不清,StrictMode 下初始化器可能跑两次;模块变量由挂载 effect 统一清
   const [handoff, setHandoff] = useState(() => {
     const h = _gestureHandoff;
-    if (h && Date.now() - h.at < 300 && _exitHtml) {
+    // 有效期 = 动画时间轴 + 余量:commit 落在滑出播完之后(慢加载)时接手已无
+    // 可播内容,直接走 idle 硬切(与旧行为一致)
+    if (h && Date.now() - h.start < h.ms + 300 && _exitHtml) {
       // 快照 HTML 内已含拖拽期的 translateY 滚动包装,渲染时不再叠加偏移
-      return { html: _exitHtml, x: h.x, vw: h.vw, v: h.v };
+      return { html: _exitHtml, ...h };
     }
     return null;
   });
@@ -299,7 +314,8 @@ export function PageTransition({
 
   useEffect(() => {
     if (!edgeBack) return;
-    const g = { armed: false, fromEdge: true, sx: 0, sy: 0, st: 0, lastX: 0, lastT: 0, px: 0, pt: 0 };
+    // past = 手指已越过「松手即提交」的位置阈值(vw/3),用于穿越时触发触觉反馈
+    const g = { armed: false, fromEdge: true, sx: 0, sy: 0, st: 0, lastX: 0, lastT: 0, px: 0, pt: 0, past: false };
 
     function setLayers(dx: number, transition: string) {
       const vw = dragVW.current;
@@ -335,17 +351,9 @@ export function PageTransition({
         dragHoldUntil.current = Date.now() + ms;
         _skipAnimation = true;
         _isBackNavigation = true;
-        // 供跨组接手:每帧采样顶层实际位移,本实例被卸载时新实例从断点继续
-        _gestureHandoff = { x: dx, vw, v: Math.max(velocity, 1.1), at: Date.now() };
-        const trackX = () => {
-          const el = topLayerRef.current;
-          if (!el || !dragRef.current || !_gestureHandoff) return;
-          const m = new DOMMatrixReadOnly(getComputedStyle(el).transform);
-          _gestureHandoff.x = m.m41;
-          _gestureHandoff.at = Date.now();
-          requestAnimationFrame(trackX);
-        };
-        requestAnimationFrame(trackX);
+        // 供跨组接手:存动画解析参数,新实例用负 delay 在同一条曲线上续播,
+        // 与本实例被卸载前的最后一帧逐像素衔接
+        _gestureHandoff = { x0: dx, vw, ms, start: Date.now() };
         const backAt = Date.now();
         router.back();
         setTimeout(() => {
@@ -361,7 +369,9 @@ export function PageTransition({
               }
             }, 2400);
           } else {
-            // 无历史可退(没发生跨路由 popstate):撤掉覆盖层弹回当前页
+            // 无历史可退(没发生跨路由 popstate):撤掉覆盖层弹回当前页,
+            // 断点作废,防止之后某次正常挂载误接手
+            _gestureHandoff = null;
             dragRef.current = false;
             restoreScrollTarget.current = dragScrollY.current;
             setDrag(false);
@@ -386,9 +396,10 @@ export function PageTransition({
       if (document.querySelector("[data-vaul-drawer]")) return;
       const t = e.touches[0];
       if (!t) return;
+      // 全屏任意位置左滑均可返回(原生壳与 web 一致);
+      // 左缘起手门槛更低,全屏起手要避开横向交互区且需有底层快照
       const fromEdge = t.clientX <= 24;
       if (!fromEdge) {
-        if (!FULL_SWIPE_BACK) return;
         if (inHorizontalPanRegion(e.target)) return;
         // 无底层快照(刷新/深链)时拖出去只会露空白,不接管
         if (!_snapshotStack[_snapshotStack.length - 1]?.html) return;
@@ -415,6 +426,7 @@ export function PageTransition({
         }
         if (dx > (g.fromEdge ? 10 : 18)) {
           g.armed = false;
+          g.past = false;
           dragRef.current = true;
           dragScrollY.current = window.scrollY;
           dragVW.current = window.innerWidth;
@@ -427,6 +439,12 @@ export function PageTransition({
       if (!dragRef.current) return;
       e.preventDefault();
       const dx = Math.max(0, t.clientX - g.sx);
+      // 越过提交阈值轻震一下;往回带退到阈值内(= 松手会取消)再震一下提示
+      const past = dx > dragVW.current * 0.33;
+      if (past !== g.past) {
+        g.past = past;
+        triggerHaptic();
+      }
       g.px = g.lastX;
       g.pt = g.lastT;
       g.lastX = t.clientX;
@@ -490,40 +508,41 @@ export function PageTransition({
     _gestureHandoff = null;
   }, []);
 
-  // 播放接手的剩余滑出动画:旧页快照从断点继续滑出,新页(children)视差跟进
+  // 播放接手的剩余滑出动画:用负 delay 把旧实例那条 RELEASE 曲线原样续播
+  // (完整关键帧 + 已流逝时长),位置与压暗都落在同一条时间轴上,无接缝;
+  // 旧页快照继续滑出,新页(children)视差跟进
   useIsoLayoutEffect(() => {
     if (!handoff) return;
-    const remaining = Math.max(0, handoff.vw - handoff.x);
-    const ms = Math.round(Math.min(400, Math.max(80, remaining / handoff.v)));
+    const elapsed = Math.min(handoff.ms, Date.now() - handoff.start);
     const opts: KeyframeAnimationOptions = {
-      duration: ms,
+      duration: handoff.ms,
+      delay: -elapsed,
       easing: RELEASE_EASING,
       fill: "forwards",
     };
     const anims = [
       topLayerRef.current?.animate(
         [
-          { transform: `translateX(${-0.3 * remaining}px)` },
+          { transform: `translateX(${-0.3 * (handoff.vw - handoff.x0)}px)` },
           { transform: "translateX(0px)" },
         ],
         opts,
       ),
       handoffTopRef.current?.animate(
         [
-          { transform: `translateX(${handoff.x}px)` },
+          { transform: `translateX(${handoff.x0}px)` },
           { transform: `translateX(${handoff.vw}px)` },
         ],
         opts,
       ),
       handoffDimRef.current?.animate(
-        [{ opacity: _pushDim * (1 - handoff.x / handoff.vw) }, { opacity: 0 }],
+        [{ opacity: _pushDim * (1 - handoff.x0 / handoff.vw) }, { opacity: 0 }],
         opts,
       ),
     ];
-    const t = setTimeout(() => {
-      anims.forEach((a) => a?.cancel());
-      setHandoff(null);
-    }, ms + 40);
+    // 只触发重渲染,cancel 留给 cleanup(随卸载 commit 同帧执行):
+    // 先 cancel 会让快照层回弹到行内样式的起点,重渲染前可能闪现一帧
+    const t = setTimeout(() => setHandoff(null), handoff.ms - elapsed + 40);
     return () => {
       clearTimeout(t);
       anims.forEach((a) => a?.cancel());
@@ -637,11 +656,13 @@ export function PageTransition({
             />
           </>
         )}
+        {/* 接手层压过 DOM tab bar(z-50):(bottomnav) 在滑出中途挂载时,
+            tab bar 不得凭空盖在还在滑出的旧页上,只能随左侧露出区域出现 */}
         {handoff && (
           <div
             ref={handoffDimRef}
-            className="fixed inset-0 z-[31] bg-black pointer-events-none"
-            style={{ opacity: _pushDim * (1 - handoff.x / handoff.vw) }}
+            className="fixed inset-0 z-[55] bg-black pointer-events-none"
+            style={{ opacity: _pushDim * (1 - handoff.x0 / handoff.vw) }}
           />
         )}
         {/* 顶层:当前页,跟手拖动(transform 由 setLayers 直接写行内样式,
@@ -669,9 +690,9 @@ export function PageTransition({
           // 跨组接手的旧页快照:从断点位置继续滑出屏幕
           <div
             ref={handoffTopRef}
-            className="fixed inset-0 z-[32] overflow-hidden rounded-[var(--page-corner)] bg-background pointer-events-none"
+            className="fixed inset-0 z-[60] overflow-hidden rounded-[var(--page-corner)] bg-background pointer-events-none"
             style={{
-              transform: `translateX(${handoff.x}px)`,
+              transform: `translateX(${handoff.x0}px)`,
               boxShadow: "var(--push-shadow)",
             }}
           >

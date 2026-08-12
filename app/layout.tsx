@@ -8,11 +8,11 @@ import { IdentityProvider } from "@/components/identity-provider";
 import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import "./globals.css";
 import { InitHaptic } from "@/components/init-haptic";
-import { CornerShapePolyfill } from "@/components/corner-shape-polyfill";
 import { CommunityPrefetch } from "@/components/community-prefetch";
 import { SplashAd } from "@/components/splash-ad";
 import { RealtimeNotifications } from "@/components/realtime-notifications";
 import { CompareBar } from "@/components/compare-bar";
+import { KeyboardSpacer } from "@/components/keyboard-spacer";
 import { StatusBarMask } from "@/components/status-bar-mask";
 import { Analytics } from "@vercel/analytics/next";
 import { SITE_URL } from "@/lib/seo-pages";
@@ -159,10 +159,11 @@ export default function RootLayout({
                 {/* 状态栏遮罩:仅刘海机型 + 滚动越过安全区后淡入 */}
                 <StatusBarMask />
                 {children}
+                {/* 原生键盘弹起时页面底部垫等高空白(文档流内,所有页面生效) */}
+                <KeyboardSpacer />
                 <CommunityPrefetch />
                 <SplashAd />
                 <InitHaptic/>
-                <CornerShapePolyfill />
                 <RealtimeNotifications />
                 <CompareBar />
                 <Analytics />

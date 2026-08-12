@@ -874,7 +874,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-3">
             <Link
               href="/browse?listedWithin=3"
-              className="rounded-2xl bg-gradient-to-b from-primary/15 to-card p-3"
+              className="rounded-lg bg-gradient-to-b from-primary/15 to-card p-3"
             >
               <p className="flex items-center justify-between font-mono text-[15px] font-bold">
                 新上好车
@@ -912,7 +912,7 @@ export default function Home() {
               return (
                 <Link
                   href={useDropped ? "/browse?priceDropped=true" : "/browse"}
-                  className={`rounded-2xl bg-gradient-to-b p-3 ${useDropped ? "from-orange-500/15" : "from-sky-500/15"} to-card`}
+                  className={`rounded-lg bg-gradient-to-b p-3 ${useDropped ? "from-orange-500/15" : "from-sky-500/15"} to-card`}
                 >
                   <p className="flex items-center justify-between font-mono text-[15px] font-bold">
                     {useDropped ? "降价捡漏" : "为你推荐"}

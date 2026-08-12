@@ -8,6 +8,7 @@
 import {
   Suspense,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -32,6 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import type { DbCar } from "@/lib/types";
 import {
   applyCarFilters,
@@ -95,6 +97,17 @@ interface MapStore {
   carImages?: string[];
   carCount?: number;
 }
+
+// 上次视口检索结果双层缓存(社区/车源列表同款):sessionStorage 会话内秒开,
+// localStorage 冷启动兜底;先展示旧结果,相机停稳后照常按视口刷新
+const MAP_CACHE_KEY = "clc_browse_map_v1";
+interface MapCache {
+  cars: DbCar[];
+  stores: MapStore[];
+}
+
+// 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载态
+const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
 // 底部结果面板的三档吸附高度(可见比例):收起 / 半屏 / 全屏
 const SNAPS = [0.1, 0.6, 0.9];
@@ -197,6 +210,18 @@ function BrowseMapContent() {
     });
   }, []);
 
+  // 绘制前还原上次视口结果(双层缓存,社区同款):先秒开旧数据顶住加载态,
+  // 相机停稳后的视口检索会照常覆盖(相当于「先展示、后台刷新」)
+  useIsoLayoutEffect(() => {
+    const hit = readDualCache<MapCache>(MAP_CACHE_KEY);
+    if (hit && (hit.data.cars.length > 0 || hit.data.stores.length > 0)) {
+      setCars(hit.data.cars);
+      setStores(hit.data.stores);
+      setFetchedAt(hit.at);
+      setLoading(false);
+    }
+  }, []);
+
   // 视口检索:相机停稳(regionChange)→ 防抖 → 查询该范围内的车源与店铺;
   // 用序号丢弃过期响应(快速连续拖动时只认最后一次)
   const regionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -280,11 +305,15 @@ function BrowseMapContent() {
           : { ...s, avatar_url: avatars.get(s.owner_id) ?? null }
       );
     }
-    setCars((carsRes.data as DbCar[]) || []);
+    const nextCars = (carsRes.data as DbCar[]) || [];
+    setCars(nextCars);
     setStores(nextStores);
     setLoading(false);
     setFetching(false);
     setFetchedAt(Date.now());
+    if (nextCars.length > 0 || nextStores.length > 0) {
+      writeDualCache<MapCache>(MAP_CACHE_KEY, { cars: nextCars, stores: nextStores });
+    }
   }
 
   // 最近一次停稳的视口(相机跟随档位平移、目标点偏移居中都要用)

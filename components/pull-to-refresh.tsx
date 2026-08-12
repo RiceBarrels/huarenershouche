@@ -5,7 +5,8 @@ import { Loader2 } from "lucide-react";
 
 const THRESHOLD = 64;
 const MAX_PULL = 110;
-const SETTLE = "height 0.28s cubic-bezier(0.2, 0.9, 0.3, 1)";
+// 只动 transform(合成器动画),不动 height——每帧改 height 会整页 reflow,拖起来掉帧
+const SETTLE = "transform 0.28s cubic-bezier(0.2, 0.9, 0.3, 1)";
 
 // 达到阈值时轻震一下(原生走 Capacitor Haptics,网页退化到 vibrate)
 function haptic() {
@@ -24,7 +25,6 @@ export function PullToRefresh({
   children: React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const indicatorRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
@@ -37,11 +37,25 @@ export function PullToRefresh({
   const isRefreshing = useRef(false);
   const [refreshing, setRefreshing] = useState(false);
 
+  const settleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 内容整体 translateY 露出挂在上方的指示条;归零后清掉行内 transform,
+  // 不留 stacking context(transform 祖先会改变 fixed 子元素的参照系)
   const updateIndicator = useCallback((distance: number, animate: boolean) => {
-    const el = indicatorRef.current;
+    const el = containerRef.current;
     if (!el) return;
+    if (settleTimer.current) {
+      clearTimeout(settleTimer.current);
+      settleTimer.current = null;
+    }
     el.style.transition = animate ? SETTLE : "none";
-    el.style.height = `${distance}px`;
+    el.style.transform = `translateY(${distance}px)`;
+    if (animate && distance === 0) {
+      settleTimer.current = setTimeout(() => {
+        el.style.transition = "";
+        el.style.transform = "";
+      }, 300);
+    }
     const progress = Math.min(distance / THRESHOLD, 1);
     if (arrowRef.current) {
       arrowRef.current.style.transform = `rotate(${progress * 180}deg)`;
@@ -138,11 +152,11 @@ export function PullToRefresh({
   }, [onRefresh, updateIndicator]);
 
   return (
-    <div ref={containerRef}>
+    <div ref={containerRef} className="relative">
+      {/* 指示条挂在内容上方屏幕外,内容下移时被露出(高度恒定,不参与布局变化) */}
       <div
-        ref={indicatorRef}
-        className="flex items-end justify-center overflow-hidden"
-        style={{ height: 0 }}
+        className="absolute inset-x-0 bottom-full flex items-end justify-center"
+        style={{ height: MAX_PULL }}
       >
         <div className="flex items-center justify-center pb-3">
           {refreshing ? (

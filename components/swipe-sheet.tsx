@@ -18,8 +18,9 @@ import {
   animate,
 } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
+import { triggerHaptic } from "@/lib/haptics";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
-import { getDeviceCornerPx } from "@/lib/device-corner";
+import { getDeviceCornerPx, hasDeviceCorner } from "@/lib/device-corner";
 
 const DISMISS_PX = 90; // 位移阈值
 const DISMISS_V = 0.5; // 速度阈值 px/ms
@@ -43,10 +44,12 @@ function releasePushUnder(el: HTMLElement | null, animated: boolean) {
       if (pushUnderLayers > 0) return; // 退场期间又开了新的 push 层
       el.style.transition = "";
       el.style.transform = "";
+      el.style.willChange = "";
     }, 440);
   } else {
     el.style.transition = "";
     el.style.transform = "";
+    el.style.willChange = "";
   }
 }
 // 内容与卡片的交叉溶解:打开时内容早早淡入(图标→App);
@@ -54,6 +57,8 @@ function releasePushUnder(el: HTMLElement | null, animated: boolean) {
 // (App→图标),所以可以溶解得很晚
 const CONTENT_IN = { duration: 0.1, delay: 0.05 };
 const CONTENT_OUT = { duration: 0.14, delay: 0.18 };
+// 全屏(无裁剪)状态的 clip 值;进场的终点、退场 keyframes 的显式起点
+const FULL_CLIP = "inset(0px 0px 0px 0px round 0px)";
 
 export interface OriginRect {
   top: number;
@@ -89,6 +94,13 @@ export function SwipeSheet({
   const y = useMotionValue(0);
   const panelRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const outerRef = useRef<HTMLDivElement>(null);
+  // 进场动画收敛后置 true:清掉外层残留 clip、隐藏被盖死的 hero 层
+  const [settled, setSettled] = useState(false);
+  // 关闭手势起手即置 true:提前恢复 hero 层可见,让 Safari 在拖动中就把
+  // 这张全屏层重新光栅化好,而不是压在松手退场的第一帧(那一帧还有三条
+  // 弹簧同时起步,最容易掉帧)。松手不关闭时复位
+  const [dragActive, setDragActive] = useState(false);
 
   // 拖动时轻微缩小(跟手,保持实心)——仅卡片模式(缩小是「缩回卡片」的前奏);
   // push 模式(无卡片)与 backnav 手势一致,只位移不缩放
@@ -97,13 +109,13 @@ export function SwipeSheet({
       ? 1 - Math.min(0.12, (Math.hypot(x.get(), y.get()) / 320) * 0.12)
       : 1,
   );
-  // 开始关闭手势即给窗口上圆角(iOS 关 App 同款):随拖动距离渐入,
-  // 封顶到设备屏幕圆角(直角屏/web 退回 48px = rounded-lg);
-  // 松手回弹时随位移归零自动退回直角
+  // 关闭手势的窗口圆角(iOS 关 App 同款)。border-radius 一变全屏面板就整层
+  // 重绘,所以绝不逐帧跟位移:
+  // · 圆角屏真机:常驻设备圆角,被屏幕物理圆角遮住,零动画零重绘;
+  // · 直角屏/web:起手一次性淡入 48px(rounded-lg),松手回弹/关闭淡出
   const maxDragRadius = getDeviceCornerPx(48);
-  const dragRadius = useTransform(() =>
-    Math.min(maxDragRadius, Math.hypot(x.get(), y.get()) * 2),
-  );
+  const staticRadius = hasDeviceCorner();
+  const dragRadius = useMotionValue(staticRadius ? maxDragRadius : 0);
 
   const hero = !!(originRect && heroHtml);
   const vw = typeof window !== "undefined" ? window.innerWidth : 1;
@@ -128,6 +140,21 @@ export function SwipeSheet({
       }
     : // 无卡片起点:从右滑入(backnav push 同款),转场中带设备圆角
       { x: "100%" as const, borderRadius: getDeviceCornerPx(48) };
+  // push 模式的窗口圆角:border-radius 一变全屏层就整帧重绘(Safari 尤甚),
+  // 绝不与位移同帧动画:
+  // · 圆角屏真机:常驻设备圆角(被物理圆角遮住),零动画零重绘;
+  // · 直角屏/web:滑动全程保持 48px 纯 transform 移动,落点瞬间切成直角;
+  //   退场起步瞬间切回 48px 后纯 transform 滑出。只各重绘一帧
+  const pushAnimate = {
+    x: 0,
+    borderRadius: staticRadius ? getDeviceCornerPx(48) : 0,
+  };
+  const pushEnterTransition = staticRadius
+    ? PUSH
+    : ({ default: PUSH, borderRadius: { delay: PUSH.duration, duration: 0 } } as const);
+  const pushExitTransition = staticRadius
+    ? PUSH
+    : ({ default: PUSH, borderRadius: { duration: 0 } } as const);
 
   // push 模式背后压暗强度(--push-dim 随主题),挂载时读一次
   const [pushDim] = useState(() =>
@@ -154,6 +181,8 @@ export function SwipeSheet({
     underReleasedRef.current = false;
     pushUnderLayers++;
     const vw = window.innerWidth;
+    // 提前提升为合成层:拖拽中逐帧写 transform 不再触发整页重绘/重光栅化
+    el.style.willChange = "transform";
     el.style.transition = PUSH_CSS;
     const raf = requestAnimationFrame(() => {
       el.style.transform = `translateX(${-0.3 * vw}px)`;
@@ -182,6 +211,13 @@ export function SwipeSheet({
     releasePushUnder(underElRef.current, true);
   }, [isPresent, originRect]);
 
+  // 进场收敛后把外层残留的 no-op clip 换成 none:面板(合成层)拖拽时不再
+  // 每帧被祖先 clip 重新裁剪。退场 keyframes 自带显式起点,不依赖这个值
+  useEffect(() => {
+    if (!settled || !originRect || !isPresent) return;
+    outerRef.current?.style.setProperty("clip-path", "none");
+  }, [settled, originRect, isPresent]);
+
   // 锁定 body 滚动
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -208,7 +244,26 @@ export function SwipeSheet({
       lt: 0,
       vx: 0,
       vy: 0,
-      inHScroll: false,
+      // 起手目标,轴向判定为横向时才做 isInHScroller 祖先链遍历(scrollWidth/
+      // getComputedStyle 都是强制布局读),点按和纵向滚动完全不付这笔钱
+      startTarget: null as EventTarget | null,
+      // 轴向判定时采样一次;y 拖动中 preventDefault 挡住了滚动,值不会变。
+      // 每帧读 scrollTop/scrollHeight 会在布局脏时强制整页同步 reflow,掉帧
+      atTop: false,
+      atBottom: false,
+      // 已越过「松手即关闭」的位移阈值,穿越(双向)时触发触觉反馈
+      past: false,
+      // 起手在 data-sheet-static="y" 内:纵向交给内容自己滚,横滑关闭仍可用
+      yOff: false,
+    };
+
+    // 越过关闭阈值轻震一下;往回带退到阈值内(= 松手会取消)再震一下提示
+    const syncPast = (d: number) => {
+      const past = d > DISMISS_PX;
+      if (past !== st.past) {
+        st.past = past;
+        triggerHaptic();
+      }
     };
 
     // 起点是否在可横向滚动的元素内(如图片轮播):是则横滑交给原生滚动,
@@ -229,14 +284,21 @@ export function SwipeSheet({
       // 慢慢复原(较软的弹簧),从当前拖动位置连续回位
       animate(x, 0, { type: "spring", stiffness: 320, damping: 38 });
       animate(y, 0, { type: "spring", stiffness: 320, damping: 38 });
+      if (!staticRadius) animate(dragRadius, 0, { duration: 0.3, ease: "easeOut" });
     };
 
     const onStart = (e: TouchEvent) => {
-      // 「静态层」(如图片灯箱)内的手势完全不接管:既不横拖也不下拉关闭
-      if (e.target instanceof HTMLElement && e.target.closest("[data-sheet-static]")) {
+      // 「静态层」内的手势不接管:默认(如图片灯箱)横竖全放行;
+      // ="y" 时(如聊天)只放行纵向滚动,横滑关闭仍然可用
+      const staticEl =
+        e.target instanceof HTMLElement
+          ? e.target.closest("[data-sheet-static]")
+          : null;
+      if (staticEl && staticEl.getAttribute("data-sheet-static") !== "y") {
         st.active = false;
         return;
       }
+      st.yOff = !!staticEl;
       const t = e.touches[0];
       st.active = true;
       st.axis = "";
@@ -244,13 +306,13 @@ export function SwipeSheet({
       st.sy = st.ly = t.clientY;
       st.lt = e.timeStamp;
       st.vx = st.vy = 0;
-      // 左缘起手豁免:返回手势优先于轮播横滑(与系统边缘返回一致),
-      // 否则起手落在轮播上时第一滑被轮播吃掉,要滑两次才能关闭
-      st.inHScroll = t.clientX > 24 && isInHScroller(e.target);
+      st.past = false;
+      st.startTarget = e.target;
     };
 
     const onMove = (e: TouchEvent) => {
-      if (!st.active) return;
+      // 已交给原生滚动:立刻返回,不再算速度/位移
+      if (!st.active || st.axis === "scroll") return;
       const t = e.touches[0];
       const dx = t.clientX - st.sx;
       const dy = t.clientY - st.sy;
@@ -261,31 +323,44 @@ export function SwipeSheet({
       st.ly = t.clientY;
       st.lt = e.timeStamp;
 
-      const sc = scrollRef.current;
-      const atTop = !sc || sc.scrollTop <= 0;
-      const atBottom = !sc || sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
-
       if (!st.axis) {
         if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        const sc = scrollRef.current;
+        st.atTop = !sc || sc.scrollTop <= 0;
+        st.atBottom = !sc || sc.scrollTop + sc.clientHeight >= sc.scrollHeight - 1;
         if (Math.abs(dx) > Math.abs(dy)) {
-          st.axis = st.inHScroll ? "scroll" : "x";
-        } else if ((dy > 0 && atTop) || (dy < 0 && atBottom)) {
+          // 左缘起手豁免:返回手势优先于轮播横滑(与系统边缘返回一致),
+          // 否则起手落在轮播上时第一滑被轮播吃掉,要滑两次才能关闭
+          const inHScroll = st.sx > 24 && isInHScroller(st.startTarget);
+          st.axis = inHScroll ? "scroll" : "x";
+        } else if (!st.yOff && ((dy > 0 && st.atTop) || (dy < 0 && st.atBottom))) {
           st.axis = "y";
         } else {
           st.axis = "scroll"; // 交给原生滚动
+        }
+        // 关闭手势起手:窗口圆角一次性淡入(拖动中不再逐帧变化;圆角屏常驻免动画),
+        // 并提前唤醒 hero 层(见 dragActive)
+        if (st.axis === "x" || st.axis === "y") {
+          if (!staticRadius) {
+            animate(dragRadius, maxDragRadius, { duration: 0.18, ease: "easeOut" });
+          }
+          setDragActive(true);
         }
       }
 
       if (st.axis === "x") {
         e.preventDefault();
         x.set(dx);
+        syncPast(Math.abs(dx));
       } else if (st.axis === "y") {
-        if ((dy > 0 && atTop) || (dy < 0 && atBottom)) {
+        if ((dy > 0 && st.atTop) || (dy < 0 && st.atBottom)) {
           e.preventDefault();
           y.set(dy);
+          syncPast(Math.abs(dy));
         } else {
           st.axis = "scroll";
           y.set(0);
+          if (!staticRadius) animate(dragRadius, 0, { duration: 0.2, ease: "easeOut" });
         }
       }
     };
@@ -300,12 +375,18 @@ export function SwipeSheet({
       if (goX || goY) {
         // 从当前拖动位置连续缩回原卡片:拖动位移与退场用同一时长/曲线一起归零,
         // 不再先弹回中间再缩,整段是一次连续的「缩回原位」。
+        // 圆角保持现值不再动画:退场中窗口等比缩小,48px 圆角随 scale 收敛到
+        // ≈ 卡片的 rounded-xl;圆角差额处露出的是背后不透明的 hero 卡片本身,
+        // 视觉无碍,而整个退场的逐帧 border-radius 重绘直接归零
         animate(x, 0, ZOOM);
         animate(y, 0, ZOOM);
         onClose();
         return;
       }
       springBack();
+      // 纯点按(axis 未定,如按返回钮)不复位:touchend 先于 click 触发,
+      // 复位会把刚唤醒的 hero 层又藏回去,click 关闭时白唤醒一场
+      if (st.axis) setDragActive(false);
       st.axis = "";
     };
 
@@ -319,11 +400,17 @@ export function SwipeSheet({
       el.removeEventListener("touchend", onEnd);
       el.removeEventListener("touchcancel", onEnd);
     };
-  }, [x, y, onClose]);
+  }, [x, y, dragRadius, maxDragRadius, staticRadius, onClose]);
 
   // 内容(上层)始终与卡片同轨放大 / 缩回;进/退场都在整段 ~50% 处由内层透明度交叉。
-  // 无卡片起点时退场沿 push 曲线滑回右侧
-  const contentExit = { ...rectVariant, transition: originRect ? ZOOM : PUSH };
+  // 无卡片起点时退场沿 push 曲线滑回右侧。
+  // 进场收敛后行内 clip 被直接换成 none(绕过 framer,省拖拽时的逐帧祖先
+  // 裁剪);framer 内部的 clipPath 值仍是 FULL_CLIP,退场从内部值起播、
+  // 第一帧就覆盖掉 none——收敛后关闭与进场中途打断关闭都平滑
+  const contentExit = {
+    ...rectVariant,
+    transition: originRect ? ZOOM : pushExitTransition,
+  };
 
   return (
     // 根节点为 motion 组件,AnimatePresence 才能在卸载前播放子层退场动画
@@ -353,7 +440,16 @@ export function SwipeSheet({
           <motion.div
             aria-hidden="true"
             className="pointer-events-none fixed inset-0 md:hidden"
-            style={{ x, y, scale: dragScale, zIndex: heroZIndex }}
+            style={{
+              x,
+              y,
+              scale: dragScale,
+              zIndex: heroZIndex,
+              willChange: "transform",
+              // 进场交叉溶解完成后它被不透明面板盖死,隐藏掉省一张全屏合成层
+              // (拖拽时也不再逐帧跟着变换);关闭手势起手 / 退场开始时恢复
+              visibility: settled && isPresent && !dragActive ? "hidden" : "visible",
+            }}
           >
             <motion.div
               className="fixed origin-top-left overflow-hidden rounded-xl bg-card"
@@ -362,6 +458,8 @@ export function SwipeSheet({
                 left: originRect.left,
                 width: originRect.width,
                 height: originRect.height,
+                // 缩放弹簧逐帧写 transform:不提升的话 Safari 每帧重绘父层
+                willChange: "transform",
               }}
               initial={{ x: 0, y: 0, scale: 1 }}
               animate={{
@@ -380,20 +478,33 @@ export function SwipeSheet({
       {/* 上层:浮层内容,与卡片同轨放大 / 缩小(带圆角的「App 窗口」);
           进场时内容早早淡入盖住卡片,退场时内容缩到临近卡片才溶解回卡片。 */}
       <motion.div
+        ref={outerRef}
         className="absolute inset-0 origin-top-left"
-        // push 模式:转场中窗口带设备圆角 + 投影(overflow 裁出圆角)
-        style={originRect ? undefined : { overflow: "hidden", boxShadow: "var(--push-shadow)" }}
+        // willChange:进/退场逐帧写 transform/clip-path/border-radius,提前提升
+        // 为合成层,Safari 才把 clip/圆角挪到合成器做,不再每帧重光栅化整层
+        style={
+          originRect
+            ? { willChange: "transform, clip-path" }
+            : {
+                overflow: "hidden",
+                boxShadow: "var(--push-shadow)",
+                willChange: "transform, border-radius",
+              }
+        }
         initial={rectVariant}
         animate={
           originRect
-            ? { x: 0, y: 0, scale: 1, clipPath: "inset(0px 0px 0px 0px round 0px)" }
-            : { x: 0, borderRadius: 0 }
+            ? { x: 0, y: 0, scale: 1, clipPath: FULL_CLIP }
+            : pushAnimate
         }
         exit={contentExit}
-        transition={originRect ? ZOOM : PUSH}
+        transition={originRect ? ZOOM : pushEnterTransition}
+        onAnimationComplete={() => setSettled(true)}
       >
         <motion.div
           className="absolute inset-0"
+          // 交叉溶解逐帧写 opacity:自持合成层后只改层透明度,不触发重绘
+          style={hero ? { willChange: "opacity" } : undefined}
           initial={hero ? { opacity: 0 } : false}
           animate={hero ? { opacity: 1, transition: CONTENT_IN } : {}}
           exit={hero ? { opacity: 0, transition: CONTENT_OUT } : {}}
@@ -401,7 +512,7 @@ export function SwipeSheet({
           <motion.div
             ref={panelRef}
             className="relative flex h-full w-full flex-col overflow-hidden bg-background shadow-2xl"
-            style={{ x, y, scale: dragScale, borderRadius: dragRadius, touchAction: "pan-y" }}
+            style={{ x, y, scale: dragScale, borderRadius: dragRadius, touchAction: "pan-y", willChange: "transform" }}
           >
             {/* 顶部返回栏:左侧返回,右侧快捷操作(垫出刘海安全区) */}
             <div
@@ -414,6 +525,8 @@ export function SwipeSheet({
               <button
                 type="button"
                 onClick={onClose}
+                // 手指落上就先唤醒 hero 层,点按松开触发关闭时层已光栅化好
+                onTouchStart={() => setDragActive(true)}
                 aria-label="返回"
                 className="flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
               >

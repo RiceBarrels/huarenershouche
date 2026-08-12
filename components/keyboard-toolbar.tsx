@@ -50,8 +50,10 @@ export function KeyboardToolbar() {
       style={{
         transform: open ? `translateY(-${kbHeight}px)` : "translateY(100%)",
       }}
-      // 按下不夺焦点,避免点工具条导致输入框失焦、键盘收起
+      // 按下不夺焦点,避免点工具条导致输入框失焦、键盘收起。
+      // iOS WKWebView 的失焦由合成 mouseDown 触发,只挡 pointerDown 不够
       onPointerDown={(e) => e.preventDefault()}
+      onMouseDown={(e) => e.preventDefault()}
     >
       {emojiOpen && (
         <div className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 scrollbar-none">

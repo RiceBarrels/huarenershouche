@@ -30,6 +30,12 @@ export function getDeviceCornerPx(fallback: number): number {
   return cornerPx ?? fallback;
 }
 
+/** 是否已知真机物理圆角(原生 iOS 圆角屏)。已知时全屏浮层可以常驻
+ * 同值圆角——被屏幕物理圆角遮住,视觉无差但省掉圆角动画的逐帧重绘 */
+export function hasDeviceCorner(): boolean {
+  return cornerPx !== null && cornerPx > 0;
+}
+
 /** 启动时调用一次:先用上次缓存立即生效,再向原生端取最新值 */
 export async function initDeviceCorner() {
   if (typeof window === "undefined") return;

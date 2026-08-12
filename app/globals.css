@@ -151,7 +151,8 @@
   /* 所有圆角统一用苹果同款弧度:iOS 图标/连续圆角 ≈ 超椭圆指数 5,
      corner-shape 参数为 log2(指数) → superellipse(2.32)。
      (squircle 关键字 = superellipse(2) = 指数 4,略平于苹果)
-     不支持的浏览器忽略、退回普通圆角 */
+     不支持的浏览器忽略此条,由下方 @supports not 把 --radius 缩到
+     1.3rem 补偿观感 */
   *,
   *::before,
   *::after {
@@ -165,19 +166,15 @@
   }
 }
 
-/* Safari/Firefox 的 superellipse 回退(hyperellipse polyfill,见
-   components/corner-shape-polyfill.tsx):只标注大圆角表面——小圆角上
-   squircle 与圆角肉眼无差,不值得付 JS 回退(clip-path/SVG)的开销。
-   Chrome 原生支持走上面的 corner-shape 规则,不加载 polyfill。
-   注意:--corner-shape 是 inherits:false,须逐元素命中,故用类名子串匹配
-   (兼容 md: 等变体前缀)。vaul 抽屉不纳入:clip-path 会裁掉它的 ::after
-   过滚动补底层 */
-[class*="rounded-lg"],
-[class*="rounded-xl"],
-[class*="rounded-2xl"],
-[class*="rounded-3xl"],
-[class*="rounded-4xl"] {
-  --corner-shape: superellipse(2.32);
+/* Safari/Firefox 不支持 corner-shape 的回退:不再用 JS polyfill
+   (hyperellipse 逐元素 读样式→算 path→写 clip-path,快照/转场时对几百个
+   新节点重跑,主线程被占死,正是手势掉帧主因),改为整套圆角等比缩小——
+   同一半径下 superellipse(2.32) 的视觉弧度明显小于普通圆角,
+   3rem / 2.32 ≈ 1.3rem,肉眼观感基本一致 */
+@supports not (corner-shape: squircle) {
+  :root {
+    --radius: 1.3rem;
+  }
 }
 
 /* Shimmer skeleton animation */
@@ -280,6 +277,12 @@
   to {
     transform: translateX(0);
   }
+}
+
+/* 跨组手势返回:DOM tab bar 随剩余滑出动画淡入(避免 commit 瞬间凭空闪现) */
+@keyframes tab-bar-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Tab 间切换(bottomnav → bottomnav):旧页轻微缩小淡出(幅度小才不显廉价) */

@@ -25,23 +25,29 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
   }, [router, fallback]);
 
   return (
-    <nav
-      className="sticky top-0 z-40 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 md:hidden"
+    <div className=""
       style={{
-        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingTop: "calc(42px + env(safe-area-inset-top, 0px))",
       }}
     >
-      <button
-        onClick={handleBack}
-        className="flex h-10 w-8 items-center justify-center text-foreground -ml-1"
+      <nav
+        className="fixed left-0 right-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-card/95 backdrop-blur-sm px-4 md:hidden"
+        style={{
+          paddingTop: "env(safe-area-inset-top, 0px)",
+        }}
       >
-        <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
-      </button>
-      {title && (
-        <span className="font-logo text-base truncate">
-          {title}
-        </span>
-      )}
-    </nav>
+        <button
+          onClick={handleBack}
+          className="flex h-10 w-8 items-center justify-center text-foreground -ml-1"
+        >
+          <ArrowLeft className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+        {title && (
+          <span className="font-logo text-base truncate">
+            {title}
+          </span>
+        )}
+      </nav>
+    </div>
   );
 }

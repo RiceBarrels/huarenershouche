@@ -8,6 +8,7 @@ import { Search, Plus, User, Users, Home, Car, MessageSquare } from "lucide-reac
 import { useEffect, useRef, useState } from "react";
 import { Capacitor, type PluginListenerHandle } from "@capacitor/core";
 import { supabase } from "@/lib/supabase";
+import { gestureHandoffRemaining } from "@/components/page-transition";
 import {
   LiquidGlassNav,
   rasterizeSvgIcon,
@@ -50,6 +51,12 @@ export function MobileTabBar() {
   const [nativeHeight, setNativeHeight] = useState(0);
   // 网页版:点发布弹出「发布车辆 / 社区发帖」选择菜单(与原生 UIMenu 行为一致)
   const [postMenuOpen, setPostMenuOpen] = useState(false);
+  // 跨组手势返回时本组件在旧页还在滑出的中途挂载(接手快照层已压在 z-60):
+  // DOM bar 随剩余滑出时长淡入,而不是 commit 瞬间凭空出现。渲染期读一次即可
+  const [handoffFadeMs] = useState(() => {
+    const left = gestureHandoffRemaining();
+    return left > 0 ? Math.max(left, 150) : 0;
+  });
   const iconsRef = useRef<HTMLDivElement>(null);
   const pathnameRef = useRef(pathname);
   pathnameRef.current = pathname;
@@ -178,6 +185,11 @@ export function MobileTabBar() {
       <nav
         data-bottom-nav=""
         className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur-sm md:hidden"
+        style={
+          handoffFadeMs
+            ? { animation: `tab-bar-fade-in ${handoffFadeMs}ms ease-out both` }
+            : undefined
+        }
       >
         {/* 发布选择菜单:发布车辆 / 社区发帖 */}
         <AnimatePresence>

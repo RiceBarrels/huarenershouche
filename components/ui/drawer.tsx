@@ -19,11 +19,41 @@ function withHaptic(
   };
 }
 
+// 拖拽越过「松手即关闭」的位移阈值时轻震;往回带退到阈值内(= 松手会取消)
+// 再震一下。快甩靠速度关闭的没有位置节点,不震;松手复位,下次拖拽重新计
+function useDragThresholdHaptic({
+  closeThreshold = 0.25, // vaul 的 CLOSE_THRESHOLD 默认值
+  onDrag,
+  onRelease,
+}: Pick<
+  React.ComponentProps<typeof DrawerPrimitive.Root>,
+  "closeThreshold" | "onDrag" | "onRelease"
+>) {
+  const past = React.useRef(false)
+  return {
+    onDrag: (e: React.PointerEvent<HTMLDivElement>, p: number) => {
+      const now = p > closeThreshold
+      if (now !== past.current) {
+        past.current = now
+        triggerHaptic()
+      }
+      onDrag?.(e, p)
+    },
+    onRelease: (e: React.PointerEvent<HTMLDivElement>, open: boolean) => {
+      past.current = false
+      onRelease?.(e, open)
+    },
+  }
+}
+
 // 注意:背景缩放会给 [vaul-drawer-wrapper] 加 transform,内部 fixed 元素会
 // 失去视口参照 —— 需要保持 fixed 的全局元素(如底部导航)须 portal 到 body
 function Drawer({
   shouldScaleBackground = false,
   onOpenChange,
+  closeThreshold,
+  onDrag,
+  onRelease,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.Root>) {
   // 受控 drawer:程序化 setOpen(true) 不经过 vaul 的 onOpenChange,
@@ -35,11 +65,14 @@ function Drawer({
     prevOpen.current = props.open
     triggerHaptic()
   }, [controlled, props.open])
+  const dragHaptic = useDragThresholdHaptic({ closeThreshold, onDrag, onRelease })
   return (
     <DrawerPrimitive.Root
       data-slot="drawer"
       shouldScaleBackground={shouldScaleBackground}
       onOpenChange={controlled ? onOpenChange : withHaptic(onOpenChange)}
+      closeThreshold={closeThreshold}
+      {...dragHaptic}
       {...props}
     />
   )
@@ -47,9 +80,21 @@ function Drawer({
 
 function DrawerNested({
   onOpenChange,
+  closeThreshold,
+  onDrag,
+  onRelease,
   ...props
 }: React.ComponentProps<typeof DrawerPrimitive.NestedRoot>) {
-  return <DrawerPrimitive.NestedRoot data-slot="drawer-nested" onOpenChange={withHaptic(onOpenChange)} {...props} />
+  const dragHaptic = useDragThresholdHaptic({ closeThreshold, onDrag, onRelease })
+  return (
+    <DrawerPrimitive.NestedRoot
+      data-slot="drawer-nested"
+      onOpenChange={withHaptic(onOpenChange)}
+      closeThreshold={closeThreshold}
+      {...dragHaptic}
+      {...props}
+    />
+  )
 }
 
 function DrawerTrigger({

@@ -84,10 +84,11 @@ export function CompareBar() {
   if (!mounted) return null;
 
   const visible = ids.length > 0 && pathname !== "/compare";
-  // 原生 liquid glass 胶囊上方:悬浮卡片样式,并与胶囊留 8px 间距
-  const floating = nativeNav && !overlayOpen && navHeight > 0;
-  // 浮层打开时导航被盖住,贴屏幕底部即可
-  const bottomOffset = overlayOpen ? 0 : navHeight + (floating ? 8 : 0);
+  // 原生 liquid glass 胶囊:通栏贴底,背景一直填到屏幕底(胶囊浮在其上),
+  // 内容用 paddingBottom 垫高到胶囊上方
+  const nativeFill = nativeNav && !overlayOpen && navHeight > 0;
+  // 浮层打开时导航被盖住,贴屏幕底部即可;原生胶囊时同样贴底(fill 到底)
+  const bottomOffset = overlayOpen || nativeFill ? 0 : navHeight;
 
   return createPortal(
     <>
@@ -98,21 +99,19 @@ export function CompareBar() {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 24, opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className={`fixed inset-x-0 md:px-4 ${overlayOpen ? "z-[70]" : "z-40"} ${floating ? "px-3" : ""}`}
+          className={`fixed inset-x-0 md:px-4 ${overlayOpen ? "z-[70]" : "z-40"}`}
           style={{ bottom: bottomOffset }}
         >
-          {/* 手机端通栏贴底(DOM 导航)/ 悬浮圆角卡片(原生 liquid glass 胶囊);
+          {/* 手机端通栏贴底(原生胶囊时背景 fill 到屏幕底、内容垫到胶囊上方);
               桌面端悬浮居中卡片 */}
           <div
-            className={`mx-auto flex w-full items-center gap-2 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:rounded-xl md:shadow-lg ${
-              floating
-                ? "rounded-xl bg-background/85 shadow-lg"
-                : "border-t border-border bg-background/95"
-            }`}
+            className="mx-auto flex w-full items-center gap-2 border-t border-border bg-background/95 px-3 py-2 backdrop-blur-md md:mb-4 md:max-w-2xl md:rounded-xl md:border md:shadow-lg"
             style={
-              bottomOffset === 0
-                ? { paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }
-                : undefined
+              nativeFill
+                ? { paddingBottom: navHeight + 6 }
+                : bottomOffset === 0
+                  ? { paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }
+                  : undefined
             }
           >
             <span className="hidden shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground md:flex">

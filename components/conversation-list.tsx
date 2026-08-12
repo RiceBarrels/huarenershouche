@@ -389,10 +389,10 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                   </div>
                 }
               >
-                {/* data-sheet-static:聊天自己管滚动/输入,浮层手势不接管
-                    (否则下拉翻消息记录会被当成关闭手势);键盘高度垫底 */}
+                {/* data-sheet-static="y":纵向交给聊天自己滚(下拉翻记录不算
+                    关闭手势),横滑关闭浮层仍可用;键盘高度垫底 */}
                 <div
-                  data-sheet-static
+                  data-sheet-static="y"
                   className="flex h-full flex-col transition-[padding-bottom] duration-[250ms] ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none"
                   style={{
                     paddingBottom:
