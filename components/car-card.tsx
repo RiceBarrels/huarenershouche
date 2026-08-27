@@ -379,10 +379,11 @@ export function CarCard({
 
           <div className="min-w-0 p-4">
             {/* hover 标题变绿墨色:明确"整卡可点"的即时反馈(浅色用 brand-ink,深色用 brand) */}
-            <h3 className="font-mono text-base font-semibold leading-snug tracking-tight transition-colors duration-150 group-hover:text-brand-ink dark:group-hover:text-brand">
+            {/* 标题/副标题超长时单行省略:避免换行撑高卡片、破坏网格行对齐 */}
+            <h3 className="truncate font-mono text-base font-semibold leading-snug tracking-tight transition-colors duration-150 group-hover:text-brand-ink dark:group-hover:text-brand">
               {car.title_zh}
             </h3>
-            <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
+            <p className="mt-0.5 truncate font-mono text-[13px] text-muted-foreground">
               {car.title}
             </p>
 
@@ -417,7 +418,7 @@ export function CarCard({
             {priceInsight &&
               (priceInsight.level === "great" || priceInsight.level === "good") &&
               priceInsight.delta >= 300 && (
-                <p className="mt-1 font-mono text-[12px] text-green-600 dark:text-green-400">
+                <p className="mt-1 truncate font-mono text-[12px] text-green-600 dark:text-green-400">
                   比同类均价低 {formatPrice(priceInsight.delta)}
                   <span className="text-muted-foreground">
                     {" "}· {priceInsight.sampleSize} 台同类对比
@@ -425,23 +426,23 @@ export function CarCard({
                 </p>
               )}
 
-            {/* 2×2 参数栅格 */}
+            {/* 2×2 参数栅格:min-w-0 + truncate,燃料/地区等长文字超出时省略号收尾 */}
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-              <div className="flex items-center gap-1.5">
-                <Gauge className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                <span className="font-mono text-[13px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {formatMileage(car.mileage)} mi
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Fuel className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                <span className="font-mono text-[13px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Fuel className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {car.fuel_type}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <MapPin className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                <span className="font-mono text-[13px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {car.location_zh}
                   {distance !== undefined && (
                     <span className="font-medium text-blue-600 dark:text-blue-400">
@@ -450,9 +451,9 @@ export function CarCard({
                   )}
                 </span>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                <span className="font-mono text-[13px] text-muted-foreground">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {car.year}年
                 </span>
               </div>
@@ -462,7 +463,7 @@ export function CarCard({
             <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
               <span
                 /* span 带 onClick 却无手型光标,桌面 hover 时看不出可点 */
-                className="flex cursor-pointer items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+                className="flex min-w-0 cursor-pointer items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -477,7 +478,7 @@ export function CarCard({
                     className="h-full w-full object-cover"
                   />
                 </span>
-                {car.seller_name}
+                <span className="truncate">{car.seller_name}</span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 {favCount > 0 && (
