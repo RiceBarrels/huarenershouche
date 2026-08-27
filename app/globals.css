@@ -458,6 +458,29 @@ summary {
   cursor: pointer;
 }
 
+/* ---- 带鱼屏整体缩放:1920px 起 rem 基准随视口线性放大(2560 宽约 18px、3440 宽约 21px,封顶 22px)。
+   全站字号/间距/容器宽基本是 rem 单位,会整体等比放大;
+   Tailwind 断点与 JS matchMedia 都按浏览器默认 16px/物理 px 求值,不受影响。 ---- */
+@media (min-width: 1920px) {
+  :root {
+    font-size: clamp(16px, 9.7px + 0.33vw, 22px);
+  }
+
+  /* 站内大量 text-[Npx] 微字号是 px 写死的,这里映射回 rem 跟随缩放,
+     否则 rem 正文放大后 px 小标签显得失衡(选择器与工具类同名同特异度,
+     但本规则不在 @layer 内,优先级高于 layer 里的 Tailwind 工具类) */
+  .text-\[9px\]  { font-size: 0.5625rem; }
+  .text-\[10px\] { font-size: 0.625rem; }
+  .text-\[11px\] { font-size: 0.6875rem; }
+  .text-\[12px\] { font-size: 0.75rem; }
+  .text-\[13px\] { font-size: 0.8125rem; }
+  .text-\[14px\] { font-size: 0.875rem; }
+  .text-\[15px\] { font-size: 0.9375rem; }
+  .text-\[17px\] { font-size: 1.0625rem; }
+  .text-\[22px\] { font-size: 1.375rem; }
+  .text-\[28px\] { font-size: 1.75rem; }
+}
+
 /* 原生地图 behind 模式:整页透明打洞,让 WKWebView 后面的 MapKit 显示出来 */
 html.native-map-behind, html.native-map-behind body { background: transparent !important; }
 /* 根布局的全屏画布层(vaul-drawer-wrapper)也在祖先链上,同样要打透 */

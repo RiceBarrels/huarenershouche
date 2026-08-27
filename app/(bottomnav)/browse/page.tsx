@@ -760,7 +760,8 @@ function BrowseContent() {
 
       <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
         {/* Left sidebar filters — desktop only */}
-        <div className="hidden w-[240px] shrink-0 md:block">
+        {/* 15rem 而非写死 240px:带鱼屏 root 字号放大时侧栏随内容等比变宽 */}
+        <div className="hidden w-60 shrink-0 md:block">
           {/* top-[4.5rem]:桌面 Header 是 sticky h-14,原 top-4 滚动时侧栏会钻到 Header 底下 */}
           <div className="sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] space-y-4 overflow-y-auto overscroll-contain pb-6 pr-1">
             <SearchFilters
