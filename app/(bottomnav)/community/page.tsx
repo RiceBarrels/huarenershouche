@@ -34,6 +34,7 @@ import {
   Play,
   Search,
   Share,
+  Smile,
   X,
   ImageIcon,
 } from "lucide-react";
@@ -176,6 +177,28 @@ function CommunityFeedPage() {
   const [followingList, setFollowingList] = useState<
     { id: string; username: string; avatar_url: string | null }[] | null
   >(null);
+  // 宽屏发帖入口(X 式 composer)用的当前用户资料
+  const [me, setMe] = useState<{ username: string | null; avatar_url: string | null } | null>(null);
+  useEffect(() => {
+    if (!userId) {
+      setMe(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("profiles")
+      .select("username, avatar_url")
+      .eq("id", userId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data) {
+          setMe(data as { username: string | null; avatar_url: string | null });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
   // 宽屏(xl+,右栏可见):搜索 UI 只在右栏(输入框/筛选/建议都在右边),
   // 中栏只展示结果,吸顶条不再切换成搜索框
   const [railSearch, setRailSearch] = useState(false);
@@ -1020,10 +1043,18 @@ function CommunityFeedPage() {
             若只把 top 设为安全区高度,刘海/状态栏那条不被覆盖,滚动时内容
             会从底下穿过(Capacitor 里看起来顶部"透明") */}
         <div
-          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-[101px] md:-mx-4 md:px-4 lg:mx-0 lg:px-0"
+          /* 宽屏搜索结果態:标题和 tabs 都不展示,整条吸顶条收起 */
+          className={`sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-[101px] md:-mx-4 md:px-4 lg:mx-0 lg:px-0 ${
+            railSearch && searching ? "hidden" : ""
+          }`}
           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.25rem)" }}
         >
-          <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
+          {/* 宽屏(xl+)删掉标题条:tabs 直接置顶,发帖入口是 feed 顶部的 X 式 composer */}
+          <motion.div
+            layout={!reduced}
+            transition={{ duration: 0.24, ease: EASE }}
+            className="xl:hidden"
+          >
             <AnimatePresence initial={false} mode="popLayout">
               {searchOpen && !mobileLayer && !railSearch ? (
                 <motion.div
@@ -1119,8 +1150,9 @@ function CommunityFeedPage() {
           </motion.div>
 
           {/* X 式双流 tab:为你推荐 / 正在关注(桌面搜索态隐藏;移动端搜索
-              是独立浮层,feed 原地不动,tab 条也保持) */}
-          {(!searchOpen || mobileLayer) && (
+              是独立浮层,feed 原地不动,tab 条也保持;宽屏右栏搜索只是
+              聚焦(还没输入)时 feed 还在,tabs 也保持不跳动 */}
+          {(!searchOpen || mobileLayer || (railSearch && !searching)) && (
             <div
               className={`flex overflow-hidden transition-all duration-300 ease-out ${
                 barHidden
@@ -1182,6 +1214,42 @@ function CommunityFeedPage() {
               : undefined
           }
         >
+        {/* X 式发帖入口(宽屏):头像 + 占位文案 + 图标行 + 发帖按钮,
+            点击整卡进发帖页(未登录去登录) */}
+        <Link
+          href={userId ? "/community/new" : "/login"}
+          className="mb-3 mt-3 hidden rounded-xl bg-card p-3 ring-1 ring-transparent transition-[box-shadow,background-color] hover:ring-border/70 xl:block"
+        >
+          <div className="flex gap-3">
+            <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
+              <img
+                src={avatarUrl(me?.avatar_url, me?.username)}
+                alt=""
+                className="h-full w-full object-cover"
+              />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="flex min-h-10 items-center font-mono text-[15px] text-muted-foreground/70">
+                有什么新鲜事?聊聊车吧…
+              </p>
+              <div className="mt-1.5 flex items-center justify-between border-t border-border/60 pt-2">
+                <span className="flex items-center text-brand-ink dark:text-brand">
+                  {[ImageIcon, Smile, MapPin].map((Icon, i) => (
+                    <span
+                      key={i}
+                      className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-primary/20"
+                    >
+                      <Icon className="h-[18px] w-[18px]" strokeWidth={1.5} />
+                    </span>
+                  ))}
+                </span>
+                <span className="flex h-9 items-center rounded-full bg-foreground px-5 font-mono text-sm font-medium text-background transition-opacity hover:opacity-90">
+                  发帖
+                </span>
+              </div>
+            </div>
+          </div>
+        </Link>
         <AnimatePresence mode="popLayout" initial={false} custom={tabDir}>
         <motion.div
           key={feedTab}
