@@ -31,7 +31,8 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
   const avgLabelPct = Math.min(82, Math.max(18, avgPct));
 
   return (
-    <div className="mt-3 rounded-xl bg-card p-4">
+    // 桌面略加内边距,与详情页其他楼层的留白节奏一致(手机保持 p-4)
+    <div className="mt-3 rounded-xl bg-card p-4 md:p-5">
       <div className="flex items-center justify-between gap-2">
         <h2 className="font-mono text-sm font-semibold">市场价位</h2>
         <span
@@ -49,7 +50,7 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
             className="absolute bottom-full flex -translate-x-1/2 flex-col items-center"
             style={{ left: `${carPct}%` }}
           >
-            <span className="whitespace-nowrap font-mono text-[11px] font-bold">
+            <span className="whitespace-nowrap font-mono text-[11px] font-bold tabular-nums">
               {formatPrice(car.price)}
             </span>
             <div className="h-0 w-0 border-x-4 border-t-[5px] border-x-transparent border-t-foreground" />
@@ -68,7 +69,7 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
           </div>
         </div>
         {/* min / avg / max 标签 */}
-        <div className="relative mt-1.5 flex justify-between font-mono text-[10px] text-muted-foreground">
+        <div className="relative mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
           <span>低 {formatPrice(lo)}</span>
           <span
             className="absolute -translate-x-1/2 whitespace-nowrap"
@@ -80,8 +81,8 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
         </div>
       </div>
 
-      {/* 结论文案 */}
-      <p className="mt-4 font-mono text-[11px]">
+      {/* 结论文案 — 桌面略放大,这是本卡片的核心结论 */}
+      <p className="mt-4 font-mono text-[11px] md:text-xs">
         {insight.delta > 0 ? (
           <span className="font-semibold text-green-600">
             低于市场均价 {formatPrice(insight.delta)}

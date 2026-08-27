@@ -65,15 +65,17 @@ const helpLinks = [
 export function Footer() {
   return (
     <footer className="hidden overflow-hidden border-t border-border bg-card md:block">
-      <div className="mx-auto max-w-7xl px-4 py-12">
+      <div className="mx-auto max-w-7xl px-4 py-12 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
         {/* Watermark wordmark */}
         <div className="select-none pb-10">
-          <p className="font-logo text-5xl leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl">
+          {/* 宽屏容器已放大到 88/104rem,水印跟着升一档,否则左侧字、右侧大片空白 */}
+          <p className="whitespace-nowrap font-logo text-5xl leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl 2xl:text-8xl">
             常來車網 / CLCAUTO
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 border-t border-border pt-10 md:grid-cols-4">
+        {/* 品牌栏内容更"重"(简介 + 联系方式),lg 起多分一点宽度,链接三栏视觉更均匀 */}
+        <div className="grid grid-cols-2 gap-8 border-t border-border pt-10 md:grid-cols-4 lg:grid-cols-[1.5fr_1fr_1fr_1fr]">
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
@@ -106,7 +108,7 @@ export function Footer() {
                 <li key={link.href + link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
                     {link.label}
                   </Link>
@@ -123,7 +125,7 @@ export function Footer() {
                 <li key={link.href + link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
                     {link.label}
                   </Link>
@@ -140,7 +142,7 @@ export function Footer() {
                 <li key={link.href + link.label}>
                   <Link
                     href={link.href}
-                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                    className="text-sm text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
                   >
                     {link.label}
                   </Link>

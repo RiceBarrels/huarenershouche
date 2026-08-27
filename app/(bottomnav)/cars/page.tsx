@@ -42,7 +42,7 @@ export default function CarsHubPage() {
   return (
     <>
       <Header />
-      <main className="container mx-auto max-w-5xl px-4 py-8">
+      <main className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
         <nav
           aria-label="Breadcrumb"
           className="font-mono text-[11px] text-muted-foreground"

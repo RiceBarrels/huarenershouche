@@ -69,7 +69,8 @@ export default function FavoritesPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4">
+      {/* 桌面边距与账户主页(md:px-6 md:py-8)对齐,避免子页忽紧忽松 */}
+      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4 md:px-6 md:py-8">
         <LargeTitle title="我的收藏" />
         <div className="mt-4 md:max-w-xs">
           <SegmentedControl
@@ -83,7 +84,8 @@ export default function FavoritesPage() {
         </div>
 
         {tab === "cars" ? (
-          <div className="mt-4 space-y-3">
+          // 桌面 4xl 容器下单列横卡右侧大量留白,改双栏网格提高密度
+          <div className="mt-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
             {loading ? (
               [1, 2, 3].map((i) => (
                 <div key={i} className="rounded-xl bg-card flex gap-3 p-3">
@@ -95,7 +97,8 @@ export default function FavoritesPage() {
                 </div>
               ))
             ) : list.length === 0 ? (
-              <div className="flex flex-col items-center py-16">
+              // 空状态横跨两栏,否则会被网格挤到左半边
+              <div className="flex flex-col items-center py-16 md:col-span-2">
                 <Heart className="h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
                 <p className="mt-3 font-mono text-sm text-muted-foreground">还没有收藏车辆</p>
                 <Link href="/browse"><Button size="sm" className="mt-4 h-9 px-5 font-mono text-xs">去看看</Button></Link>
@@ -169,7 +172,7 @@ function SavedSearchesTab() {
         <Link
           key={search.id}
           href={buildSearchUrl(search.params)}
-          className="group/row flex items-center gap-3 pl-4 transition-colors active:bg-muted/60"
+          className="group/row flex items-center gap-3 pl-4 transition-colors active:bg-muted/60 md:hover:bg-muted/40"
         >
           <Search className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={2} />
           <span className="flex min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-3.5 group-last/row:border-0 min-h-[56px]">

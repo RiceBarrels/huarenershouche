@@ -46,7 +46,8 @@ function RatingStars({ rating }: { rating: string }) {
 function RecallCard({ recall }: { recall: RecallItem }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-xl bg-card p-3">
+    // 整卡可点展开:hover 轻微变色提示可交互(触屏无 hover,不影响手机)
+    <div className="rounded-xl bg-card p-3 transition-colors hover:bg-muted/40">
       <button
         type="button"
         className="flex w-full items-start gap-2 text-left"
@@ -103,7 +104,8 @@ function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
   const [expanded, setExpanded] = useState(false);
   const hasSeverity = complaint.crash || complaint.injuries > 0 || complaint.deaths > 0;
   return (
-    <div className="rounded-xl bg-card p-3">
+    // 同 RecallCard:hover 变色提示整卡可展开
+    <div className="rounded-xl bg-card p-3 transition-colors hover:bg-muted/40">
       <button
         type="button"
         className="flex w-full items-start gap-2 text-left"
@@ -225,7 +227,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
             <FileWarning className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">安全召回</span>
           </div>
-          <p className={`mt-1 font-mono text-lg font-bold ${data.recalls.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
+          <p className={`mt-1 font-mono text-lg font-bold tabular-nums ${data.recalls.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
             {data.recalls.length}
           </p>
         </div>
@@ -234,14 +236,14 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
             <CircleAlert className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">投诉记录</span>
           </div>
-          <p className="mt-1 font-mono text-lg font-bold">{data.complaints.length}</p>
+          <p className="mt-1 font-mono text-lg font-bold tabular-nums">{data.complaints.length}</p>
         </div>
         <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <CarFront className="h-3.5 w-3.5 text-red-500" strokeWidth={1.5} />
             <span className="font-mono text-[10px] text-muted-foreground">涉及碰撞</span>
           </div>
-          <p className={`mt-1 font-mono text-lg font-bold ${crashComplaints.length > 0 ? "text-red-500" : ""}`}>
+          <p className={`mt-1 font-mono text-lg font-bold tabular-nums ${crashComplaints.length > 0 ? "text-red-500" : ""}`}>
             {crashComplaints.length}
           </p>
         </div>

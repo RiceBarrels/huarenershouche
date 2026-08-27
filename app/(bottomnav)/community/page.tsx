@@ -1346,7 +1346,8 @@ function PostCard({
           openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML, e.currentTarget);
         }
       }}
-      className="block p-3 bg-card rounded-xl transition-colors hover:bg-muted/30"
+      /* 桌面:hover 细描边 + 点按变深,鼠标环境下给出更明确的可点击反馈(工具感 1px 边,非发光) */
+      className="block p-3 bg-card rounded-xl transition-colors hover:bg-muted/30 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
     >
       <div className="flex gap-3">
         {/* 头像列 */}
@@ -1503,7 +1504,8 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
           openCar(car, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML, e.currentTarget);
         }
       }}
-      className="block p-3 bg-card rounded-xl transition-colors hover:bg-muted/30"
+      /* 桌面 hover/点按反馈与帖子卡保持一致,避免两种卡片手感割裂 */
+      className="block p-3 bg-card rounded-xl transition-colors hover:bg-muted/30 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
     >
       {/* 与帖子完全同构的 X 式卡片:头像列 + 名字行 + 正文 + 大图 + 底部行 */}
       <div className="flex gap-3">

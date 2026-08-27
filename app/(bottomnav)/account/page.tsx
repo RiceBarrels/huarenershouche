@@ -226,7 +226,8 @@ function AccountContent() {
             <div className="flex items-center gap-4 p-4 md:px-6 md:py-5">
               <button
                 type="button"
-                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-muted"
+                // 桌面头卡更宽,头像升一号避免"小头像大空卡"
+                className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-full bg-muted md:h-20 md:w-20"
                 onClick={() => setAvatarViewOpen(true)}
                 aria-label="查看头像"
               >
@@ -296,7 +297,7 @@ function AccountContent() {
             <button
               type="button"
               onClick={switchToSelf}
-              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-muted/60 ${!isActingAsClaimed ? "bg-muted/40" : ""}`}
+              className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors active:bg-muted/60 md:hover:bg-muted/40 ${!isActingAsClaimed ? "bg-muted/40" : ""}`}
             >
               <UserCircle className="h-5 w-5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
               <span className="flex-1 font-mono text-sm">本人账号</span>
@@ -307,7 +308,7 @@ function AccountContent() {
                 key={a.id}
                 type="button"
                 onClick={() => switchTo(a.id)}
-                className={`flex w-full items-center gap-3 border-t border-border/50 px-4 py-3 text-left transition-colors active:bg-muted/60 ${actingId === a.id ? "bg-muted/40" : ""}`}
+                className={`flex w-full items-center gap-3 border-t border-border/50 px-4 py-3 text-left transition-colors active:bg-muted/60 md:hover:bg-muted/40 ${actingId === a.id ? "bg-muted/40" : ""}`}
               >
                 <img src={avatarUrl(a.avatar_url, a.id)} alt="" className="h-5 w-5 shrink-0 rounded-full object-cover" />
                 <span className="flex-1 truncate font-mono text-sm">{a.username}</span>
@@ -464,7 +465,8 @@ function AccountContent() {
           <button
             type="button"
             onClick={() => setLogoutOpen(true)}
-            className="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-full bg-card text-center font-mono text-[15px] text-destructive transition-colors active:bg-muted/60"
+            // 桌面容器宽达 5xl,整宽红字按钮太夸张:限宽居中并补 hover 态
+            className="mt-6 flex min-h-[56px] w-full items-center justify-center rounded-full bg-card text-center font-mono text-[15px] text-destructive transition-colors active:bg-muted/60 md:mx-auto md:max-w-sm md:hover:bg-muted/40"
           >
             退出登录
           </button>

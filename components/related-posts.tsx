@@ -107,7 +107,9 @@ export function RelatedPosts({
         相关推荐
         <span className="h-px flex-1 bg-border" aria-hidden />
       </h2>
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      {/* 桌面 3 列:max-w-2xl 下 2 列的 3:4 封面单张过大(约 300×400),
+          3 列密度更接近瀑布流推荐位的浏览节奏 */}
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
         {posts.map((post) => {
           const cover = post.images?.[0];
           return (
@@ -126,7 +128,9 @@ export function RelatedPosts({
                   );
                 }
               }}
-              className="block overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
+              /* 桌面 hover 细描边:封面图占满卡片上半时,底色 hover 几乎不可见,
+                 1px 描边让鼠标反馈始终可感知(与全站卡片手感统一) */
+              className="block overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
             >
               {cover ? (
                 <div className="relative">

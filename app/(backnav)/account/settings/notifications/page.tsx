@@ -25,7 +25,7 @@ export default function NotificationSettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
         <LargeTitle title="通知设置" subtitle="降价、新车源与私信提醒" />
         {loading ? (
           <Skeleton className="mt-5 h-40 w-full rounded-xl" />

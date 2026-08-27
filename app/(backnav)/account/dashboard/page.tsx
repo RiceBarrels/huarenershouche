@@ -82,7 +82,8 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4">
+      {/* 桌面边距与账户主页(md:px-6 md:py-8)对齐,避免子页忽紧忽松 */}
+      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4 md:px-6 md:py-8">
         <LargeTitle title="数据面板" subtitle="车辆曝光与互动数据" />
 
         {loading ? (
@@ -145,7 +146,7 @@ export default function DashboardPage() {
                     <Link
                       key={car.id}
                       href={carLink(car.id)}
-                      className="group/row flex items-center gap-3 pl-3 transition-colors active:bg-muted/60"
+                      className="group/row flex items-center gap-3 pl-3 transition-colors active:bg-muted/60 md:hover:bg-muted/40"
                     >
                       {/* 同心圆角:卡 26px − 边距 12px = 14px */}
                       <div className="h-12 w-16 shrink-0 overflow-hidden rounded-[14px] bg-muted">

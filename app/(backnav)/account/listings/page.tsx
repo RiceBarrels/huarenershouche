@@ -110,7 +110,8 @@ export default function ListingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4">
+      {/* 桌面边距与账户主页(md:px-6 md:py-8)对齐,避免子页忽紧忽松 */}
+      <main className="relative mx-auto w-full max-w-4xl flex-1 px-4 py-4 md:px-6 md:py-8">
         <LargeTitle
           title="我的发布"
           trailing={
@@ -176,7 +177,8 @@ export default function ListingsPage() {
             myCars.map((car) => (
               <div key={car.id} className="rounded-xl bg-card flex gap-3 p-3">
                 <Link href={carLink(car.id)} className="shrink-0">
-                  <div className="h-20 w-28 overflow-hidden rounded-[14px] bg-muted">
+                  {/* 桌面横卡更宽,缩略图升一号,压缩右侧空白 */}
+                  <div className="h-20 w-28 overflow-hidden rounded-[14px] bg-muted md:h-24 md:w-36">
                     {car.image_url ? (
                       <img src={car.image_url} alt="" className="h-full w-full object-cover" />
                     ) : (

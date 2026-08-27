@@ -117,7 +117,7 @@ export default function ProfileSettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
         <div className="flex items-center gap-2 px-1">
           <h1 className="font-mono text-[28px] font-bold tracking-tight">个人资料</h1>
           {saving && (

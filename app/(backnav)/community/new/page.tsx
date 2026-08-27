@@ -591,7 +591,9 @@ export default function NewPostPage() {
                   />
                 </div>
                 {/* 建议标签 + 已选标签(横向滚动胶囊) */}
-                <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-none">
+                {/* 桌面标签换行平铺:鼠标环境横向滚动不可发现(无滚动条提示),
+                    换行能一眼看全所有建议标签 */}
+                <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-none md:flex-wrap md:overflow-visible">
                   {[...tags.filter((t) => !TAG_SUGGESTIONS.includes(t)), ...TAG_SUGGESTIONS].map(
                     (tag) => {
                       const selected = tags.includes(tag);

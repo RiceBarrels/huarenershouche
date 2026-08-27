@@ -312,8 +312,8 @@ export default function CarDetailPage({
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
         {showChrome && <Header />}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl">
+          <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-[1920px]:grid-cols-[1fr_380px] min-[1920px]:gap-8">
             <div>
               <Skeleton className="aspect-[16/10] w-full rounded-xl" />
               <div className="mt-6 space-y-3">
@@ -417,10 +417,10 @@ export default function CarDetailPage({
 
       {showChrome && <Header />}
       {showChrome && <ScrollProgress />}
-      <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl">
         {showChrome && <DesktopBack fallback="/browse" />}
 
-        <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-[1920px]:grid-cols-[1fr_380px] min-[1920px]:gap-8">
           {/* Left: Image + Details */}
           <div>
             {/* Image gallery — main + thumbnails on desktop, real swipe carousel on mobile */}
@@ -487,7 +487,8 @@ export default function CarDetailPage({
               </div>
 
               {/* Desktop: single image + arrows */}
-              <div className="relative hidden aspect-[16/10] flex-1 overflow-hidden rounded-xl bg-muted md:block">
+              {/* group:桌面箭头平时隐藏、悬停主图才浮现,减少常驻遮挡 */}
+              <div className="group relative hidden aspect-[16/10] min-w-0 flex-1 overflow-hidden rounded-xl bg-muted md:block">
                 {allImages.length > 0 ? (
                   isVideo(allImages[currentImage]) ? (
                     <video
@@ -518,7 +519,8 @@ export default function CarDetailPage({
                         e.preventDefault();
                         setCurrentImage((prev) => (prev === 0 ? allImages.length - 1 : prev - 1));
                       }}
-                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+                      aria-label="上一张"
+                      className="absolute left-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 opacity-0 backdrop-blur-sm transition group-hover:opacity-100 hover:bg-background focus-visible:opacity-100"
                     >
                       <ChevronLeft className="h-4 w-4" strokeWidth={1.5} />
                     </button>
@@ -527,7 +529,8 @@ export default function CarDetailPage({
                         e.preventDefault();
                         setCurrentImage((prev) => (prev === allImages.length - 1 ? 0 : prev + 1));
                       }}
-                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm transition-colors hover:bg-background"
+                      aria-label="下一张"
+                      className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 opacity-0 backdrop-blur-sm transition group-hover:opacity-100 hover:bg-background focus-visible:opacity-100"
                     >
                       <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
                     </button>
@@ -542,15 +545,21 @@ export default function CarDetailPage({
                 )}
               </div>
 
-              {/* Desktop thumbnail column */}
+              {/* Desktop thumbnail column — 高度由 flex 拉伸跟随主图,不再用 100vw 估算
+                  (主容器有 max-w 上限、embedded 浮层里宽度≠视口宽度,vw 换算在两种场景都会失真) */}
               {allImages.length > 1 && (
-                <div className="hidden w-[120px] shrink-0 flex-col gap-1.5 overflow-y-auto md:flex" style={{ maxHeight: "calc((100vw - 2rem - 320px - 1.5rem) * 10 / 16)" }}>
+                <div className="relative hidden w-[120px] shrink-0 md:block min-[1920px]:w-[140px]">
+                  <div className="absolute inset-0 flex flex-col gap-1.5 overflow-y-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                   {allImages.slice(0, 4).map((url, i) => (
                     <button
                       key={i}
                       onClick={() => setCurrentImage(i)}
-                      className={`relative aspect-[4/3] w-full shrink-0 overflow-hidden rounded-xl bg-muted ring-2 transition-all ${
-                        i === currentImage ? "ring-brand-ink" : "ring-transparent hover:ring-brand-ink/50"
+                      aria-label={`第 ${i + 1} 张`}
+                      className={`relative aspect-[16/10] w-full shrink-0 overflow-hidden rounded-xl bg-muted ring-2 transition-all ${
+                        // 与主图同比例裁切,选中高亮、未选中降透明度做即时 hover 反馈
+                        i === currentImage
+                          ? "ring-brand-ink"
+                          : "opacity-75 ring-transparent hover:opacity-100 hover:ring-brand-ink/50"
                       }`}
                     >
                       {isVideo(url) ? (
@@ -570,6 +579,7 @@ export default function CarDetailPage({
                       )}
                     </button>
                   ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -607,7 +617,8 @@ export default function CarDetailPage({
             <div
               className="mt-6"
             >
-              <h1 className="font-mono text-xl font-semibold tracking-tight">
+              {/* 桌面标题略放大,与卡片小字拉开层级(手机保持 text-xl 不变) */}
+              <h1 className="font-mono text-xl font-semibold tracking-tight md:text-2xl">
                 {car.title_zh}
               </h1>
               <p className="mt-1 font-mono text-sm text-muted-foreground">
@@ -615,7 +626,7 @@ export default function CarDetailPage({
               </p>
 
               <div className="mt-4 flex flex-wrap items-baseline gap-2">
-                <span className="font-mono text-2xl font-bold">
+                <span className="font-mono text-2xl font-bold tabular-nums md:text-3xl">
                   {formatPrice(car.price)}
                 </span>
                 {insight && (
@@ -652,7 +663,8 @@ export default function CarDetailPage({
                     {formatPrice(Math.abs(car.price - watchedPrice))}
                   </span>
                 )}
-                <span className="font-mono text-[11px] text-muted-foreground">
+                {/* 桌面把浏览/收藏/上架时间这组次要元数据推到行尾,与价格拉开视觉分组(手机保持顺排换行) */}
+                <span className="font-mono text-[11px] tabular-nums text-muted-foreground md:ml-auto">
                   {car.views_count || 0} 次浏览
                 </span>
                 <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
@@ -675,7 +687,8 @@ export default function CarDetailPage({
 
             {/* Specs data sheet */}
             <Reveal>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {/* 桌面参数卡间距略放宽,与上下楼层留白节奏一致(手机保持 gap-2) */}
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3">
                 <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
                     <Calendar
@@ -686,7 +699,7 @@ export default function CarDetailPage({
                       年份
                     </span>
                   </div>
-                  <p className="mt-1 font-mono text-sm font-medium">
+                  <p className="mt-1 font-mono text-sm font-medium tabular-nums">
                     {car.year}
                   </p>
                 </div>
@@ -700,7 +713,7 @@ export default function CarDetailPage({
                       里程
                     </span>
                   </div>
-                  <p className="mt-1 font-mono text-sm font-medium">
+                  <p className="mt-1 font-mono text-sm font-medium tabular-nums">
                     {formatMileage(car.mileage)} mi
                   </p>
                 </div>
@@ -858,8 +871,10 @@ export default function CarDetailPage({
           </div>
 
           {/* Right: Seller card */}
+          {/* 侧栏比视口高时 sticky 会钉住顶部、底部按钮永远够不到;
+              限制最大高度让侧栏内部可滚(隐藏滚动条,滚轮悬停即可滚动) */}
           <div
-            className="lg:sticky lg:top-20 lg:self-start"
+            className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:[-ms-overflow-style:none] lg:[scrollbar-width:none] lg:[&::-webkit-scrollbar]:hidden"
           >
             <div className="rounded-xl bg-card p-4">
               <h3 className="font-mono text-sm font-semibold">卖家信息</h3>
@@ -931,7 +946,8 @@ export default function CarDetailPage({
                 </div>
               )}
 
-              <div className="mt-4 space-y-2">
+              {/* 桌面在卖家信息与按钮组之间加一条分隔线,区分"信息区/操作区"(手机不变) */}
+              <div className="mt-4 space-y-2 md:mt-3 md:border-t md:border-border md:pt-3">
                 {user ? (
                   <Button
                     className="w-full gap-1.5 font-mono text-xs"
@@ -1300,10 +1316,14 @@ export default function CarDetailPage({
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {similarCars.map((c) => (
                 <Reveal key={c.id}>
-                  <CarCard
-                    car={c}
-                    priceInsight={getPriceInsight(c, makePool)}
-                  />
+                  {/* hover 微上移放在内层 div:Reveal 的 motion 会写 inline transform,
+                      直接加在同一层会互相覆盖;lg: 前缀确保只作用于桌面 */}
+                  <div className="transition-transform duration-150 ease-out lg:hover:-translate-y-0.5">
+                    <CarCard
+                      car={c}
+                      priceInsight={getPriceInsight(c, makePool)}
+                    />
+                  </div>
                 </Reveal>
               ))}
             </div>

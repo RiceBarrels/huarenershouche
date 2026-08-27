@@ -5,6 +5,7 @@ import Link from "next/link";
 import { TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { MAKES_ZH } from "@/lib/mock-data";
+import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface MakeCount {
@@ -57,12 +58,17 @@ export function TrendingSearches() {
   }, []);
 
   return (
-    <section className="px-4 pb-10">
-      <div className="mx-auto max-w-5xl">
-        {/* Section header */}
-        <div className="mb-4 flex items-center gap-2">
+    // 桌面端由首页外层 section 统一控制 px/py 与容器宽度,这里的内边距和 max-w 只留给手机端,
+    // 否则会出现双重缩进、楼层左边缘对不齐的问题
+    <section className="px-4 pb-10 md:p-0">
+      <div className="mx-auto max-w-5xl md:max-w-none">
+        {/* 手机保留小图标标题;桌面统一用 SectionHeader,与其他楼层同一套视觉语言 */}
+        <div className="mb-4 flex items-center gap-2 md:hidden">
           <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
           <h2 className="font-mono text-sm font-medium">热门搜索</h2>
+        </div>
+        <div className="hidden md:block">
+          <SectionHeader label="Trending" title="热门搜索" className="mb-6" />
         </div>
 
         {/* Row 1: Popular brands */}
@@ -82,7 +88,7 @@ export function TrendingSearches() {
                 <Link
                   key={make}
                   href={`/browse?make=${encodeURIComponent(make)}`}
-                  className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                  className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                 >
                   {MAKES_ZH[make] || make}
                   <span className="ml-1 text-muted-foreground">
@@ -104,7 +110,7 @@ export function TrendingSearches() {
               <Link
                 key={tag.label}
                 href={`/browse?${tag.params}`}
-                className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground transition-colors hover:bg-foreground hover:text-background"
+                className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
               >
                 {tag.label}
               </Link>

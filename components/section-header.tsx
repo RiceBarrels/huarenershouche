@@ -26,7 +26,7 @@ export function SectionHeader({ index, label, title, action, className }: Sectio
         {action && (
           <Link
             href={action.href}
-            className="group flex shrink-0 items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+            className="group flex shrink-0 items-center gap-1 rounded-sm font-mono text-xs text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50"
           >
             {action.label}
             <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />

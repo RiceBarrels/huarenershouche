@@ -226,12 +226,15 @@ export const PILL_OFF =
 // 输入框 / 分组容器的 iOS 填充底色
 export const IOS_FILL = "bg-black/[0.05] dark:bg-white/[0.08]";
 
-/* 桌面侧栏分组:标题在卡外(iOS 分组表头),内容装进白色圆角卡 */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+/* 桌面侧栏分组:标题在卡外(iOS 分组表头),内容装进白色圆角卡。
+   active 时标题旁亮一个小圆点:侧栏很长,滚动中也能一眼看出哪些分组已有选中条件 */
+function Section({ title, active, children }: { title: string; active?: boolean; children: React.ReactNode }) {
   return (
     <section>
-      <p className="px-4 pb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+      <p className="flex items-center gap-1.5 px-4 pb-1.5 font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
         {title}
+        {/* 浅色下薄荷绿太浅,提示点用 brand-ink;深色反之用 brand */}
+        {active && <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand-ink/70 dark:bg-brand" />}
       </p>
       <div className="rounded-[22px] bg-card p-3.5">{children}</div>
     </section>
@@ -368,14 +371,16 @@ export function SearchFilters({
     : MILEAGE_STOPS.length - 1;
 
   return (
-    <aside className="w-full space-y-5">
+    /* space-y-6:分组标题在卡外,组间距略大于卡内间距才能形成清晰的分组节奏 */
+    <aside className="w-full space-y-6">
       {/* Search — iOS 搜索栏:灰底画布上的白色胶囊 */}
       <div ref={searchRef} className="relative">
         <div className="relative">
           <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
           <input
             placeholder="搜索品牌、车型..."
-            className="h-10 w-full rounded-full bg-card pl-9 pr-4 font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+            /* focus 细环:白胶囊在浅灰画布上聚焦态原本无任何变化 */
+            className="h-10 w-full rounded-full bg-card pl-9 pr-4 font-mono text-sm outline-none ring-1 ring-transparent transition-shadow placeholder:text-muted-foreground/60 focus:ring-brand-ink/30 dark:focus:ring-brand/40"
             value={filters.keyword}
             onFocus={() => setSearchFocused(true)}
             onChange={(e) => update("keyword", e.target.value)}
@@ -435,7 +440,8 @@ export function SearchFilters({
       )}
 
       {/* Location — zipcode + distance */}
-      <Section title="位置">
+      {/* 距离默认值 "50" 不算"已选",避免提示点常亮失去意义 */}
+      <Section title="位置" active={!!filters.location || (!!filters.maxDistance && filters.maxDistance !== INITIAL_FILTERS.maxDistance)}>
         <div className="flex items-center gap-2">
           <input
             placeholder="输入 Zipcode"
@@ -484,7 +490,7 @@ export function SearchFilters({
       </Section>
 
       {/* Brand */}
-      <Section title="品牌">
+      <Section title="品牌" active={!!filters.make}>
         <div className="grid grid-cols-3 gap-1.5">
           {HOT_MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
@@ -538,7 +544,7 @@ export function SearchFilters({
 
       {/* Model — only shown when exactly one make is selected */}
       {modelOptions && modelOptions.length > 0 && (
-        <Section title="车型">
+        <Section title="车型" active={!!filters.model}>
           <SidebarPillSelect
             options={modelOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.model}
@@ -549,7 +555,7 @@ export function SearchFilters({
       )}
 
       {/* Body style */}
-      <Section title="车身类型">
+      <Section title="车身类型" active={!!filters.bodyStyle}>
         <SidebarPillSelect
           options={BODY_STYLE_OPTIONS}
           value={filters.bodyStyle}
@@ -558,7 +564,7 @@ export function SearchFilters({
       </Section>
 
       {/* Seller type */}
-      <Section title="卖家类型">
+      <Section title="卖家类型" active={!!filters.sellerType}>
         <SidebarPillSelect
           options={[
             { value: "dealer", label: "车行" },
@@ -570,7 +576,7 @@ export function SearchFilters({
       </Section>
 
       {/* Price slider + input */}
-      <Section title="价格范围">
+      <Section title="价格范围" active={!!(filters.minPrice || filters.maxPrice)}>
         <div className="flex items-center gap-1.5">
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
@@ -619,7 +625,7 @@ export function SearchFilters({
       </Section>
 
       {/* Monthly payment budget */}
-      <Section title="月供预算">
+      <Section title="月供预算" active={!!filters.maxPayment}>
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
@@ -655,7 +661,7 @@ export function SearchFilters({
       </Section>
 
       {/* Year slider + input */}
-      <Section title="年份范围">
+      <Section title="年份范围" active={!!(filters.minYear || filters.maxYear)}>
         <div className="flex items-center gap-1.5">
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
@@ -704,24 +710,24 @@ export function SearchFilters({
       </Section>
 
       {/* Fuel type */}
-      <Section title="燃油类型">
+      <Section title="燃油类型" active={!!filters.fuelType}>
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </Section>
 
       {/* Transmission — hidden when exclusively electric */}
       {!isElectric && (
-        <Section title="变速箱">
+        <Section title="变速箱" active={!!filters.transmission}>
           <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
         </Section>
       )}
 
       {/* Drivetrain */}
-      <Section title="驱动方式">
+      <Section title="驱动方式" active={!!filters.drivetrain}>
         <SidebarPillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
       </Section>
 
       {/* Mileage slider with breakpoints */}
-      <Section title="最高里程">
+      <Section title="最高里程" active={!!filters.maxMileage}>
         <p className="font-mono text-[11px] text-foreground">
           {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
         </p>
@@ -744,18 +750,18 @@ export function SearchFilters({
       </Section>
 
       {/* Exterior color */}
-      <Section title="外观颜色">
+      <Section title="外观颜色" active={!!filters.exteriorColor}>
         <SidebarPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
       </Section>
 
       {/* Interior color */}
-      <Section title="内饰颜色">
+      <Section title="内饰颜色" active={!!filters.interiorColor}>
         <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
       </Section>
 
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
-        <Section title="车辆配置">
+        <Section title="车辆配置" active={!!filters.features}>
           <SidebarPillSelect
             options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.features}
@@ -766,7 +772,21 @@ export function SearchFilters({
       )}
 
       {/* More conditions — iOS 列表行 + brand 绿勾选 */}
-      <Section title="更多条件">
+      <Section
+        title="更多条件"
+        active={
+          !!(
+            filters.dealRating ||
+            filters.priceDropped ||
+            filters.listedWithin ||
+            filters.noAccident ||
+            filters.oneOwner ||
+            filters.hasCarfax ||
+            filters.hasVideo ||
+            filters.hasPrice
+          )
+        }
+      >
         <div className="space-y-1">
           <button
             type="button"

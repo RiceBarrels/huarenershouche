@@ -61,20 +61,24 @@ const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
 // 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// 响应式列数(与社区瀑布流一致):2 / md 3 / xl 4
+// 响应式列数(与社区瀑布流一致):1 / md 3 / xl 4 / 带鱼屏 5
 function useColumnCount(): number {
-  // 手机端一排一个;平板 3 列、桌面 4 列
+  // 手机端一排一个;平板 3 列、桌面 4 列、超宽屏 5 列
   const [count, setCount] = useState(1);
   useEffect(() => {
     const mdQuery = window.matchMedia("(min-width: 768px)");
     const xlQuery = window.matchMedia("(min-width: 1280px)");
-    const update = () => setCount(xlQuery.matches ? 4 : mdQuery.matches ? 3 : 1);
+    const uwQuery = window.matchMedia("(min-width: 1920px)");
+    const update = () =>
+      setCount(uwQuery.matches ? 5 : xlQuery.matches ? 4 : mdQuery.matches ? 3 : 1);
     update();
     mdQuery.addEventListener("change", update);
     xlQuery.addEventListener("change", update);
+    uwQuery.addEventListener("change", update);
     return () => {
       mdQuery.removeEventListener("change", update);
       xlQuery.removeEventListener("change", update);
+      uwQuery.removeEventListener("change", update);
     };
   }, []);
   return count;
@@ -483,7 +487,7 @@ function BrowseContent() {
 
       {/* Banner */}
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <div>
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
@@ -754,10 +758,11 @@ function BrowseContent() {
         )}
       </div>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem]">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
         {/* Left sidebar filters — desktop only */}
         <div className="hidden w-[240px] shrink-0 md:block">
-          <div className="sticky top-4 max-h-[calc(100vh-2rem)] space-y-4 overflow-y-auto overscroll-contain pr-1">
+          {/* top-[4.5rem]:桌面 Header 是 sticky h-14,原 top-4 滚动时侧栏会钻到 Header 底下 */}
+          <div className="sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] space-y-4 overflow-y-auto overscroll-contain pb-6 pr-1">
             <SearchFilters
               onFilter={setFilters}
               initialFilters={filters}
@@ -770,7 +775,8 @@ function BrowseContent() {
         {/* Main content */}
         <main className="min-w-0 flex-1">
           {/* Results toolbar — sticky under header on desktop */}
-          <div className="mb-4 md:sticky md:top-14 md:z-20 md:-mx-1 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
+          {/* md:border-b 细分隔线:吸顶后与下方卡片流有 1px 界限,符合"1px 边框"的工具感 */}
+          <div className="mb-4 md:sticky md:top-14 md:z-20 md:-mx-1 md:border-b md:border-border/60 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
             <div className="flex flex-wrap items-center gap-3">
               <p className="flex items-baseline gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                 <span>Results:</span>
@@ -785,7 +791,7 @@ function BrowseContent() {
                     if (!searchSaved) saveSearch(savedSearchParams);
                   }}
                   disabled={searchSaved}
-                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[11px] font-medium transition-opacity active:opacity-70 ${
+                  className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[11px] font-medium transition-opacity hover:opacity-85 active:opacity-70 ${
                     searchSaved
                       ? `${IOS_FILL} text-muted-foreground`
                       : "bg-brand/30 text-brand-ink"
@@ -830,15 +836,16 @@ function BrowseContent() {
                   <button
                     key={`${chip.key}-${i}`}
                     onClick={() => clearFilter(chip.key)}
-                    className={`flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[12px] transition-opacity active:opacity-70 ${IOS_FILL}`}
+                    /* 桌面 chips 补 hover 反馈:IOS_FILL 本身无 hover,鼠标场景需要即时提示"可点击移除" */
+                    className={`group flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[12px] transition-colors hover:bg-black/[0.08] active:opacity-70 dark:hover:bg-white/[0.12] ${IOS_FILL}`}
                   >
                     {chip.label}
-                    <X className="h-2.5 w-2.5 text-muted-foreground" strokeWidth={2} />
+                    <X className="h-2.5 w-2.5 text-muted-foreground transition-colors group-hover:text-foreground" strokeWidth={2} />
                   </button>
                 ))}
                 <button
                   onClick={() => setFilters(INITIAL_FILTERS)}
-                  className="flex items-center gap-1 px-2 py-1.5 font-mono text-[12px] text-destructive transition-opacity active:opacity-70"
+                  className="flex items-center gap-1 px-2 py-1.5 font-mono text-[12px] text-destructive transition-opacity hover:opacity-80 active:opacity-70"
                 >
                   <X className="h-2.5 w-2.5" strokeWidth={2} />
                   清空
@@ -853,7 +860,8 @@ function BrowseContent() {
               initial={reduced ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.2, ease: EASE }}
-              className="flex flex-col items-center justify-center py-24"
+              /* 宽屏下加载区加高:避免 spinner 贴着吸顶工具条显得局促 */
+              className="flex flex-col items-center justify-center py-24 md:py-32"
             >
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
@@ -891,7 +899,8 @@ function BrowseContent() {
             )}
             </>
           ) : (
-            <div className="flex flex-col items-center rounded-[26px] bg-card px-6 py-16">
+            /* 空状态在宽屏限宽居中:整行拉通的空卡片在 4-5 列宽度下比例失衡 */
+            <div className="flex flex-col items-center rounded-[26px] bg-card px-6 py-16 md:mx-auto md:max-w-md md:py-20">
               <Car className="h-8 w-8 text-muted-foreground/40" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 No Results

@@ -19,9 +19,10 @@ export function DesktopBack({ fallback = "/" }: { fallback?: string }) {
           router.push(fallback);
         }
       }}
-      className="mb-4 hidden items-center gap-1.5 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground md:inline-flex"
+      className="group mb-4 hidden items-center gap-1.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground md:inline-flex"
     >
-      <ArrowLeft className="h-3.5 w-3.5" strokeWidth={1.5} />
+      {/* hover 时箭头向左微移:符合"微位移"交互规范,暗示返回方向 */}
+      <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" strokeWidth={1.5} />
       返回
     </button>
   );

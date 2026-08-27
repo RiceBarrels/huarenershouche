@@ -59,10 +59,10 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
     <div className="space-y-4">
       <h3 className="font-mono text-xs font-semibold">月供计算器</h3>
 
-      {/* Monthly payment highlight */}
-      <div className="rounded-xl bg-card p-3 text-center">
-        <p className="font-mono text-[10px] text-muted-foreground">预估月供</p>
-        <p className="mt-1 font-mono text-xl font-bold">
+      {/* Monthly payment highlight — 桌面加大结果数字,让"月供"这个核心结论一眼可读 */}
+      <div className="rounded-xl bg-card p-3 text-center md:p-4">
+        <p className="font-mono text-[10px] text-muted-foreground md:text-[11px]">预估月供</p>
+        <p className="mt-1 font-mono text-xl font-bold tabular-nums md:text-2xl">
           {fmt(monthlyPayment)}
           <span className="text-[11px] font-normal text-muted-foreground">
             /月
@@ -76,7 +76,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
           <Label className="font-mono text-[10px] text-muted-foreground">
             首付比例
           </Label>
-          <span className="font-mono text-xs font-medium">
+          <span className="font-mono text-xs font-medium tabular-nums">
             {downPaymentPct}% ({fmt(downPayment)})
           </span>
         </div>
@@ -100,7 +100,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
               key={t}
               variant={loanTerm === t ? "default" : "secondary"}
               size="sm"
-              className="font-mono text-[10px]"
+              className="font-mono text-[10px] tabular-nums md:text-xs"
               onClick={() => setLoanTerm(t)}
             >
               {t}月
@@ -144,25 +144,25 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
         />
       </div>
 
-      {/* Summary */}
+      {/* Summary — 金额统一 tabular-nums,右侧数字列对齐不跳动 */}
       <div className="space-y-1.5 border-t border-border pt-3">
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] text-muted-foreground">
+          <span className="font-mono text-[10px] text-muted-foreground md:text-[11px]">
             贷款金额
           </span>
-          <span className="font-mono text-xs">{fmt(price - downPayment)}</span>
+          <span className="font-mono text-xs tabular-nums">{fmt(price - downPayment)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] text-muted-foreground">
+          <span className="font-mono text-[10px] text-muted-foreground md:text-[11px]">
             利息总额
           </span>
-          <span className="font-mono text-xs">{fmt(totalInterest)}</span>
+          <span className="font-mono text-xs tabular-nums">{fmt(totalInterest)}</span>
         </div>
         <div className="flex justify-between">
-          <span className="font-mono text-[10px] text-muted-foreground">
+          <span className="font-mono text-[10px] text-muted-foreground md:text-[11px]">
             总花费
           </span>
-          <span className="font-mono text-xs font-medium">
+          <span className="font-mono text-xs font-medium tabular-nums">
             {fmt(totalCost)}
           </span>
         </div>

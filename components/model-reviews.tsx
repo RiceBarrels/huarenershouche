@@ -74,12 +74,13 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
         </span>
       </div>
 
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      {/* 桌面卡片内边距/间距与"相似车辆"网格的密度对齐(手机保持 p-3/gap-3) */}
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
         {posts.map((post) => (
           <Link
             key={post.id}
             href={communityPostLink(post.id)}
-            className="block rounded-xl bg-card p-3 transition-colors hover:bg-muted/40"
+            className="block rounded-xl bg-card p-3 transition-colors hover:bg-muted/40 md:p-4"
           >
             <h3 className="line-clamp-1 font-mono text-xs font-semibold leading-tight">
               {post.title}

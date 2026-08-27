@@ -140,7 +140,7 @@ export default function StoresSettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
         <LargeTitle
           title="门店与车行认证"
           subtitle={accountType === "dealer" ? "管理您的门店信息" : "添加门店并提交认证，审核通过后可升级为认证车行"}

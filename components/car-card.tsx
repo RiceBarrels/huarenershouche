@@ -119,6 +119,8 @@ export function CarCard({
   return (
     <Link
       href={carLink(car.id)}
+      /* 键盘可达性:focus-visible 环仅键盘导航时出现,不影响触屏/鼠标 */
+      className="block rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-ink/40 dark:focus-visible:ring-brand/60"
       onClick={(e) => {
         // 移动端:在当前页浮层打开(从卡片放大);桌面端正常跳转
         if (overlayEnabled) {
@@ -137,7 +139,9 @@ export function CarCard({
         whileHover={{ y: -2 }}
         whileTap={{ scale: 1.02 }}
         transition={{ duration: 0.15, ease: "easeOut" }}
-        className="group cursor-pointer overflow-hidden rounded-xl bg-card transition-colors hover:bg-card/50 active:bg-accent"
+        /* 桌面 hover 改用 1px ring + 细阴影(设计系统:边框/细阴影,不用透明度变化);
+           原 hover:bg-card/50 会让白卡片半透明,信息反而变淡。移动端 active 态保持不变 */
+        className="group cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-transparent transition-[box-shadow,background-color] duration-150 active:bg-accent md:hover:shadow-sm md:hover:ring-border"
       >
         {/* ===== 手机版:图左文右 + 标签行 + 位置行 + 操作按钮 ===== */}
         <div className="p-3 md:hidden">
@@ -285,7 +289,8 @@ export function CarCard({
               <img
                 src={car.image_url}
                 alt={car.title}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                /* 200ms:与卡片 ring/标题变色同步的快过渡,避免图片放大明显滞后 */
+                className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
               />
             ) : (
               <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
@@ -349,12 +354,13 @@ export function CarCard({
                 {inCompare ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
-                    <span className="font-mono text-[11px] text-green-600 dark:text-green-500">已加对比</span>
+                    {/* 统一 12px:原来两种状态 11px/13px 不一致,切换时按钮会跳宽 */}
+                    <span className="font-mono text-[12px] text-green-600 dark:text-green-500">已加对比</span>
                   </>
                 ) : (
                   <>
                     <GitCompare className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="font-mono text-[13px] text-muted-foreground">对比</span>
+                    <span className="font-mono text-[12px] text-muted-foreground">对比</span>
                   </>
                 )}
               </button>
@@ -372,7 +378,8 @@ export function CarCard({
           </div>
 
           <div className="min-w-0 p-4">
-            <h3 className="font-mono text-base font-semibold leading-snug tracking-tight">
+            {/* hover 标题变绿墨色:明确"整卡可点"的即时反馈(浅色用 brand-ink,深色用 brand) */}
+            <h3 className="font-mono text-base font-semibold leading-snug tracking-tight transition-colors duration-150 group-hover:text-brand-ink dark:group-hover:text-brand">
               {car.title_zh}
             </h3>
             <p className="mt-0.5 font-mono text-[13px] text-muted-foreground">
@@ -454,7 +461,8 @@ export function CarCard({
             {/* 卖家/收藏数/系统检索 底栏 */}
             <div className="mt-3 flex items-center justify-between border-t border-border pt-2.5">
               <span
-                className="flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                /* span 带 onClick 却无手型光标,桌面 hover 时看不出可点 */
+                className="flex cursor-pointer items-center gap-1.5 font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();

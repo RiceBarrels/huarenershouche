@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat } from "lucide-react";
+import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat, Search } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -77,7 +77,7 @@ export function Header() {
           : "border-transparent bg-background"
       }`}
     >
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
           <span className="font-logo text-base tracking-tight">
@@ -87,17 +87,20 @@ export function Header() {
           <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
         </Link>
 
-        <nav className="flex items-center gap-6">
+        {/* md 断点(768–1024)横向空间紧张,链接与右侧按钮的间距到 lg 才放开,避免整行溢出换行 */}
+        <nav className="flex items-center gap-4 lg:gap-6">
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(link.href + "/");
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`relative py-1 font-mono text-xs tracking-widest transition-colors hover:text-foreground ${
+                aria-current={active ? "page" : undefined}
+                className={`relative py-1 font-mono text-xs tracking-widest transition-colors ${
                   active
                     ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand"
-                    : "text-muted-foreground"
+                    : // 未激活项 hover 时先给一条中性色下划线做"就位"暗示,点击后换品牌色
+                      "text-muted-foreground hover:text-foreground hover:after:absolute hover:after:inset-x-0 hover:after:bottom-0 hover:after:h-px hover:after:bg-border"
                 }`}
               >
                 {link.label}
@@ -106,7 +109,13 @@ export function Header() {
           })}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 lg:gap-3">
+          {/* 搜索入口:桌面无底部导航,给一个直达浏览页搜索的图标入口 */}
+          <Link href="/browse" aria-label="搜索车辆">
+            <Button variant="ghost" size="icon" className="h-8 w-8" title="搜索车辆" tabIndex={-1}>
+              <Search className="h-3.5 w-3.5" strokeWidth={1.5} />
+            </Button>
+          </Link>
           {mounted && (
             <Popover>
               <PopoverTrigger asChild>
@@ -119,7 +128,8 @@ export function Header() {
                   <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-48 p-1.5 font-mono">
+              {/* sideOffset 让下拉与 header 分隔线保持呼吸感,不贴边 */}
+              <PopoverContent align="end" sideOffset={8} className="w-48 p-1.5 font-mono">
                 <p className="px-3 pb-1 pt-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   个性化
                 </p>
@@ -149,7 +159,7 @@ export function Header() {
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-60" strokeWidth={1.5} />
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent align="end" className="w-64 p-1 font-mono">
+                  <PopoverContent align="end" sideOffset={8} className="w-64 p-1 font-mono">
                     <p className="px-2 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                       切换身份
                     </p>
@@ -195,17 +205,20 @@ export function Header() {
                   </PopoverContent>
                 </Popover>
               )}
-              <Link href="/messages" className="relative">
+              <Link href="/messages" className="relative" aria-label="消息">
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
+                  title="消息"
+                  tabIndex={-1}
                 >
                   <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </Button>
                 {unreadCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white">
-                    {unreadCount}
+                    {/* 三位数会撑破圆形徽标,封顶展示 */}
+                    {unreadCount > 99 ? "99+" : unreadCount}
                   </span>
                 )}
               </Link>
@@ -230,6 +243,8 @@ export function Header() {
                 size="sm"
                 className="font-mono text-xs text-muted-foreground"
                 onClick={handleLogout}
+                aria-label="退出登录"
+                title="退出登录"
               >
                 <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
@@ -259,7 +274,7 @@ export function Header() {
       {/* 正在以车行身份操作的提示条 */}
       {isActingAsClaimed && (
         <div className="bg-amber-500/10">
-          <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4">
+          <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
             <span className="flex items-center gap-1.5 font-mono text-[11px] text-amber-700 dark:text-amber-400">
               <Store className="h-3 w-3" strokeWidth={1.5} />
               正在以「{actingProfile?.username || "车行"}」身份操作

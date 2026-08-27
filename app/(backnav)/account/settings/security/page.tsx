@@ -68,7 +68,7 @@ export default function SecuritySettingsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
+      <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 md:py-8">
         <LargeTitle title="账号与安全" subtitle="登录邮箱与账号管理" />
 
         {loading ? (

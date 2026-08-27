@@ -317,7 +317,8 @@ export default function UserProfilePage({
             </div>
             <div className="mt-6 space-y-2">
               <Skeleton className="h-4 w-24" />
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {/* 骨架列数与真实车源网格(sm:grid-cols-2)一致,避免加载完成时跳列 */}
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {[1, 2, 3].map((i) => (
                   <div key={i} className="overflow-hidden rounded-xl bg-card">
                     <Skeleton className="aspect-[16/10] w-full" />
@@ -407,7 +408,8 @@ export default function UserProfilePage({
 
               <div className="mt-3 px-1">
                 <div className="flex items-center gap-2">
-                  <h1 className="font-mono text-xl font-bold">{profile.username}</h1>
+                  {/* 桌面用户名升到 2xl,与更高的横幅/更大的头像比例匹配 */}
+                  <h1 className="font-mono text-xl font-bold md:text-2xl">{profile.username}</h1>
                   {isUnclaimedSystem ? (
                     <Badge variant="secondary" className="gap-1 font-mono text-[10px]">
                       <Globe className="h-3 w-3" strokeWidth={1.5} />
@@ -567,7 +569,9 @@ export default function UserProfilePage({
                       <Link
                         key={post.id}
                         href={communityPostLink(post.id)}
-                        className="flex gap-3 px-1 py-3.5 bg-card rounded-xl transition-colors hover:bg-muted/30"
+                        /* 桌面:补齐水平内边距(px-1 在卡片底色下左右几乎贴边),
+                           并加与社区 feed 卡一致的 hover 描边/点按反馈 */
+                        className="flex gap-3 px-1 py-3.5 bg-card rounded-xl transition-colors hover:bg-muted/30 md:px-3 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
                       >
                         <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
                           <img

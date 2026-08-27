@@ -506,11 +506,13 @@ export default function CommunityDetailPage({
           </div>
         </div>
 
-        {/* X 式:标题/正文在媒体之前,大字号全色 */}
-        <h1 className="mt-3 font-mono text-lg font-bold leading-snug">
+        {/* X 式:标题/正文在媒体之前,大字号全色。
+            桌面:标题升半档、正文行高放宽到 1.8——中文长文在 42em 行宽下
+            需要更松的行距才不显拥挤(行宽由 max-w-2xl 保证,刻意不拉宽) */}
+        <h1 className="mt-3 font-mono text-lg font-bold leading-snug md:text-xl">
           {post.title}
         </h1>
-        <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground">
+        <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground md:mt-2 md:leading-[1.8]">
           <HashtagText text={post.content} />
         </div>
 
@@ -543,8 +545,10 @@ export default function CommunityDetailPage({
               {media.map((src, i) => (
                 <div
                   key={i}
+                  /* 桌面把多图轮播从 4:5 压到 4:3:672px 宽的 4:5 高达 840px,
+                     一屏放不下轮播 + 指示点;4:3 可整体入画,竖图 contain 留灰边 */
                   className={`flex w-full shrink-0 snap-center items-center justify-center bg-muted ${
-                    media.length > 1 ? "aspect-[4/5]" : ""
+                    media.length > 1 ? "aspect-[4/5] md:aspect-[4/3]" : ""
                   }`}
                 >
                   {VIDEO_RE.test(src) ? (
@@ -621,7 +625,8 @@ export default function CommunityDetailPage({
             共 {comments.length} 条评论
           </h2>
 
-          <div className="mt-4 space-y-4">
+          {/* 桌面楼层间距略放大,楼与楼的层级分隔更清晰 */}
+          <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
             {commentsLoading ? (
               <p className="font-mono text-xs text-muted-foreground">
                 加载中...
@@ -651,7 +656,9 @@ export default function CommunityDetailPage({
                       onDelete={() => handleDeleteComment(comment.id)}
                     />
                     {replies.length > 0 && (
-                      <div className="ml-10 mt-2 space-y-2">
+                      /* 桌面缩进对齐父楼正文起点:头像 32px + 间距 10px = 42px
+                         (ml-10 的 40px 差 2px,小屏差异不可见故仅桌面修正) */
+                      <div className="ml-10 mt-2 space-y-2 md:ml-[42px]">
                         {visibleReplies.map((reply) => (
                           <CommentRow
                             key={reply.id}
@@ -723,7 +730,8 @@ export default function CommunityDetailPage({
         }
         style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
       >
-        <div className="mx-auto w-full max-w-2xl px-4 py-2">
+        {/* 桌面底栏纵向多给一点呼吸,输入框不贴边 */}
+        <div className="mx-auto w-full max-w-2xl px-4 py-2 md:py-3">
           {replyTo && (
             <div className="mb-1.5 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
               <span className="truncate">回复 @{replyTo.name}</span>

@@ -364,7 +364,8 @@ export default function Home() {
       const prioritized = [...cars].sort(
         (a, b) => Number(!!a.source_id) - Number(!!b.source_id)
       );
-      const featuredNext = prioritized.slice(0, 6);
+      // 取 8 张:普通桌面 3 列展示前 6,带鱼屏 4 列展示 8
+      const featuredNext = prioritized.slice(0, 8);
       setFeatured(featuredNext);
 
       let recommendedNext: DbCar[] = [];
@@ -519,7 +520,7 @@ export default function Home() {
           className="absolute inset-x-0 -top-24 bottom-0 hidden bg-grid [mask-image:linear-gradient(to_bottom,black_35%,transparent)] md:block"
         />
 
-        <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl">
+        <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           {/* Micro label + location */}
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:block md:text-[11px]">
@@ -581,7 +582,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
                   >
                     <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -615,7 +616,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
                   >
                     <Car className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -649,7 +650,7 @@ export default function Home() {
                 <DrawerTrigger asChild>
                   <button
                     type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left transition-colors active:bg-muted md:bg-background md:hover:bg-muted/40"
+                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
                   >
                     <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                     <span className="min-w-0">
@@ -728,7 +729,8 @@ export default function Home() {
               </div>
               <Button
                 type="submit"
-                className="h-12 gap-2 rounded-r-full bg-primary px-6 font-mono text-sm text-primary-foreground hover:opacity-90 md:px-8"
+                // 桌面外层表单是 rounded-md,按钮右侧跟随同级圆角,避免胶囊角在直角容器里留出白色缺口
+                className="h-12 gap-2 rounded-r-full bg-primary px-6 font-mono text-sm text-primary-foreground hover:opacity-90 md:rounded-r-md md:px-8"
               >
                 搜索
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
@@ -812,7 +814,7 @@ export default function Home() {
               <button
                 key={m}
                 onClick={() => router.push(buildUrl({ make: m }))}
-                className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50"
               >
                 {MAKES_ZH[m]}
               </button>
@@ -823,7 +825,7 @@ export default function Home() {
               <button
                 key={t.label}
                 onClick={() => router.push(buildUrl(t.params))}
-                className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50"
               >
                 {t.label}
               </button>
@@ -963,10 +965,10 @@ export default function Home() {
         />
       )}
 
-      {/* Recommended for you */}
+      {/* Recommended for you — 桌面所有楼层统一用 border-t 细线分隔,保持垂直节奏一致 */}
       {showRecommended && recommended.length > 0 && (
-        <section className="hidden md:block md:px-4 md:py-10">
-          <div className="">
+        <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
             <Reveal>
               <SectionHeader
                 index="01"
@@ -976,10 +978,10 @@ export default function Home() {
                 className="mb-6"
               />
             </Reveal>
-            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {/* 候选池按 30 排(供手机端无限滑),桌面楼层只展示前 6 */}
-              {recommended.slice(0, 6).map((car) => (
-                <RevealItem key={car.id}>
+            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3 2xl:grid-cols-4">
+              {/* 候选池按 30 排(供手机端无限滑),桌面楼层展示前 6,带鱼屏 4 列补到 8 */}
+              {recommended.slice(0, 8).map((car, i) => (
+                <RevealItem key={car.id} className={i >= 6 ? "hidden 2xl:block" : undefined}>
                   <CarCard car={car} />
                 </RevealItem>
               ))}
@@ -990,8 +992,8 @@ export default function Home() {
 
       {/* Featured listings */}
       {featured.length > 0 && (
-        <section className="hidden md:block md:px-4 md:py-10">
-          <div className="">
+        <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
+          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
             <Reveal>
               <SectionHeader
                 index={showRecommended && recommended.length > 0 ? "02" : "01"}
@@ -1001,9 +1003,10 @@ export default function Home() {
                 className="mb-6"
               />
             </Reveal>
-            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {featured.map((car) => (
-                <RevealItem key={car.id}>
+            <RevealGroup className="grid grid-cols-1 gap-3 md:grid-cols-3 2xl:grid-cols-4">
+              {/* 普通桌面 3 列展示前 6,带鱼屏 4 列展示 8 */}
+              {featured.map((car, i) => (
+                <RevealItem key={car.id} className={i >= 6 ? "hidden 2xl:block" : undefined}>
                   <CarCard car={car} />
                 </RevealItem>
               ))}
@@ -1014,7 +1017,7 @@ export default function Home() {
 
       {/* Price drops */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <PriceDroppedCars />
           </Reveal>
@@ -1023,16 +1026,17 @@ export default function Home() {
 
       {/* Browse by body style */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <SectionHeader index="03" label="Body Style" title="按车身类型找车" className="mb-6" />
           </Reveal>
-          <RevealGroup stagger={0.05} className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-4 md:overflow-visible">
+          {/* 2xl 起 8 类一行排开,与车源网格的 2xl 断点保持同步(1920 宽自然继承) */}
+          <RevealGroup stagger={0.05} className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-4 md:overflow-visible md:pb-0 2xl:grid-cols-8">
             {BODY_STYLE_OPTIONS.slice(0, 8).map((opt) => (
               <RevealItem key={opt.value} variants={scaleIn} className="w-32 shrink-0 md:w-auto">
                 <Link
                   href={`/browse?bodyStyle=${opt.value}`}
-                  className="group flex flex-col items-center rounded-xl bg-card px-4 py-3 transition-colors hover:bg-muted/50"
+                  className="group flex flex-col items-center rounded-xl bg-card px-4 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                 >
                   <BodyStyleSilhouette
                     style={opt.value}
@@ -1049,7 +1053,7 @@ export default function Home() {
 
       {/* Shop by monthly payment */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <SectionHeader index="04" label="Monthly Budget" title="月供预算购车" className="mb-2" />
           </Reveal>
@@ -1065,7 +1069,7 @@ export default function Home() {
                 <Link
                   key={p}
                   href={`/browse?maxPayment=${p}`}
-                  className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                  className="rounded-full bg-muted px-2.5 py-1 font-mono text-[11px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                 >
                   ${p}/月
                 </Link>
@@ -1109,7 +1113,7 @@ export default function Home() {
 
       {/* Trending searches */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <TrendingSearches />
           </Reveal>
@@ -1118,7 +1122,7 @@ export default function Home() {
 
       {/* Region entry */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <RegionBrandEntry />
           </Reveal>
@@ -1127,7 +1131,7 @@ export default function Home() {
 
       {/* Community & QA entry */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <SectionHeader
               index="05"
@@ -1145,7 +1149,7 @@ export default function Home() {
                 <RevealItem key={post.id}>
                   <Link
                     href={`/community/${post.id}`}
-                    className="block h-full overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
+                    className="block h-full overflow-hidden rounded-xl bg-card outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                   >
                     {post.images?.[0] && (
                       <img
@@ -1190,7 +1194,7 @@ export default function Home() {
               { href: "/guide/loan", title: "贷款预审", desc: "在线比价、秒批" },
             ].map((item) => (
               <RevealItem key={item.href}>
-                <Link href={item.href} className="block rounded-xl bg-card p-4 transition-colors hover:bg-muted/40">
+                <Link href={item.href} className="block rounded-xl bg-card p-4 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50">
                   <p className="font-mono text-xs font-semibold">{item.title}</p>
                   <p className="mt-1 font-mono text-[10px] text-muted-foreground">{item.desc}</p>
                 </Link>
@@ -1202,7 +1206,7 @@ export default function Home() {
 
       {/* Trust reviews */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <TrustReviews />
           </Reveal>
@@ -1211,7 +1215,7 @@ export default function Home() {
 
       {/* Why choose us */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-14">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <SectionHeader index="06" label="Why Us" title="为什么选择常來車網" className="mb-2" />
           </Reveal>
@@ -1237,7 +1241,7 @@ export default function Home() {
 
       {/* How it works */}
       <section className="hidden md:block md:border-t md:border-border md:bg-muted/30 md:px-4 md:py-14">
-        <div className="">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
           <Reveal>
             <SectionHeader index="07" label="How It Works" title="买车三步走" className="mb-8" />
           </Reveal>

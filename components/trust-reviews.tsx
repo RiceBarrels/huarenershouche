@@ -236,20 +236,26 @@ export function TrustReviews() {
   }
 
   return (
-    <section className="px-4 pb-10">
-      <div className="mx-auto max-w-5xl">
-        {/* Section header */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
+    // 桌面端 px/py 与容器宽度交给首页外层 section 统一控制,内边距和 max-w 只留手机端,
+    // 避免双重缩进导致楼层左边缘错位
+    <section className="px-4 pb-10 md:p-0">
+      <div className="mx-auto max-w-5xl md:max-w-none">
+        {/* 桌面沿用 SectionHeader 的视觉语言(微标签+大标题+细线);
+            因右侧需保留评分与写评价入口,这里手写同构 markup 而非直接复用组件 */}
+        <div className="mb-2 hidden font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground md:flex">
+          <span>Reviews</span>
+        </div>
+        <div className="mb-4 flex items-center justify-between md:mb-0 md:items-end">
+          <div className="flex items-center gap-3 md:items-end">
             <div className="flex items-center gap-2">
-              <Star className="h-4 w-4" strokeWidth={1.5} />
-              <h2 className="font-mono text-sm font-medium">用户评价</h2>
+              <Star className="h-4 w-4 md:hidden" strokeWidth={1.5} />
+              <h2 className="font-mono text-sm font-medium md:font-logo md:text-2xl md:font-normal md:tracking-tight">用户评价</h2>
             </div>
             {userId ? (
               <button
                 type="button"
                 onClick={() => (formOpen ? setFormOpen(false) : openForm())}
-                className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:mb-1"
               >
                 <Pencil className="h-2.5 w-2.5" strokeWidth={1.5} />
                 {ownReview ? "修改我的评价" : "写评价"}
@@ -257,13 +263,13 @@ export function TrustReviews() {
             ) : (
               <Link
                 href="/login"
-                className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:mb-1"
               >
                 登录后写评价
               </Link>
             )}
           </div>
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 md:mb-1">
             <div className="flex items-center gap-0.5">
               {Array.from({ length: 5 }).map((_, i) => (
                 <Star
@@ -282,6 +288,8 @@ export function TrustReviews() {
             </span>
           </div>
         </div>
+        {/* 桌面补上 SectionHeader 同款 1px 细线,收束标题区 */}
+        <div className="mb-6 mt-3 hidden h-px w-full bg-border md:block" />
 
         {/* Write review form */}
         {formOpen && userId && (
@@ -350,7 +358,8 @@ export function TrustReviews() {
         )}
 
         {/* Review cards — horizontal scroll on mobile, grid on desktop */}
-        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible">
+        {/* 2xl 容器放宽到 88rem 后,3 列文字卡片会过宽,升到 4 列保持可读行长 */}
+        <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible md:pb-0 2xl:grid-cols-4">
           {reviews.map((review) => (
             <div
               key={review.id}

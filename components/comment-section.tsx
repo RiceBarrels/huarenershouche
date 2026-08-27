@@ -112,7 +112,8 @@ export function CommentSection({ carId }: { carId: string }) {
       {/* Comment input */}
       <div className="mt-4">
         {userId ? (
-          <div className="flex gap-2">
+          /* 桌面:输入框与发送键间距放宽,与下方评论列表 gap-3 的节奏对齐 */
+          <div className="flex gap-2 md:gap-3">
             <textarea
               ref={inputRef}
               className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
@@ -148,8 +149,8 @@ export function CommentSection({ carId }: { carId: string }) {
         )}
       </div>
 
-      {/* Comments list */}
-      <div className="mt-4 space-y-3">
+      {/* Comments list — 桌面条目间距略放大,长列表扫读更省力 */}
+      <div className="mt-4 space-y-3 md:mt-5 md:space-y-4">
         {loading ? (
           <p className="font-mono text-xs text-muted-foreground">加载中...</p>
         ) : comments.length === 0 ? (

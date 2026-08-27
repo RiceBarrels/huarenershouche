@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ChevronRight, MapPin, TrendingDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { carLink } from "@/lib/static-link";
+import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar } from "@/lib/types";
 
@@ -50,10 +51,12 @@ export function PriceDroppedCars() {
   if (!loading && cars.length === 0) return null;
 
   return (
-    <section className="px-4 pb-10">
-      <div className="mx-auto max-w-5xl">
-        {/* Section header */}
-        <div className="mb-4 flex items-center justify-between">
+    // 桌面端 px/py 与容器宽度交给首页外层 section 统一控制,内边距和 max-w 只留手机端,
+    // 避免双重缩进导致楼层左边缘错位
+    <section className="px-4 pb-10 md:p-0">
+      <div className="mx-auto max-w-5xl md:max-w-none">
+        {/* 手机保留小图标标题;桌面统一用 SectionHeader,与其他楼层同一套视觉语言 */}
+        <div className="mb-4 flex items-center justify-between md:hidden">
           <div className="flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-green-600" strokeWidth={1.5} />
             <h2 className="font-mono text-sm font-medium">最近降价</h2>
@@ -66,14 +69,22 @@ export function PriceDroppedCars() {
             <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
           </Link>
         </div>
+        <div className="hidden md:block">
+          <SectionHeader
+            label="Price Drops"
+            title="最近降价"
+            action={{ href: "/browse?priceDropped=true", label: "查看全部" }}
+            className="mb-6"
+          />
+        </div>
 
         {/* Horizontal scrollable row */}
         {loading ? (
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="flex gap-3 overflow-x-auto pb-2 md:grid md:grid-cols-3 md:overflow-visible md:pb-0 xl:grid-cols-6">
             {Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
-                className="w-[220px] shrink-0 overflow-hidden rounded-xl bg-card"
+                className="w-[220px] shrink-0 overflow-hidden rounded-xl bg-card md:w-auto"
               >
                 <Skeleton className="aspect-[16/10] w-full rounded-none" />
                 <div className="p-2.5">
@@ -85,7 +96,8 @@ export function PriceDroppedCars() {
             ))}
           </div>
         ) : (
-          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none">
+          // 手机保持横滑;桌面改为网格铺满容器,避免固定 220px 卡片在宽屏右侧留白
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none md:grid md:grid-cols-3 md:overflow-visible md:pb-0 xl:grid-cols-6">
             {cars.map((car) => {
               const discountPct = car.original_price
                 ? Math.round((1 - car.price / car.original_price) * 100)
@@ -98,7 +110,7 @@ export function PriceDroppedCars() {
                 <Link
                   key={car.id}
                   href={carLink(car.id)}
-                  className="group w-[220px] shrink-0 overflow-hidden rounded-xl bg-card transition-colors hover:bg-muted/40"
+                  className="group w-[220px] shrink-0 overflow-hidden rounded-xl bg-card outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:w-auto"
                 >
                   {/* Image */}
                   <div className="relative aspect-[16/10] overflow-hidden bg-muted">

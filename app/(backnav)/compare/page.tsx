@@ -21,7 +21,7 @@ export default function ComparePage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 2xl:max-w-7xl">
         <div className="mb-6">
           <div className="mb-3 flex items-center gap-3">
             <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
