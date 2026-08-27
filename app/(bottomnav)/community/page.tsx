@@ -172,6 +172,21 @@ function CommunityFeedPage() {
   const [followingRefreshing, setFollowingRefreshing] = useState(false);
   // 关注流顶部的作者筛选(null = 全部)
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
+  // 桌面左栏:我关注的人(X 式三栏布局的左侧列表;null = 加载中)
+  const [followingList, setFollowingList] = useState<
+    { id: string; username: string; avatar_url: string | null }[] | null
+  >(null);
+  // 宽屏(xl+,右栏可见):搜索 UI 只在右栏(输入框/筛选/建议都在右边),
+  // 中栏只展示结果,吸顶条不再切换成搜索框
+  const [railSearch, setRailSearch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1280px)");
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读取媒体查询,仅首帧一次
+    setRailSearch(mq.matches);
+    const update = (e: MediaQueryListEvent) => setRailSearch(e.matches);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
   // tab 切换方向(驱动左右滑动动画)
   const [tabDir, setTabDir] = useState(1);
   // 顶栏:下滑隐藏、上滑或回到顶部显示(X 式)
@@ -247,6 +262,38 @@ function CommunityFeedPage() {
     });
     return () => subscription.unsubscribe();
   }, []);
+
+  // 桌面左栏关注列表:follows 表按关注时间倒序,内嵌被关注者资料
+  //(轻量查询,不做断点判断,避免「小屏加载后拉宽窗口」时列表缺数据)
+  useEffect(() => {
+    if (!userId) {
+      setFollowingList(null);
+      return;
+    }
+    let cancelled = false;
+    supabase
+      .from("follows")
+      .select("followee_id, profiles!followee_id(username, avatar_url)")
+      .eq("follower_id", userId)
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        if (cancelled) return;
+        type Row = {
+          followee_id: string;
+          profiles: { username: string | null; avatar_url: string | null } | null;
+        };
+        setFollowingList(
+          ((data as Row[] | null) || []).map((r) => ({
+            id: r.followee_id,
+            username: r.profiles?.username || "用户",
+            avatar_url: r.profiles?.avatar_url ?? null,
+          })),
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   // ?q= 是搜索状态的唯一事实来源:出现(哪怕为空)= 搜索开,消失 = 搜索关。
   // hashtag 跳转、返回键、手动改地址栏都会经这里驱动 UI
@@ -352,6 +399,18 @@ function CommunityFeedPage() {
   // 推荐关键词:打开搜索时拉热度候选池(top 40,会话缓存),
   // 展示时根据当前输入实时过滤重排(子串 + 拼音匹配)
   const [suggestPool, setSuggestPool] = useState<string[]>([]);
+  // 桌面右栏「大家在搜」:宽屏(xl+)开页即拉候选池(lib 内有会话缓存,
+  // 与搜索面板共享一份数据);窄屏仍然等打开搜索时才拉
+  useEffect(() => {
+    if (!window.matchMedia("(min-width: 1280px)").matches) return;
+    let cancelled = false;
+    getSuggestionPool().then((pool) => {
+      if (!cancelled) setSuggestPool(pool);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     if (!searchOpen) return;
     let cancelled = false;
@@ -889,17 +948,84 @@ function CommunityFeedPage() {
     <PullToRefresh onRefresh={refreshFeed}>
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-3 py-4 md:px-4 md:py-6">
+      {/* X 式三栏(桌面):左 关注列表(lg+)/ 中 信息流 / 右 搜索+热搜+车源(xl+)。
+          移动端只有中栏,行为不变 */}
+      <main className="mx-auto flex w-full max-w-2xl flex-1 items-start justify-center px-3 py-4 md:px-4 md:py-6 lg:max-w-5xl lg:gap-6 xl:max-w-7xl">
+        {/* 左栏:关注列表(替代 X 的导航栏)+ 发帖按钮 */}
+        <aside className="scrollbar-none sticky top-20 hidden max-h-[calc(100vh-6rem)] w-56 shrink-0 overflow-y-auto lg:block">
+          <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
+            Following
+          </span>
+          <h2 className="font-logo text-lg tracking-tight">关注列表</h2>
+          <div className="mt-3">
+            {!userId ? (
+              <div className="rounded-xl bg-card p-4">
+                <p className="font-mono text-xs leading-relaxed text-muted-foreground">
+                  登录后,你关注的人会出现在这里
+                </p>
+                <Link
+                  href="/login"
+                  className="mt-3 inline-flex h-8 items-center rounded-full bg-primary px-4 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  登录 / 注册
+                </Link>
+              </div>
+            ) : followingList === null ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
+              </div>
+            ) : followingList.length === 0 ? (
+              <div className="rounded-xl bg-card p-4">
+                <p className="font-mono text-xs text-muted-foreground">还没有关注任何人</p>
+                <p className="mt-1 font-mono text-[11px] leading-relaxed text-muted-foreground/70">
+                  在帖子里点「关注」,对方就会出现在这里
+                </p>
+              </div>
+            ) : (
+              <ul className="space-y-0.5">
+                {followingList.map((u) => (
+                  <li key={u.id}>
+                    <Link
+                      href={userLink(u.id)}
+                      className="flex items-center gap-2.5 rounded-full px-2 py-1.5 transition-colors hover:bg-muted/60"
+                    >
+                      <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-muted ring-1 ring-border">
+                        <img
+                          src={avatarUrl(u.avatar_url, u.username)}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </span>
+                      <span className="min-w-0 truncate font-mono text-[13px] text-foreground">
+                        {u.username}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <Link
+            href="/community/new"
+            className="mt-4 flex h-10 w-full items-center justify-center gap-1.5 rounded-full bg-foreground font-mono text-sm font-medium text-background transition-opacity hover:opacity-90"
+          >
+            <Plus className="h-4 w-4" strokeWidth={1.5} />
+            发帖
+          </Link>
+        </aside>
+
+        {/* 中栏:原有信息流 */}
+        <div className="w-full min-w-0 max-w-2xl">
         {/* Top bar — title + search (sticky)。安全区并入吸顶条自身的 padding:
             若只把 top 设为安全区高度,刘海/状态栏那条不被覆盖,滚动时内容
             会从底下穿过(Capacitor 里看起来顶部"透明") */}
         <div
-          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-14 md:-mx-4 md:px-4"
+          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-14 md:-mx-4 md:px-4 lg:mx-0 lg:px-0"
           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.25rem)" }}
         >
           <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
             <AnimatePresence initial={false} mode="popLayout">
-              {searchOpen && !mobileLayer ? (
+              {searchOpen && !mobileLayer && !railSearch ? (
                 <motion.div
                   key="search"
                   layout={!reduced}
@@ -970,7 +1096,8 @@ function CommunityFeedPage() {
                         // 移动端 ?q= 由浮层注册 effect 写到浮层历史条目上
                         if (!mobileLayer) syncSearchUrl("");
                       }}
-                      className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      /* 宽屏右栏自带搜索框,这里的入口藏掉避免重复 */
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground xl:hidden"
                       aria-label="搜索帖子"
                     >
                       <motion.span layoutId="community-search-icon" className="flex">
@@ -979,7 +1106,8 @@ function CommunityFeedPage() {
                     </button>
                     <Link
                       href="/community/new"
-                      className="hidden h-9 items-center gap-1 rounded-full bg-muted px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground md:flex"
+                      /* 左栏(lg+)有大发帖按钮,吸顶条这颗只在 md–lg 出现 */
+                      className="hidden h-9 items-center gap-1 rounded-full bg-muted px-3 font-mono text-[11px] text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground md:flex lg:hidden"
                     >
                       <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
                       发帖
@@ -1026,15 +1154,18 @@ function CommunityFeedPage() {
           )}
         </div>
 
-        {/* 桌面搜索面板:搜索记录/猜你想搜 + 结果(移动端在独立浮层里渲染) */}
-        {searchOpen && !mobileLayer && (
+        {/* 桌面搜索面板:搜索记录/猜你想搜 + 结果(移动端在独立浮层里渲染)。
+            宽屏右栏搜索:仅在真正搜索(有关键词/类型)时接管中栏,
+            光聚焦输入框不清空 feed */}
+        {searchOpen && !mobileLayer && (!railSearch || searching) && (
           <motion.div
             initial={reduced ? false : { opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.22, ease: EASE }}
             className="mt-4"
           >
-            {searchSuggestPanel}
+            {/* 宽屏:输入/筛选/建议都在右栏,中栏只展示搜索结果 */}
+            {!railSearch && searchSuggestPanel}
             {searchResults}
           </motion.div>
         )}
@@ -1045,7 +1176,11 @@ function CommunityFeedPage() {
         <div
           onTouchStart={onFeedTouchStart}
           onTouchEnd={onFeedTouchEnd}
-          style={searchOpen && !mobileLayer ? { display: "none" } : undefined}
+          style={
+            searchOpen && !mobileLayer && (!railSearch || searching)
+              ? { display: "none" }
+              : undefined
+          }
         >
         <AnimatePresence mode="popLayout" initial={false} custom={tabDir}>
         <motion.div
@@ -1245,6 +1380,128 @@ function CommunityFeedPage() {
         </motion.div>
         </AnimatePresence>
         </div>
+        </div>
+
+        {/* 右栏:搜索框 + 大家在搜 + 车源推荐(X 右侧栏式)。
+            桌面搜索 UI 只在这里:聚焦展开筛选/建议,输入后中栏切成结果 */}
+        <aside className="scrollbar-none sticky top-20 hidden max-h-[calc(100vh-6rem)] w-72 shrink-0 space-y-4 overflow-y-auto xl:block">
+          <div className="flex h-10 w-full items-center gap-2 rounded-full bg-muted px-4 transition-colors focus-within:ring-1 focus-within:ring-border">
+            <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+            <input
+              value={keyword}
+              onFocus={() => {
+                if (!searchOpen) {
+                  setSearchOpen(true);
+                  syncSearchUrl(keyword);
+                }
+              }}
+              onChange={(e) => {
+                if (!searchOpen) setSearchOpen(true);
+                setKeyword(e.target.value);
+                syncSearchUrl(e.target.value);
+              }}
+              onBlur={() => saveSearchHistory(keyword)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+              }}
+              placeholder="搜索帖子..."
+              className="h-full w-full bg-transparent font-mono text-sm outline-none placeholder:text-muted-foreground/60"
+            />
+            {searchOpen && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchOpen(false);
+                  setKeyword("");
+                  setSearchType("");
+                  syncSearchUrl(null);
+                }}
+                className="shrink-0 p-1 text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="关闭搜索"
+              >
+                <X className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            )}
+          </div>
+
+          {/* 搜索态:类型筛选 + 搜索记录/猜你想搜(替换掉热搜/车源卡) */}
+          {searchOpen && (
+            <div className="rounded-xl bg-card p-4">
+              {typeChips}
+              <div className="mt-4">{searchSuggestPanel}</div>
+            </div>
+          )}
+
+          {!searchOpen && suggestPool.length > 0 && (
+            <div className="rounded-xl bg-card p-4">
+              <h3 className="font-mono text-sm font-semibold">大家在搜</h3>
+              <ul className="mt-1">
+                {suggestPool.slice(0, 6).map((t, i) => (
+                  <li key={t}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSearchOpen(true);
+                        pickKeyword(t);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-full px-2 py-2 text-left transition-colors hover:bg-muted/60"
+                    >
+                      <span className="w-4 shrink-0 font-mono text-[11px] text-muted-foreground/60">
+                        {i + 1}
+                      </span>
+                      <span className="min-w-0 truncate font-mono text-[13px] text-foreground">
+                        {t}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!searchOpen && nearbyCars.length > 0 && (
+            <div className="rounded-xl bg-card p-4">
+              <h3 className="font-mono text-sm font-semibold">
+                {nearbyCars[0]?.personalized ? "为你推荐" : "附近车源"}
+              </h3>
+              <ul className="mt-1 space-y-0.5">
+                {nearbyCars.slice(0, 3).map(({ car, distance }) => (
+                  <li key={car.id}>
+                    <Link
+                      href={carLink(car.id)}
+                      className="flex items-center gap-2.5 rounded-lg px-1.5 py-2 transition-colors hover:bg-muted/60"
+                    >
+                      <span className="h-12 w-16 shrink-0 overflow-hidden rounded-lg bg-muted ring-1 ring-border/60">
+                        {car.image_url && (
+                          <img
+                            src={car.image_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                            loading="lazy"
+                          />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-mono text-[13px] text-foreground">
+                          {car.title_zh}
+                        </span>
+                        <span className="mt-0.5 flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                          <span className="text-brand-ink">
+                            {car.price > 0 ? formatPrice(car.price) : "电议"}
+                          </span>
+                          {distance != null && <span>· {formatDistance(distance)}</span>}
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </aside>
       </main>
       <Footer />
     </div>
