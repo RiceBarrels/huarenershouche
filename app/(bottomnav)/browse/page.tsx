@@ -61,27 +61,6 @@ const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
 // 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// 响应式列数(与社区瀑布流一致):1 / md 3 / xl 4 / 1920 5 / 2560 6
-function useColumnCount(): number {
-  // 手机端一排一个;平板 3 列、桌面 4 列、超宽屏 5 列、带鱼屏 6 列
-  const [count, setCount] = useState(1);
-  useEffect(() => {
-    const queries: [MediaQueryList, number][] = [
-      [window.matchMedia("(min-width: 2560px)"), 6],
-      [window.matchMedia("(min-width: 1920px)"), 5],
-      [window.matchMedia("(min-width: 1280px)"), 4],
-      [window.matchMedia("(min-width: 768px)"), 3],
-    ];
-    const update = () => setCount(queries.find(([q]) => q.matches)?.[1] ?? 1);
-    update();
-    for (const [q] of queries) q.addEventListener("change", update);
-    return () => {
-      for (const [q] of queries) q.removeEventListener("change", update);
-    };
-  }, []);
-  return count;
-}
-
 export default function BrowsePage() {
   return (
     <Suspense>
@@ -103,7 +82,6 @@ function BrowseContent() {
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
-  const columnCount = useColumnCount();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [userZip, setUserZip] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -869,24 +847,16 @@ function BrowseContent() {
             </motion.div>
           ) : filtered.length > 0 ? (
             <>
-            {/* 瀑布流:显式列分发(与社区一致)。按全局序号 i%列数 分列,
-                加载更多时已有卡片不会换列,避免重排。 */}
-            <div className="flex items-start gap-3 md:gap-4">
-              {Array.from({ length: columnCount }, (_, ci) => (
-                <div key={ci} className="flex min-w-0 flex-1 flex-col gap-3 md:gap-4">
-                  {filtered
-                    .slice(0, visibleCount)
-                    .filter((_, i) => i % columnCount === ci)
-                    .map((car) => (
-                      <Reveal key={car.id}>
-                        <CarCard
-                          car={car}
-                          distance={distances.get(car.id)}
-                          priceInsight={insightMap.get(car.id) ?? null}
-                        />
-                      </Reveal>
-                    ))}
-                </div>
+            {/* 规则网格:行行顶部对齐(替代瀑布流);列数比原来少一档,卡片更宽 */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3 min-[1920px]:grid-cols-4 min-[2560px]:grid-cols-5">
+              {filtered.slice(0, visibleCount).map((car) => (
+                <Reveal key={car.id}>
+                  <CarCard
+                    car={car}
+                    distance={distances.get(car.id)}
+                    priceInsight={insightMap.get(car.id) ?? null}
+                  />
+                </Reveal>
               ))}
             </div>
             {/* 无限滚动哨兵 */}
