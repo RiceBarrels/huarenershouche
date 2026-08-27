@@ -450,109 +450,12 @@ button:focus-visible {
   }
 }
 
-/* ---- 桌面端自定义光标:绿色卡通风(仅精确指针设备;触屏不受影响) ---- */
-@media (hover: hover) and (pointer: fine) {
-  :root {
-    /* 默认箭头:绿色实心 + 粗白描边(卡通感,深浅背景都清晰) */
-    --cursor-arrow: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M5 2.5v16.5l4.2-3.6 2.8 6.3 3.1-1.4-2.8-6.2 5.5-.6z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='2.2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 5 3;
-    /* 可点击:手绘卡通手套指针(白手套 + 绿描边,指尖为热点) */
-    --cursor-pointer: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='26' viewBox='0 0 24 26'><path d='M8.5 12.6 V3.3 a1.7 1.7 0 0 1 3.4 0 V9 a1.55 1.55 0 0 1 3.1 0.2 a1.55 1.55 0 0 1 3 0.4 a1.5 1.5 0 0 1 2.9 0.6 v5.2 c0 4.3 -3 7.1 -7.3 7.1 h-1.6 c-2.3 0 -4.1 -0.9 -5.5 -2.5 l-2.4 -2.8 c-0.75 -0.9 -0.7 -2.1 0.15 -2.9 c0.9 -0.8 2.2 -0.75 3 0.1 l1.25 1.3 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 10 2;
-    /* 文本/输入:卡通工字光标(绿色实心 + 粗白描边,热点在中心) */
-    --cursor-text: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M7 2 h10 v3 h-3.5 v14 h3.5 v3 h-10 v-3 h3.5 v-14 h-3.5 z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='2' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
-    /* 禁止:白底圆 + 绿描边斜杠(同放大镜配色) */
-    --cursor-not-allowed: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='7.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2.2'/><path d='M7 7 L17 17' stroke='%2389fcd2' stroke-width='2.2' stroke-linecap='round'/></svg>") 12 12;
-    /* 拖拽:白手套开掌 / 握拳(同手套指针配色) */
-    --cursor-grab: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6 13.2 V7.6 a1.2 1.2 0 0 1 2.4 0 V9.5 L8.7 9.5 V5.2 a1.2 1.2 0 0 1 2.4 0 V9.2 L11.4 9.2 V5.8 a1.2 1.2 0 0 1 2.4 0 V9.8 L14.1 9.8 V7.2 a1.1 1.1 0 0 1 2.2 0 V13 c0 4 -2.7 6.5 -6.4 6.5 h-0.8 c-3.2 0 -5.1 -2.1 -5.1 -5.3 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 11 12;
-    --cursor-grabbing: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M6.2 12.8 V11 a1.4 1.4 0 0 1 2.8 0 V10.6 a1.4 1.4 0 0 1 2.8 0 V10.8 a1.4 1.4 0 0 1 2.8 0 V11.2 a1.3 1.3 0 0 1 2.6 0 V14 c0 3.6 -2.6 5.8 -6 5.8 h-0.9 c-3 0 -4.9 -2 -4.9 -5 Z' fill='%23ffffff' stroke='%2389fcd2' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 13;
-    /* 左右/上下拖动调整:绿色双向箭头 + 白描边 */
-    --cursor-ew-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M2.5 12 L8 7.5 V10.2 H16 V7.5 L21.5 12 L16 16.5 V13.8 H8 V16.5 Z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
-    --cursor-ns-resize: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><path d='M12 2.5 L16.5 8 H13.8 V16 H16.5 L12 21.5 L7.5 16 H10.2 V8 H7.5 Z' fill='%2389fcd2' stroke='%23ffffff' stroke-width='1.8' stroke-linejoin='round' stroke-linecap='round'/></svg>") 12 12;
-  }
-
-  html,
-  body {
-    cursor: var(--cursor-arrow), auto;
-  }
-
-  a,
-  button:not(:disabled),
-  [role="button"],
-  select,
-  summary,
-  label,
-  .cursor-pointer {
-    cursor: var(--cursor-pointer), pointer;
-  }
-
-  /* 输入框 / 文本域 / 可编辑区域:卡通工字光标 */
-  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="image"]),
-  textarea,
-  [contenteditable]:not([contenteditable="false"]),
-  .cursor-text {
-    cursor: var(--cursor-text), text;
-  }
-
-  /* 常规可选中文字也用工字光标;交互元素(链接/按钮等)内部的文字仍保持手套指针 */
-  :where(p, h1, h2, h3, h4, h5, h6, blockquote, figcaption, li, dt, dd, td, th, pre, code, time):not(:where(a, button, [role="button"], label, summary, .cursor-pointer, [contenteditable]) *) {
-    cursor: var(--cursor-text), text;
-  }
-
-  /* 禁用态回到默认箭头 */
-  button:disabled,
-  input:disabled,
-  textarea:disabled,
-  [aria-disabled="true"] {
-    cursor: var(--cursor-arrow), default;
-  }
-
-  /* Tailwind cursor 工具类全部映射到卡通风格 */
-  .cursor-default {
-    cursor: var(--cursor-arrow), default;
-  }
-  .cursor-not-allowed,
-  .cursor-not-allowed:disabled {
-    cursor: var(--cursor-not-allowed), not-allowed;
-  }
-  .cursor-grab {
-    cursor: var(--cursor-grab), grab;
-  }
-  .cursor-grab:active,
-  .cursor-grabbing {
-    cursor: var(--cursor-grabbing), grabbing;
-  }
-
-  /* Leaflet 地图:leaflet.css 在 globals 之后加载,需要更高优先级才能覆盖 */
-  .leaflet-container.leaflet-grab {
-    cursor: var(--cursor-grab), grab;
-  }
-  .leaflet-container .leaflet-interactive {
-    cursor: var(--cursor-pointer), pointer;
-  }
-  .leaflet-dragging .leaflet-container.leaflet-grab,
-  .leaflet-dragging .leaflet-container.leaflet-grab .leaflet-interactive,
-  .leaflet-dragging .leaflet-container .leaflet-marker-draggable {
-    cursor: var(--cursor-grabbing), grabbing;
-  }
-  .cursor-w-resize,
-  .cursor-e-resize,
-  .cursor-ew-resize,
-  .cursor-col-resize {
-    cursor: var(--cursor-ew-resize), ew-resize;
-  }
-  .cursor-n-resize,
-  .cursor-s-resize,
-  .cursor-ns-resize,
-  .cursor-row-resize {
-    cursor: var(--cursor-ns-resize), ns-resize;
-  }
-
-  /* 缩放:卡通放大镜(+ / −),热点在镜片中心 */
-  .cursor-zoom-in {
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2389fcd2' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6 M10 7.2 v5.6' stroke='%2389fcd2' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-in;
-  }
-  .cursor-zoom-out {
-    cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='10' cy='10' r='6.5' fill='%23ffffff' stroke='%2389fcd2' stroke-width='2'/><path d='M15 15 L20.5 20.5' stroke='%2389fcd2' stroke-width='2.6' stroke-linecap='round'/><path d='M7.2 10 h5.6' stroke='%2389fcd2' stroke-width='1.8' stroke-linecap='round'/></svg>") 10 10, zoom-out;
-  }
+/* ---- 光标:系统默认;仅把可点击元素恢复成小手(Tailwind v4 预设按钮为默认箭头) ---- */
+button:not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+select,
+summary {
+  cursor: pointer;
 }
 
 /* 原生地图 behind 模式:整页透明打洞,让 WKWebView 后面的 MapKit 显示出来 */
