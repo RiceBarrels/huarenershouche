@@ -738,8 +738,8 @@ function BrowseContent() {
         {/* Left sidebar filters — desktop only */}
         {/* 15rem 而非写死 240px:带鱼屏 root 字号放大时侧栏随内容等比变宽 */}
         <div className="hidden w-60 shrink-0 md:block">
-          {/* top-[4.5rem]:桌面 Header 是 sticky h-14,原 top-4 滚动时侧栏会钻到 Header 底下 */}
-          <div className="sticky top-[4.5rem] max-h-[calc(100vh-5.5rem)] space-y-4 overflow-y-auto overscroll-contain pb-6 pr-1">
+          {/* top-[117px]:桌面 Header 改双行(56+44+1px)后吸顶位跟着下移,再留 16px 呼吸 */}
+          <div className="sticky top-[117px] max-h-[calc(100vh-8.5rem)] space-y-4 overflow-y-auto overscroll-contain pb-6 pr-1">
             <SearchFilters
               onFilter={setFilters}
               initialFilters={filters}
@@ -753,7 +753,7 @@ function BrowseContent() {
         <main className="min-w-0 flex-1">
           {/* Results toolbar — sticky under header on desktop */}
           {/* md:border-b 细分隔线:吸顶后与下方卡片流有 1px 界限,符合"1px 边框"的工具感 */}
-          <div className="mb-4 md:sticky md:top-14 md:z-20 md:-mx-1 md:border-b md:border-border/60 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
+          <div className="mb-4 md:sticky md:top-[101px] md:z-20 md:-mx-1 md:border-b md:border-border/60 md:bg-background/90 md:px-1 md:pb-2 md:pt-1 md:backdrop-blur-md">
             <div className="flex flex-wrap items-center gap-3">
               <p className="flex items-baseline gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                 <span>Results:</span>

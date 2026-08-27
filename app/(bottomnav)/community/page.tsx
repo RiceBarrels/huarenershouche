@@ -952,7 +952,7 @@ function CommunityFeedPage() {
           移动端只有中栏,行为不变 */}
       <main className="mx-auto flex w-full max-w-2xl flex-1 items-start justify-center px-3 py-4 md:px-4 md:py-6 lg:max-w-5xl lg:gap-6 xl:max-w-7xl">
         {/* 左栏:关注列表(替代 X 的导航栏)+ 发帖按钮 */}
-        <aside className="scrollbar-none sticky top-20 hidden max-h-[calc(100vh-6rem)] w-56 shrink-0 overflow-y-auto lg:block">
+        <aside className="scrollbar-none sticky top-[117px] hidden max-h-[calc(100vh-8.5rem)] w-56 shrink-0 overflow-y-auto lg:block">
           <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
             Following
           </span>
@@ -1020,7 +1020,7 @@ function CommunityFeedPage() {
             若只把 top 设为安全区高度,刘海/状态栏那条不被覆盖,滚动时内容
             会从底下穿过(Capacitor 里看起来顶部"透明") */}
         <div
-          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-14 md:-mx-4 md:px-4 lg:mx-0 lg:px-0"
+          className="sticky top-0 z-30 -m-3 mb-0 bg-card/90 px-3 pb-3 border-b border-border backdrop-blur-md md:top-[101px] md:-mx-4 md:px-4 lg:mx-0 lg:px-0"
           style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 0.25rem)" }}
         >
           <motion.div layout={!reduced} transition={{ duration: 0.24, ease: EASE }}>
@@ -1384,7 +1384,7 @@ function CommunityFeedPage() {
 
         {/* 右栏:搜索框 + 大家在搜 + 车源推荐(X 右侧栏式)。
             桌面搜索 UI 只在这里:聚焦展开筛选/建议,输入后中栏切成结果 */}
-        <aside className="scrollbar-none sticky top-20 hidden max-h-[calc(100vh-6rem)] w-72 shrink-0 space-y-4 overflow-y-auto xl:block">
+        <aside className="scrollbar-none sticky top-[117px] hidden max-h-[calc(100vh-8.5rem)] w-72 shrink-0 space-y-4 overflow-y-auto xl:block">
           <div className="flex h-10 w-full items-center gap-2 rounded-full bg-muted px-4 transition-colors focus-within:ring-1 focus-within:ring-border">
             <Search className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
             <input

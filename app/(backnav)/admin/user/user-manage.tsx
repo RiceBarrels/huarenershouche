@@ -68,6 +68,8 @@ export default function AdminUserManagePage() {
     last_sign_in_at: string | null;
     auth_created_at: string | null;
   } | null>(null);
+  // 邮箱等 auth 信息的读取状态:RPC 出错时不能停留在"读取中",要把错误亮出来
+  const [authState, setAuthState] = useState<"loading" | "done" | "error">("loading");
 
   const [form, setForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -100,9 +102,15 @@ export default function AdminUserManagePage() {
     setPostCount(postRes.count ?? 0);
     setConvCount((convBuyerRes.count ?? 0) + (convSellerRes.count ?? 0));
 
-    // 邮箱等 auth 信息（auth.users 需经 RPC 读取）
-    const { data: authRows } = await supabase.rpc("admin_get_auth_user", { target: userId });
-    setAuthInfo(Array.isArray(authRows) && authRows.length > 0 ? authRows[0] : null);
+    // 邮箱等 auth 信息（auth.users 需经 RPC 读取;函数缺失/无权限时显式进入 error 态）
+    const { data: authRows, error: authErr } = await supabase.rpc("admin_get_auth_user", { target: userId });
+    if (authErr) {
+      setAuthInfo(null);
+      setAuthState("error");
+    } else {
+      setAuthInfo(Array.isArray(authRows) && authRows.length > 0 ? authRows[0] : null);
+      setAuthState("done");
+    }
 
     // 系统账号的认领人昵称
     if (p?.is_system && p.claimed_by) {
@@ -358,9 +366,13 @@ export default function AdminUserManagePage() {
             </div>
             <p className="mt-1 flex items-center gap-1 text-[11px]">
               <Mail className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-              {authInfo === null ? (
+              {authState === "loading" ? (
                 <span className="text-muted-foreground">邮箱读取中…</span>
-              ) : authInfo.email ? (
+              ) : authState === "error" ? (
+                <span className="text-red-600 dark:text-red-400">
+                  邮箱读取失败：数据库缺少 admin_get_auth_user 函数（执行 supabase/admin-expiry.sql 中对应段落）
+                </span>
+              ) : authInfo?.email ? (
                 <>
                   <a href={`mailto:${authInfo.email}`} className="break-all font-medium hover:underline">{authInfo.email}</a>
                   {authInfo.email_confirmed_at ? (

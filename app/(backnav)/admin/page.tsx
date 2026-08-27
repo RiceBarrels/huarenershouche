@@ -20,6 +20,29 @@ import type { DbProfile, DbCar, DbDealerStore, DbListingSource } from "@/lib/typ
 
 type Tab = "verifications" | "users" | "cars" | "reports" | "tickets" | "sources";
 
+// 用户群体筛选:与搜索独立,可单独按群体过滤用户列表
+type UserSegment = "all" | "personal" | "dealer" | "system" | "admin" | "banned";
+
+const USER_SEGMENTS: { key: UserSegment; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "personal", label: "个人" },
+  { key: "dealer", label: "车行" },
+  { key: "system", label: "系统" },
+  { key: "admin", label: "管理员" },
+  { key: "banned", label: "已封禁" },
+];
+
+function matchSegment(u: DbProfile, seg: UserSegment): boolean {
+  switch (seg) {
+    case "personal": return !u.is_system && u.account_type !== "dealer";
+    case "dealer": return !u.is_system && u.account_type === "dealer";
+    case "system": return !!u.is_system;
+    case "admin": return u.role === "admin";
+    case "banned": return !!u.banned;
+    default: return true;
+  }
+}
+
 interface SyncResult {
   key: string;
   status: "success" | "partial" | "error" | "skipped";
@@ -92,6 +115,8 @@ export default function AdminPage() {
   // Search
   const [userSearch, setUserSearch] = useState("");
   const [carSearch, setCarSearch] = useState("");
+  // 用户群体(与关键词搜索叠加过滤)
+  const [userSegment, setUserSegment] = useState<UserSegment>("all");
 
   // Action loading
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -503,12 +528,13 @@ export default function AdminPage() {
 
   // === Filtered lists ===
 
+  const segmentUsers = users.filter((u) => matchSegment(u, userSegment));
   const filteredUsers = userSearch
-    ? users.filter((u) =>
+    ? segmentUsers.filter((u) =>
         u.username?.toLowerCase().includes(userSearch.toLowerCase()) ||
         u.id.includes(userSearch)
       )
-    : users;
+    : segmentUsers;
 
   const carExpired = (car: DbCar) =>
     car.status === "removed" && !!car.expires_at && new Date(car.expires_at).getTime() < Date.now();
@@ -549,15 +575,19 @@ export default function AdminPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <div className="mx-auto w-full max-w-2xl px-4 py-4 md:py-8">
+      {/* 桌面加宽为面板布局:左侧竖向导航 + 右侧内容区;手机保持窄列 + 横向 tab 不变 */}
+      <div className="mx-auto w-full max-w-2xl px-4 py-4 md:max-w-6xl md:py-8 2xl:max-w-[88rem]">
         <DesktopBack />
         <h1 className="flex items-center gap-2 text-lg font-semibold">
           <ShieldCheck className="h-5 w-5" strokeWidth={1.5} />
           管理后台
+          <span className="hidden font-mono text-[10px] font-normal uppercase tracking-[0.25em] text-muted-foreground/60 md:inline">
+            Admin Console
+          </span>
         </h1>
 
-        {/* Tabs */}
-        <div className="mt-4 flex gap-1.5 overflow-x-auto">
+        {/* Tabs(手机:横向胶囊) */}
+        <div className="mt-4 flex gap-1.5 overflow-x-auto md:hidden">
           {tabs.map((t) => (
             <button
               key={t.key}
@@ -580,6 +610,62 @@ export default function AdminPage() {
             </button>
           ))}
         </div>
+
+        <div className="md:mt-6 md:flex md:items-start md:gap-6">
+          {/* 桌面:左侧竖向导航(sticky 于双行 Header 下方) */}
+          <aside className="sticky top-[117px] hidden w-44 shrink-0 md:block">
+            <p className="px-3 pb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+              Sections
+            </p>
+            <nav className="space-y-1">
+              {tabs.map((t) => (
+                <button
+                  key={t.key}
+                  onClick={() => handleTabChange(t.key)}
+                  className={`flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-xs transition-colors ${
+                    tab === t.key
+                      ? "border-border bg-card font-medium"
+                      : "border-transparent text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                  }`}
+                >
+                  {t.icon}
+                  {t.label}
+                  {t.count ? (
+                    <span className={`ml-auto flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[10px] ${
+                      tab === t.key ? "bg-foreground text-background" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {t.count}
+                    </span>
+                  ) : null}
+                </button>
+              ))}
+            </nav>
+          </aside>
+
+          <div className="min-w-0 flex-1">
+          {/* 桌面:待办统计卡,点击直达对应板块 */}
+          <div className="hidden grid-cols-3 gap-3 md:grid">
+            {([
+              { key: "verifications" as Tab, label: "待审核认证", value: counts.verifications },
+              { key: "reports" as Tab, label: "未处理举报", value: counts.reports },
+              { key: "tickets" as Tab, label: "开放工单", value: counts.tickets },
+            ]).map((stat) => (
+              <button
+                key={stat.key}
+                onClick={() => handleTabChange(stat.key)}
+                className={`rounded-lg border p-4 text-left transition-colors ${
+                  tab === stat.key ? "border-border bg-card" : "border-border/60 bg-card/60 hover:border-border hover:bg-card"
+                }`}
+              >
+                <p className={`font-mono text-2xl font-bold tabular-nums ${stat.value > 0 ? "text-foreground" : "text-muted-foreground/50"}`}>
+                  {stat.value}
+                </p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                  {stat.label}
+                </p>
+              </button>
+            ))}
+          </div>
 
         {/* === Verifications Tab === */}
         {tab === "verifications" && (
@@ -656,6 +742,26 @@ export default function AdminPage() {
         {/* === Users Tab === */}
         {tab === "users" && (
           <div className="mt-4">
+            {/* 用户群体筛选:独立于关键词搜索,两者叠加过滤 */}
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {USER_SEGMENTS.map((s) => {
+                const n = s.key === "all" ? users.length : users.filter((u) => matchSegment(u, s.key)).length;
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => setUserSegment(s.key)}
+                    className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                      userSegment === s.key
+                        ? "bg-primary/30 font-medium text-brand-ink"
+                        : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                    }`}
+                  >
+                    {s.label}
+                    <span className="tabular-nums opacity-70">{n}</span>
+                  </button>
+                );
+              })}
+            </div>
             <Input
               className="h-9 text-xs"
               placeholder="搜索用户名或ID..."
@@ -1145,6 +1251,8 @@ export default function AdminPage() {
             )}
           </div>
         )}
+          </div>
+        </div>
       </div>
     </div>
   );
