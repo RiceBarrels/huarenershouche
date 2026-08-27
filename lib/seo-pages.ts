@@ -92,7 +92,9 @@ export const SEO_CITIES: SeoCity[] = [
   { code: "NY-NYC", en: "New York City", zh: "纽约市", slug: "new-york-city", stateAbbr: "NY", keywords: ["new york", "nyc", "纽约"] },
   { code: "NY-MAN", en: "Manhattan", zh: "曼哈顿", slug: "manhattan", stateAbbr: "NY", keywords: ["manhattan", "曼哈顿"] },
   { code: "NY-BK", en: "Brooklyn", zh: "布鲁克林", slug: "brooklyn", stateAbbr: "NY", keywords: ["brooklyn", "布鲁克林"] },
-  { code: "NY-QN", en: "Queens", zh: "皇后区法拉盛", slug: "queens-flushing", stateAbbr: "NY", keywords: ["queens", "flushing", "皇后区", "法拉盛"] },
+  { code: "NY-QN", en: "Queens", zh: "皇后区", slug: "queens-flushing", stateAbbr: "NY", keywords: ["queens", "flushing", "皇后区", "法拉盛"] },
+  // 法拉盛单独成页(东岸最大华人社区,自定义强化文案见 FLUSHING_PAGE)
+  { code: "NY-QN", en: "Flushing", zh: "法拉盛", slug: "flushing", stateAbbr: "NY", keywords: ["flushing", "法拉盛", "queens", "皇后区"] },
   { code: "NY-LI", en: "Long Island", zh: "长岛", slug: "long-island", stateAbbr: "NY", keywords: ["long island", "长岛"] },
   { code: "TX-HOU", en: "Houston", zh: "休斯顿", slug: "houston", stateAbbr: "TX", keywords: ["houston", "休斯顿", "休斯敦"] },
   { code: "TX-DAL", en: "Dallas", zh: "达拉斯", slug: "dallas", stateAbbr: "TX", keywords: ["dallas", "plano", "达拉斯", "普莱诺"] },
@@ -685,6 +687,25 @@ function fuelStatePage(f: { slug: string; value: string; zh: string; en: string 
   };
 }
 
+// 法拉盛强化落地页:不走通用城市模板,手写文案覆盖「法拉盛二手车 / 法拉盛买车 /
+// 纽约法拉盛华人车行」等搜索词;slug 与 SEO_CITIES 里的 flushing 一致,
+// buildAll 里先注册本页,通用 cityPage 因 slug 重复被跳过
+const FLUSHING_PAGE: SeoPageDef = {
+  slug: "flushing",
+  kind: "city",
+  label: "法拉盛",
+  title: `法拉盛二手车 - 纽约法拉盛华人买车卖车·华人车行直售 | ${SITE_NAME}`,
+  description: `法拉盛(Flushing)华人二手车市场:缅街周边华人车行与个人卖家直售,丰田、本田、宝马、特斯拉等热门品牌车源,全中文看车谈价,支持按价格、里程、距离筛选,提供 VIN 召回查询与 Carfax 报告,免费发布卖车信息。`,
+  h1: "法拉盛二手车",
+  intro: [
+    `法拉盛(Flushing)是纽约乃至东岸最大的华人社区,在这里买二手车不用跑远:${SITE_NAME}汇集法拉盛缅街(Main St)及皇后区周边的华人车行与个人卖家车源,约看车方便,砍价、验车、过户全程中文沟通,没有语言障碍。`,
+    `刚来纽约的留学生和新移民,可以按预算筛选一万美元以内的代步车,个人直售没有车行加价;需要家用车的,也有汉兰达、塞纳、奥德赛等七座车源可选。每辆车都支持 VIN 召回记录查询,部分车源附带 Carfax 报告,车况透明再下手。`,
+    `在法拉盛卖车同样简单:免费发布、无中间商抽成,直接卖给同城华人买家。法拉盛的华人车行也可以入驻开通店铺,集中展示在售车辆,让更多纽约华人找到你。`,
+  ],
+  browseParams: { location: "NY-QN" },
+  listFilter: { stateAbbr: "NY", cityKeywords: ["flushing", "法拉盛", "queens", "皇后区"] },
+};
+
 const THEME_PAGES: SeoPageDef[] = [
   {
     slug: "low-mileage",
@@ -737,6 +758,7 @@ function buildAll(): SeoPageDef[] {
 
   for (const m of SELLABLE_MAKES) add(makePage(m));
   for (const s of SEO_STATES) add(statePage(s));
+  add(FLUSHING_PAGE); // 先于通用城市页注册,同 slug 的模板页会被跳过
   for (const c of SEO_CITIES) add(cityPage(c));
   const hotStates = SEO_STATES.filter((s) => HOT_STATE_ABBRS.includes(s.abbr));
   for (const m of SELLABLE_MAKES) {

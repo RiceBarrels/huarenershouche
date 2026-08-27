@@ -32,7 +32,8 @@ export async function generateMetadata({
   const def = getSeoPage(slug);
   if (!def) return {};
   return {
-    title: def.title,
+    // def.title 已含「| 站名」,absolute 跳过 layout 的 %s 模板,避免站名重复两次
+    title: { absolute: def.title },
     description: def.description,
     alternates: { canonical: `${SITE_URL}/cars/${def.slug}` },
     openGraph: { title: def.title, description: def.description },
@@ -79,7 +80,7 @@ export default async function SeoLandingPage({
   return (
     <>
       <Header />
-      <main className="container mx-auto max-w-5xl px-4 py-8">
+      <main className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
         <nav
           aria-label="Breadcrumb"
           className="font-mono text-[11px] text-muted-foreground"
