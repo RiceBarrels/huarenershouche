@@ -364,15 +364,26 @@ export function CarCard({
                   </>
                 )}
               </button>
+              {/* 收藏按钮与收藏数合一:数字直接跟在爱心里(0 时保持圆形) */}
               <button
                 type="button"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-background/90 transition-colors hover:bg-background"
+                aria-label={liked ? "取消收藏" : "收藏"}
+                className={`flex h-8 items-center justify-center gap-1 rounded-full bg-background/90 transition-colors hover:bg-background ${
+                  favCount > 0 ? "px-2.5" : "w-8"
+                }`}
                 onClick={handleFavorite}
               >
                 <Heart
                   className={`h-4 w-4 transition-colors ${liked ? "fill-red-500 text-red-500" : "text-muted-foreground"}`}
                   strokeWidth={1.5}
                 />
+                {favCount > 0 && (
+                  <span
+                    className={`font-mono text-[12px] ${liked ? "text-red-500" : "text-muted-foreground"}`}
+                  >
+                    {favCount}
+                  </span>
+                )}
               </button>
             </div>
           </div>
@@ -480,19 +491,12 @@ export function CarCard({
                 </span>
                 <span className="truncate">{car.seller_name}</span>
               </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {favCount > 0 && (
-                  <span className="flex items-center gap-0.5 font-mono text-[11px] text-muted-foreground/60">
-                    <Heart className="h-3 w-3" strokeWidth={1.5} />
-                    {favCount}
-                  </span>
-                )}
-                {car.source_id && (
-                  <Badge variant="secondary" className="font-mono text-[10px] font-medium">
-                    系统检索
-                  </Badge>
-                )}
-              </span>
+              {/* 收藏数已并入图上爱心按钮,底栏只留来源标识 */}
+              {car.source_id && (
+                <Badge variant="secondary" className="shrink-0 font-mono text-[10px] font-medium">
+                  系统检索
+                </Badge>
+              )}
             </div>
           </div>
         </div>
