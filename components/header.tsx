@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat, Search } from "lucide-react";
+import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat, Search, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -11,6 +11,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ThemeOptions } from "@/components/theme-options";
 import { avatarUrl } from "@/lib/avatar";
 import { useIdentity } from "@/components/identity-provider";
+import { useShowNavBack } from "@/components/nav-back-context";
+import { setBackNavigation } from "@/components/page-transition";
 
 const NAV_LINKS = [
   { href: "/browse", label: "买车" },
@@ -39,6 +41,8 @@ export function Header() {
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
+  // (backnav) 布局组内:导航链接行最左侧显示统一的返回按钮
+  const showNavBack = useShowNavBack();
 
   // 社区(帖子)路由下,导航搜索框切换为搜索帖子;其余场景一律搜车源进 /browse
   const inCommunity = pathname === "/community" || pathname.startsWith("/community/");
@@ -291,8 +295,26 @@ export function Header() {
           </div>
         </div>
 
-        {/* 第二行:导航链接 */}
+        {/* 第二行:导航链接(backnav 组最左侧带统一返回按钮) */}
         <nav className="flex h-11 items-center gap-4 lg:gap-6">
+          {showNavBack && (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setBackNavigation();
+                  if (window.history.length > 1) router.back();
+                  else router.push("/");
+                }}
+                className="group -ml-1 flex items-center gap-1.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {/* hover 时箭头向左微移:符合"微位移"交互规范,暗示返回方向 */}
+                <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" strokeWidth={1.5} />
+                返回
+              </button>
+              <span aria-hidden="true" className="h-4 w-px bg-border" />
+            </>
+          )}
           {NAV_LINKS.map((link) => {
             const active = pathname === link.href || pathname.startsWith(link.href + "/");
             return (

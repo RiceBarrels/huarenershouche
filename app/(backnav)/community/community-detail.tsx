@@ -22,7 +22,6 @@ import { useRouteParams } from "@/lib/use-route-params";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 import { RelatedPosts } from "@/components/related-posts";
 import { HashtagText } from "@/components/hashtag-text";
@@ -459,7 +458,6 @@ export default function CommunityDetailPage({
     >
       {showChrome && <Header />}
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4">
-        {showChrome && <DesktopBack fallback="/community" />}
 
         {/* X 式作者行:大头像 + 加粗名字,右侧分享 */}
         <div className="flex items-center gap-3">

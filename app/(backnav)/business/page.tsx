@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
 
 const SERVICES = [
@@ -108,7 +107,6 @@ export default function BusinessPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
-        <DesktopBack />
         <LargeTitle title="商业合作" subtitle="面向车行、金融、保险等行业伙伴" />
 
         {/* Services */}

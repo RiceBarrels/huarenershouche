@@ -12,7 +12,6 @@ import { supabase } from "@/lib/supabase";
 import { carEditLink, adminUserLink } from "@/lib/static-link";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -577,7 +576,6 @@ export default function AdminPage() {
       <Header />
       {/* 桌面加宽为面板布局:左侧竖向导航 + 右侧内容区;手机保持窄列 + 横向 tab 不变 */}
       <div className="mx-auto w-full max-w-2xl px-4 py-4 md:max-w-6xl md:py-8 2xl:max-w-[88rem]">
-        <DesktopBack />
         <h1 className="flex items-center gap-2 text-lg font-semibold">
           <ShieldCheck className="h-5 w-5" strokeWidth={1.5} />
           管理后台

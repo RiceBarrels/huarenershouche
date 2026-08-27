@@ -8,7 +8,6 @@ import { Mail, MessageCircle, Clock, Send, Loader2, CheckCircle, ChevronRight } 
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
 
 const FAQ = [
@@ -91,7 +90,6 @@ export default function ContactPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4">
-        <DesktopBack />
         <LargeTitle title="联系客服" subtitle="有任何问题或建议，欢迎联系我们" />
 
         {/* Contact info */}

@@ -13,7 +13,6 @@ import { avatarUrl } from "@/lib/avatar";
 import { timeAgo } from "@/lib/format";
 import { communityPostLink } from "@/lib/static-link";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { Footer } from "@/components/footer";
 
 import { CarCard } from "@/components/car-card";
@@ -305,7 +304,6 @@ export default function UserProfilePage({
       {showChrome && <Header />}
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-6 min-h-screen">
-        {showChrome && <DesktopBack fallback="/" />}
         {loading ? (
           <div className="mt-4">
             <div className="flex items-start gap-4 border-b border-border pb-6">

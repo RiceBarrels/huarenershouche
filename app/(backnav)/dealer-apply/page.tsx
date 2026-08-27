@@ -19,7 +19,6 @@ import { supabase } from "@/lib/supabase";
 import { geocodeAddress } from "@/lib/geocode";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
-import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
 import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
 import type { DbDealerStore, DbProfile } from "@/lib/types";
@@ -134,7 +133,6 @@ export default function DealerApplyPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="relative mx-auto w-full max-w-lg flex-1 px-4 py-4 pb-16">
-        <DesktopBack />
         <LargeTitle title="车行入驻" subtitle="免费入驻，1-2 个工作日完成审核" />
         <p className="mt-3 px-1 font-mono text-xs leading-relaxed text-muted-foreground">
           华人车行免费入驻常來車網，提交门店资料后 1-2 个工作日完成审核，审核通过自动升级为认证车行账号。

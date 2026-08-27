@@ -13,7 +13,6 @@ import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { carLink, carEditLink } from "@/lib/static-link";
 import { Header } from "@/components/header";
-import { DesktopBack } from "@/components/desktop-back";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -332,7 +331,6 @@ export default function AdminUserManagePage() {
       <div className="flex min-h-screen flex-col bg-background font-mono">
         <Header />
         <div className="mx-auto w-full max-w-2xl px-4 py-8">
-          <DesktopBack />
           <p className="py-12 text-center text-xs text-muted-foreground">找不到该用户</p>
           <div className="text-center">
             <Link href="/admin"><Button variant="secondary" size="sm" className="text-xs">返回管理后台</Button></Link>
@@ -348,7 +346,6 @@ export default function AdminUserManagePage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <div className="mx-auto w-full max-w-2xl px-4 py-4 md:py-8">
-        <DesktopBack />
 
         {/* Identity header */}
         <div className="flex items-start gap-3 rounded-xl bg-card p-3">

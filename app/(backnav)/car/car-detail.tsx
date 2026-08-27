@@ -43,7 +43,6 @@ import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Reveal } from "@/components/reveal";
-import { DesktopBack } from "@/components/desktop-back";
 import { ScrollProgress } from "@/components/scroll-progress";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
@@ -418,7 +417,6 @@ export default function CarDetailPage({
       {showChrome && <Header />}
       {showChrome && <ScrollProgress />}
       <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl min-[2560px]:max-w-[88rem]">
-        {showChrome && <DesktopBack fallback="/browse" />}
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-[1920px]:grid-cols-[1fr_380px] min-[1920px]:gap-8">
           {/* Left: Image + Details */}

@@ -227,6 +227,11 @@ function refreshPushDim() {
 // Tab 间切换(bottomnav ↔ bottomnav)用缩放弹出转场,更快更轻
 const TAB_DURATION = 260;
 
+// 桌面(md+)不做 iOS 式方向滑动:前进/返回一律用默认的缩放弹出(dynamic)转场。
+// 每次转场时实时判断,窗口拖宽/拖窄后立即生效
+const isDesktop = () =>
+  typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches;
+
 // (bottomnav) 组内路由:两端都命中才算 tab 切换
 const TAB_EXACT = new Set(["/", "/browse", "/community", "/account"]);
 const isTabPath = (p: string) =>
@@ -269,6 +274,7 @@ export function PageTransition({
   // 首挂载(跨布局组导航)也按方向播动画;tab 切换不跨组,无需在此判断
   const [phase, setPhase] = useState<"idle" | "push" | "pop" | "tab">(() => {
     if (!appHydrated || prefersReducedMotion || _skipAnimation) return "idle";
+    if (isDesktop()) return "tab";
     return _isBackNavigation ? "pop" : "push";
   });
   const snapshotScrollY = useRef(_snapshotScrollY);
@@ -388,6 +394,8 @@ export function PageTransition({
 
     function onStart(e: TouchEvent) {
       if (phaseRef.current !== "idle" || dragRef.current) return;
+      // 桌面统一缩放转场,滑动返回的方向语义不再成立(触屏宽窗同理)
+      if (isDesktop()) return;
       // 一级 tab 页(首页/买车/社区/我的)不做左滑返回
       if (TAB_EXACT.has(window.location.pathname)) return;
       // 详情浮层(SwipeSheet/ProfileDrawer 压了 overlay 历史)或 vaul 抽屉打开时,
@@ -470,6 +478,8 @@ export function PageTransition({
     // 目的页用真实内容从左滑入(与系统返回一致),而不是滑出后露空白。
     function onProgrammaticBack(e: Event) {
       if (phaseRef.current !== "idle" || dragRef.current) return;
+      // 桌面不接管:走普通 router.back() → popstate → 统一缩放转场
+      if (isDesktop()) return;
       const under = _snapshotStack[_snapshotStack.length - 1] ?? null;
       if (!under?.html) return;
       e.preventDefault();
@@ -615,8 +625,8 @@ export function PageTransition({
       _skipAnimation = false;
       _isBackNavigation = false;
       setPhase("idle");
-    } else if (tabToTab) {
-      // tab 间切换无方向感,前进/返回统一播缩放弹出
+    } else if (tabToTab || isDesktop()) {
+      // tab 间切换无方向感,前进/返回统一播缩放弹出;桌面所有导航同款(只限电脑版)
       _isBackNavigation = false;
       setPhase("tab");
     } else if (_isBackNavigation) {
