@@ -146,7 +146,7 @@ export function CarCard({
         {/* ===== 手机版:图左文右 + 标签行 + 位置行 + 操作按钮 ===== */}
         <div className="p-3 md:hidden">
           <div className="flex gap-2.5">
-            <div className="relative aspect-square w-[32%] shrink-0 self-start overflow-hidden rounded-lg bg-muted">
+            <div className="relative aspect-[4/3] w-[32%] shrink-0 self-start overflow-hidden rounded-lg bg-muted">
               {car.image_url ? (
                 <img
                   src={car.image_url}
