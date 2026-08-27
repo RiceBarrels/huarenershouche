@@ -807,8 +807,18 @@ function BrowseContent() {
               </div>
             </div>
             {/* Desktop active filter chips */}
-            {activeFilterChips.length > 0 && (
+            {(activeFilterChips.length > 0 || !!filters.keyword) && (
               <div className="mt-2 hidden flex-wrap gap-1.5 md:flex">
+                {/* 关键词来自导航栏搜索框(?q=),侧栏已无输入框,用 chip 展示并支持移除 */}
+                {filters.keyword && (
+                  <button
+                    onClick={() => clearFilter("keyword")}
+                    className={`group flex items-center gap-1 rounded-full px-3 py-1.5 font-mono text-[12px] transition-colors hover:bg-black/[0.08] active:opacity-70 dark:hover:bg-white/[0.12] ${IOS_FILL}`}
+                  >
+                    “{filters.keyword}”
+                    <X className="h-2.5 w-2.5 text-muted-foreground transition-colors group-hover:text-foreground" strokeWidth={2} />
+                  </button>
+                )}
                 {activeFilterChips.map((chip, i) => (
                   <button
                     key={`${chip.key}-${i}`}

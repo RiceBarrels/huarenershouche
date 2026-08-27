@@ -1,8 +1,7 @@
 "use client";
 
-import { Search, X, Clock, Trash2, Check } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
-import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
+import { X, Check } from "lucide-react";
+import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
@@ -300,16 +299,12 @@ export function SearchFilters({
   featureOptions?: CountOption[];
 }) {
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
-  const [searchFocused, setSearchFocused] = useState(false);
-  const [history, setHistory] = useState<string[]>([]);
   // Zipcode 输入的本地缓冲(未满 5 位时不写入 filters)
   const [zip, setZip] = useState(() =>
     /^\d{5}$/.test((initialFilters || INITIAL_FILTERS).location)
       ? (initialFilters || INITIAL_FILTERS).location
       : ""
   );
-  const searchRef = useRef<HTMLDivElement>(null);
-
   useEffect(() => {
     if (initialFilters) {
       setFilters(initialFilters);
@@ -321,20 +316,6 @@ export function SearchFilters({
       }
     }
   }, [initialFilters]);
-
-  useEffect(() => {
-    setHistory(getSearchHistory());
-  }, []);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
-        setSearchFocused(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
 
   const activeCount = Object.entries(filters).filter(
     ([k, v]) => v && k !== "keyword"
@@ -373,59 +354,7 @@ export function SearchFilters({
   return (
     /* space-y-6:分组标题在卡外,组间距略大于卡内间距才能形成清晰的分组节奏 */
     <aside className="w-full space-y-6">
-      {/* Search — iOS 搜索栏:灰底画布上的白色胶囊 */}
-      <div ref={searchRef} className="relative">
-        <div className="relative">
-          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
-          <input
-            placeholder="搜索品牌、车型..."
-            /* focus 细环:白胶囊在浅灰画布上聚焦态原本无任何变化 */
-            className="h-10 w-full rounded-full bg-card pl-9 pr-4 font-mono text-sm outline-none ring-1 ring-transparent transition-shadow placeholder:text-muted-foreground/60 focus:ring-brand-ink/30 dark:focus:ring-brand/40"
-            value={filters.keyword}
-            onFocus={() => setSearchFocused(true)}
-            onChange={(e) => update("keyword", e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && filters.keyword.trim()) {
-                addSearchHistory(filters.keyword.trim());
-                setHistory(getSearchHistory());
-                setSearchFocused(false);
-              }
-            }}
-          />
-        </div>
-        {searchFocused && !filters.keyword && history.length > 0 && (
-          <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-[22px] bg-card shadow-lg">
-            <div className="flex items-center justify-between px-4 py-2">
-              <span className="font-mono text-[10px] text-muted-foreground">搜索历史</span>
-              <button
-                type="button"
-                onClick={() => {
-                  clearSearchHistory();
-                  setHistory([]);
-                }}
-                className="flex items-center gap-0.5 font-mono text-[10px] text-muted-foreground hover:text-foreground"
-              >
-                <Trash2 className="h-2.5 w-2.5" strokeWidth={1.5} />
-                清除
-              </button>
-            </div>
-            {history.map((term) => (
-              <button
-                key={term}
-                type="button"
-                className="flex w-full items-center gap-2 px-4 py-2 font-mono text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                onClick={() => {
-                  update("keyword", term);
-                  setSearchFocused(false);
-                }}
-              >
-                <Clock className="h-3 w-3" strokeWidth={1.5} />
-                {term}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* 关键词搜索已上移到全站导航栏搜索框(输入后带 ?q= 进入本页) */}
 
       {/* Clear all — iOS 红色操作胶囊 */}
       {activeCount > 0 && (

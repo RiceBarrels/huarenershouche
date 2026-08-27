@@ -509,10 +509,13 @@ export default function Home() {
       </AnimatePresence>
 
       {/* Hero — typographic, grid backdrop */}
-      <section 
-        className="relative overflow-hidden p-4 rounded-b-lg bg-linear-160 from-primary/50 via-card dark:from-primary/15"
+      {/* 桌面导航未滚动时透明:hero 用负 margin 顶到页面最上方,渐变延伸到导航背后(瓜子式),
+          内部 spacer 把内容压回导航下方原位(56+44+1px 导航高 + 24px flex gap = 125px) */}
+      <section
+        className="relative overflow-hidden p-4 rounded-b-lg bg-linear-160 from-primary/50 via-card dark:from-primary/15 md:-mt-[125px]"
         style={{ paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)" }}
       >
+        <div aria-hidden="true" className="hidden md:block md:h-[125px]" />
         {/* Grid backdrop with subtle parallax */}
         <motion.div
           aria-hidden="true"
@@ -560,8 +563,11 @@ export default function Home() {
             </div>
           </div>
 
+          {/* 桌面:左侧大标题文案 + 右侧「快速找车」卡片(瓜子 Vehicle Finder 式) */}
+          <div className="md:mt-9 md:grid md:grid-cols-[minmax(0,1fr)_360px] md:items-start md:gap-10 lg:grid-cols-[minmax(0,1fr)_400px] lg:gap-14">
+          <div className="min-w-0">
           {/* Oversized mono headline */}
-          <h1 className="mt-8 hidden font-logo text-4xl leading-[1.08] tracking-tight md:mt-10 md:block md:text-6xl xl:text-7xl">
+          <h1 className="mt-8 hidden font-logo text-4xl leading-[1.08] tracking-tight md:mt-0 md:block md:text-6xl xl:text-7xl">
             <span className="sr-only">常來車網 - 北美华人二手车交易平台，买车卖车免费发布</span>
             <span aria-hidden="true" className="block">华人买车</span>
             <span aria-hidden="true" className="block">
@@ -575,119 +581,14 @@ export default function Home() {
             车源来自三类:车行网站车辆自动检索、个人发布、车行发布
           </p>
 
-          {/* Structured search — 地区/品牌/更多筛选 drawer + 关键词 */}
-          <div ref={heroSearchRef} className="mt-4 md:mt-10">
-            <div className="grid-cols-3 gap-2 hidden md:grid">
-              <Drawer>
-                <DrawerTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
-                  >
-                    <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="min-w-0">
-                      <span className="block font-mono text-[10px] text-muted-foreground">地区</span>
-                      <span className={`block truncate font-mono text-xs ${searchFilters.location ? "font-medium" : "text-muted-foreground"}`}>
-                        {getLocationLabel(searchFilters)}
-                      </span>
-                    </span>
-                  </button>
-                </DrawerTrigger>
-                <DrawerContent className="max-h-[85vh]">
-                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                    <DrawerClose asChild>
-                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                        <X className="h-4 w-4" strokeWidth={1.5} />
-                      </button>
-                    </DrawerClose>
-                    <span className="font-mono text-sm font-semibold">地区</span>
-                    <div className="h-8 w-8" />
-                  </div>
-                  <div className="overflow-y-auto px-4 pb-6">
-                    <LocationDrawerContent
-                      filters={searchFilters}
-                      onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
-                    />
-                  </div>
-                </DrawerContent>
-              </Drawer>
-
-              <Drawer>
-                <DrawerTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
-                  >
-                    <Car className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="min-w-0">
-                      <span className="block font-mono text-[10px] text-muted-foreground">品牌</span>
-                      <span className={`block truncate font-mono text-xs ${searchFilters.make ? "font-medium" : "text-muted-foreground"}`}>
-                        {getBrandLabel(searchFilters)}
-                      </span>
-                    </span>
-                  </button>
-                </DrawerTrigger>
-                <DrawerContent className="max-h-[85vh]">
-                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                    <DrawerClose asChild>
-                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                        <X className="h-4 w-4" strokeWidth={1.5} />
-                      </button>
-                    </DrawerClose>
-                    <span className="font-mono text-sm font-semibold">品牌</span>
-                    <div className="h-8 w-8" />
-                  </div>
-                  <div className="overflow-y-auto px-4 pb-6">
-                    <BrandDrawerContent
-                      filters={searchFilters}
-                      onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
-                    />
-                  </div>
-                </DrawerContent>
-              </Drawer>
-
-              <Drawer>
-                <DrawerTrigger asChild>
-                  <button
-                    type="button"
-                    className="flex items-center gap-2 rounded-xl border-0 bg-muted/60 px-3 py-2.5 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:bg-background md:hover:bg-muted/40"
-                  >
-                    <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="min-w-0">
-                      <span className="block font-mono text-[10px] text-muted-foreground">更多筛选</span>
-                      <span className={`block truncate font-mono text-xs ${searchActiveCount > 0 ? "font-medium" : "text-muted-foreground"}`}>
-                        {searchActiveCount > 0 ? `${searchActiveCount} 项` : "不限"}
-                      </span>
-                    </span>
-                  </button>
-                </DrawerTrigger>
-                <DrawerContent>
-                  <div className="flex items-center justify-between px-4 pb-2 pt-4">
-                    <DrawerClose asChild>
-                      <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
-                        <X className="h-4 w-4" strokeWidth={1.5} />
-                      </button>
-                    </DrawerClose>
-                    <span className="font-mono text-sm font-semibold">筛选</span>
-                    <div className="h-8 w-8" />
-                  </div>
-                  <div className="overflow-y-auto pb-6">
-                    <MobileFilterDrawer
-                      filters={searchFilters}
-                      onFilter={setSearchFilters}
-                      activeCount={searchActiveCount}
-                    />
-                  </div>
-                </DrawerContent>
-              </Drawer>
-            </div>
-
+          {/* 手机:关键词搜索行(桌面关键词搜索已上移到导航栏) */}
+          <div ref={heroSearchRef} className="mt-4 md:hidden">
             <form
               onSubmit={(e) => {
                 e.preventDefault();
                 handleSearch();
               }}
-              className="mt-2 flex overflow-hidden rounded-full bg-background md:rounded-md"
+              className="mt-2 flex overflow-hidden rounded-full bg-background"
             >
               {/* 手机:地区选择挂在搜索行左侧(瓜子式「城市▾ | 搜索 | 按钮」) */}
               <Drawer>
@@ -729,8 +630,7 @@ export default function Home() {
               </div>
               <Button
                 type="submit"
-                // 桌面外层表单是 rounded-md,按钮右侧跟随同级圆角,避免胶囊角在直角容器里留出白色缺口
-                className="h-12 gap-2 rounded-r-full bg-primary px-6 font-mono text-sm text-primary-foreground hover:opacity-90 md:rounded-r-md md:px-8"
+                className="h-12 gap-2 rounded-r-full bg-primary px-6 font-mono text-sm text-primary-foreground hover:opacity-90"
               >
                 搜索
                 <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
@@ -859,6 +759,138 @@ export default function Home() {
               </p>
             </div>
           </div>
+          </div>
+
+          {/* 右侧:快速找车卡片(借鉴瓜子 Vehicle Finder;关键词搜索在导航栏) */}
+          <aside className="hidden md:block">
+            <div className="rounded-lg border border-border bg-card/80 p-5 shadow-sm backdrop-blur-sm">
+              <div className="flex items-baseline justify-between">
+                <p className="font-mono text-sm font-semibold">快速找车</p>
+                <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-muted-foreground/60">Vehicle Finder</span>
+              </div>
+              <div className="mt-4 space-y-2">
+                <Drawer>
+                  <DrawerTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <MapPin className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[10px] text-muted-foreground">地区</span>
+                          <span className={`block truncate font-mono text-xs ${searchFilters.location ? "font-medium" : "text-muted-foreground"}`}>
+                            {getLocationLabel(searchFilters)}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    </button>
+                  </DrawerTrigger>
+                  <DrawerContent className="max-h-[85vh]">
+                    <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                      <DrawerClose asChild>
+                        <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                          <X className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
+                      </DrawerClose>
+                      <span className="font-mono text-sm font-semibold">地区</span>
+                      <div className="h-8 w-8" />
+                    </div>
+                    <div className="overflow-y-auto px-4 pb-6">
+                      <LocationDrawerContent
+                        filters={searchFilters}
+                        onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
+                      />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
+
+                <Drawer>
+                  <DrawerTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <Car className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[10px] text-muted-foreground">品牌</span>
+                          <span className={`block truncate font-mono text-xs ${searchFilters.make ? "font-medium" : "text-muted-foreground"}`}>
+                            {getBrandLabel(searchFilters)}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    </button>
+                  </DrawerTrigger>
+                  <DrawerContent className="max-h-[85vh]">
+                    <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                      <DrawerClose asChild>
+                        <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                          <X className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
+                      </DrawerClose>
+                      <span className="font-mono text-sm font-semibold">品牌</span>
+                      <div className="h-8 w-8" />
+                    </div>
+                    <div className="overflow-y-auto px-4 pb-6">
+                      <BrandDrawerContent
+                        filters={searchFilters}
+                        onUpdate={(key, value) => setSearchFilters((prev) => ({ ...prev, [key]: value }))}
+                      />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
+
+                <Drawer>
+                  <DrawerTrigger asChild>
+                    <button
+                      type="button"
+                      className="flex w-full items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2.5 text-left outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+                    >
+                      <span className="flex min-w-0 items-center gap-2">
+                        <SlidersHorizontal className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                        <span className="min-w-0">
+                          <span className="block font-mono text-[10px] text-muted-foreground">更多筛选</span>
+                          <span className={`block truncate font-mono text-xs ${searchActiveCount > 0 ? "font-medium" : "text-muted-foreground"}`}>
+                            {searchActiveCount > 0 ? `${searchActiveCount} 项` : "不限"}
+                          </span>
+                        </span>
+                      </span>
+                      <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    </button>
+                  </DrawerTrigger>
+                  <DrawerContent>
+                    <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                      <DrawerClose asChild>
+                        <button type="button" className="flex h-8 w-8 items-center justify-center text-muted-foreground transition-colors hover:text-foreground">
+                          <X className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
+                      </DrawerClose>
+                      <span className="font-mono text-sm font-semibold">筛选</span>
+                      <div className="h-8 w-8" />
+                    </div>
+                    <div className="overflow-y-auto pb-6">
+                      <MobileFilterDrawer
+                        filters={searchFilters}
+                        onFilter={setSearchFilters}
+                        activeCount={searchActiveCount}
+                      />
+                    </div>
+                  </DrawerContent>
+                </Drawer>
+              </div>
+              <Button
+                onClick={handleSearch}
+                className="mt-4 h-11 w-full gap-2 font-mono text-sm"
+              >
+                搜索{carCount ? ` ${carCount.toLocaleString()} 辆车源` : "车源"}
+                <ArrowRight className="h-4 w-4" strokeWidth={1.5} />
+              </Button>
+            </div>
+          </aside>
+          </div>
         </div>
 
         {/* Scroll hint */}
@@ -867,6 +899,32 @@ export default function Home() {
             Scroll
             <ChevronRight className="h-3 w-3 rotate-90 animate-bounce" strokeWidth={1.5} />
           </span>
+        </div>
+      </section>
+
+      {/* 桌面分类入口卡片(瓜子式金刚区) */}
+      <section className="hidden md:block md:px-4">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              { href: "/browse", title: "全部车源", desc: carCount ? `${carCount.toLocaleString()}+ 辆在售` : "浏览全部在售车辆", grad: "from-primary/25" },
+              { href: "/browse?listedWithin=3", title: "新上好车", desc: "最近 3 天上架", grad: "from-sky-500/20" },
+              { href: "/browse?priceDropped=true", title: "降价捡漏", desc: "近期已降价车源", grad: "from-orange-500/20" },
+              { href: "/browse?sellerType=dealer", title: "车行直营", desc: "华人车行认证车源", grad: "from-emerald-500/20" },
+            ].map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className={`group flex items-center justify-between rounded-lg border border-border/60 bg-gradient-to-br ${c.grad} to-card p-4 outline-none transition-colors hover:border-border focus-visible:ring-2 focus-visible:ring-brand-ink/50`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate font-mono text-sm font-bold">{c.title}</span>
+                  <span className="mt-1 block truncate font-mono text-[11px] text-muted-foreground">{c.desc}</span>
+                </span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" strokeWidth={1.5} />
+              </Link>
+            ))}
+          </div>
         </div>
       </section>
 

@@ -4,7 +4,7 @@ import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat,
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -36,7 +36,12 @@ export function Header() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [query, setQuery] = useState("");
   const pathname = usePathname();
+  const router = useRouter();
+
+  // 社区(帖子)路由下,导航搜索框切换为搜索帖子;其余场景一律搜车源进 /browse
+  const inCommunity = pathname === "/community" || pathname.startsWith("/community/");
 
   useEffect(() => {
     setMounted(true);
@@ -51,6 +56,14 @@ export function Header() {
       window.removeEventListener("scroll", onScroll);
     };
   }, []);
+
+  // 路由切换时,把当前页 URL 里的 ?q= 回填进搜索框(/browse?q=、/community?q= 深链进来时同步)。
+  // 不用 useSearchParams:Header 被大量静态页复用,避免每页都要包 Suspense 边界。
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("q") || "";
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读当前 URL 回填,仅路由切换时一次
+    setQuery(q);
+  }, [pathname]);
 
   // 未读数按「当前操作身份」(actingId)统计 —— 切换成车行时看车行收件箱。
   useEffect(() => {
@@ -67,6 +80,17 @@ export function Header() {
     await supabase.auth.signOut();
   }
 
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const q = query.trim();
+    if (inCommunity) {
+      // 社区页以 ?q= 为搜索开关的唯一事实来源,空串也会打开搜索层
+      router.push(`/community?q=${encodeURIComponent(q)}`);
+    } else {
+      router.push(q ? `/browse?q=${encodeURIComponent(q)}` : "/browse");
+    }
+  }
+
   const hasClaimed = claimedAccounts.length > 0;
 
   return (
@@ -74,48 +98,45 @@ export function Header() {
       className={`sticky top-0 z-50 hidden border-b transition-[background-color,border-color,backdrop-filter] duration-200 md:block ${
         scrolled
           ? "border-border bg-background/85 backdrop-blur-md"
-          : "border-transparent bg-background"
+          : "border-transparent bg-transparent"
       }`}
     >
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
-        <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
-          <span className="font-logo text-base tracking-tight">
-            常來車網
-            <span className="animate-cursor-blink text-brand-ink">_</span>
-          </span>
-          <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
-        </Link>
-
-        {/* md 断点(768–1024)横向空间紧张,链接与右侧按钮的间距到 lg 才放开,避免整行溢出换行 */}
-        <nav className="flex items-center gap-4 lg:gap-6">
-          {NAV_LINKS.map((link) => {
-            const active = pathname === link.href || pathname.startsWith(link.href + "/");
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={active ? "page" : undefined}
-                className={`relative py-1 font-mono text-xs tracking-widest transition-colors ${
-                  active
-                    ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand"
-                    : // 未激活项 hover 时先给一条中性色下划线做"就位"暗示,点击后换品牌色
-                      "text-muted-foreground hover:text-foreground hover:after:absolute hover:after:inset-x-0 hover:after:bottom-0 hover:after:h-px hover:after:bg-border"
-                }`}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="flex items-center gap-2 lg:gap-3">
-          {/* 搜索入口:桌面无底部导航,给一个直达浏览页搜索的图标入口 */}
-          <Link href="/browse" aria-label="搜索车辆">
-            <Button variant="ghost" size="icon" className="h-8 w-8" title="搜索车辆" tabIndex={-1}>
-              <Search className="h-3.5 w-3.5" strokeWidth={1.5} />
-            </Button>
+      <div className="mx-auto max-w-7xl px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
+        {/* 第一行:logo + 搜索框 + 操作区(瓜子式) */}
+        <div className="flex h-14 items-center gap-4 lg:gap-6">
+          <Link href="/" className="flex shrink-0 items-center gap-2">
+            <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
+            <span className="font-logo text-base tracking-tight">
+              常來車網
+              <span className="animate-cursor-blink text-brand-ink">_</span>
+            </span>
+            <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
           </Link>
+
+          <form
+            onSubmit={handleSearchSubmit}
+            /* 社区首页宽屏(xl+)自带右栏搜索框,导航这只藏掉避免双搜索框 */
+            className={`min-w-0 max-w-xl flex-1 ${pathname === "/community" ? "xl:hidden" : ""}`}
+          >
+            <div className="flex items-center overflow-hidden rounded-full border border-border bg-muted/60 transition-colors focus-within:border-brand-ink/40 focus-within:bg-background">
+              <Search className="ml-3.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={inCommunity ? "搜索帖子、话题..." : "搜索品牌、车型、关键词..."}
+                aria-label={inCommunity ? "搜索帖子" : "搜索车辆"}
+                className="h-9 w-full min-w-0 bg-transparent px-2.5 font-mono text-xs outline-none placeholder:text-muted-foreground/70"
+              />
+              <button
+                type="submit"
+                className="mr-1 flex h-7 shrink-0 items-center rounded-full bg-primary px-3.5 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                搜索
+              </button>
+            </div>
+          </form>
+
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:gap-3">
           {mounted && (
             <Popover>
               <PopoverTrigger asChild>
@@ -267,8 +288,36 @@ export function Header() {
               </Link>
             </>
           )}
+          </div>
         </div>
 
+        {/* 第二行:导航链接 */}
+        <nav className="flex h-11 items-center gap-4 lg:gap-6">
+          {NAV_LINKS.map((link) => {
+            const active = pathname === link.href || pathname.startsWith(link.href + "/");
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                aria-current={active ? "page" : undefined}
+                className={`relative py-1 font-mono text-xs tracking-widest transition-colors ${
+                  active
+                    ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-px after:bg-brand"
+                    : // 未激活项 hover 时先给一条中性色下划线做"就位"暗示,点击后换品牌色
+                      "text-muted-foreground hover:text-foreground hover:after:absolute hover:after:inset-x-0 hover:after:bottom-0 hover:after:h-px hover:after:bg-border"
+                }`}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+          <Link
+            href="/business"
+            className="ml-auto py-1 font-mono text-xs tracking-widest text-muted-foreground transition-colors hover:text-foreground"
+          >
+            车行入驻
+          </Link>
+        </nav>
       </div>
 
       {/* 正在以车行身份操作的提示条 */}
