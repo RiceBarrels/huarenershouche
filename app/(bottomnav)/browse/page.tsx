@@ -61,24 +61,22 @@ const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
 // 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-// 响应式列数(与社区瀑布流一致):1 / md 3 / xl 4 / 带鱼屏 5
+// 响应式列数(与社区瀑布流一致):1 / md 3 / xl 4 / 1920 5 / 2560 6
 function useColumnCount(): number {
-  // 手机端一排一个;平板 3 列、桌面 4 列、超宽屏 5 列
+  // 手机端一排一个;平板 3 列、桌面 4 列、超宽屏 5 列、带鱼屏 6 列
   const [count, setCount] = useState(1);
   useEffect(() => {
-    const mdQuery = window.matchMedia("(min-width: 768px)");
-    const xlQuery = window.matchMedia("(min-width: 1280px)");
-    const uwQuery = window.matchMedia("(min-width: 1920px)");
-    const update = () =>
-      setCount(uwQuery.matches ? 5 : xlQuery.matches ? 4 : mdQuery.matches ? 3 : 1);
+    const queries: [MediaQueryList, number][] = [
+      [window.matchMedia("(min-width: 2560px)"), 6],
+      [window.matchMedia("(min-width: 1920px)"), 5],
+      [window.matchMedia("(min-width: 1280px)"), 4],
+      [window.matchMedia("(min-width: 768px)"), 3],
+    ];
+    const update = () => setCount(queries.find(([q]) => q.matches)?.[1] ?? 1);
     update();
-    mdQuery.addEventListener("change", update);
-    xlQuery.addEventListener("change", update);
-    uwQuery.addEventListener("change", update);
+    for (const [q] of queries) q.addEventListener("change", update);
     return () => {
-      mdQuery.removeEventListener("change", update);
-      xlQuery.removeEventListener("change", update);
-      uwQuery.removeEventListener("change", update);
+      for (const [q] of queries) q.removeEventListener("change", update);
     };
   }, []);
   return count;
@@ -487,7 +485,7 @@ function BrowseContent() {
 
       {/* Banner */}
       <div className="hidden border-b border-border bg-gradient-to-r from-foreground/[0.03] to-foreground/[0.06] sm:block">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <div>
             <div className="flex items-center gap-2">
               <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
@@ -758,7 +756,7 @@ function BrowseContent() {
         )}
       </div>
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 gap-6 px-4 py-6 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
         {/* Left sidebar filters — desktop only */}
         {/* 15rem 而非写死 240px:带鱼屏 root 字号放大时侧栏随内容等比变宽 */}
         <div className="hidden w-60 shrink-0 md:block">

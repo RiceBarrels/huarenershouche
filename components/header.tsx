@@ -77,7 +77,7 @@ export function Header() {
           : "border-transparent bg-background"
       }`}
     >
-      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
         <Link href="/" className="flex items-center gap-2">
           <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
           <span className="font-logo text-base tracking-tight">
@@ -274,7 +274,7 @@ export function Header() {
       {/* 正在以车行身份操作的提示条 */}
       {isActingAsClaimed && (
         <div className="bg-amber-500/10">
-          <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+          <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
             <span className="flex items-center gap-1.5 font-mono text-[11px] text-amber-700 dark:text-amber-400">
               <Store className="h-3 w-3" strokeWidth={1.5} />
               正在以「{actingProfile?.username || "车行"}」身份操作

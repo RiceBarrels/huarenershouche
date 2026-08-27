@@ -520,7 +520,7 @@ export default function Home() {
           className="absolute inset-x-0 -top-24 bottom-0 hidden bg-grid [mask-image:linear-gradient(to_bottom,black_35%,transparent)] md:block"
         />
 
-        <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="relative mx-auto w-full max-w-5xl xl:max-w-6xl 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           {/* Micro label + location */}
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:block md:text-[11px]">
@@ -968,7 +968,7 @@ export default function Home() {
       {/* Recommended for you — 桌面所有楼层统一用 border-t 细线分隔,保持垂直节奏一致 */}
       {showRecommended && recommended.length > 0 && (
         <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
             <Reveal>
               <SectionHeader
                 index="01"
@@ -993,7 +993,7 @@ export default function Home() {
       {/* Featured listings */}
       {featured.length > 0 && (
         <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+          <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
             <Reveal>
               <SectionHeader
                 index={showRecommended && recommended.length > 0 ? "02" : "01"}
@@ -1017,7 +1017,7 @@ export default function Home() {
 
       {/* Price drops */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <PriceDroppedCars />
           </Reveal>
@@ -1026,7 +1026,7 @@ export default function Home() {
 
       {/* Browse by body style */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <SectionHeader index="03" label="Body Style" title="按车身类型找车" className="mb-6" />
           </Reveal>
@@ -1053,7 +1053,7 @@ export default function Home() {
 
       {/* Shop by monthly payment */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <SectionHeader index="04" label="Monthly Budget" title="月供预算购车" className="mb-2" />
           </Reveal>
@@ -1113,7 +1113,7 @@ export default function Home() {
 
       {/* Trending searches */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <TrendingSearches />
           </Reveal>
@@ -1122,7 +1122,7 @@ export default function Home() {
 
       {/* Region entry */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <RegionBrandEntry />
           </Reveal>
@@ -1131,7 +1131,7 @@ export default function Home() {
 
       {/* Community & QA entry */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <SectionHeader
               index="05"
@@ -1206,7 +1206,7 @@ export default function Home() {
 
       {/* Trust reviews */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-10">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <TrustReviews />
           </Reveal>
@@ -1215,7 +1215,7 @@ export default function Home() {
 
       {/* Why choose us */}
       <section className="hidden md:block md:border-t md:border-border md:px-4 md:py-14">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <SectionHeader index="06" label="Why Us" title="为什么选择常來車網" className="mb-2" />
           </Reveal>
@@ -1241,7 +1241,7 @@ export default function Home() {
 
       {/* How it works */}
       <section className="hidden md:block md:border-t md:border-border md:bg-muted/30 md:px-4 md:py-14">
-        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+        <div className="mx-auto w-full 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <Reveal>
             <SectionHeader index="07" label="How It Works" title="买车三步走" className="mb-8" />
           </Reveal>

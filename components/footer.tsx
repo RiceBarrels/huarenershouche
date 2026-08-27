@@ -65,7 +65,7 @@ const helpLinks = [
 export function Footer() {
   return (
     <footer className="hidden overflow-hidden border-t border-border bg-card md:block">
-      <div className="mx-auto max-w-7xl px-4 py-12 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem]">
+      <div className="mx-auto max-w-7xl px-4 py-12 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
         {/* Watermark wordmark */}
         <div className="select-none pb-10">
           {/* 宽屏容器已放大到 88/104rem,水印跟着升一档,否则左侧字、右侧大片空白 */}

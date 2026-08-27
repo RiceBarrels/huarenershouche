@@ -312,7 +312,7 @@ export default function CarDetailPage({
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
         {showChrome && <Header />}
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl">
+        <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl min-[2560px]:max-w-[88rem]">
           <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-[1920px]:grid-cols-[1fr_380px] min-[1920px]:gap-8">
             <div>
               <Skeleton className="aspect-[16/10] w-full rounded-xl" />
@@ -417,7 +417,7 @@ export default function CarDetailPage({
 
       {showChrome && <Header />}
       {showChrome && <ScrollProgress />}
-      <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl">
+      <main className="mx-auto w-full max-w-5xl flex-1 overflow-x-hidden px-4 py-6 2xl:max-w-6xl min-[1920px]:max-w-7xl min-[2560px]:max-w-[88rem]">
         {showChrome && <DesktopBack fallback="/browse" />}
 
         <div className="grid gap-6 lg:grid-cols-[1fr_320px] min-[1920px]:grid-cols-[1fr_380px] min-[1920px]:gap-8">
