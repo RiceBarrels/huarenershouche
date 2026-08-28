@@ -57,3 +57,7 @@ Philosophy: "工具感而非科技感" — tool-like, not tech-like. Anti-AI aes
 All `NEXT_PUBLIC_*` (client-exposed):
 - `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` — Supabase connection
 - `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` — Google Maps Geocoding API (`lib/geocode.ts`)
+- `NEXT_PUBLIC_OPENPANEL_CLIENT_ID` — OpenPanel analytics (`components/openpanel.tsx`)
+
+Server-only:
+- `OPENPANEL_CLIENT_SECRET` — OpenPanel server-side tracking (`lib/openpanel-server.ts`)

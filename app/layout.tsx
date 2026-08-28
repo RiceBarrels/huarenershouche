@@ -15,6 +15,7 @@ import { CompareBar } from "@/components/compare-bar";
 import { KeyboardSpacer } from "@/components/keyboard-spacer";
 import { StatusBarMask } from "@/components/status-bar-mask";
 import { Analytics } from "@vercel/analytics/next";
+import { OpenPanelAnalytics } from "@/components/openpanel";
 import { SITE_URL } from "@/lib/seo-pages";
 
 const geistSans = Geist({
@@ -167,6 +168,7 @@ export default function RootLayout({
                 <RealtimeNotifications />
                 <CompareBar />
                 <Analytics />
+                <OpenPanelAnalytics />
                 </CarOverlayProvider>
               </IdentityProvider>
             </CapacitorProvider>
