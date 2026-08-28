@@ -2,20 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
-import { MotionProvider } from "@/components/motion-provider";
-import { CapacitorProvider } from "@/components/capacitor-provider";
-import { IdentityProvider } from "@/components/identity-provider";
-import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import "./globals.css";
-import { InitHaptic } from "@/components/init-haptic";
-import { CommunityPrefetch } from "@/components/community-prefetch";
-import { SplashAd } from "@/components/splash-ad";
-import { RealtimeNotifications } from "@/components/realtime-notifications";
-import { CompareBar } from "@/components/compare-bar";
-import { KeyboardSpacer } from "@/components/keyboard-spacer";
-import { StatusBarMask } from "@/components/status-bar-mask";
-import { Analytics } from "@vercel/analytics/next";
-import { OpenPanelAnalytics } from "@/components/openpanel";
 import { SITE_URL } from "@/lib/seo-pages";
 
 const geistSans = Geist({
@@ -81,6 +68,12 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: "/",
+    // 站点存在 zh/en 两个语言树(/zh/... 与 /en/...);具体页面级 hreflang 由 sitemap 提供
+    languages: {
+      "zh-CN": "/zh",
+      en: "/en",
+      "x-default": "/zh",
+    },
   },
   robots: {
     index: true,
@@ -115,7 +108,7 @@ const JSON_LD = {
         "@type": "SearchAction",
         target: {
           "@type": "EntryPoint",
-          urlTemplate: `${SITE_URL}/browse?q={search_term_string}`,
+          urlTemplate: `${SITE_URL}/zh/browse?q={search_term_string}`,
         },
         "query-input": "required name=search_term_string",
       },
@@ -144,37 +137,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} antialiased`}
       >
-        <ThemeProvider>
-          <MotionProvider>
-          <div
-            vaul-drawer-wrapper=""
-            className="min-h-dvh bg-background"
-            style={{
-              paddingLeft: "env(safe-area-inset-left, 0px)",
-              paddingRight: "env(safe-area-inset-right, 0px)",
-            }}
-          >
-            <CapacitorProvider>
-              <IdentityProvider>
-                <CarOverlayProvider>
-                {/* 状态栏遮罩:仅刘海机型 + 滚动越过安全区后淡入 */}
-                <StatusBarMask />
-                {children}
-                {/* 原生键盘弹起时页面底部垫等高空白(文档流内,所有页面生效) */}
-                <KeyboardSpacer />
-                <CommunityPrefetch />
-                <SplashAd />
-                <InitHaptic/>
-                <RealtimeNotifications />
-                <CompareBar />
-                <Analytics />
-                <OpenPanelAnalytics />
-                </CarOverlayProvider>
-              </IdentityProvider>
-            </CapacitorProvider>
-          </div>
-          </MotionProvider>
-        </ThemeProvider>
+        {/* 语言树([locale]/layout)自带其余 Provider;ThemeProvider 留在根上,
+            让入口重定向页也有正确的暗色背景,避免 App 启动白闪 */}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

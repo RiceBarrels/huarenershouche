@@ -2,8 +2,10 @@
 
 import { ArrowUp } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useI18n } from "@/components/i18n-provider";
 
 export function BackToTop() {
+  const { t } = useI18n();
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function BackToTop() {
       style={{
         bottom: "calc(env(safe-area-inset-bottom) + 80px)",
       }}
-      aria-label="回到顶部"
+      aria-label={t("回到顶部")}
     >
       {/* hover 箭头上移半格,暗示"回到顶部"方向;仅桌面生效 */}
       <ArrowUp className="h-4 w-4 transition-transform duration-150 md:group-hover:-translate-y-0.5" strokeWidth={1.5} />

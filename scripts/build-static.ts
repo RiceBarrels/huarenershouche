@@ -22,7 +22,7 @@
 
 import { execSync } from "child_process";
 import { existsSync, renameSync, unlinkSync, writeFileSync, readFileSync, readdirSync, statSync, mkdirSync } from "fs";
-import { join, relative, dirname } from "path";
+import { join, relative, dirname, basename } from "path";
 
 const ROOT = join(import.meta.dir, "..");
 const APP_DIR = join(ROOT, "app");
@@ -70,19 +70,22 @@ function findFilesRecursive(dir: string, match: (name: string) => boolean): stri
   return results;
 }
 
-function isDynamicPath(p: string): boolean { return p.includes("["); }
+// [locale] 段是"静态化的动态段"(generateStaticParams 固定返回 zh/en),
+// 静态导出完全支持,不算需要隐藏/生成 fallback 的动态路由
+function isDynamicPath(p: string): boolean { return p.split("[locale]").join("").includes("["); }
 function rel(p: string) { return relative(ROOT, p); }
 
 function extractParams(filePath: string): string[] {
   // Handles [id], catch-all [...slug], and optional catch-all [[...slug]]
   const matches = [...filePath.matchAll(/\[\[?(?:\.\.\.)?([a-zA-Z][a-zA-Z0-9]*)\]\]?/g)];
-  return matches.map((m) => m[1]);
+  return matches.map((m) => m[1]).filter((p) => p !== "locale");
 }
 
 function findParentRoute(filePath: string): string {
   const parts = relative(APP_DIR, dirname(filePath)).split("/");
   const staticParts: string[] = [];
   for (const part of parts) {
+    if (part === "[locale]") continue; // 语言段不算动态,继续往下取父路由
     if (part.includes("[")) break;
     if (part.startsWith("(") && part.endsWith(")")) continue;
     staticParts.push(part);
@@ -235,7 +238,7 @@ function collectDynamicDirs(dir: string) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
     if (!statSync(full).isDirectory()) continue;
-    if (entry.includes("[")) dynamicDirs.push(full);
+    if (entry.includes("[") && entry !== "[locale]") dynamicDirs.push(full);
     collectDynamicDirs(full);
   }
 }
@@ -248,7 +251,11 @@ const topLevel = dynamicDirs.filter((d) =>
 // under dynamic segments in static export even with generateStaticParams
 const dirsToHide: { original: string; hidden: string }[] = [];
 for (const dir of topLevel) {
-  dirsToHide.push({ original: dir, hidden: dir.replace(/\[/g, "_").replace(/\]/g, "_") + ".__hidden__" });
+  // 只改最后一段目录名(路径上层可能含 [locale],整条替换会指向不存在的父目录)
+  dirsToHide.push({
+    original: dir,
+    hidden: join(dirname(dir), basename(dir).replace(/\[/g, "_").replace(/\]/g, "_") + ".__hidden__"),
+  });
 }
 
 // Ignored paths from ignoreInStatic.json (user-editable, supports globs)

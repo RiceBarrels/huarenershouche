@@ -18,6 +18,7 @@ import {
   animate,
 } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 import { triggerHaptic } from "@/lib/haptics";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 import { getDeviceCornerPx, hasDeviceCorner } from "@/lib/device-corner";
@@ -90,6 +91,7 @@ export function SwipeSheet({
   // 底部 nav(z-50),放大/缩回时卡片从 nav 底下钻过;sheet 本身层级不受影响
   heroZIndex?: number;
 }) {
+  const { t } = useI18n();
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -527,7 +529,7 @@ export function SwipeSheet({
                 onClick={onClose}
                 // 手指落上就先唤醒 hero 层,点按松开触发关闭时层已光栅化好
                 onTouchStart={() => setDragActive(true)}
-                aria-label="返回"
+                aria-label={t("返回")}
                 className="flex h-9 w-9 items-center justify-center text-foreground transition-colors hover:text-muted-foreground"
               >
                 <ChevronLeft className="h-5 w-5" strokeWidth={1.5} />

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { useOverlay } from "@/components/car-overlay-provider";
 
 // 把文本里的 #话题 渲染成可点击链接(X 式),点击跳社区搜索该话题。

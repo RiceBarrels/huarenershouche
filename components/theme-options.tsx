@@ -2,6 +2,7 @@
 
 import { Check, Monitor, Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+import { useI18n } from "@/components/i18n-provider";
 
 const OPTIONS = [
   { value: "light", label: "浅色模式", icon: Sun },
@@ -12,6 +13,7 @@ const OPTIONS = [
 /** 个性化面板的主题三选一(浅色/深色/跟随系统),Popover 和 Drawer 共用 */
 export function ThemeOptions({ onSelect }: { onSelect?: () => void }) {
   const { theme, setTheme } = useTheme();
+  const { t } = useI18n();
   const active = theme ?? "system";
 
   return (
@@ -32,7 +34,7 @@ export function ThemeOptions({ onSelect }: { onSelect?: () => void }) {
             }`}
           >
             <Icon className="h-4 w-4" strokeWidth={1.5} />
-            {opt.label}
+            {t(opt.label)}
             {selected && (
               <Check className="ml-auto h-4 w-4 text-brand-ink" strokeWidth={2} />
             )}

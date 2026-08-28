@@ -6,6 +6,7 @@
 import { useEffect, useState } from "react";
 import { Bell, BellOff, Tag, Sparkles, MessageSquare, RefreshCw } from "lucide-react";
 import { SettingsGroup, SettingsRow, GroupFooter, IOSSwitch } from "@/components/ios-settings";
+import { useI18n } from "@/components/i18n-provider";
 import {
   getNotificationPrefs,
   saveNotificationPrefs,
@@ -34,6 +35,7 @@ const PREF_HINTS: Record<string, string> = {
 };
 
 export function NotificationSettings() {
+  const { t } = useI18n();
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
   const [permission, setPermission] = useState<string>("default");
   const [supported, setSupported] = useState(true);
@@ -51,10 +53,10 @@ export function NotificationSettings() {
         <SettingsGroup capsule>
           <SettingsRow
             icon={<BellOff className="h-5 w-5 text-slate-400" strokeWidth={1.5} />}
-            label="通知不可用"
+            label={t("通知不可用")}
           />
         </SettingsGroup>
-        <GroupFooter>当前浏览器不支持推送通知。</GroupFooter>
+        <GroupFooter>{t("当前浏览器不支持推送通知。")}</GroupFooter>
       </>
     );
   }
@@ -90,14 +92,14 @@ export function NotificationSettings() {
       <SettingsGroup capsule>
         <SettingsRow
           icon={<Bell className="h-5 w-5 text-red-500" strokeWidth={1.5} />}
-          label="推送通知"
+          label={t("推送通知")}
           trailing={<IOSSwitch checked={prefs.enabled} onChange={handleMasterToggle} disabled={permission === "denied"} />}
         />
       </SettingsGroup>
       <GroupFooter>
         {permission === "denied"
-          ? "通知权限已被浏览器拒绝,请在系统设置中重新允许后再开启。"
-          : "开启后可接收降价、新车源、私信等提醒。"}
+          ? t("通知权限已被浏览器拒绝,请在系统设置中重新允许后再开启。")
+          : t("开启后可接收降价、新车源、私信等提醒。")}
       </GroupFooter>
 
       {prefs.enabled && (
@@ -107,13 +109,13 @@ export function NotificationSettings() {
               <SettingsRow
                 key={row.key}
                 icon={row.icon}
-                label={row.label}
+                label={t(row.label)}
                 trailing={<IOSSwitch checked={prefs[row.key]} onChange={() => togglePref(row.key)} />}
               />
             ))}
           </SettingsGroup>
           <GroupFooter>
-            {PREF_ROWS.map((r) => PREF_HINTS[r.key]).join(";")}。
+            {PREF_ROWS.map((r) => t(PREF_HINTS[r.key])).join(";")}。
           </GroupFooter>
         </>
       )}

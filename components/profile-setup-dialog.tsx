@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -24,6 +25,7 @@ export function ProfileSetupDialog({
   onComplete,
   userId,
 }: ProfileSetupDialogProps) {
+  const { t } = useI18n();
   const [step, setStep] = useState<"name" | "type" | "dealer-form" | "submitted">("name");
   const [username, setUsername] = useState("");
   const [accountType, setAccountType] = useState<"private" | "dealer">("private");
@@ -90,17 +92,17 @@ export function ProfileSetupDialog({
           <>
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
-                设置你的名字
+                {t("设置你的名字")}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  用户名 *
+                  {t("用户名")} *
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
-                  placeholder="输入你的用户名"
+                  placeholder={t("输入你的用户名")}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoFocus
@@ -111,7 +113,7 @@ export function ProfileSetupDialog({
                 onClick={handleNameSubmit}
                 disabled={!username.trim() || loading}
               >
-                {loading ? "保存中..." : "下一步"}
+                {loading ? t("保存中...") : t("下一步")}
               </Button>
             </div>
           </>
@@ -121,7 +123,7 @@ export function ProfileSetupDialog({
           <>
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
-                选择账户类型
+                {t("选择账户类型")}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
@@ -131,9 +133,9 @@ export function ProfileSetupDialog({
               >
                 <User className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                 <div className="text-left">
-                  <p className="font-mono text-sm font-medium">个人用户</p>
+                  <p className="font-mono text-sm font-medium">{t("个人用户")}</p>
                   <p className="font-mono text-[11px] text-muted-foreground">
-                    个人买卖二手车
+                    {t("个人买卖二手车")}
                   </p>
                 </div>
               </button>
@@ -143,9 +145,9 @@ export function ProfileSetupDialog({
               >
                 <Store className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                 <div className="text-left">
-                  <p className="font-mono text-sm font-medium">车行</p>
+                  <p className="font-mono text-sm font-medium">{t("车行")}</p>
                   <p className="font-mono text-[11px] text-muted-foreground">
-                    需要认证后使用，享受更多功能
+                    {t("需要认证后使用，享受更多功能")}
                   </p>
                 </div>
               </button>
@@ -157,17 +159,17 @@ export function ProfileSetupDialog({
           <>
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
-                车行信息
+                {t("车行信息")}
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleDealerSubmit} className="space-y-3">
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  店名 *
+                  {t("店名")} *
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
-                  placeholder="车行名称"
+                  placeholder={t("车行名称")}
                   value={dealerForm.store_name}
                   onChange={(e) => setDealerForm((f) => ({ ...f, store_name: e.target.value }))}
                   required
@@ -175,11 +177,11 @@ export function ProfileSetupDialog({
               </div>
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  地址 *
+                  {t("地址")} *
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
-                  placeholder="车行地址"
+                  placeholder={t("车行地址")}
                   value={dealerForm.address}
                   onChange={(e) => setDealerForm((f) => ({ ...f, address: e.target.value }))}
                   required
@@ -187,7 +189,7 @@ export function ProfileSetupDialog({
               </div>
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  电话 *
+                  {t("电话")} *
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
@@ -200,7 +202,7 @@ export function ProfileSetupDialog({
               </div>
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  邮箱 *
+                  {t("邮箱")} *
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
@@ -213,7 +215,7 @@ export function ProfileSetupDialog({
               </div>
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  微信号
+                  {t("微信号")}
                 </Label>
                 <Input
                   className="mt-1 font-mono text-sm"
@@ -227,7 +229,7 @@ export function ProfileSetupDialog({
                 className="w-full font-mono text-xs"
                 disabled={loading}
               >
-                {loading ? "提交中..." : "提交认证申请"}
+                {loading ? t("提交中...") : t("提交认证申请")}
               </Button>
             </form>
           </>
@@ -237,22 +239,22 @@ export function ProfileSetupDialog({
           <>
             <DialogHeader>
               <DialogTitle className="font-mono text-sm">
-                提交成功
+                {t("提交成功")}
               </DialogTitle>
             </DialogHeader>
             <div className="flex flex-col items-center py-4">
               <CheckCircle className="h-10 w-10 text-green-500" strokeWidth={1.5} />
               <p className="mt-3 font-mono text-sm text-center">
-                我们会在两天内联系您
+                {t("我们会在两天内联系您")}
               </p>
               <p className="mt-1 font-mono text-[11px] text-muted-foreground text-center">
-                认证通过后即可使用车行全部功能
+                {t("认证通过后即可使用车行全部功能")}
               </p>
               <Button
                 className="mt-4 font-mono text-xs"
                 onClick={onComplete}
               >
-                知道了
+                {t("知道了")}
               </Button>
             </div>
           </>

@@ -9,6 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { getCompareIds, removeFromCompare } from "@/lib/compare";
 import { Badge } from "@/components/ui/badge";
 import { MAKES_ZH } from "@/lib/mock-data";
+import { useI18n } from "@/components/i18n-provider";
+import { carLocation, carTitle, type Locale } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -38,7 +40,12 @@ const COMPARE_FIELDS: { key: keyof DbCar | "make_zh" | "account_type"; label: st
   { key: "views_count", label: "浏览量" },
 ];
 
-function getCellValue(car: DbCar, key: string): string {
+function getCellValue(
+  car: DbCar,
+  key: string,
+  t: (text: string) => string,
+  locale: Locale,
+): string {
   switch (key) {
     case "make_zh":
       return `${MAKES_ZH[car.make] || car.make} ${car.make}`;
@@ -47,15 +54,26 @@ function getCellValue(car: DbCar, key: string): string {
     case "mileage":
       return `${formatMileage(car.mileage)} mi`;
     case "account_type":
-      return car.profiles?.account_type === "dealer" ? "车行" : "个人";
+      return car.profiles?.account_type === "dealer" ? t("车行") : t("个人");
     case "views_count":
       return String(car.views_count || 0);
+    case "location_zh":
+      return carLocation(car, locale) || "—";
+    case "fuel_type":
+    case "transmission":
+    case "drivetrain":
+    case "exterior_color":
+    case "interior_color": {
+      const value = (car as unknown as Record<string, unknown>)[key];
+      return value ? t(String(value)) : "—";
+    }
     default:
       return String((car as unknown as Record<string, unknown>)[key] || "—");
   }
 }
 
 export function CompareContent() {
+  const { t, locale } = useI18n();
   const [ids, setIds] = useState<string[]>([]);
   const [cars, setCars] = useState<Map<string, DbCar>>(new Map());
 
@@ -108,10 +126,10 @@ export function CompareContent() {
       <div className="flex flex-col items-center justify-center py-16">
         <Scale className="h-10 w-10 text-muted-foreground/40" strokeWidth={1} />
         <p className="mt-3 font-mono text-sm text-muted-foreground">
-          还没有对比车辆
+          {t("还没有对比车辆")}
         </p>
         <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
-          在车源卡片或详情页点「对比」添加,最多 3 辆
+          {t("在车源卡片或详情页点「对比」添加,最多 3 辆")}
         </p>
       </div>
     );
@@ -127,25 +145,25 @@ export function CompareContent() {
               {car.image_url ? (
                 <img
                   src={car.image_url}
-                  alt={car.title}
+                  alt={carTitle(car, locale)}
                   className="h-full w-full object-cover"
                 />
               ) : (
                 <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
-                  暂无图片
+                  {t("暂无图片")}
                 </div>
               )}
             </div>
             <button
               onClick={() => removeFromCompare(car.id)}
-              aria-label="移出对比"
+              aria-label={t("移出对比")}
               className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
             >
               <X className="h-3 w-3" strokeWidth={1.5} />
             </button>
             <div className="p-2">
               <p className="truncate font-mono text-xs font-semibold">
-                {car.title_zh}
+                {carTitle(car, locale)}
               </p>
               <p className="font-mono text-sm font-bold">
                 {formatPrice(car.price)}
@@ -165,7 +183,7 @@ export function CompareContent() {
                 return (
                   <tr key={field.key} className="border-b border-border">
                     <td className="whitespace-nowrap bg-muted/30 px-3 py-2.5 font-mono text-[11px] font-medium text-muted-foreground">
-                      {field.label}
+                      {t(field.label)}
                     </td>
                     {selected.map((car) => (
                       <td
@@ -176,7 +194,7 @@ export function CompareContent() {
                             : ""
                         }`}
                       >
-                        {getCellValue(car, field.key)}
+                        {getCellValue(car, field.key, t, locale)}
                       </td>
                     ))}
                   </tr>
@@ -185,7 +203,7 @@ export function CompareContent() {
               {/* Features row */}
               <tr className="border-b border-border">
                 <td className="whitespace-nowrap bg-muted/30 px-3 py-2.5 font-mono text-[11px] font-medium text-muted-foreground">
-                  配置
+                  {t("配置")}
                 </td>
                 {selected.map((car) => (
                   <td key={car.id} className="px-3 py-2.5">
@@ -197,7 +215,7 @@ export function CompareContent() {
                             variant="outline"
                             className="font-mono text-[10px]"
                           >
-                            {f}
+                            {t(f)}
                           </Badge>
                         ))}
                       </div>

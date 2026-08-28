@@ -7,10 +7,11 @@
 // · 每个分类的已加载数据常驻内存,切回不重新请求。
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Loader2 } from "lucide-react";
 import { CarCard } from "@/components/car-card";
+import { useI18n } from "@/components/i18n-provider";
 import { supabase } from "@/lib/supabase";
 import type { DbCar } from "@/lib/types";
 
@@ -59,6 +60,7 @@ export function HomeFeed({
   recommended: DbCar[];
   showRecommended: boolean;
 }) {
+  const { t } = useI18n();
   const tabs = TAB_DEFS.filter(
     (t) => t.key !== "recommended" || (showRecommended && recommended.length > 0),
   );
@@ -183,20 +185,20 @@ export function HomeFeed({
     <section className="px-3 pt-1 md:hidden">
       <div className="px-1">
         <div className="flex items-end gap-5 overflow-x-auto scrollbar-none">
-          {tabs.map((t) => {
-            const isActive = active === t.key;
+          {tabs.map((tab) => {
+            const isActive = active === tab.key;
             return (
               <button
-                key={t.key}
+                key={tab.key}
                 type="button"
-                onClick={() => switchTab(t.key)}
+                onClick={() => switchTab(tab.key)}
                 className={`relative shrink-0 pb-2 font-mono transition-colors ${
                   isActive
                     ? "text-[15px] font-bold text-foreground"
                     : "text-sm text-muted-foreground"
                 }`}
               >
-                {t.label}
+                {t(tab.label)}
                 {isActive && (
                   <motion.span
                     layoutId="home-feed-underline"
@@ -226,7 +228,7 @@ export function HomeFeed({
           ))}
           {display.length === 0 && !loading && !hasMore && (
             <p className="py-10 text-center font-mono text-xs text-muted-foreground">
-              暂无该分类的车源
+              {t("暂无该分类的车源")}
             </p>
           )}
         </motion.div>
@@ -237,7 +239,7 @@ export function HomeFeed({
       {loading && (
         <div className="flex items-center justify-center gap-1.5 py-4 font-mono text-xs text-muted-foreground">
           <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-          加载中…
+          {t("加载中…")}
         </div>
       )}
       {!hasMore && display.length > 0 && (
@@ -245,7 +247,7 @@ export function HomeFeed({
           href={activeDef.browseHref}
           className="mt-4 flex h-11 items-center justify-center gap-1 rounded-full bg-card font-mono text-sm font-medium transition-colors active:bg-muted"
         >
-          查看全部车源
+          {t("查看全部车源")}
           <ChevronRight className="h-4 w-4" strokeWidth={1.5} />
         </Link>
       )}

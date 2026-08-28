@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { Star, Loader2, Pencil, Trash2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import type { DbPlatformReview } from "@/lib/types";
 
@@ -74,14 +75,17 @@ const SEED_REVIEWS: SeedReview[] = [
   },
 ];
 
-function formatTimeAgo(iso: string): string {
+function formatTimeAgo(
+  iso: string,
+  t: (text: string, vars?: Record<string, string | number>) => string,
+): string {
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (days <= 0) return "今天";
-  if (days === 1) return "昨天";
-  if (days < 7) return `${days} 天前`;
-  if (days < 30) return `${Math.floor(days / 7)} 周前`;
-  if (days < 365) return `${Math.floor(days / 30)} 个月前`;
-  return `${Math.floor(days / 365)} 年前`;
+  if (days <= 0) return t("今天");
+  if (days === 1) return t("昨天");
+  if (days < 7) return t("{n} 天前", { n: days });
+  if (days < 30) return t("{n} 周前", { n: Math.floor(days / 7) });
+  if (days < 365) return t("{n} 个月前", { n: Math.floor(days / 30) });
+  return t("{n} 年前", { n: Math.floor(days / 365) });
 }
 
 // 统一渲染用的评价条目（种子数据 + 数据库真实评价）
@@ -132,6 +136,7 @@ function StarPicker({ value, onChange }: { value: number; onChange: (v: number) 
 }
 
 export function TrustReviews() {
+  const { t } = useI18n();
   const [userId, setUserId] = useState<string | null>(null);
   const [dbReviews, setDbReviews] = useState<DbPlatformReview[]>([]);
   const [formOpen, setFormOpen] = useState(false);
@@ -165,7 +170,7 @@ export function TrustReviews() {
       id: r.id,
       rating: r.rating,
       content: r.content,
-      reviewer: r.profiles?.username || "用户",
+      reviewer: r.profiles?.username || t("用户"),
       avatarUrl: r.profiles?.avatar_url ?? null,
       transactionType: (r.transaction_type === "sell" ? "卖车" : "购车") as "购车" | "卖车",
       date: r.created_at,
@@ -211,7 +216,7 @@ export function TrustReviews() {
       ? await supabase.from("platform_reviews").update(payload).eq("id", ownReview.id)
       : await supabase.from("platform_reviews").insert(payload);
     if (err) {
-      setError("提交失败，请稍后再试");
+      setError(t("提交失败，请稍后再试"));
     } else {
       const { data } = await supabase
         .from("platform_reviews")
@@ -249,7 +254,7 @@ export function TrustReviews() {
           <div className="flex items-center gap-3 md:items-end">
             <div className="flex items-center gap-2">
               <Star className="h-4 w-4 md:hidden" strokeWidth={1.5} />
-              <h2 className="font-mono text-sm font-medium md:font-logo md:text-2xl md:font-normal md:tracking-tight">用户评价</h2>
+              <h2 className="font-mono text-sm font-medium md:font-logo md:text-2xl md:font-normal md:tracking-tight">{t("用户评价")}</h2>
             </div>
             {userId ? (
               <button
@@ -258,14 +263,14 @@ export function TrustReviews() {
                 className="flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:mb-1"
               >
                 <Pencil className="h-2.5 w-2.5" strokeWidth={1.5} />
-                {ownReview ? "修改我的评价" : "写评价"}
+                {ownReview ? t("修改我的评价") : t("写评价")}
               </button>
             ) : (
               <Link
                 href="/login"
                 className="rounded-full bg-muted px-2 py-0.5 font-mono text-[10px] text-muted-foreground outline-none transition-colors hover:bg-muted/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:mb-1"
               >
-                登录后写评价
+                {t("登录后写评价")}
               </Link>
             )}
           </div>
@@ -297,25 +302,25 @@ export function TrustReviews() {
             <div className="flex flex-wrap items-center gap-4">
               <StarPicker value={rating} onChange={setRating} />
               <div className="flex gap-1.5">
-                {(["购车", "卖车"] as const).map((t) => (
+                {(["购车", "卖车"] as const).map((type) => (
                   <button
-                    key={t}
+                    key={type}
                     type="button"
                     className={`rounded-full px-2 py-0.5 font-mono text-[11px] transition-colors ${
-                      transactionType === t
+                      transactionType === type
                         ? "bg-foreground text-background"
                         : "bg-muted hover:bg-muted/70"
                     }`}
-                    onClick={() => setTransactionType(t)}
+                    onClick={() => setTransactionType(type)}
                   >
-                    {t}
+                    {t(type)}
                   </button>
                 ))}
               </div>
             </div>
             <textarea
               className="mt-3 w-full resize-none rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
-              placeholder="分享你在平台买车/卖车的真实体验（至少 10 个字）..."
+              placeholder={t("分享你在平台买车/卖车的真实体验（至少 10 个字）...")}
               rows={3}
               maxLength={500}
               value={content}
@@ -340,7 +345,7 @@ export function TrustReviews() {
                     onClick={handleDelete}
                   >
                     <Trash2 className="h-3 w-3" strokeWidth={1.5} />
-                    删除
+                    {t("删除")}
                   </Button>
                 )}
                 <Button
@@ -350,7 +355,7 @@ export function TrustReviews() {
                   onClick={handleSubmit}
                 >
                   {sending && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />}
-                  {ownReview ? "更新评价" : "提交评价"}
+                  {ownReview ? t("更新评价") : t("提交评价")}
                 </Button>
               </div>
             </div>
@@ -370,7 +375,7 @@ export function TrustReviews() {
 
               {/* Review text */}
               <p className="mt-2.5 font-mono text-[11px] leading-relaxed text-foreground line-clamp-4">
-                {review.content}
+                {t(review.content)}
               </p>
 
               {/* Reviewer info */}
@@ -387,14 +392,14 @@ export function TrustReviews() {
                     {review.reviewer}
                   </span>
                   <span className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-                    {review.transactionType}
+                    {t(review.transactionType)}
                   </span>
                 </div>
                 <span
                   className="font-mono text-[10px] text-muted-foreground"
                   suppressHydrationWarning
                 >
-                  {formatTimeAgo(review.date)}
+                  {formatTimeAgo(review.date, t)}
                 </span>
               </div>
             </div>

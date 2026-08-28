@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, ChevronsUpDown, LocateFixed, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -24,6 +25,7 @@ export function LocationCombobox({
   placeholder = "选择地区",
   className,
 }: LocationComboboxProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<GeoResult[]>([]);
@@ -93,7 +95,7 @@ export function LocationCombobox({
             className
           )}
         >
-          <span className="truncate">{value || placeholder}</span>
+          <span className="truncate">{value || t(placeholder)}</span>
           <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -107,7 +109,7 @@ export function LocationCombobox({
             <input
               ref={inputRef}
               className="w-full bg-transparent font-mono text-xs text-foreground outline-none placeholder:text-muted-foreground"
-              placeholder="城市名或邮编 (如 90001)..."
+              placeholder={t("城市名或邮编 (如 90001)...")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
@@ -128,7 +130,7 @@ export function LocationCombobox({
             ) : (
               <LocateFixed className="h-3.5 w-3.5" strokeWidth={1.5} />
             )}
-            {detecting ? "定位中..." : "使用当前位置"}
+            {detecting ? t("定位中...") : t("使用当前位置")}
           </button>
 
           {/* Results */}
@@ -156,11 +158,11 @@ export function LocationCombobox({
               ))
             ) : query.length >= 2 ? (
               <p className="py-4 text-center font-mono text-xs text-muted-foreground">
-                未找到结果
+                {t("未找到结果")}
               </p>
             ) : (
               <p className="py-4 text-center font-mono text-xs text-muted-foreground">
-                输入城市名或 5 位邮编
+                {t("输入城市名或 5 位邮编")}
               </p>
             )}
           </div>

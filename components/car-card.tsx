@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { motion } from "framer-motion";
 import { carLink } from "@/lib/static-link";
 import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame, Phone, ArrowUpRight } from "lucide-react";
@@ -12,6 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
 import { estimateMonthlyPayment } from "@/lib/format";
 import { useCarOverlay } from "@/components/car-overlay-provider";
+import { useI18n } from "@/components/i18n-provider";
+import { carLocation, carTitle, localizePath } from "@/lib/i18n";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
 
@@ -85,6 +87,7 @@ export function CarCard({
   const [favCount, setFavCount] = useState(car.favorites_count || 0);
   const [inCompare, setInCompare] = useState(false);
   const { enabled: overlayEnabled, openCar, openUser } = useCarOverlay();
+  const { t, locale } = useI18n();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage,仅挂载时一次
@@ -150,12 +153,12 @@ export function CarCard({
               {car.image_url ? (
                 <img
                   src={car.image_url}
-                  alt={car.title}
+                  alt={carTitle(car, locale)}
                   className="absolute inset-0 h-full w-full object-cover"
                 />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center font-mono text-xs text-muted-foreground">
-                  暂无图片
+                  {t("暂无图片")}
                 </div>
               )}
             </div>
@@ -173,7 +176,7 @@ export function CarCard({
                 </span>
                 <button
                   type="button"
-                  aria-label={liked ? "取消收藏" : "收藏"}
+                  aria-label={liked ? t("取消收藏") : t("收藏")}
                   className="-mr-1 -mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors active:bg-muted"
                   onClick={handleFavorite}
                 >
@@ -184,11 +187,11 @@ export function CarCard({
                 </button>
               </div>
               <h3 className="line-clamp-2 font-mono text-[14px] font-medium leading-snug">
-                {car.title_zh}
+                {carTitle(car, locale)}
               </h3>
               <p className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
-                {car.year}年 · {formatMileage(car.mileage)} mi · {car.fuel_type}
-                {car.source_id ? " · 系统检索" : ""}
+                {t("{year}年", { year: car.year })} · {formatMileage(car.mileage)} mi · {t(car.fuel_type)}
+                {car.source_id ? ` · ${t("系统检索")}` : ""}
               </p>
 
               {/* 标签行:价格评级 / 降价 / 新上·热门(放右栏,填满图片旁空间) */}
@@ -202,26 +205,26 @@ export function CarCard({
                       className={`flex items-center gap-0.5 rounded-full px-2 py-0.5 font-mono text-[11px] font-semibold ${priceInsight.className}`}
                     >
                       <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
-                      {priceInsight.label}
+                      {t(priceInsight.label)}
                     </span>
                   )}
                   {car.original_price && car.original_price > car.price && (
                     <span className="flex items-center rounded-full bg-green-500/10 px-2 py-0.5 font-mono text-[11px] font-semibold text-green-600 dark:text-green-400">
-                      已降价 {Math.round((1 - car.price / car.original_price) * 100)}%
+                      {t("已降价 {pct}%", { pct: Math.round((1 - car.price / car.original_price) * 100) })}
                     </span>
                   )}
                   {daysListed(car) < 1 ? (
                     <span className="flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                      今日新上
+                      {t("今日新上")}
                     </span>
                   ) : daysListed(car) <= 3 ? (
                     <span className="flex items-center rounded-full bg-blue-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-blue-600 dark:text-blue-400">
-                      新上架
+                      {t("新上架")}
                     </span>
                   ) : isHotListing(car) ? (
                     <span className="flex items-center gap-0.5 rounded-full bg-orange-500/10 px-2 py-0.5 font-mono text-[11px] font-medium text-orange-600 dark:text-orange-400">
                       <Flame className="h-3 w-3" strokeWidth={1.5} />
-                      热门
+                      {t("热门")}
                     </span>
                   ) : null}
                 </div>
@@ -231,7 +234,7 @@ export function CarCard({
               <p className="mt-1.5 flex items-center gap-1 font-mono text-[12px] text-muted-foreground">
                 <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                 <span className="truncate">
-                  {car.location_zh}
+                  {carLocation(car, locale)}
                   {distance !== undefined && (
                     <span className="font-medium text-blue-600 dark:text-blue-400">
                       {" "}({formatDistance(distance)})
@@ -255,7 +258,7 @@ export function CarCard({
                 }}
               >
                 <Phone className="h-4 w-4" strokeWidth={1.75} />
-                电话
+                {t("电话")}
               </button>
             )}
             <button
@@ -270,12 +273,12 @@ export function CarCard({
               {inCompare ? (
                 <>
                   <Check className="h-4 w-4" strokeWidth={2} />
-                  已加入对比
+                  {t("已加入对比")}
                 </>
               ) : (
                 <>
                   <GitCompare className="h-4 w-4" strokeWidth={1.75} />
-                  加入对比
+                  {t("加入对比")}
                 </>
               )}
             </button>
@@ -288,26 +291,26 @@ export function CarCard({
             {car.image_url ? (
               <img
                 src={car.image_url}
-                alt={car.title}
+                alt={carTitle(car, locale)}
                 /* 200ms:与卡片 ring/标题变色同步的快过渡,避免图片放大明显滞后 */
                 className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
               />
             ) : (
               <div className="flex h-full items-center justify-center font-mono text-xs text-muted-foreground">
-                暂无图片
+                {t("暂无图片")}
               </div>
             )}
             <div className="absolute left-2 right-32 top-2 flex flex-wrap gap-1">
               {car.source_id ? null : car.profiles?.account_type === "dealer" ? (
                 <Badge variant="secondary" className="font-mono text-[11px] font-medium">
-                  车行
+                  {t("车行")}
                 </Badge>
               ) : (
                 <Badge
                   variant="outline"
                   className="bg-background/90 font-mono text-[11px] font-medium"
                 >
-                  个人
+                  {t("个人")}
                 </Badge>
               )}
               {distance !== undefined && (
@@ -324,14 +327,14 @@ export function CarCard({
                   variant="outline"
                   className="bg-background/90 px-2 font-mono text-[10px] font-medium text-blue-600 dark:text-blue-400"
                 >
-                  今日新上
+                  {t("今日新上")}
                 </Badge>
               ) : daysListed(car) <= 3 ? (
                 <Badge
                   variant="outline"
                   className="bg-background/90 px-2 font-mono text-[10px] font-medium text-blue-600 dark:text-blue-400"
                 >
-                  新上架
+                  {t("新上架")}
                 </Badge>
               ) : isHotListing(car) ? (
                 <Badge
@@ -339,7 +342,7 @@ export function CarCard({
                   className="gap-0.5 bg-background/90 px-2 font-mono text-[11px] font-medium text-orange-600 dark:text-orange-400"
                 >
                   <Flame className="h-2.5 w-2.5" strokeWidth={1.5} />
-                  热门
+                  {t("热门")}
                 </Badge>
               ) : null}
             </div>
@@ -349,25 +352,25 @@ export function CarCard({
                 type="button"
                 className="flex h-8 items-center gap-1 rounded-full bg-background/90 px-2.5 transition-colors hover:bg-background"
                 onClick={handleCompare}
-                title={inCompare ? "移出对比" : "加入对比"}
+                title={inCompare ? t("移出对比") : t("加入对比")}
               >
                 {inCompare ? (
                   <>
                     <Check className="h-3.5 w-3.5 text-green-500" strokeWidth={2} />
                     {/* 统一 12px:原来两种状态 11px/13px 不一致,切换时按钮会跳宽 */}
-                    <span className="font-mono text-[12px] text-green-600 dark:text-green-500">已加对比</span>
+                    <span className="font-mono text-[12px] text-green-600 dark:text-green-500">{t("已加对比")}</span>
                   </>
                 ) : (
                   <>
                     <GitCompare className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                    <span className="font-mono text-[12px] text-muted-foreground">对比</span>
+                    <span className="font-mono text-[12px] text-muted-foreground">{t("对比")}</span>
                   </>
                 )}
               </button>
               {/* 收藏按钮与收藏数合一:数字直接跟在爱心里(0 时保持圆形) */}
               <button
                 type="button"
-                aria-label={liked ? "取消收藏" : "收藏"}
+                aria-label={liked ? t("取消收藏") : t("收藏")}
                 className={`flex h-8 items-center justify-center gap-1 rounded-full bg-background/90 transition-colors hover:bg-background ${
                   favCount > 0 ? "px-2.5" : "w-8"
                 }`}
@@ -392,11 +395,8 @@ export function CarCard({
             {/* hover 标题变绿墨色:明确"整卡可点"的即时反馈(浅色用 brand-ink,深色用 brand) */}
             {/* 标题/副标题超长时单行省略:避免换行撑高卡片、破坏网格行对齐 */}
             <h3 className="truncate font-mono text-base font-semibold leading-snug tracking-tight transition-colors duration-150 group-hover:text-brand-ink dark:group-hover:text-brand">
-              {car.title_zh}
+              {carTitle(car, locale)}
             </h3>
-            <p className="mt-0.5 truncate font-mono text-[13px] text-muted-foreground">
-              {car.title}
-            </p>
 
             <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="font-mono text-xl font-bold">
@@ -416,12 +416,12 @@ export function CarCard({
                 <span
                   className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold ${priceInsight.className}`}
                 >
-                  {priceInsight.label}
+                  {t(priceInsight.label)}
                 </span>
               )}
               {car.price > 0 && (
                 <span className="font-mono text-[11px] text-muted-foreground">
-                  分期 ~${estimateMonthlyPayment(car.price)}/月
+                  {t("分期 ~${amt}/月", { amt: estimateMonthlyPayment(car.price) })}
                 </span>
               )}
             </div>
@@ -430,9 +430,9 @@ export function CarCard({
               (priceInsight.level === "great" || priceInsight.level === "good") &&
               priceInsight.delta >= 300 && (
                 <p className="mt-1 truncate font-mono text-[12px] text-green-600 dark:text-green-400">
-                  比同类均价低 {formatPrice(priceInsight.delta)}
+                  {t("比同类均价低 {price}", { price: formatPrice(priceInsight.delta) })}
                   <span className="text-muted-foreground">
-                    {" "}· {priceInsight.sampleSize} 台同类对比
+                    {" "}· {t("{n} 台同类对比", { n: priceInsight.sampleSize })}
                   </span>
                 </p>
               )}
@@ -448,13 +448,13 @@ export function CarCard({
               <div className="flex min-w-0 items-center gap-1.5">
                 <Fuel className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
-                  {car.fuel_type}
+                  {t(car.fuel_type)}
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
-                  {car.location_zh}
+                  {carLocation(car, locale)}
                   {distance !== undefined && (
                     <span className="font-medium text-blue-600 dark:text-blue-400">
                       {" · "}{formatDistance(distance)}
@@ -465,7 +465,7 @@ export function CarCard({
               <div className="flex min-w-0 items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
-                  {car.year}年
+                  {t("{year}年", { year: car.year })}
                 </span>
               </div>
             </div>
@@ -479,7 +479,7 @@ export function CarCard({
                   e.preventDefault();
                   e.stopPropagation();
                   if (overlayEnabled) openUser(car.seller_id);
-                  else window.location.href = `/user/${car.seller_id}`;
+                  else window.location.href = localizePath(`/user/${car.seller_id}`, locale);
                 }}
               >
                 <span className="flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
@@ -494,7 +494,7 @@ export function CarCard({
               {/* 收藏数已并入图上爱心按钮,底栏只留来源标识 */}
               {car.source_id && (
                 <Badge variant="secondary" className="shrink-0 font-mono text-[10px] font-medium">
-                  系统检索
+                  {t("系统检索")}
                 </Badge>
               )}
             </div>

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { Haptics, ImpactStyle } from "@capacitor/haptics";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/components/localized-navigation";
 
 export function InitHaptic() {
   const pathname = usePathname();

@@ -1,7 +1,7 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
-import Link from "next/link";
+import { usePathname, useRouter } from "@/components/localized-navigation";
+import Link from "@/components/localized-navigation";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Plus, User, Users, Home, Car, MessageSquare } from "lucide-react";
@@ -15,6 +15,7 @@ import {
   setNativeBarConfigured,
   type LiquidGlassNavTab,
 } from "@/lib/liquid-glass-nav";
+import { useI18n } from "@/components/i18n-provider";
 
 const TABS = [
   { href: "/", icon: Home, label: "首页", match: (p: string) => p === "/" },
@@ -35,6 +36,7 @@ const activeHref = (pathname: string) =>
 type BarMode = "init" | "native" | "dom";
 
 export function MobileTabBar() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState(false);
@@ -96,7 +98,7 @@ export function MobileTabBar() {
       const all: LiquidGlassNavTab[] = await Promise.all(
         TABS.map(async (tab, i) => ({
           id: tab.href,
-          title: tab.label,
+          title: t(tab.label),
           scale: 3,
           mode: "template" as const,
           icon: await rasterizeSvgIcon(svgs[i], { size: 66 }),
@@ -111,8 +113,8 @@ export function MobileTabBar() {
         action: post && {
           ...post,
           menu: [
-            { id: "/post", title: "发布车辆", symbol: "car.fill" },
-            { id: "/community/new", title: "社区发帖", symbol: "text.bubble" },
+            { id: "/post", title: t("发布车辆"), symbol: "car.fill" },
+            { id: "/community/new", title: t("社区发帖"), symbol: "text.bubble" },
           ],
         },
         selectedId: activeHref(pathnameRef.current),
@@ -206,7 +208,7 @@ export function MobileTabBar() {
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-muted"
               >
                 <Car className="h-5 w-5 text-brand-ink" strokeWidth={1.8} />
-                <span className="text-sm">发布车辆</span>
+                <span className="text-sm">{t("发布车辆")}</span>
               </button>
               <div className="h-px bg-border" />
               <button
@@ -214,7 +216,7 @@ export function MobileTabBar() {
                 className="flex w-full items-center gap-3 px-4 py-3.5 text-left active:bg-muted"
               >
                 <MessageSquare className="h-5 w-5 text-brand-ink" strokeWidth={1.8} />
-                <span className="text-sm">社区发帖</span>
+                <span className="text-sm">{t("社区发帖")}</span>
               </button>
             </motion.div>
           )}
@@ -237,7 +239,7 @@ export function MobileTabBar() {
                       strokeWidth={2}
                     />
                   </span>
-                  <span className="mt-0.5 font-mono text-[10px]">{tab.label}</span>
+                  <span className="mt-0.5 font-mono text-[10px]">{t(tab.label)}</span>
                 </button>
               );
             }
@@ -251,7 +253,7 @@ export function MobileTabBar() {
                 }`}
               >
                 <tab.icon className="h-5 w-5" strokeWidth={active ? 2 : 1.5} />
-                <span className="font-mono text-[10px]">{tab.label}</span>
+                <span className="font-mono text-[10px]">{t(tab.label)}</span>
               </Link>
             );
           })}

@@ -19,7 +19,9 @@ No test framework is configured.
 
 ## Architecture
 
-**Routing:** Next.js App Router with file-based routing. Dynamic routes at `/car/[id]` and `/user/[id]`. No API routes — all data flows through the Supabase client directly.
+**Routing:** Next.js App Router with file-based routing under `app/[locale]/` — path-based i18n with `/zh/...`, `/en/...`, `/ko/...` trees (all prerendered per locale for SEO). Dynamic routes at `/car/[id]` and `/user/[id]`. Old unprefixed URLs 301 to `/zh/...` via `vercel.json`.
+
+**i18n:** Chinese source text is the translation key: `t("发布车辆")` from `useI18n()` (`components/i18n-provider.tsx`); dictionaries in `lib/i18n/en.ts` / `lib/i18n/ko.ts` (missing keys fall back to Chinese; Korean brand name is 또와카). DB enum values (fuel_type "汽油", colors, transmission) are stored in Chinese — always render them through `t(...)`, and locations through `carLocation(car, locale)`. Listing/post content for lazy locales (ko) is translated on demand by `/api/translate-listing` and `/api/translate-post` (OpenRouter) and cached in the `other_i18n` jsonb column (`supabase/other-i18n.sql`); community posts show an X-style "translated · show original" toggle on non-zh locales. Internal links/router must import from `@/components/localized-navigation` (drop-in `Link`/`useRouter`/`usePathname` that auto-prefix the locale and strip it from pathname). Bilingual car data via `carTitle(car, locale)`/`carDescription(car, locale)` from `lib/i18n` — show one language only, never both titles. Web: language switch navigates between locale trees. Capacitor: root `app/page.tsx` picks the tree from localStorage/browser language; in-app switching swaps text via context without navigation. Server Components with Chinese metadata/SEO landing pages (`/cars/*`, guide/terms prose) intentionally stay Chinese.
 
 **Backend:** Supabase PostgreSQL with RLS. Key tables: `cars`, `profiles`, `conversations`, `messages`, `comments`, `dealer_stores`. RPC functions: `increment_views`, `get_unread_count`. Client initialized in `lib/supabase.ts`.
 

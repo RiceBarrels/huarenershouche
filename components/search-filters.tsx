@@ -3,6 +3,7 @@
 import { X, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
+import { useI18n } from "@/components/i18n-provider";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 
@@ -34,9 +35,12 @@ function mileageToIndex(miles: number): number {
   }
   return MILEAGE_STOPS.length - 1;
 }
-function formatMileageLabel(miles: number): string {
-  if (miles >= 999999) return "不限";
-  if (miles >= 10000) return `${(miles / 10000).toFixed(0)}万mi`;
+function formatMileageLabel(
+  miles: number,
+  t: (text: string, vars?: Record<string, string | number>) => string
+): string {
+  if (miles >= 999999) return t("不限");
+  if (miles >= 10000) return t("{n}万mi", { n: (miles / 10000).toFixed(0) });
   return `${miles.toLocaleString()} mi`;
 }
 
@@ -253,6 +257,7 @@ function SidebarPillSelect({
   /** 大小写不敏感匹配（车型名） */
   insensitive?: boolean;
 }) {
+  const { t } = useI18n();
   const selected = (v: string) => (insensitive ? isInListCI(value, v) : isInList(value, v));
   const toggle = (v: string) => (insensitive ? toggleInListCI(value, v) : toggleInList(value, v));
   return (
@@ -262,7 +267,7 @@ function SidebarPillSelect({
         className={`rounded-full px-3 py-1.5 font-mono text-xs transition-colors ${!value ? PILL_ON : PILL_OFF}`}
         onClick={() => onChange("")}
       >
-        不限
+        {t("不限")}
       </button>
       {options.map((opt) => (
         <button
@@ -277,7 +282,7 @@ function SidebarPillSelect({
               style={{ backgroundColor: opt.color }}
             />
           )}
-          {opt.label}
+          {t(opt.label)}
           {opt.count !== undefined && <span className="opacity-60">{opt.count}</span>}
         </button>
       ))}
@@ -298,6 +303,7 @@ export function SearchFilters({
   /** 车辆配置标签选项（带数量），browse 页统计传入 */
   featureOptions?: CountOption[];
 }) {
+  const { t, locale } = useI18n();
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
   // Zipcode 输入的本地缓冲(未满 5 位时不写入 filters)
   const [zip, setZip] = useState(() =>
@@ -364,16 +370,16 @@ export function SearchFilters({
           onClick={reset}
         >
           <X className="h-3 w-3" strokeWidth={1.5} />
-          清除全部筛选 ({activeCount})
+          {t("清除全部筛选 ({n})", { n: activeCount })}
         </button>
       )}
 
       {/* Location — zipcode + distance */}
       {/* 距离默认值 "50" 不算"已选",避免提示点常亮失去意义 */}
-      <Section title="位置" active={!!filters.location || (!!filters.maxDistance && filters.maxDistance !== INITIAL_FILTERS.maxDistance)}>
+      <Section title={t("位置")} active={!!filters.location || (!!filters.maxDistance && filters.maxDistance !== INITIAL_FILTERS.maxDistance)}>
         <div className="flex items-center gap-2">
           <input
-            placeholder="输入 Zipcode"
+            placeholder={t("输入 Zipcode")}
             className={`h-9 min-w-0 flex-1 rounded-xl px-3 font-mono text-xs outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
             maxLength={5}
             inputMode="numeric"
@@ -394,17 +400,17 @@ export function SearchFilters({
                 update("location", "");
               }}
             >
-              清除
+              {t("清除")}
             </button>
           )}
         </div>
         <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
           {/^\d{5}$/.test(filters.location)
-            ? `以 Zip ${filters.location} 为中心按距离筛选`
-            : "不填则以自动定位的位置计算距离"}
+            ? t("以 Zip {zip} 为中心按距离筛选", { zip: filters.location })
+            : t("不填则以自动定位的位置计算距离")}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          <span className="font-mono text-[10px] text-muted-foreground">距离</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{t("距离")}</span>
           {["", "10", "25", "50", "100", "200"].map((v) => (
             <button
               key={v}
@@ -412,14 +418,14 @@ export function SearchFilters({
               className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.maxDistance === v ? PILL_ON : PILL_OFF}`}
               onClick={() => update("maxDistance", v)}
             >
-              {v === "" ? "不限" : `≤${v}mi`}
+              {v === "" ? t("不限") : `≤${v}mi`}
             </button>
           ))}
         </div>
       </Section>
 
       {/* Brand */}
-      <Section title="品牌" active={!!filters.make}>
+      <Section title={t("品牌")} active={!!filters.make}>
         <div className="grid grid-cols-3 gap-1.5">
           {HOT_MAKES.map((make) => {
             const logo = getBrandLogoUrl(make);
@@ -436,19 +442,19 @@ export function SearchFilters({
                     <img src={logo} alt={make} className="h-5 w-5 object-contain" />
                   ) : null}
                 </span>
-                <span className="font-mono text-[10px] leading-tight">{MAKES_ZH[make]}</span>
+                <span className="font-mono text-[10px] leading-tight">{t(MAKES_ZH[make])}</span>
               </button>
             );
           })}
         </div>
-        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">全部品牌</p>
+        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{t("全部品牌")}</p>
         <div className={`max-h-[280px] overflow-y-auto rounded-2xl ${IOS_FILL}`}>
           <button
             type="button"
             className={`flex w-full items-center justify-between px-3 py-1.5 font-mono text-[11px] transition-colors hover:bg-muted ${!filters.make ? "bg-brand/30 font-medium text-brand-ink" : ""}`}
             onClick={() => update("make", "")}
           >
-            <span>不限</span>
+            <span>{t("不限")}</span>
             {!filters.make && <Check className="h-3 w-3 text-brand-ink" strokeWidth={2} />}
           </button>
           {MAKES.map((make) => {
@@ -463,7 +469,7 @@ export function SearchFilters({
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
                 </span>
-                <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
+                <span className="flex-1 text-left">{locale === "en" ? make : `${MAKES_ZH[make]} ${make}`}</span>
                 {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0 text-brand-ink" strokeWidth={2} />}
               </button>
             );
@@ -473,7 +479,7 @@ export function SearchFilters({
 
       {/* Model — only shown when exactly one make is selected */}
       {modelOptions && modelOptions.length > 0 && (
-        <Section title="车型" active={!!filters.model}>
+        <Section title={t("车型")} active={!!filters.model}>
           <SidebarPillSelect
             options={modelOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.model}
@@ -484,7 +490,7 @@ export function SearchFilters({
       )}
 
       {/* Body style */}
-      <Section title="车身类型" active={!!filters.bodyStyle}>
+      <Section title={t("车身类型")} active={!!filters.bodyStyle}>
         <SidebarPillSelect
           options={BODY_STYLE_OPTIONS}
           value={filters.bodyStyle}
@@ -493,7 +499,7 @@ export function SearchFilters({
       </Section>
 
       {/* Seller type */}
-      <Section title="卖家类型" active={!!filters.sellerType}>
+      <Section title={t("卖家类型")} active={!!filters.sellerType}>
         <SidebarPillSelect
           options={[
             { value: "dealer", label: "车行" },
@@ -505,11 +511,11 @@ export function SearchFilters({
       </Section>
 
       {/* Price slider + input */}
-      <Section title="价格范围" active={!!(filters.minPrice || filters.maxPrice)}>
+      <Section title={t("价格范围")} active={!!(filters.minPrice || filters.maxPrice)}>
         <div className="flex items-center gap-1.5">
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-            placeholder="最低"
+            placeholder={t("最低")}
             inputMode="numeric"
             value={filters.minPrice}
             onChange={(e) => {
@@ -522,7 +528,7 @@ export function SearchFilters({
           <span className="font-mono text-[11px] text-muted-foreground">-</span>
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-            placeholder="最高"
+            placeholder={t("最高")}
             inputMode="numeric"
             value={filters.maxPrice}
             onChange={(e) => {
@@ -554,14 +560,14 @@ export function SearchFilters({
       </Section>
 
       {/* Monthly payment budget */}
-      <Section title="月供预算" active={!!filters.maxPayment}>
+      <Section title={t("月供预算")} active={!!filters.maxPayment}>
         <div className="flex flex-wrap gap-1.5">
           <button
             type="button"
             className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${!filters.maxPayment ? PILL_ON : PILL_OFF}`}
             onClick={() => update("maxPayment", "")}
           >
-            不限
+            {t("不限")}
           </button>
           {PAYMENT_PRESETS.map((v) => (
             <button
@@ -570,13 +576,13 @@ export function SearchFilters({
               className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.maxPayment === v ? PILL_ON : PILL_OFF}`}
               onClick={() => update("maxPayment", v)}
             >
-              ≤${v}/月
+              {t("≤${n}/月", { n: v })}
             </button>
           ))}
         </div>
         <input
           className={`mt-2 h-9 w-full rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-          placeholder="自定义月供 ($/月)"
+          placeholder={t("自定义月供 ($/月)")}
           inputMode="numeric"
           value={filters.maxPayment}
           onChange={(e) => {
@@ -585,16 +591,16 @@ export function SearchFilters({
           }}
         />
         <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-          按 0 首付 / 6.5% APR / 60 期估算
+          {t("按 0 首付 / 6.5% APR / 60 期估算")}
         </p>
       </Section>
 
       {/* Year slider + input */}
-      <Section title="年份范围" active={!!(filters.minYear || filters.maxYear)}>
+      <Section title={t("年份范围")} active={!!(filters.minYear || filters.maxYear)}>
         <div className="flex items-center gap-1.5">
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-            placeholder="最早"
+            placeholder={t("最早")}
             inputMode="numeric"
             maxLength={4}
             value={filters.minYear}
@@ -608,7 +614,7 @@ export function SearchFilters({
           <span className="font-mono text-[11px] text-muted-foreground">-</span>
           <input
             className={`h-9 w-full min-w-0 rounded-xl px-3 font-mono text-[11px] outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-            placeholder="最新"
+            placeholder={t("最新")}
             inputMode="numeric"
             maxLength={4}
             value={filters.maxYear}
@@ -639,26 +645,26 @@ export function SearchFilters({
       </Section>
 
       {/* Fuel type */}
-      <Section title="燃油类型" active={!!filters.fuelType}>
+      <Section title={t("燃油类型")} active={!!filters.fuelType}>
         <SidebarPillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
       </Section>
 
       {/* Transmission — hidden when exclusively electric */}
       {!isElectric && (
-        <Section title="变速箱" active={!!filters.transmission}>
+        <Section title={t("变速箱")} active={!!filters.transmission}>
           <SidebarPillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
         </Section>
       )}
 
       {/* Drivetrain */}
-      <Section title="驱动方式" active={!!filters.drivetrain}>
+      <Section title={t("驱动方式")} active={!!filters.drivetrain}>
         <SidebarPillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
       </Section>
 
       {/* Mileage slider with breakpoints */}
-      <Section title="最高里程" active={!!filters.maxMileage}>
+      <Section title={t("最高里程")} active={!!filters.maxMileage}>
         <p className="font-mono text-[11px] text-foreground">
-          {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
+          {formatMileageLabel(MILEAGE_STOPS[mileageIdx], t)}
         </p>
         <Slider
           className="mt-2"
@@ -679,30 +685,30 @@ export function SearchFilters({
       </Section>
 
       {/* Exterior color */}
-      <Section title="外观颜色" active={!!filters.exteriorColor}>
+      <Section title={t("外观颜色")} active={!!filters.exteriorColor}>
         <SidebarPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
       </Section>
 
       {/* Interior color */}
-      <Section title="内饰颜色" active={!!filters.interiorColor}>
+      <Section title={t("内饰颜色")} active={!!filters.interiorColor}>
         <SidebarPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
       </Section>
 
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
-        <Section title="车辆配置" active={!!filters.features}>
+        <Section title={t("车辆配置")} active={!!filters.features}>
           <SidebarPillSelect
             options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
             value={filters.features}
             onChange={(v) => update("features", v)}
           />
-          <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">需同时满足所选配置</p>
+          <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">{t("需同时满足所选配置")}</p>
         </Section>
       )}
 
       {/* More conditions — iOS 列表行 + brand 绿勾选 */}
       <Section
-        title="更多条件"
+        title={t("更多条件")}
         active={
           !!(
             filters.dealRating ||
@@ -722,7 +728,7 @@ export function SearchFilters({
             className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters.dealRating === "good" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
             onClick={() => update("dealRating", filters.dealRating === "good" ? "" : "good")}
           >
-            <span>只看好价</span>
+            <span>{t("只看好价")}</span>
             {filters.dealRating === "good" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
           </button>
           <button
@@ -730,22 +736,22 @@ export function SearchFilters({
             className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters.priceDropped === "true" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
             onClick={() => update("priceDropped", filters.priceDropped === "true" ? "" : "true")}
           >
-            <span>只看降价</span>
+            <span>{t("只看降价")}</span>
             {filters.priceDropped === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
           </button>
-          {CONDITION_TOGGLES.map((t) => (
+          {CONDITION_TOGGLES.map((tg) => (
             <button
-              key={t.key}
+              key={tg.key}
               type="button"
-              className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters[t.key] === "true" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
-              onClick={() => update(t.key, filters[t.key] === "true" ? "" : "true")}
+              className={`flex w-full items-center justify-between rounded-full px-3 py-2 font-mono text-[11px] transition-colors ${filters[tg.key] === "true" ? "bg-brand/30 font-medium text-brand-ink" : PILL_OFF}`}
+              onClick={() => update(tg.key, filters[tg.key] === "true" ? "" : "true")}
             >
-              <span>{t.label}</span>
-              {filters[t.key] === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
+              <span>{t(tg.label)}</span>
+              {filters[tg.key] === "true" && <Check className="h-3.5 w-3.5" strokeWidth={2} />}
             </button>
           ))}
         </div>
-        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">上架时间</p>
+        <p className="mt-3 px-1 pb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">{t("上架时间")}</p>
         <div className="flex flex-wrap gap-1.5">
           {LISTED_WITHIN_OPTIONS.map((opt) => (
             <button
@@ -754,7 +760,7 @@ export function SearchFilters({
               className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${filters.listedWithin === opt.value ? PILL_ON : PILL_OFF}`}
               onClick={() => update("listedWithin", opt.value)}
             >
-              {opt.label}
+              {t(opt.label)}
             </button>
           ))}
         </div>

@@ -244,3 +244,175 @@ export async function localizeListing(input: ListingFields): Promise<LocalizedFi
     features,
   };
 }
+
+// ---- 小语种按需翻译(cars.other_i18n 缓存用) ----
+
+const TARGET_LANG_NAMES: Record<string, string> = {
+  en: "English",
+  ko: "Korean",
+  es: "Spanish",
+};
+
+/**
+ * 把车源标题/描述翻译成目标小语种(如 ko)。失败或未配置时返回 null,
+ * 由调用方回退英文展示。品牌/车型/单位保持英文不翻。
+ */
+export async function translateListingInto(
+  target: string,
+  input: { title: string | null; description: string | null }
+): Promise<{ title: string | null; description: string | null } | null> {
+  const key = process.env.OPENROUTER_API_KEY;
+  const lang = TARGET_LANG_NAMES[target];
+  if (!key || !lang) return null;
+  if (!input.title && !input.description) return { title: null, description: null };
+
+  const body = JSON.stringify({
+    model: MODEL,
+    temperature: 0,
+    max_tokens: MAX_TOKENS,
+    messages: [
+      {
+        role: "system",
+        content: `You are a precise translator for a used-car marketplace. Translate into natural ${lang}. Keep vehicle brand / model / trim / year / VIN / units (mi, AWD, 1.5L...) unchanged in English. Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
+      },
+      {
+        role: "user",
+        content: [
+          `Translate this car listing into ${lang}.`,
+          'Output JSON with exactly these keys: {"title": string|null, "description": string|null}',
+          "If a field is null in the input, keep it null.",
+          "",
+          "INPUT:",
+          JSON.stringify({ title: input.title, description: input.description }),
+        ].join("\n"),
+      },
+    ],
+  });
+
+  let content: string | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://clcauto.com",
+          "X-Title": "CLCAuto Listing Translation",
+        },
+        body,
+      });
+      clearTimeout(timer);
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await sleep(backoffMs(attempt));
+          continue;
+        }
+        return null;
+      }
+      if (!res.ok) return null;
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      content = json.choices?.[0]?.message?.content ?? null;
+      break;
+    } catch {
+      clearTimeout(timer);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      return null;
+    }
+  }
+
+  const parsed = extractJson(content);
+  if (!parsed) return null;
+  return {
+    title: asStr(parsed.title) ?? input.title,
+    description: asStr(parsed.description) ?? input.description,
+  };
+}
+
+/**
+ * 社区帖子按需翻译(en/ko 等)。保持 #话题、@提及、车型品牌名原样。
+ * 失败或未配置返回 null,前端回退显示原文。
+ */
+export async function translatePostInto(
+  target: string,
+  input: { title: string | null; content: string | null }
+): Promise<{ title: string | null; content: string | null } | null> {
+  const key = process.env.OPENROUTER_API_KEY;
+  const lang = TARGET_LANG_NAMES[target];
+  if (!key || !lang) return null;
+  if (!input.title && !input.content) return { title: null, content: null };
+
+  const body = JSON.stringify({
+    model: MODEL,
+    temperature: 0,
+    max_tokens: MAX_TOKENS,
+    messages: [
+      {
+        role: "system",
+        content: `You are a precise translator for a used-car community forum. Translate into natural ${lang}. Keep #hashtags, @mentions, URLs, and vehicle brand/model/trim names unchanged. Preserve line breaks. Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
+      },
+      {
+        role: "user",
+        content: [
+          `Translate this community post into ${lang}.`,
+          'Output JSON with exactly these keys: {"title": string|null, "content": string|null}',
+          "If a field is null in the input, keep it null.",
+          "",
+          "INPUT:",
+          JSON.stringify({ title: input.title, content: input.content }),
+        ].join("\n"),
+      },
+    ],
+  });
+
+  let content: string | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://clcauto.com",
+          "X-Title": "CLCAuto Post Translation",
+        },
+        body,
+      });
+      clearTimeout(timer);
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await sleep(backoffMs(attempt));
+          continue;
+        }
+        return null;
+      }
+      if (!res.ok) return null;
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      content = json.choices?.[0]?.message?.content ?? null;
+      break;
+    } catch {
+      clearTimeout(timer);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      return null;
+    }
+  }
+
+  const parsed = extractJson(content);
+  if (!parsed) return null;
+  return {
+    title: asStr(parsed.title) ?? input.title,
+    content: asStr(parsed.content) ?? input.content,
+  };
+}

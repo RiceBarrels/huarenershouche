@@ -2,6 +2,7 @@
 
 import { useRef, useState, useCallback, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 
 const THRESHOLD = 64;
 const MAX_PULL = 110;
@@ -24,6 +25,7 @@ export function PullToRefresh({
   onRefresh: () => Promise<void>;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const arrowRef = useRef<HTMLDivElement>(null);
@@ -62,10 +64,10 @@ export function PullToRefresh({
       arrowRef.current.style.opacity = String(progress);
     }
     if (textRef.current) {
-      textRef.current.textContent = progress >= 1 ? "松开刷新" : "下拉刷新";
+      textRef.current.textContent = progress >= 1 ? t("松开刷新") : t("下拉刷新");
       textRef.current.style.opacity = String(progress);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -169,7 +171,7 @@ export function PullToRefresh({
                 </svg>
               </div>
               <span ref={textRef} className="font-mono text-[10px] text-muted-foreground" style={{ opacity: 0 }}>
-                下拉刷新
+                {t("下拉刷新")}
               </span>
             </div>
           )}

@@ -1,15 +1,20 @@
-export function timeAgo(date: string): string {
+import { interpolate } from "@/lib/i18n";
+
+// 相对时间。传入 useI18n() 的 t 才会翻译;不传时按中文原文输出(兼容旧调用)
+type TranslateFn = (text: string, vars?: Record<string, string | number>) => string;
+
+export function timeAgo(date: string, t: TranslateFn = interpolate): string {
   const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return "刚刚";
+  if (seconds < 60) return t("刚刚");
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} 分钟前`;
+  if (minutes < 60) return t("{n} 分钟前", { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} 小时前`;
+  if (hours < 24) return t("{n} 小时前", { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days} 天前`;
+  if (days < 30) return t("{n} 天前", { n: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} 个月前`;
-  return `${Math.floor(months / 12)} 年前`;
+  if (months < 12) return t("{n} 个月前", { n: months });
+  return t("{n} 年前", { n: Math.floor(months / 12) });
 }
 
 export function formatPrice(price: number): string {

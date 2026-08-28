@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Smile, Hash } from "lucide-react"
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height"
+import { useI18n } from "@/components/i18n-provider"
 
 // 常用表情(横向滚动一排,点按插入)
 const EMOJIS = [
@@ -16,6 +17,7 @@ const EMOJIS = [
  * Web 端键盘高度恒为 0,不渲染任何可见内容。
  */
 export function KeyboardToolbar() {
+  const { t } = useI18n()
   const kbHeight = useKeyboardHeight()
   const [emojiOpen, setEmojiOpen] = React.useState(false)
   const open = kbHeight > 0
@@ -72,7 +74,7 @@ export function KeyboardToolbar() {
       <div className="flex h-11 items-center gap-1 px-2">
         <button
           type="button"
-          aria-label="表情"
+          aria-label={t("表情")}
           onClick={() => setEmojiOpen((v) => !v)}
           className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
             emojiOpen ? "bg-muted text-foreground" : "text-foreground"
@@ -82,7 +84,7 @@ export function KeyboardToolbar() {
         </button>
         <button
           type="button"
-          aria-label="插入话题"
+          aria-label={t("插入话题")}
           onClick={() => insert("#")}
           className="flex h-9 w-9 items-center justify-center rounded-full text-foreground"
         >
@@ -97,7 +99,7 @@ export function KeyboardToolbar() {
           }}
           className="px-3 text-[15px] font-medium text-foreground active:opacity-60"
         >
-          完成
+          {t("完成")}
         </button>
       </div>
     </div>

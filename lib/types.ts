@@ -25,6 +25,9 @@ export interface DbCar {
   vin: string | null;
   description: string | null;
   description_zh: string | null;
+  // 小语种内容缓存:{ ko: { title, description } },首次被该语言用户浏览时
+  // 由 /api/translate-listing 按需翻译写入(zh/en 仍走 title/title_zh 双列)
+  other_i18n?: Record<string, { title?: string | null; description?: string | null }> | null;
   seller_name: string;
   phone: string | null;
   carfax_url: string | null;
@@ -40,6 +43,8 @@ export interface DbCar {
   source_id: string | null;
   source_listing_id: string | null;
   source_url: string | null;
+  // 源站原始图片外链(images 转存到我方 Storage 后仍保留,用于检测换图/下架回退)
+  source_images: string[] | null;
   last_seen_at: string | null;
   // Owner-disabled syndicated listing (excluded from public queries; untouched by the sync engine)
   owner_hidden: boolean;
@@ -80,6 +85,7 @@ export interface DbListingSource {
     inserted?: number;
     updated?: number;
     delisted?: number;
+    mirrored?: number;
     errors?: string[];
     duration_ms?: number;
   } | null;
@@ -122,7 +128,7 @@ export interface DbConversation {
   last_message_at: string;
   created_at: string;
   // Joined
-  cars?: { id: string; title_zh: string; image_url: string | null; price: number };
+  cars?: { id: string; title: string | null; title_zh: string | null; image_url: string | null; price: number };
   buyer_profile?: { username: string; avatar_url: string | null };
   seller_profile?: { username: string; avatar_url: string | null };
 }
@@ -171,6 +177,8 @@ export interface DbCommunityPost {
   tags: string[];
   likes_count: number;
   comments_count: number;
+  // 非中文界面的 AI 翻译缓存:{ en: { title, content }, ko: ... },按需写入
+  other_i18n?: Record<string, { title?: string | null; content?: string | null }> | null;
   status: "active" | "hidden" | "removed";
   created_at: string;
   updated_at: string;

@@ -15,9 +15,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { openExternal } from "@/lib/open-external";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
@@ -68,6 +69,7 @@ function readCachedAd(): SplashAdRow | null {
 }
 
 export function SplashAd() {
+  const { t } = useI18n();
   const router = useRouter();
   // SSR 首帧渲染空,挂载后才读本地缓存(避免 hydration 不一致)
   const mounted = useSyncExternalStore(
@@ -148,12 +150,12 @@ export function SplashAd() {
             type="button"
             onClick={openAd}
             className="relative min-h-0 flex-1"
-            aria-label={ad!.title || "广告"}
+            aria-label={ad!.title || t("广告")}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={ad!.image_url}
-              alt={ad!.title || "广告"}
+              alt={ad!.title || t("广告")}
               className="absolute inset-0 h-full w-full object-cover"
             />
             {/* 跳过按钮(垫出刘海安全区) */}
@@ -167,7 +169,7 @@ export function SplashAd() {
               className="absolute right-4 rounded-full bg-black/45 px-3 py-1.5 font-mono text-xs text-white backdrop-blur-sm"
               style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
             >
-              跳过 {remain}s
+              {t("跳过 {n}s", { n: remain })}
             </span>
           </button>
           {/* 品牌栏 */}
@@ -175,9 +177,9 @@ export function SplashAd() {
             className="flex shrink-0 items-center justify-center gap-2 bg-background py-4"
             style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom, 0px))" }}
           >
-            <span className="font-logo text-2xl text-brand-ink">常來車網</span>
+            <span className="font-logo text-2xl text-brand-ink">{t("常來車網")}</span>
             <span className="font-mono text-[10px] text-muted-foreground">
-              北美华人的二手车平台
+              {t("北美华人的二手车平台")}
             </span>
           </div>
         </motion.div>

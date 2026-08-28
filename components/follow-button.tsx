@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 
 // X 式紧凑关注按钮(帖子详情作者行等处):自查登录态与关注关系,
 // 乐观更新、失败回滚;自己/未登录点击跳登录。follows 表见 supabase/follows.sql
@@ -14,6 +15,7 @@ export function FollowButton({
   className?: string;
 }) {
   const router = useRouter();
+  const { t } = useI18n();
   const [authId, setAuthId] = useState<string | null>(null);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -82,7 +84,7 @@ export function FollowButton({
           : "bg-foreground text-background hover:opacity-90"
       } ${className}`}
     >
-      {isFollowing ? "已关注" : "关注"}
+      {isFollowing ? t("已关注") : t("关注")}
     </button>
   );
 }

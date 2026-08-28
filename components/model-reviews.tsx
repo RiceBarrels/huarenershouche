@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { Heart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { communityPostLink } from "@/lib/static-link";
 import { timeAgo } from "@/lib/format";
 import type { DbCommunityPost } from "@/lib/types";
@@ -19,6 +20,7 @@ interface ModelReviewsProps {
  * 一条都没有时不渲染。
  */
 export function ModelReviews({ make, model }: ModelReviewsProps) {
+  const { t } = useI18n();
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [makeLevelOnly, setMakeLevelOnly] = useState(false);
 
@@ -68,9 +70,9 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
   return (
     <section className="mt-10 border-t border-border pt-6">
       <div className="flex flex-wrap items-baseline gap-2">
-        <h2 className="font-mono text-sm font-semibold">车主口碑</h2>
+        <h2 className="font-mono text-sm font-semibold">{t("车主口碑")}</h2>
         <span className="font-mono text-[10px] text-muted-foreground">
-          {makeLevelOnly ? `同品牌车主评价 · ${make}` : `${make} ${model}`}
+          {makeLevelOnly ? t("同品牌车主评价 · {make}", { make }) : `${make} ${model}`}
         </span>
       </div>
 
@@ -93,7 +95,7 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
                 <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
                 {post.likes_count || 0}
               </span>
-              <span>{timeAgo(post.created_at)}</span>
+              <span>{timeAgo(post.created_at, t)}</span>
             </div>
           </Link>
         ))}
@@ -103,7 +105,7 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
         href="/community"
         className="mt-3 inline-block font-mono text-[11px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
       >
-        查看全部车主评价 →
+        {t("查看全部车主评价 →")}
       </Link>
     </section>
   );

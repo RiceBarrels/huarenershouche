@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { ChevronRight, MapPin, TrendingDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { carLink } from "@/lib/static-link";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/components/i18n-provider";
+import { carLocation, carTitle } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -18,6 +20,7 @@ function formatPrice(price: number): string {
 }
 
 export function PriceDroppedCars() {
+  const { t, locale } = useI18n();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -59,21 +62,21 @@ export function PriceDroppedCars() {
         <div className="mb-4 flex items-center justify-between md:hidden">
           <div className="flex items-center gap-2">
             <TrendingDown className="h-4 w-4 text-green-600" strokeWidth={1.5} />
-            <h2 className="font-mono text-sm font-medium">最近降价</h2>
+            <h2 className="font-mono text-sm font-medium">{t("最近降价")}</h2>
           </div>
           <Link
             href="/browse?priceDropped=true"
             className="flex items-center gap-1 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
-            查看全部
+            {t("查看全部")}
             <ChevronRight className="h-3 w-3" strokeWidth={1.5} />
           </Link>
         </div>
         <div className="hidden md:block">
           <SectionHeader
             label="Price Drops"
-            title="最近降价"
-            action={{ href: "/browse?priceDropped=true", label: "查看全部" }}
+            title={t("最近降价")}
+            action={{ href: "/browse?priceDropped=true", label: t("查看全部") }}
             className="mb-6"
           />
         </div>
@@ -117,13 +120,13 @@ export function PriceDroppedCars() {
                     {car.image_url ? (
                       <img
                         src={car.image_url}
-                        alt={car.title_zh}
+                        alt={carTitle(car, locale)}
                         className="h-full w-full object-cover transition-transform group-hover:scale-105"
                       />
                     ) : (
                       <div className="flex h-full items-center justify-center">
                         <span className="font-mono text-[10px] text-muted-foreground">
-                          暂无图片
+                          {t("暂无图片")}
                         </span>
                       </div>
                     )}
@@ -145,7 +148,7 @@ export function PriceDroppedCars() {
                   {/* Info */}
                   <div className="p-2.5">
                     <p className="truncate font-mono text-xs font-medium">
-                      {car.title_zh}
+                      {carTitle(car, locale)}
                     </p>
                     <div className="mt-1.5 flex items-baseline gap-2">
                       <span className="font-mono text-sm font-bold">
@@ -160,7 +163,7 @@ export function PriceDroppedCars() {
                     <div className="mt-1.5 flex items-center gap-1 text-muted-foreground">
                       <MapPin className="h-3 w-3" strokeWidth={1.5} />
                       <span className="font-mono text-[10px]">
-                        {car.location_zh}
+                        {carLocation(car, locale)}
                       </span>
                     </div>
                   </div>

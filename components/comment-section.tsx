@@ -4,23 +4,28 @@ import { useEffect, useState, useRef } from "react";
 import { Trash2, Send, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import type { DbComment } from "@/lib/types";
 
-function timeAgo(dateStr: string): string {
+function timeAgo(
+  dateStr: string,
+  t: (text: string, vars?: Record<string, string | number>) => string,
+): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "刚刚";
-  if (mins < 60) return `${mins}分钟前`;
+  if (mins < 1) return t("刚刚");
+  if (mins < 60) return t("{n}分钟前", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return t("{n}小时前", { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}天前`;
+  if (days < 30) return t("{n}天前", { n: days });
   return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
 export function CommentSection({ carId }: { carId: string }) {
+  const { t } = useI18n();
   const [comments, setComments] = useState<DbComment[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -106,7 +111,7 @@ export function CommentSection({ carId }: { carId: string }) {
   return (
     <section className="mt-8 border-t border-border pt-6">
       <h2 className="font-mono text-sm font-semibold">
-        评论 ({comments.length})
+        {t("评论")} ({comments.length})
       </h2>
 
       {/* Comment input */}
@@ -117,7 +122,7 @@ export function CommentSection({ carId }: { carId: string }) {
             <textarea
               ref={inputRef}
               className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
-              placeholder="写评论..."
+              placeholder={t("写评论...")}
               rows={2}
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -139,12 +144,12 @@ export function CommentSection({ carId }: { carId: string }) {
               ) : (
                 <Send className="h-3 w-3" strokeWidth={1.5} />
               )}
-              发送
+              {t("发送")}
             </Button>
           </div>
         ) : (
           <Link href="/login" className="block w-full rounded-xl border border-dashed border-border px-4 py-3 text-center font-mono text-xs text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground">
-            登录后发表评论
+            {t("登录后发表评论")}
           </Link>
         )}
       </div>
@@ -152,10 +157,10 @@ export function CommentSection({ carId }: { carId: string }) {
       {/* Comments list — 桌面条目间距略放大,长列表扫读更省力 */}
       <div className="mt-4 space-y-3 md:mt-5 md:space-y-4">
         {loading ? (
-          <p className="font-mono text-xs text-muted-foreground">加载中...</p>
+          <p className="font-mono text-xs text-muted-foreground">{t("加载中...")}</p>
         ) : comments.length === 0 ? (
           <p className="py-6 text-center font-mono text-xs text-muted-foreground">
-            暂无评论，来说两句吧
+            {t("暂无评论，来说两句吧")}
           </p>
         ) : (
           comments.map((comment) => (
@@ -170,10 +175,10 @@ export function CommentSection({ carId }: { carId: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-xs font-medium">
-                    {comment.profiles?.username || "匿名"}
+                    {comment.profiles?.username || t("匿名")}
                   </span>
                   <span className="font-mono text-[10px] text-muted-foreground">
-                    {timeAgo(comment.created_at)}
+                    {timeAgo(comment.created_at, t)}
                   </span>
                   {userId === comment.user_id && (
                     <button

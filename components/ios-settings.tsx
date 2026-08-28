@@ -7,7 +7,7 @@
 // 圆角规范:卡 26px 超椭圆;行内嵌套元素同心圆角(外 26 − 边距);
 // 控件一律胶囊形。
 
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { ChevronRight } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 

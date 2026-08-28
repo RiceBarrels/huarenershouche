@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SEO_PAGES, SITE_URL } from "@/lib/seo-pages";
+import { LOCALES } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 
 // 静态导出（Capacitor / output: "export"）下必须是纯静态 sitemap
@@ -93,5 +94,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
   }
 
-  return [...staticRoutes, ...seoRoutes, ...carRoutes, ...userRoutes, ...postRoutes];
+  // 路径级 i18n:每个 URL 按语言拆成 /zh /en /ko 多条,并互挂 hreflang
+  const all = [...staticRoutes, ...seoRoutes, ...carRoutes, ...userRoutes, ...postRoutes];
+  return all.flatMap((entry) => {
+    const path = entry.url.slice(SITE_URL.length);
+    const languages = {
+      "zh-CN": `${SITE_URL}/zh${path}`,
+      en: `${SITE_URL}/en${path}`,
+      ko: `${SITE_URL}/ko${path}`,
+      "x-default": `${SITE_URL}/zh${path}`,
+    };
+    return LOCALES.map((loc) => ({
+      ...entry,
+      url: `${SITE_URL}/${loc}${path}`,
+      // 翻译树权重略降,避免稀释中文主站
+      priority: loc === "zh" ? entry.priority : Math.max(0.1, (entry.priority ?? 0.5) - 0.2),
+      alternates: { languages },
+    }));
+  });
 }

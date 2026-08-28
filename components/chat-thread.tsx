@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { ArrowLeft, Send, Loader2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
+import { useI18n } from "@/components/i18n-provider";
 import { userLink } from "@/lib/static-link";
 import { Button } from "@/components/ui/button";
 import type { DbMessage } from "@/lib/types";
@@ -34,6 +35,7 @@ interface ChatThreadProps {
 
 export function ChatThread({ conversationId, currentUserId, otherUsername, onBack, hideHeader }: ChatThreadProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const [messages, setMessages] = useState<DbMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -145,7 +147,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
   // 上传图片/视频到存储桶,以公开 URL 作为消息内容发送
   async function handleUpload(file: File) {
     if (file.size > 50 * 1024 * 1024) {
-      alert("文件不能超过 50MB");
+      alert(t("文件不能超过 50MB"));
       return;
     }
     setUploading(true);
@@ -160,7 +162,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
         content: publicUrl,
       });
     } else {
-      alert("上传失败,请重试");
+      alert(t("上传失败,请重试"));
     }
     setUploading(false);
   }
@@ -203,7 +205,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           </div>
         ) : messages.length === 0 ? (
           <p className="py-8 text-center font-mono text-xs text-muted-foreground">
-            开始聊天吧
+            {t("开始聊天吧")}
           </p>
         ) : (
           <div className="space-y-3">
@@ -219,11 +221,11 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                   <button
                     type="button"
                     onClick={() => goProfile(msg.sender_id)}
-                    aria-label="查看主页"
+                    aria-label={t("查看主页")}
                     className="h-8 w-8 shrink-0 overflow-hidden rounded-full bg-muted transition-opacity hover:opacity-80"
                   >
                     <img
-                      src={avatarUrl(sender?.avatar_url, sender?.username || (isMine ? "我" : otherUsername))}
+                      src={avatarUrl(sender?.avatar_url, sender?.username || (isMine ? t("我") : otherUsername))}
                       alt=""
                       className="h-full w-full object-cover"
                     />
@@ -250,7 +252,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                         <a href={msg.content} target="_blank" rel="noreferrer">
                           <img
                             src={msg.content}
-                            alt="图片消息"
+                            alt={t("图片消息")}
                             loading="lazy"
                             className="max-h-64 w-full rounded-xl object-contain"
                           />
@@ -298,7 +300,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={uploading}
-            aria-label="发送图片或视频"
+            aria-label={t("发送图片或视频")}
             className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
           >
             {uploading ? (
@@ -310,7 +312,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
           <textarea
             ref={inputRef}
             className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
-            placeholder="输入消息..."
+            placeholder={t("输入消息...")}
             rows={1}
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -326,7 +328,7 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             onClick={handleSend}
             disabled={!content.trim()}
           >
-              <><Send className="h-3 w-3" strokeWidth={1.5} /> 发送</>
+              <><Send className="h-3 w-3" strokeWidth={1.5} /> {t("发送")}</>
           </Button>
         </div>
       </div>

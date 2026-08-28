@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { QrCode, X, Copy, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-provider";
 
 interface QrShareProps {
   url: string;
@@ -10,6 +11,7 @@ interface QrShareProps {
 }
 
 export function QrShare({ url, title }: QrShareProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -29,7 +31,7 @@ export function QrShare({ url, title }: QrShareProps) {
         onClick={() => setOpen(true)}
       >
         <QrCode className="h-3.5 w-3.5" strokeWidth={1.5} />
-        二维码
+        {t("二维码")}
       </Button>
 
       {open && (
@@ -63,7 +65,7 @@ export function QrShare({ url, title }: QrShareProps) {
               </p>
 
               <p className="font-mono text-[11px] text-muted-foreground">
-                扫码查看车辆详情
+                {t("扫码查看车辆详情")}
               </p>
 
               <Button
@@ -76,7 +78,7 @@ export function QrShare({ url, title }: QrShareProps) {
                 ) : (
                   <Copy className="h-3.5 w-3.5" strokeWidth={1.5} />
                 )}
-                {copied ? "已复制" : "复制链接"}
+                {copied ? t("已复制") : t("复制链接")}
               </Button>
             </div>
           </div>

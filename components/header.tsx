@@ -2,13 +2,15 @@
 
 import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat, Search, ArrowLeft } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ThemeOptions } from "@/components/theme-options";
+import { LanguageOptions } from "@/components/language-options";
+import { useI18n } from "@/components/i18n-provider";
 import { avatarUrl } from "@/lib/avatar";
 import { useIdentity } from "@/components/identity-provider";
 import { useShowNavBack } from "@/components/nav-back-context";
@@ -41,6 +43,7 @@ export function Header() {
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
+  const { t } = useI18n();
   // (backnav) 布局组内:导航链接行最左侧显示统一的返回按钮
   const showNavBack = useShowNavBack();
 
@@ -109,9 +112,9 @@ export function Header() {
         {/* 第一行:logo + 搜索框 + 操作区(瓜子式) */}
         <div className="flex h-14 items-center gap-4 lg:gap-6">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image src="/logo.png" alt="常來車網" width={24} height={24} className="h-6 w-6" />
+            <Image src="/logo.png" alt={t("常來車網")} width={24} height={24} className="h-6 w-6" />
             <span className="font-logo text-base tracking-tight">
-              常來車網
+              {t("常來車網")}
               <span className="animate-cursor-blink text-brand-ink">_</span>
             </span>
             <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground/60">beta</span>
@@ -127,15 +130,15 @@ export function Header() {
               <input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={inCommunity ? "搜索帖子、话题..." : "搜索品牌、车型、关键词..."}
-                aria-label={inCommunity ? "搜索帖子" : "搜索车辆"}
+                placeholder={inCommunity ? t("搜索帖子、话题...") : t("搜索品牌、车型、关键词...")}
+                aria-label={inCommunity ? t("搜索帖子") : t("搜索车辆")}
                 className="h-9 w-full min-w-0 bg-transparent px-2.5 font-mono text-xs outline-none placeholder:text-muted-foreground/70"
               />
               <button
                 type="submit"
                 className="mr-1 flex h-7 shrink-0 items-center rounded-full bg-primary px-3.5 font-mono text-xs text-primary-foreground transition-opacity hover:opacity-90"
               >
-                搜索
+                {t("搜索")}
               </button>
             </div>
           </form>
@@ -148,7 +151,7 @@ export function Header() {
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  aria-label="个性化"
+                  aria-label={t("个性化")}
                 >
                   <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </Button>
@@ -156,9 +159,13 @@ export function Header() {
               {/* sideOffset 让下拉与 header 分隔线保持呼吸感,不贴边 */}
               <PopoverContent align="end" sideOffset={8} className="w-48 p-1.5 font-mono">
                 <p className="px-3 pb-1 pt-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  个性化
+                  {t("个性化")}
                 </p>
                 <ThemeOptions />
+                <p className="border-t border-border px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                  {t("语言")}
+                </p>
+                <LanguageOptions />
               </PopoverContent>
             </Popover>
           )}
@@ -179,14 +186,14 @@ export function Header() {
                         <User className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                       )}
                       <span className="truncate">
-                        {isActingAsClaimed ? actingProfile?.username || "车行" : "本人账号"}
+                        {isActingAsClaimed ? actingProfile?.username || t("车行") : t("本人账号")}
                       </span>
                       <ChevronDown className="h-3 w-3 shrink-0 opacity-60" strokeWidth={1.5} />
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent align="end" sideOffset={8} className="w-64 p-1 font-mono">
                     <p className="px-2 py-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                      切换身份
+                      {t("切换身份")}
                     </p>
                     <button
                       type="button"
@@ -199,8 +206,8 @@ export function Header() {
                       }`}
                     >
                       <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-                      <span className="flex-1 truncate">本人账号</span>
-                      {!isActingAsClaimed && <span className="text-[10px] text-brand-ink">当前</span>}
+                      <span className="flex-1 truncate">{t("本人账号")}</span>
+                      {!isActingAsClaimed && <span className="text-[10px] text-brand-ink">{t("当前")}</span>}
                     </button>
                     {claimedAccounts.map((acct) => (
                       <button
@@ -221,7 +228,7 @@ export function Header() {
                         />
                         <span className="flex-1 truncate">{acct.username}</span>
                         {actingId === acct.id ? (
-                          <span className="text-[10px] text-brand-ink">当前</span>
+                          <span className="text-[10px] text-brand-ink">{t("当前")}</span>
                         ) : (
                           <Store className="h-3 w-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                         )}
@@ -230,12 +237,12 @@ export function Header() {
                   </PopoverContent>
                 </Popover>
               )}
-              <Link href="/messages" className="relative" aria-label="消息">
+              <Link href="/messages" className="relative" aria-label={t("消息")}>
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8"
-                  title="消息"
+                  title={t("消息")}
                   tabIndex={-1}
                 >
                   <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -254,13 +261,13 @@ export function Header() {
                   className="gap-1.5 font-mono text-xs"
                 >
                   <User className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  我的
+                  {t("我的")}
                 </Button>
               </Link>
               <Link href="/post">
                 <Button size="sm" className="gap-1.5 font-mono text-xs">
                   <Plus className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  发布车辆
+                  {t("发布车辆")}
                 </Button>
               </Link>
               <Button
@@ -268,8 +275,8 @@ export function Header() {
                 size="sm"
                 className="font-mono text-xs text-muted-foreground"
                 onClick={handleLogout}
-                aria-label="退出登录"
-                title="退出登录"
+                aria-label={t("退出登录")}
+                title={t("退出登录")}
               >
                 <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
@@ -282,12 +289,12 @@ export function Header() {
                   size="sm"
                   className="font-mono text-xs"
                 >
-                  登录
+                  {t("登录")}
                 </Button>
               </Link>
               <Link href="/register">
                 <Button size="sm" className="font-mono text-xs">
-                  免费发布
+                  {t("免费发布")}
                 </Button>
               </Link>
             </>
@@ -310,7 +317,7 @@ export function Header() {
               >
                 {/* hover 时箭头向左微移:符合"微位移"交互规范,暗示返回方向 */}
                 <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-150 group-hover:-translate-x-0.5" strokeWidth={1.5} />
-                返回
+                {t("返回")}
               </button>
               <span aria-hidden="true" className="h-4 w-px bg-border" />
             </>
@@ -329,7 +336,7 @@ export function Header() {
                       "text-muted-foreground hover:text-foreground hover:after:absolute hover:after:inset-x-0 hover:after:bottom-0 hover:after:h-px hover:after:bg-border"
                 }`}
               >
-                {link.label}
+                {t(link.label)}
               </Link>
             );
           })}
@@ -337,7 +344,7 @@ export function Header() {
             href="/business"
             className="ml-auto py-1 font-mono text-xs tracking-widest text-muted-foreground transition-colors hover:text-foreground"
           >
-            车行入驻
+            {t("车行入驻")}
           </Link>
         </nav>
       </div>
@@ -348,7 +355,7 @@ export function Header() {
           <div className="mx-auto flex h-8 max-w-7xl items-center justify-between px-4 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
             <span className="flex items-center gap-1.5 font-mono text-[11px] text-amber-700 dark:text-amber-400">
               <Store className="h-3 w-3" strokeWidth={1.5} />
-              正在以「{actingProfile?.username || "车行"}」身份操作
+              {t("正在以「{name}」身份操作", { name: actingProfile?.username || t("车行") })}
             </span>
             <button
               type="button"
@@ -356,7 +363,7 @@ export function Header() {
               className="flex items-center gap-1 font-mono text-[11px] text-amber-700 underline-offset-2 hover:underline dark:text-amber-400"
             >
               <Repeat className="h-3 w-3" strokeWidth={1.5} />
-              切回本人
+              {t("切回本人")}
             </button>
           </div>
         </div>

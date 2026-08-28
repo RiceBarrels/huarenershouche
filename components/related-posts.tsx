@@ -5,12 +5,13 @@
 // 静态导出(Capacitor)模式下无 initial,客户端自行拉取。
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { Heart, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { communityPostLink } from "@/lib/static-link";
 import { useOverlay } from "@/components/car-overlay-provider";
+import { useI18n } from "@/components/i18n-provider";
 import type { DbCommunityPost } from "@/lib/types";
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
@@ -38,6 +39,7 @@ export function RelatedPosts({
 }: RelatedPostsProps) {
   const [posts, setPosts] = useState<DbCommunityPost[]>(initial ?? []);
   const { enabled: overlayEnabled, openPost } = useOverlay();
+  const { t } = useI18n();
 
   useEffect(() => {
     if (initial && initial.length > 0) return;
@@ -104,7 +106,7 @@ export function RelatedPosts({
     <section className={className}>
       <h2 className="flex items-center gap-2 font-mono text-xs font-semibold text-muted-foreground">
         <span className="h-px w-6 bg-border" aria-hidden />
-        相关推荐
+        {t("相关推荐")}
         <span className="h-px flex-1 bg-border" aria-hidden />
       </h2>
       {/* 桌面 3 列:max-w-2xl 下 2 列的 3:4 封面单张过大(约 300×400),
@@ -161,14 +163,14 @@ export function RelatedPosts({
                     />
                   )}
                   <span className="absolute left-1.5 top-1.5 rounded-md bg-background/85 px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground backdrop-blur-sm">
-                    {TYPE_LABELS[post.type] || post.type}
+                    {t(TYPE_LABELS[post.type] || post.type)}
                   </span>
                 </div>
               ) : null}
               <div className="p-2.5">
                 {!cover && (
                   <span className="mb-1.5 inline-block rounded-md bg-muted px-1.5 py-0.5 font-mono text-[9px] text-muted-foreground">
-                    {TYPE_LABELS[post.type] || post.type}
+                    {t(TYPE_LABELS[post.type] || post.type)}
                   </span>
                 )}
                 <h3 className="line-clamp-2 font-mono text-xs font-medium leading-snug">
@@ -191,7 +193,7 @@ export function RelatedPosts({
                     />
                   </span>
                   <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
-                    {post.profiles?.username || "匿名"}
+                    {post.profiles?.username || t("匿名")}
                   </span>
                   <span className="ml-auto flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-muted-foreground">
                     <Heart className="h-3 w-3" strokeWidth={1.5} />

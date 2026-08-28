@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "@/components/localized-navigation";
 import { useEffect, useLayoutEffect, useState, useRef } from "react";
 import { triggerHaptic } from "@/lib/haptics";
 

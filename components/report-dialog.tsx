@@ -12,6 +12,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 
 const REPORT_REASONS = [
   "虚假信息 / 诈骗",
@@ -24,6 +25,7 @@ const REPORT_REASONS = [
 ];
 
 export function ReportDialog({ carId, children }: { carId: string; children: React.ReactNode }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState("");
   const [detail, setDetail] = useState("");
@@ -68,7 +70,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
           </DrawerClose>
           <span className="flex items-center gap-1.5 font-mono text-sm font-semibold">
             <Flag className="h-4 w-4" strokeWidth={1.5} />
-            举报此车辆
+            {t("举报此车辆")}
           </span>
           <div className="h-8 w-8" />
         </div>
@@ -77,7 +79,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
           {done ? (
             <div className="flex flex-col items-center py-8">
               <CheckCircle className="h-8 w-8 text-green-500" strokeWidth={1.5} />
-              <p className="mt-3 font-mono text-sm">感谢你的举报，我们会尽快处理</p>
+              <p className="mt-3 font-mono text-sm">{t("感谢你的举报，我们会尽快处理")}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -93,13 +95,13 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
                         : "bg-card hover:bg-muted/50"
                     }`}
                   >
-                    {reason}
+                    {t(reason)}
                   </button>
                 ))}
               </div>
 
               <textarea
-                placeholder="补充说明（可选）"
+                placeholder={t("补充说明（可选）")}
                 className="w-full rounded-xl bg-muted px-3 py-2 font-mono text-xs placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 rows={3}
                 value={detail}
@@ -116,7 +118,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
                 ) : (
                   <Flag className="h-3 w-3" strokeWidth={1.5} />
                 )}
-                提交举报
+                {t("提交举报")}
               </Button>
             </div>
           )}

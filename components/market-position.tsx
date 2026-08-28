@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPrice } from "@/lib/format";
+import { useI18n } from "@/components/i18n-provider";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
 
@@ -15,6 +16,7 @@ interface MarketPositionProps {
  * 同类样本不足（insight 为 null）时不渲染。
  */
 export function MarketPosition({ car, comparables, insight }: MarketPositionProps) {
+  const { t } = useI18n();
   if (!insight || comparables.length === 0 || car.price <= 0) return null;
 
   const prices = comparables.map((c) => c.price);
@@ -34,11 +36,11 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
     // 桌面略加内边距,与详情页其他楼层的留白节奏一致(手机保持 p-4)
     <div className="mt-3 rounded-xl bg-card p-4 md:p-5">
       <div className="flex items-center justify-between gap-2">
-        <h2 className="font-mono text-sm font-semibold">市场价位</h2>
+        <h2 className="font-mono text-sm font-semibold">{t("市场价位")}</h2>
         <span
           className={`rounded-full px-1.5 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
         >
-          {insight.label}
+          {t(insight.label)}
         </span>
       </div>
 
@@ -70,14 +72,14 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
         </div>
         {/* min / avg / max 标签 */}
         <div className="relative mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
-          <span>低 {formatPrice(lo)}</span>
+          <span>{t("低")} {formatPrice(lo)}</span>
           <span
             className="absolute -translate-x-1/2 whitespace-nowrap"
             style={{ left: `${avgLabelPct}%` }}
           >
-            均价 {formatPrice(avg)}
+            {t("均价")} {formatPrice(avg)}
           </span>
-          <span>高 {formatPrice(hi)}</span>
+          <span>{t("高")} {formatPrice(hi)}</span>
         </div>
       </div>
 
@@ -85,22 +87,24 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
       <p className="mt-4 font-mono text-[11px] md:text-xs">
         {insight.delta > 0 ? (
           <span className="font-semibold text-green-600">
-            低于市场均价 {formatPrice(insight.delta)}
+            {t("低于市场均价 {price}", { price: formatPrice(insight.delta) })}
           </span>
         ) : insight.delta < 0 ? (
           <span className="font-semibold text-orange-600">
-            高于市场均价 {formatPrice(Math.abs(insight.delta))}
+            {t("高于市场均价 {price}", { price: formatPrice(Math.abs(insight.delta)) })}
           </span>
         ) : (
-          <span className="font-semibold text-foreground">与市场均价持平</span>
+          <span className="font-semibold text-foreground">{t("与市场均价持平")}</span>
         )}
         <span className="text-muted-foreground">
-          {" "}· 对比 {insight.sampleSize} 台
-          {insight.sameModel ? "同款车型" : "同品牌"}在售车源
+          {" "}· {t("对比 {n} 台{scope}在售车源", {
+            n: insight.sampleSize,
+            scope: t(insight.sameModel ? "同款车型" : "同品牌"),
+          })}
         </span>
       </p>
       <p className="mt-1 font-mono text-[10px] text-muted-foreground">
-        * 均价已按里程差异修正，仅供参考
+        {t("* 均价已按里程差异修正，仅供参考")}
       </p>
     </div>
   );

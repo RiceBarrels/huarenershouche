@@ -6,11 +6,12 @@
 // 每页上排 5 个功能、下排 5 个品牌,整页横滑,底部页点指示。
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { match } from "pinyin-pro";
 import { Search, X, LayoutGrid } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCarOverlay } from "@/components/car-overlay-provider";
+import { useI18n } from "@/components/i18n-provider";
 import {
   Drawer,
   DrawerClose,
@@ -103,6 +104,7 @@ function FeatureIcon({ f, size = "lg" }: { f: Feature; size?: "lg" | "sm" }) {
 }
 
 export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
+  const { t } = useI18n();
   const router = useRouter();
   const { openPage } = useCarOverlay();
   const [recent, setRecent] = useState<string[]>(DEFAULT_ORDER);
@@ -148,7 +150,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
       className="flex flex-col items-center gap-1.5 rounded-xl py-2 transition-colors active:bg-muted/50"
     >
       <FeatureIcon f={f} />
-      <span className="font-mono text-[11px]">{f.name}</span>
+      <span className="font-mono text-[11px]">{t(f.name)}</span>
     </button>
   );
 
@@ -173,7 +175,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
             <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
               <LayoutGrid className="h-6 w-6" strokeWidth={1.8} />
             </span>
-            <span className="font-mono text-[11px]">全部功能</span>
+            <span className="font-mono text-[11px]">{t("全部功能")}</span>
           </button>
         </DrawerTrigger>
         <DrawerContent className="max-h-[88vh]">
@@ -186,7 +188,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
                 <X className="h-4 w-4" strokeWidth={1.5} />
               </button>
             </DrawerClose>
-            <span className="font-mono text-sm font-semibold">全部功能</span>
+            <span className="font-mono text-sm font-semibold">{t("全部功能")}</span>
             <div className="h-8 w-8" />
           </div>
 
@@ -194,7 +196,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
           <div className="relative px-4 pb-1">
             <Search className="absolute left-7 top-1/2 h-3.5 w-3.5 -translate-y-[65%] text-muted-foreground" strokeWidth={1.5} />
             <Input
-              placeholder="搜索功能(支持拼音)..."
+              placeholder={t("搜索功能(支持拼音)...")}
               className="h-9 rounded-full pl-9 font-mono text-sm"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -205,7 +207,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
             {/* 最近使用(搜索时隐藏) */}
             {!q && (
               <>
-                <p className="font-mono text-[11px] font-medium text-muted-foreground">最近使用</p>
+                <p className="font-mono text-[11px] font-medium text-muted-foreground">{t("最近使用")}</p>
                 <div className="mt-2 grid grid-cols-4 gap-y-3">
                   {recentEight.map((f) => (
                     <button
@@ -215,7 +217,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
                       className="flex flex-col items-center gap-1 rounded-xl py-1.5 transition-colors active:bg-muted/50"
                     >
                       <FeatureIcon f={f} size="sm" />
-                      <span className="font-mono text-[10px]">{f.name}</span>
+                      <span className="font-mono text-[10px]">{t(f.name)}</span>
                     </button>
                   ))}
                 </div>
@@ -234,14 +236,14 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
                   >
                     <FeatureIcon f={f} size="sm" />
                     <span className="min-w-0">
-                      <span className="block font-mono text-[13px] font-medium">{f.name}</span>
-                      <span className="block truncate font-mono text-[11px] text-muted-foreground">{f.desc}</span>
+                      <span className="block font-mono text-[13px] font-medium">{t(f.name)}</span>
+                      <span className="block truncate font-mono text-[11px] text-muted-foreground">{t(f.desc)}</span>
                     </span>
                   </button>
                 ))}
                 {filtered.length === 0 && (
                   <p className="py-8 text-center font-mono text-xs text-muted-foreground">
-                    没有找到相关功能
+                    {t("没有找到相关功能")}
                   </p>
                 )}
               </div>
@@ -251,7 +253,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
                 if (items.length === 0) return null;
                 return (
                   <div key={cat}>
-                    <p className="mt-5 font-mono text-[11px] font-medium text-muted-foreground">{cat}</p>
+                    <p className="mt-5 font-mono text-[11px] font-medium text-muted-foreground">{t(cat)}</p>
                     <div className="mt-2 space-y-1">
                       {items.map((f) => (
                         <button
@@ -262,8 +264,8 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
                         >
                           <FeatureIcon f={f} size="sm" />
                           <span className="min-w-0">
-                            <span className="block font-mono text-[13px] font-medium">{f.name}</span>
-                            <span className="block truncate font-mono text-[11px] text-muted-foreground">{f.desc}</span>
+                            <span className="block font-mono text-[13px] font-medium">{t(f.name)}</span>
+                            <span className="block truncate font-mono text-[11px] text-muted-foreground">{t(f.desc)}</span>
                           </span>
                         </button>
                       ))}

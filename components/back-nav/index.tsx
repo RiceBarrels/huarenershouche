@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { useCallback } from "react";
 import { ArrowLeft } from "lucide-react";
 import { setBackNavigation, animatedBack } from "@/components/page-transition";

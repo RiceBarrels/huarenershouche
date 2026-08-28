@@ -15,7 +15,7 @@ import {
   useState,
   type ComponentType,
 } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname } from "@/components/localized-navigation";
 import { AnimatePresence } from "framer-motion";
 import dynamic from "next/dynamic";
 import { SwipeSheet, type OriginRect } from "@/components/swipe-sheet";
@@ -30,36 +30,36 @@ import { triggerHaptic } from "@/lib/haptics";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 // 动态载入,打断 detail → card → 本文件 的循环依赖,并分包
-const CarDetail = dynamic(() => import("@/app/(backnav)/car/car-detail"), {
+const CarDetail = dynamic(() => import("@/app/[locale]/(backnav)/car/car-detail"), {
   ssr: false,
 });
 const CommunityDetail = dynamic(
-  () => import("@/app/(backnav)/community/community-detail"),
+  () => import("@/app/[locale]/(backnav)/community/community-detail"),
   { ssr: false },
 );
-const UserDetail = dynamic(() => import("@/app/(backnav)/user/user-detail"), {
+const UserDetail = dynamic(() => import("@/app/[locale]/(backnav)/user/user-detail"), {
   ssr: false,
 });
 
 // 手机端以浮层栈打开的普通页面(上一页保持挂载,真实垫在后面):
 // 仅收录无复杂内链的叶子页;浮层内发生真实路由跳转时会自动清栈。
 const PAGE_ROUTES: Record<string, ComponentType> = {
-  "/tools/loan": dynamic(() => import("@/app/(backnav)/tools/loan/page"), { ssr: false }),
-  "/tools/fuel": dynamic(() => import("@/app/(backnav)/tools/fuel/page"), { ssr: false }),
-  "/tools/budget": dynamic(() => import("@/app/(backnav)/tools/budget/page"), { ssr: false }),
-  "/tools/units": dynamic(() => import("@/app/(backnav)/tools/units/page"), { ssr: false }),
-  "/tools/parking": dynamic(() => import("@/app/(backnav)/tools/parking/page"), { ssr: false }),
-  "/tools/luck": dynamic(() => import("@/app/(backnav)/tools/luck/page"), { ssr: false }),
-  "/tools/plate": dynamic(() => import("@/app/(backnav)/tools/plate/page"), { ssr: false }),
-  "/tools/haggle": dynamic(() => import("@/app/(backnav)/tools/haggle/page"), { ssr: false }),
-  "/vin": dynamic(() => import("@/app/(backnav)/vin/page"), { ssr: false }),
-  "/guide": dynamic(() => import("@/app/(backnav)/guide/page"), { ssr: false }),
-  "/guide/buying": dynamic(() => import("@/app/(backnav)/guide/buying/page"), { ssr: false }),
-  "/guide/loan": dynamic(() => import("@/app/(backnav)/guide/loan/page"), { ssr: false }),
-  "/guide/insurance": dynamic(() => import("@/app/(backnav)/guide/insurance/page"), { ssr: false }),
-  "/guide/dmv": dynamic(() => import("@/app/(backnav)/guide/dmv/page"), { ssr: false }),
-  "/business": dynamic(() => import("@/app/(backnav)/business/page"), { ssr: false }),
-  "/contact": dynamic(() => import("@/app/(backnav)/contact/page"), { ssr: false }),
+  "/tools/loan": dynamic(() => import("@/app/[locale]/(backnav)/tools/loan/page"), { ssr: false }),
+  "/tools/fuel": dynamic(() => import("@/app/[locale]/(backnav)/tools/fuel/page"), { ssr: false }),
+  "/tools/budget": dynamic(() => import("@/app/[locale]/(backnav)/tools/budget/page"), { ssr: false }),
+  "/tools/units": dynamic(() => import("@/app/[locale]/(backnav)/tools/units/page"), { ssr: false }),
+  "/tools/parking": dynamic(() => import("@/app/[locale]/(backnav)/tools/parking/page"), { ssr: false }),
+  "/tools/luck": dynamic(() => import("@/app/[locale]/(backnav)/tools/luck/page"), { ssr: false }),
+  "/tools/plate": dynamic(() => import("@/app/[locale]/(backnav)/tools/plate/page"), { ssr: false }),
+  "/tools/haggle": dynamic(() => import("@/app/[locale]/(backnav)/tools/haggle/page"), { ssr: false }),
+  "/vin": dynamic(() => import("@/app/[locale]/(backnav)/vin/page"), { ssr: false }),
+  "/guide": dynamic(() => import("@/app/[locale]/(backnav)/guide/page"), { ssr: false }),
+  "/guide/buying": dynamic(() => import("@/app/[locale]/(backnav)/guide/buying/page"), { ssr: false }),
+  "/guide/loan": dynamic(() => import("@/app/[locale]/(backnav)/guide/loan/page"), { ssr: false }),
+  "/guide/insurance": dynamic(() => import("@/app/[locale]/(backnav)/guide/insurance/page"), { ssr: false }),
+  "/guide/dmv": dynamic(() => import("@/app/[locale]/(backnav)/guide/dmv/page"), { ssr: false }),
+  "/business": dynamic(() => import("@/app/[locale]/(backnav)/business/page"), { ssr: false }),
+  "/contact": dynamic(() => import("@/app/[locale]/(backnav)/contact/page"), { ssr: false }),
 };
 
 interface OverlayCtx {

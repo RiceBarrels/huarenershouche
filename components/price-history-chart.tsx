@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPriceHistory, type PriceRecord } from "@/lib/price-history";
+import { useI18n } from "@/components/i18n-provider";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -17,6 +18,7 @@ function formatDate(iso: string): string {
 }
 
 export function PriceHistoryChart({ carId }: { carId: string }) {
+  const { t } = useI18n();
   const [records, setRecords] = useState<PriceRecord[]>([]);
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export function PriceHistoryChart({ carId }: { carId: string }) {
     // 桌面内边距/行距略放宽,与市场价位卡片的密度一致;
     // 日期在左、价格在右,数字用 tabular-nums 保证多行纵向对齐
     <div className="mt-3 rounded-xl bg-card p-3 md:p-4">
-      <p className="font-mono text-xs font-semibold">价格变动记录</p>
+      <p className="font-mono text-xs font-semibold">{t("价格变动记录")}</p>
       <div className="mt-2 space-y-1 tabular-nums md:space-y-1.5">
         {records.map((rec, i) => {
           if (i === 0) {

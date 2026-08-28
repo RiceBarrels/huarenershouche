@@ -4,11 +4,12 @@
 // 过滤逻辑与 browse 页保持口径一致（州按 location 结尾缩写、车身类型按车型名推断）。
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { CarCard } from "@/components/car-card";
 import { classifyBodyStyle } from "@/lib/body-style";
+import { useI18n } from "@/components/i18n-provider";
 import type { DbCar } from "@/lib/types";
 import type { SeoListFilter } from "@/lib/seo-pages";
 
@@ -34,6 +35,7 @@ export function SeoCarList({
   filter: SeoListFilter;
   browseHref: string;
 }) {
+  const { t } = useI18n();
   const [cars, setCars] = useState<DbCar[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -77,7 +79,7 @@ export function SeoCarList({
     return (
       <div className="flex items-center gap-2 py-10">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
-        <span className="font-mono text-xs text-muted-foreground">正在加载车源...</span>
+        <span className="font-mono text-xs text-muted-foreground">{t("正在加载车源...")}</span>
       </div>
     );
   }
@@ -86,13 +88,13 @@ export function SeoCarList({
     return (
       <div className="rounded-xl border border-dashed border-border px-4 py-10 text-center">
         <p className="font-mono text-xs text-muted-foreground">
-          该分类下暂时没有在售车源，去看看全部车源吧
+          {t("该分类下暂时没有在售车源，去看看全部车源吧")}
         </p>
         <Link
           href="/browse"
           className="mt-3 inline-flex items-center gap-1 rounded-full bg-muted px-3 py-1.5 font-mono text-xs transition-colors hover:bg-muted/70"
         >
-          浏览全部车源
+          {t("浏览全部车源")}
           <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
         </Link>
       </div>
@@ -102,7 +104,7 @@ export function SeoCarList({
   return (
     <div>
       <p className="font-mono text-[11px] text-muted-foreground">
-        共 {cars.length}{cars.length >= 200 ? "+" : ""} 辆在售
+        {t("共 {n} 辆在售", { n: `${cars.length}${cars.length >= 200 ? "+" : ""}` })}
       </p>
       <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cars.slice(0, SHOW_LIMIT).map((car) => (
@@ -115,7 +117,7 @@ export function SeoCarList({
             href={browseHref}
             className="inline-flex items-center gap-1 rounded-full bg-muted px-4 py-2 font-mono text-xs transition-colors hover:bg-muted/70"
           >
-            查看全部 {cars.length}{cars.length >= 200 ? "+" : ""} 辆
+            {t("查看全部 {n} 辆", { n: `${cars.length}${cars.length >= 200 ? "+" : ""}` })}
             <ArrowRight className="h-3 w-3" strokeWidth={1.5} />
           </Link>
         </div>

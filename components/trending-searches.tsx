@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { TrendingUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,6 +26,7 @@ const QUICK_FILTERS: { label: string; params: string }[] = [
 ];
 
 export function TrendingSearches() {
+  const { t } = useI18n();
   const [topMakes, setTopMakes] = useState<MakeCount[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -65,16 +67,16 @@ export function TrendingSearches() {
         {/* 手机保留小图标标题;桌面统一用 SectionHeader,与其他楼层同一套视觉语言 */}
         <div className="mb-4 flex items-center gap-2 md:hidden">
           <TrendingUp className="h-4 w-4" strokeWidth={1.5} />
-          <h2 className="font-mono text-sm font-medium">热门搜索</h2>
+          <h2 className="font-mono text-sm font-medium">{t("热门搜索")}</h2>
         </div>
         <div className="hidden md:block">
-          <SectionHeader label="Trending" title="热门搜索" className="mb-6" />
+          <SectionHeader label="Trending" title={t("热门搜索")} className="mb-6" />
         </div>
 
         {/* Row 1: Popular brands */}
         <div className="mb-3">
           <p className="mb-2 font-mono text-[10px] text-muted-foreground">
-            热门品牌
+            {t("热门品牌")}
           </p>
           {loading ? (
             <div className="flex flex-wrap gap-2">
@@ -90,7 +92,7 @@ export function TrendingSearches() {
                   href={`/browse?make=${encodeURIComponent(make)}`}
                   className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
                 >
-                  {MAKES_ZH[make] || make}
+                  {t(MAKES_ZH[make] || make)}
                   <span className="ml-1 text-muted-foreground">
                     {count}
                   </span>
@@ -103,7 +105,7 @@ export function TrendingSearches() {
         {/* Row 2: Quick filters */}
         <div>
           <p className="mb-2 font-mono text-[10px] text-muted-foreground">
-            快速筛选
+            {t("快速筛选")}
           </p>
           <div className="flex flex-wrap gap-2">
             {QUICK_FILTERS.map((tag) => (
@@ -112,7 +114,7 @@ export function TrendingSearches() {
                 href={`/browse?${tag.params}`}
                 className="rounded-full bg-muted px-3 py-1.5 font-mono text-[11px] text-foreground outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
               >
-                {tag.label}
+                {t(tag.label)}
               </Link>
             ))}
           </div>

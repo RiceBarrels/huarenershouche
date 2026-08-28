@@ -20,6 +20,7 @@ import {
   Weight,
 } from "lucide-react";
 import { decodeVin, verifyVinMatch, hasVinData, type VinResult } from "@/lib/vin";
+import { useI18n } from "@/components/i18n-provider";
 
 interface VinCheckProps {
   vin: string;
@@ -123,6 +124,7 @@ const SPEC_GROUPS: SpecGroup[] = [
 ];
 
 export function VinCheck({ vin, car }: VinCheckProps) {
+  const { t } = useI18n();
   const [vinData, setVinData] = useState<VinResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [checked, setChecked] = useState(false);
@@ -141,7 +143,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
     setError("");
     const result = await decodeVin(vin);
     if (!result || !hasVinData(result)) {
-      setError("VIN 解码失败，请检查 VIN 是否正确");
+      setError(t("VIN 解码失败，请检查 VIN 是否正确"));
       setLoading(false);
       setChecked(true);
       return;
@@ -157,7 +159,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
     return (
       <div className="mt-3 flex items-center gap-2 py-2">
         <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" strokeWidth={1.5} />
-        <span className="font-mono text-xs text-muted-foreground">正在解码 VIN...</span>
+        <span className="font-mono text-xs text-muted-foreground">{t("正在解码 VIN...")}</span>
       </div>
     );
   }
@@ -210,7 +212,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
               : "text-amber-700 dark:text-amber-300"
           }`}
         >
-          {verification.matched ? "VIN 认证通过" : "VIN 信息存在差异"}
+          {verification.matched ? t("VIN 认证通过") : t("VIN 信息存在差异")}
         </span>
       </div>
 
@@ -237,7 +239,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
           <span className="font-mono text-[11px]">{vinData.engineHP} HP</span>
         )}
         {vinData.engineCylinders && (
-          <span className="font-mono text-[11px]">{vinData.engineCylinders}缸</span>
+          <span className="font-mono text-[11px]">{t("{n}缸", { n: vinData.engineCylinders })}</span>
         )}
         {vinData.transmission && (
           <span className="font-mono text-[11px]">{vinData.transmission}</span>
@@ -246,7 +248,7 @@ export function VinCheck({ vin, car }: VinCheckProps) {
           <span className="font-mono text-[11px]">{vinData.driveType}</span>
         )}
         {vinData.plantCountry && (
-          <span className="font-mono text-[11px] text-muted-foreground">产地: {vinData.plantCountry}</span>
+          <span className="font-mono text-[11px] text-muted-foreground">{t("产地: {country}", { country: vinData.plantCountry })}</span>
         )}
       </div>
 
@@ -261,7 +263,9 @@ export function VinCheck({ vin, car }: VinCheckProps) {
         ) : (
           <ChevronDown className="h-3 w-3" strokeWidth={1.5} />
         )}
-        {expanded ? "收起详情" : `查看全部 VIN 信息 (${groupsWithData.reduce((n, g) => n + g.items.length, 0)} 项)`}
+        {expanded
+          ? t("收起详情")
+          : t("查看全部 VIN 信息 ({n} 项)", { n: groupsWithData.reduce((n, g) => n + g.items.length, 0) })}
       </button>
 
       {/* Detail specs grouped */}
@@ -273,14 +277,14 @@ export function VinCheck({ vin, car }: VinCheckProps) {
               <div key={group.title}>
                 <div className="flex items-center gap-1.5">
                   <Icon className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-                  <span className="font-mono text-[11px] font-semibold">{group.title}</span>
+                  <span className="font-mono text-[11px] font-semibold">{t(group.title)}</span>
                 </div>
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5">
                   {group.items.map(({ key, label }) => {
                     const value = String(vinData[key] || "");
                     return (
                       <div key={key} className="flex justify-between gap-2">
-                        <span className="font-mono text-[10px] text-muted-foreground">{label}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground">{t(label)}</span>
                         <span className="text-right font-mono text-[11px] font-medium">{value}</span>
                       </div>
                     );

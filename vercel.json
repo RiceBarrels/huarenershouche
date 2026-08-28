@@ -4,5 +4,17 @@
       "path": "/api/sync",
       "schedule": "0 12 * * *"
     }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/zh",
+      "permanent": false
+    },
+    {
+      "source": "/((?!zh(?:/|$)|en(?:/|$)|ko(?:/|$)|api/|_next/|.*\\..*).+)",
+      "destination": "/zh/$1",
+      "permanent": true
+    }
   ]
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -33,6 +34,7 @@ export function AuthDialog({
   children: React.ReactNode;
   onSuccess?: () => void;
 }) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -119,7 +121,7 @@ export function AuthDialog({
         <DialogContent className="sm:max-w-[380px]">
           <DialogHeader>
             <DialogTitle className="font-logo text-2xl font-bold tracking-tight">
-              {mode === "login" ? "登录" : "注册"}
+              {mode === "login" ? t("登录") : t("注册")}
             </DialogTitle>
           </DialogHeader>
 
@@ -136,7 +138,7 @@ export function AuthDialog({
             ) : (
               <GoogleIcon className="h-4 w-4" />
             )}
-            使用 Google {mode === "login" ? "登录" : "注册"}
+            {mode === "login" ? t("使用 Google 登录") : t("使用 Google 注册")}
           </Button>
 
           <div className="relative">
@@ -145,7 +147,7 @@ export function AuthDialog({
             </div>
             <div className="relative flex justify-center">
               <span className="bg-background px-3 font-mono text-[10px] text-muted-foreground/60">
-                或使用邮箱
+                {t("或使用邮箱")}
               </span>
             </div>
           </div>
@@ -154,11 +156,11 @@ export function AuthDialog({
             {mode === "register" && (
               <div>
                 <Label className="font-mono text-[11px] text-muted-foreground">
-                  用户名
+                  {t("用户名")}
                 </Label>
                 <Input
                   className="mt-1.5 h-12 font-mono text-base"
-                  placeholder="你的用户名"
+                  placeholder={t("你的用户名")}
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -167,7 +169,7 @@ export function AuthDialog({
             )}
             <div>
               <Label className="font-mono text-[11px] text-muted-foreground">
-                邮箱
+                {t("邮箱")}
               </Label>
               <Input
                 className="mt-1.5 h-12 font-mono text-base"
@@ -180,12 +182,12 @@ export function AuthDialog({
             </div>
             <div>
               <Label className="font-mono text-[11px] text-muted-foreground">
-                密码
+                {t("密码")}
               </Label>
               <Input
                 className="mt-1.5 h-12 font-mono text-base"
                 type="password"
-                placeholder="至少6位"
+                placeholder={t("至少6位")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -201,10 +203,10 @@ export function AuthDialog({
               disabled={loading}
             >
               {loading
-                ? "处理中..."
+                ? t("处理中...")
                 : mode === "login"
-                  ? "登录"
-                  : "注册"}
+                  ? t("登录")
+                  : t("注册")}
             </Button>
             <button
               type="button"
@@ -215,8 +217,8 @@ export function AuthDialog({
               }}
             >
               {mode === "login"
-                ? "没有账号？点击注册"
-                : "已有账号？点击登录"}
+                ? t("没有账号？点击注册")
+                : t("已有账号？点击登录")}
             </button>
           </form>
         </DialogContent>

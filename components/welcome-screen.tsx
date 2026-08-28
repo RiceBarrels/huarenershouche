@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronRight, Loader2, MapPin, Shield, Zap } from "lucide-react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
@@ -42,6 +43,7 @@ const SLIDES = [
 ];
 
 export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
+  const { t } = useI18n();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -149,13 +151,13 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                       )}
                     </div>
                     <h1 className="mt-8 text-center font-logo text-2xl tracking-tight">
-                      {slide.title}
+                      {t(slide.title)}
                     </h1>
                     <p className="mt-3 text-center font-mono text-sm text-muted-foreground">
-                      {slide.subtitle}
+                      {t(slide.subtitle)}
                     </p>
                     <p className="mt-1.5 text-center font-mono text-xs text-muted-foreground/70">
-                      {slide.description}
+                      {t(slide.description)}
                     </p>
                   </>
                 );
@@ -174,10 +176,10 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                 <Zap className="h-7 w-7 text-foreground" strokeWidth={1.2} />
               </div>
               <h1 className="mt-6 text-center font-mono text-xl font-semibold tracking-tight">
-                开始使用
+                {t("开始使用")}
               </h1>
               <p className="mt-2 text-center font-mono text-xs text-muted-foreground">
-                登录后可发布车辆、收藏、私信卖家
+                {t("登录后可发布车辆、收藏、私信卖家")}
               </p>
 
               <div className="mt-8 w-full max-w-xs space-y-3">
@@ -193,7 +195,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                   ) : (
                     <GoogleIcon className="h-4.5 w-4.5" />
                   )}
-                  使用 Google 登录
+                  {t("使用 Google 登录")}
                 </Button>
 
                 <Button
@@ -209,7 +211,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                       <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
                     </svg>
                   )}
-                  使用 Apple 登录
+                  {t("使用 Apple 登录")}
                 </Button>
 
                 <Button
@@ -218,7 +220,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                   className="w-full py-5 font-mono text-sm"
                   onClick={handleEmailLogin}
                 >
-                  使用邮箱登录
+                  {t("使用邮箱登录")}
                 </Button>
 
                 {error && (
@@ -257,14 +259,14 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                   className="font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                   onClick={handleSkip}
                 >
-                  跳过
+                  {t("跳过")}
                 </button>
                 <Button
                   size="sm"
                   className="gap-1 font-mono text-xs"
                   onClick={handleNext}
                 >
-                  {isLastSlide ? "开始" : "下一步"}
+                  {isLastSlide ? t("开始") : t("下一步")}
                   <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} />
                 </Button>
               </div>
@@ -275,7 +277,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
               className="w-full py-2 text-center font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
               onClick={handleSkip}
             >
-              先逛逛，稍后再说
+              {t("先逛逛，稍后再说")}
             </button>
           )}
         </div>

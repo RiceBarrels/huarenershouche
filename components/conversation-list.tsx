@@ -14,6 +14,8 @@ import { AnimatePresence } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
+import { useI18n } from "@/components/i18n-provider";
+import { carTitle } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatThread, CHAT_MEDIA_RE } from "@/components/chat-thread";
 import { SwipeSheet } from "@/components/swipe-sheet";
@@ -35,15 +37,18 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-function timeAgo(dateStr: string): string {
+function timeAgo(
+  dateStr: string,
+  t: (text: string, vars?: Record<string, string | number>) => string,
+): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "刚刚";
-  if (mins < 60) return `${mins}分钟前`;
+  if (mins < 1) return t("刚刚");
+  if (mins < 60) return t("{n}分钟前", { n: mins });
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}小时前`;
+  if (hours < 24) return t("{n}小时前", { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}天前`;
+  if (days < 30) return t("{n}天前", { n: days });
   return new Date(dateStr).toLocaleDateString("zh-CN");
 }
 
@@ -55,7 +60,7 @@ export const inboxCacheKey = (userId: string) => `messages_inbox_${userId}`;
 async function fetchConversations(userId: string): Promise<ConvRow[]> {
   const { data } = await supabase
     .from("conversations")
-    .select("*, cars(id, title_zh, image_url, price)")
+    .select("*, cars(id, title, title_zh, image_url, price)")
     .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
     .order("last_message_at", { ascending: false });
 
@@ -106,6 +111,7 @@ async function fetchConversations(userId: string): Promise<ConvRow[]> {
 }
 
 export function ConversationList({ userId, initialConvId, initialOtherUserId }: { userId: string; initialConvId?: string | null; initialOtherUserId?: string | null }) {
+  const { t, locale } = useI18n();
   const [activeConversation, setActiveConversation] = useState<string | null>(initialConvId || null);
   const [activeOtherName, setActiveOtherName] = useState("");
   // 原生壳 resize:"none" 下 webview 不缩放,全屏聊天由这里垫出键盘高度
@@ -198,7 +204,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
         const otherProfile =
           target.buyer_id === userId ? target.seller_profile : target.buyer_profile;
         // eslint-disable-next-line react-hooks/set-state-in-effect -- URL 直达会话,仅数据就绪时一次
-        setActiveOtherName(otherProfile?.username || "用户");
+        setActiveOtherName(otherProfile?.username || t("用户"));
       }
     }
     if (initialOtherUserId && !activeConversation) {
@@ -212,7 +218,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
         setActiveConversation(target.id);
         const otherProfile =
           target.buyer_id === userId ? target.seller_profile : target.buyer_profile;
-        setActiveOtherName(otherProfile?.username || "用户");
+        setActiveOtherName(otherProfile?.username || t("用户"));
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅列表数据变化时对账 URL 参数
@@ -266,9 +272,9 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
     body = (
       <div className="flex flex-col items-center rounded-[26px] bg-card py-16">
         <MessageSquare className="h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
-        <p className="mt-3 font-mono text-sm text-muted-foreground">暂无消息</p>
+        <p className="mt-3 font-mono text-sm text-muted-foreground">{t("暂无消息")}</p>
         <p className="mt-1 font-mono text-[11px] text-muted-foreground/70">
-          在车辆详情页可以给卖家发消息
+          {t("在车辆详情页可以给卖家发消息")}
         </p>
       </div>
     );
@@ -279,15 +285,15 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
       {conversations.map((conv) => {
         const isBuyer = conv.buyer_id === userId;
         const otherProfile = isBuyer ? conv.seller_profile : conv.buyer_profile;
-        const otherName = otherProfile?.username || "用户";
+        const otherName = otherProfile?.username || t("用户");
         const unread = (conv.unread_count ?? 0) > 0;
         const preview = conv.last_message
           ? CHAT_MEDIA_RE.test(conv.last_message)
             ? /\.(mp4|mov|webm)(\?|$)/i.test(conv.last_message)
-              ? "[视频]"
-              : "[图片]"
+              ? t("[视频]")
+              : t("[图片]")
             : conv.last_message
-          : "暂无消息";
+          : t("暂无消息");
 
         return (
           <button
@@ -324,7 +330,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                     {otherName}
                   </span>
                   <span className="shrink-0 font-mono text-[11px] text-muted-foreground">
-                    {timeAgo(conv.last_message_at)}
+                    {timeAgo(conv.last_message_at, t)}
                   </span>
                 </div>
                 <p
@@ -337,7 +343,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                 {conv.cars && (
                   <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground/70">
                     <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-                    {conv.cars.title_zh} · {formatPrice(conv.cars.price)}
+                    {carTitle(conv.cars, locale)} · {formatPrice(conv.cars.price)}
                   </p>
                 )}
               </div>
@@ -384,7 +390,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                       />
                     </span>
                     <span className="truncate font-mono text-sm font-medium">
-                      {activeOtherName || "用户"}
+                      {activeOtherName || t("用户")}
                     </span>
                   </div>
                 }
@@ -402,7 +408,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                   <ChatThread
                     conversationId={activeConversation}
                     currentUserId={userId}
-                    otherUsername={activeOtherName || "用户"}
+                    otherUsername={activeOtherName || t("用户")}
                     onBack={closeChat}
                     hideHeader
                   />

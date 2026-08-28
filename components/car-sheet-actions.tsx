@@ -4,11 +4,13 @@
 // 浮层不改地址栏,分享链接用车辆的规范地址而非当前 URL。
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { Heart, GitCompare, Check, Share2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
 import { SITE_URL } from "@/lib/seo-pages";
+import { useI18n } from "@/components/i18n-provider";
+import { carTitle } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 const BTN =
@@ -16,6 +18,7 @@ const BTN =
 
 export function CarSheetActions({ car }: { car: DbCar }) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const [inCompare, setInCompare] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const [authId, setAuthId] = useState<string | null>(null);
@@ -75,8 +78,8 @@ export function CarSheetActions({ car }: { car: DbCar }) {
     const url = `${SITE_URL}/car/${car.id}`;
     const { nativeShare } = await import("@/lib/capacitor");
     const shared = await nativeShare({
-      title: car.title_zh,
-      text: car.title_zh,
+      title: carTitle(car, locale),
+      text: carTitle(car, locale),
       url,
     });
     if (!shared) {
@@ -91,7 +94,7 @@ export function CarSheetActions({ car }: { car: DbCar }) {
       <button
         type="button"
         onClick={toggleFavorite}
-        aria-label={isFavorited ? "取消收藏" : "收藏"}
+        aria-label={isFavorited ? t("取消收藏") : t("收藏")}
         className={BTN}
       >
         <Heart
@@ -105,7 +108,7 @@ export function CarSheetActions({ car }: { car: DbCar }) {
           if (inCompare) removeFromCompare(car.id);
           else addToCompare(car.id);
         }}
-        aria-label={inCompare ? "移出对比" : "加入对比"}
+        aria-label={inCompare ? t("移出对比") : t("加入对比")}
         className={BTN}
       >
         {inCompare ? (
@@ -114,7 +117,7 @@ export function CarSheetActions({ car }: { car: DbCar }) {
           <GitCompare className="h-[18px] w-[18px]" strokeWidth={1.5} />
         )}
       </button>
-      <button type="button" onClick={share} aria-label="分享" className={BTN}>
+      <button type="button" onClick={share} aria-label={t("分享")} className={BTN}>
         {copied ? (
           <Check className="h-[18px] w-[18px] text-green-500" strokeWidth={2} />
         ) : (

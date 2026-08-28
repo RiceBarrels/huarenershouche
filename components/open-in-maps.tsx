@@ -11,6 +11,7 @@ import {
   DrawerTrigger,
 } from "@/components/ui/drawer";
 import { ChevronRight } from "lucide-react";
+import { useI18n } from "@/components/i18n-provider";
 
 // 打开外部地图的目标:坐标 / 地址 / 类目搜索三种形态任选
 export interface MapTarget {
@@ -101,6 +102,7 @@ export function OpenInMaps({
   target: MapTarget;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   const subtitle =
     target.query ||
     target.address ||
@@ -113,7 +115,7 @@ export function OpenInMaps({
       <DrawerContent>
         <DrawerHeader>
           <DrawerTitle className="font-mono">
-            {target.mode === "directions" ? "选择导航应用" : "选择地图应用"}
+            {target.mode === "directions" ? t("选择导航应用") : t("选择地图应用")}
           </DrawerTitle>
           {subtitle && (
             <DrawerDescription className="truncate font-mono text-xs">
@@ -132,7 +134,7 @@ export function OpenInMaps({
                 className="h-full w-full object-contain"
               />
             }
-            label="Apple 地图"
+            label={t("Apple 地图")}
             sub="Apple Maps"
           />
           <MapAppRow
@@ -145,7 +147,7 @@ export function OpenInMaps({
                 className="h-full w-full object-contain"
               />
             }
-            label="Google 地图"
+            label={t("Google 地图")}
             sub="Google Maps"
           />
         </div>

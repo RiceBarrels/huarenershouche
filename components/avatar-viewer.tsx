@@ -20,6 +20,7 @@ import { createPortal } from "react-dom";
 import { MoreHorizontal, Download, Camera, Check, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NonModalDrawer } from "@/components/non-modal-drawer";
+import { useI18n } from "@/components/i18n-provider";
 import {
   OverlayLayerRegistryCtx,
   OverlayLayerZCtx,
@@ -30,7 +31,7 @@ import { triggerHaptic } from "@/lib/haptics";
 
 export function AvatarViewer({
   src,
-  alt = "头像",
+  alt,
   open,
   onClose,
   onEdit,
@@ -42,6 +43,7 @@ export function AvatarViewer({
   /** 自己的头像:提供后菜单里出现「更换头像」 */
   onEdit?: () => void;
 }) {
+  const { t } = useI18n();
   const registry = useContext(OverlayLayerRegistryCtx);
   const zMap = useContext(OverlayLayerZCtx);
   const id = useId();
@@ -153,7 +155,7 @@ export function AvatarViewer({
               >
                 <motion.img
                   src={src}
-                  alt={alt}
+                  alt={alt ?? t("头像")}
                   className="max-h-[80vh] w-full select-none object-contain"
                   draggable={false}
                   initial={{ scale: 0.88 }}
@@ -170,7 +172,7 @@ export function AvatarViewer({
                   }}
                   className="absolute right-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur-sm transition-colors active:bg-white/25"
                   style={{ top: "calc(env(safe-area-inset-top, 0px) + 0.75rem)" }}
-                  aria-label="更多操作"
+                  aria-label={t("更多操作")}
                 >
                   <MoreHorizontal className="h-5 w-5" strokeWidth={1.8} />
                 </button>
@@ -185,7 +187,7 @@ export function AvatarViewer({
                       className="pointer-events-none absolute bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-white/15 px-4 py-2 font-mono text-xs text-white backdrop-blur-sm"
                     >
                       <Check className="h-3.5 w-3.5" strokeWidth={2} />
-                      已保存到相册
+                      {t("已保存到相册")}
                     </motion.span>
                   )}
                 </AnimatePresence>
@@ -208,7 +210,7 @@ export function AvatarViewer({
             ) : (
               <Download className="h-4 w-4" strokeWidth={1.5} />
             )}
-            保存图片
+            {t("保存图片")}
           </button>
           {onEdit && (
             <button
@@ -221,7 +223,7 @@ export function AvatarViewer({
               className="flex w-full items-center justify-center gap-2 py-3.5 font-mono text-sm transition-colors active:bg-muted/50"
             >
               <Camera className="h-4 w-4" strokeWidth={1.5} />
-              更换头像
+              {t("更换头像")}
             </button>
           )}
           <button
@@ -229,7 +231,7 @@ export function AvatarViewer({
             onClick={() => setMenuOpen(false)}
             className="w-full py-3.5 text-center font-mono text-sm text-muted-foreground transition-colors active:bg-muted/50"
           >
-            取消
+            {t("取消")}
           </button>
         </div>
       </NonModalDrawer>

@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/drawer";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { match } from "pinyin-pro";
+import { useI18n } from "@/components/i18n-provider";
+import { interpolate, type Locale } from "@/lib/i18n";
 import { triggerHaptic } from "@/lib/haptics";
 import { IOSSwitch } from "@/components/ios-settings";
 
@@ -21,6 +23,8 @@ import {
 } from "@/components/search-filters";
 import type { Filters, CountOption } from "@/components/search-filters";
 import { BODY_STYLE_OPTIONS, bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
+
+type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
 // --- Price breakpoints ---
 const PRICE_STOPS = [
@@ -44,9 +48,9 @@ function mileageToIndex(miles: number): number {
   }
   return MILEAGE_STOPS.length - 1;
 }
-function formatMileageLabel(miles: number): string {
-  if (miles >= 999999) return "不限";
-  if (miles >= 10000) return `${(miles / 10000).toFixed(0)}万mi`;
+function formatMileageLabel(miles: number, t: TFn): string {
+  if (miles >= 999999) return t("不限");
+  if (miles >= 10000) return t("{n}万mi", { n: (miles / 10000).toFixed(0) });
   return `${miles.toLocaleString()} mi`;
 }
 
@@ -100,95 +104,99 @@ const INTERIOR_COLOR_OPTIONS = [
 ];
 
 // Summary text for each filter category
-export function getLocationLabel(filters: Filters): string {
-  if (!filters.location) return "不限";
+// t/locale 为可选参数以兼容旧调用方(不传则维持中文输出)
+export function getLocationLabel(filters: Filters, t: TFn = interpolate): string {
+  if (!filters.location) return t("不限");
   if (/^\d{5}$/.test(filters.location)) return `Zip ${filters.location}`;
   return filters.location;
 }
 
-export function getBrandLabel(filters: Filters): string {
-  if (!filters.make) return "不限";
+export function getBrandLabel(filters: Filters, t: TFn = interpolate, locale: Locale = "zh"): string {
+  if (!filters.make) return t("不限");
   const items = filters.make.split(",");
-  const labels = items.map((m) => MAKES_ZH[m] || m);
-  return labels.length <= 2 ? labels.join("、") : `${labels[0]}等${labels.length}个`;
+  const labels = items.map((m) => (locale === "en" ? m : MAKES_ZH[m] || m));
+  return labels.length <= 2
+    ? labels.join(t("、"))
+    : t("{first}等{n}个", { first: labels[0], n: labels.length });
 }
 
-function getPriceYearLabel(filters: Filters): string {
+function getPriceYearLabel(filters: Filters, t: TFn): string {
   const parts: string[] = [];
   if (filters.minPrice || filters.maxPrice) {
     const min = filters.minPrice ? `$${Number(filters.minPrice).toLocaleString()}` : "$0";
-    const max = filters.maxPrice ? `$${Number(filters.maxPrice).toLocaleString()}` : "不限";
+    const max = filters.maxPrice ? `$${Number(filters.maxPrice).toLocaleString()}` : t("不限");
     parts.push(`${min}-${max}`);
   }
-  if (filters.maxPayment) parts.push(`月供≤$${filters.maxPayment}`);
+  if (filters.maxPayment) parts.push(t("月供≤${n}", { n: filters.maxPayment }));
   if (filters.minYear || filters.maxYear) {
     const min = filters.minYear || "2000";
     const max = filters.maxYear || "2026";
-    parts.push(`${min}-${max}年`);
+    parts.push(t("{min}-{max}年", { min, max }));
   }
-  return parts.length > 0 ? parts.join(" · ") : "不限";
+  return parts.length > 0 ? parts.join(" · ") : t("不限");
 }
 
-function getModelLabel(filters: Filters): string {
-  if (!filters.model) return "不限";
+function getModelLabel(filters: Filters, t: TFn): string {
+  if (!filters.model) return t("不限");
   const items = filters.model.split(",").filter(Boolean).map((m) => m.trim());
-  return items.length <= 2 ? items.join("、") : `${items[0]}等${items.length}个`;
+  return items.length <= 2
+    ? items.join(t("、"))
+    : t("{first}等{n}个", { first: items[0], n: items.length });
 }
 
-function getFeaturesLabel(filters: Filters): string {
-  if (!filters.features) return "不限";
+function getFeaturesLabel(filters: Filters, t: TFn): string {
+  if (!filters.features) return t("不限");
   const items = filters.features.split(",").filter(Boolean);
-  return items.length <= 2 ? items.join("、") : `${items[0]}等${items.length}项`;
+  return items.length <= 2
+    ? items.join(t("、"))
+    : t("{first}等{n}项", { first: items[0], n: items.length });
 }
 
-function getBodyStyleSummary(filters: Filters): string {
-  if (!filters.bodyStyle) return "不限";
+function getBodyStyleSummary(filters: Filters, t: TFn): string {
+  if (!filters.bodyStyle) return t("不限");
   const items = filters.bodyStyle.split(",").filter(Boolean);
-  const labels = items.map((v) => bodyStyleLabel(v as BodyStyle));
-  return labels.length <= 3 ? labels.join("/") : `${labels[0]}等${labels.length}类`;
+  const labels = items.map((v) => t(bodyStyleLabel(v as BodyStyle)));
+  return labels.length <= 3
+    ? labels.join("/")
+    : t("{first}等{n}类", { first: labels[0], n: labels.length });
 }
 
-function getMoreLabel(filters: Filters): string {
+function getMoreLabel(filters: Filters, t: TFn): string {
   const parts: string[] = [];
-  if (filters.dealRating) parts.push(filters.dealRating === "great" ? "只看超值好价" : "只看好价");
-  if (filters.priceDropped === "true") parts.push("已降价");
+  if (filters.dealRating) parts.push(filters.dealRating === "great" ? t("只看超值好价") : t("只看好价"));
+  if (filters.priceDropped === "true") parts.push(t("已降价"));
   if (filters.listedWithin) {
-    parts.push(filters.listedWithin === "1" ? "24小时内上架" : `${filters.listedWithin}天内上架`);
+    parts.push(filters.listedWithin === "1" ? t("24小时内上架") : t("{n}天内上架", { n: filters.listedWithin }));
   }
-  for (const t of CONDITION_TOGGLES) {
-    if (filters[t.key] === "true") parts.push(t.label);
+  for (const tog of CONDITION_TOGGLES) {
+    if (filters[tog.key] === "true") parts.push(t(tog.label));
   }
-  return parts.length > 0 ? parts.join(" · ") : "不限";
+  return parts.length > 0 ? parts.join(" · ") : t("不限");
 }
 
-function getSpecsLabel(filters: Filters): string {
+function getSpecsLabel(filters: Filters, t: TFn): string {
   const parts: string[] = [];
-  if (filters.fuelType) {
-    const items = filters.fuelType.split(",");
-    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
-  }
-  if (filters.transmission) {
-    const items = filters.transmission.split(",");
-    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
-  }
-  if (filters.drivetrain) {
-    const items = filters.drivetrain.split(",");
-    parts.push(items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}种`);
-  }
+  const summarize = (list: string, tail: string) => {
+    const items = list.split(",").map((v) => t(v));
+    return items.length <= 2
+      ? items.join("/")
+      : t(tail, { first: items[0], n: items.length });
+  };
+  if (filters.fuelType) parts.push(summarize(filters.fuelType, "{first}等{n}种"));
+  if (filters.transmission) parts.push(summarize(filters.transmission, "{first}等{n}种"));
+  if (filters.drivetrain) parts.push(summarize(filters.drivetrain, "{first}等{n}种"));
   if (filters.exteriorColor) {
-    const items = filters.exteriorColor.split(",");
-    parts.push("外" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+    parts.push(t("外{colors}", { colors: summarize(filters.exteriorColor, "{first}等{n}色") }));
   }
   if (filters.interiorColor) {
-    const items = filters.interiorColor.split(",");
-    parts.push("内" + (items.length <= 2 ? items.join("/") : `${items[0]}等${items.length}色`));
+    parts.push(t("内{colors}", { colors: summarize(filters.interiorColor, "{first}等{n}色") }));
   }
-  return parts.length > 0 ? parts.join(" · ") : "不限";
+  return parts.length > 0 ? parts.join(" · ") : t("不限");
 }
 
-function getSellerLabel(filters: Filters): string {
-  if (!filters.sellerType) return "不限";
-  return filters.sellerType === "dealer" ? "车行" : "个人";
+function getSellerLabel(filters: Filters, t: TFn): string {
+  if (!filters.sellerType) return t("不限");
+  return filters.sellerType === "dealer" ? t("车行") : t("个人");
 }
 
 // --- Multi-select helpers ---
@@ -258,6 +266,7 @@ function PillSelect({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -268,7 +277,7 @@ function PillSelect({
           onChange("");
         }}
       >
-        不限
+        {t("不限")}
       </button>
       {options.map((opt) => (
         <button
@@ -280,7 +289,7 @@ function PillSelect({
             onChange(toggleInList(value, opt.value));
           }}
         >
-          {opt.label}
+          {t(opt.label)}
         </button>
       ))}
     </div>
@@ -300,6 +309,7 @@ function CountPillSelect({
   /** 大小写不敏感匹配（车型名） */
   insensitive?: boolean;
 }) {
+  const { t } = useI18n();
   const selected = (name: string) => (insensitive ? isInListCI(value, name) : isInList(value, name));
   const toggle = (name: string) => (insensitive ? toggleInListCI(value, name) : toggleInList(value, name));
   return (
@@ -312,7 +322,7 @@ function CountPillSelect({
           onChange("");
         }}
       >
-        不限
+        {t("不限")}
       </button>
       {options.map((opt) => (
         <button
@@ -342,6 +352,7 @@ function ColorPillSelect({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-wrap gap-2">
       <button
@@ -352,7 +363,7 @@ function ColorPillSelect({
           onChange("");
         }}
       >
-        不限
+        {t("不限")}
       </button>
       {options.map((opt) => (
         <button
@@ -368,7 +379,7 @@ function ColorPillSelect({
             className="inline-block h-3 w-3 rounded-full border border-border"
             style={{ backgroundColor: opt.color }}
           />
-          {opt.label}
+          {t(opt.label)}
         </button>
       ))}
     </div>
@@ -392,6 +403,7 @@ function FilterRow({
   active: boolean;
   children: React.ReactNode;
 }) {
+  const { t } = useI18n();
   return (
     <DrawerNested>
       <DrawerTrigger asChild>
@@ -420,7 +432,7 @@ function FilterRow({
               type="button"
               className="absolute right-4 font-mono text-[15px] font-medium text-brand-ink active:opacity-60"
             >
-              完成
+              {t("完成")}
             </button>
           </DrawerClose>
         </div>
@@ -440,6 +452,7 @@ export function LocationDrawerContent({
   filters: Filters;
   onUpdate: (key: keyof Filters, value: string) => void;
 }) {
+  const { t } = useI18n();
   const [zip, setZip] = useState(
     /^\d{5}$/.test(filters.location) ? filters.location : ""
   );
@@ -449,7 +462,7 @@ export function LocationDrawerContent({
       {/* Zip code input */}
       <div className="flex items-center gap-2">
         <FilterInput
-          placeholder="输入 Zip Code"
+          placeholder={t("输入 Zip Code")}
           className="flex-1"
           inputMode="numeric"
           maxLength={5}
@@ -470,19 +483,19 @@ export function LocationDrawerContent({
               onUpdate("location", "");
             }}
           >
-            清除
+            {t("清除")}
           </button>
         )}
       </div>
       <p className="mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
         {/^\d{5}$/.test(filters.location)
-          ? `以 Zip ${filters.location} 为中心按距离筛选`
-          : "不填则以自动定位的位置计算距离"}
+          ? t("以 Zip {zip} 为中心按距离筛选", { zip: filters.location })
+          : t("不填则以自动定位的位置计算距离")}
       </p>
 
       {/* 距离范围 */}
       <div className="mt-5">
-        <SectionTitle>距离范围</SectionTitle>
+        <SectionTitle>{t("距离范围")}</SectionTitle>
         <div className="mt-2.5 flex flex-wrap gap-2">
           {["", "10", "25", "50", "100", "200"].map((v) => (
             <button
@@ -494,13 +507,13 @@ export function LocationDrawerContent({
                 onUpdate("maxDistance", v);
               }}
             >
-              {v === "" ? "不限" : `≤${v} mi`}
+              {v === "" ? t("不限") : `≤${v} mi`}
             </button>
           ))}
         </div>
         <FilterInput
           className="mt-2.5"
-          placeholder="自定义距离 (miles)"
+          placeholder={t("自定义距离 (miles)")}
           inputMode="numeric"
           value={filters.maxDistance}
           onChange={(e) => {
@@ -515,6 +528,7 @@ export function LocationDrawerContent({
 
 // --- Brand drawer content with search ---
 function BrandItem({ make, selected, onToggle }: { make: string; selected: boolean; onToggle: () => void }) {
+  const { locale } = useI18n();
   const logo = getBrandLogoUrl(make);
   return (
     <button
@@ -532,7 +546,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
           <Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
         )}
       </span>
-      <span className="flex-1 text-left">{MAKES_ZH[make]} {make}</span>
+      <span className="flex-1 text-left">{locale === "en" ? make : `${MAKES_ZH[make]} ${make}`}</span>
       {selected && <Check className="h-4 w-4 shrink-0 text-brand-ink" strokeWidth={2} />}
     </button>
   );
@@ -545,6 +559,7 @@ export function BrandDrawerContent({
   filters: Filters;
   onUpdate: (key: keyof Filters, value: string) => void;
 }) {
+  const { t, locale } = useI18n();
   const [brandSearch, setBrandSearch] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -578,7 +593,7 @@ export function BrandDrawerContent({
               {getBrandLogoUrl(make) && (
                 <img src={getBrandLogoUrl(make)!} alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
               )}
-              {MAKES_ZH[make] || make}
+              {locale === "en" ? make : MAKES_ZH[make] || make}
               <X className="h-3 w-3" strokeWidth={2} />
             </button>
           ))}
@@ -587,13 +602,13 @@ export function BrandDrawerContent({
             className="px-2 py-1.5 font-mono text-xs text-muted-foreground active:text-foreground"
             onClick={() => onUpdate("make", "")}
           >
-            清除
+            {t("清除")}
           </button>
         </div>
       )}
 
       <FilterInput
-        placeholder="搜索品牌..."
+        placeholder={t("搜索品牌...")}
         value={brandSearch}
         onChange={(e) => setBrandSearch(e.target.value)}
       />
@@ -601,7 +616,7 @@ export function BrandDrawerContent({
       {/* Hot brands grid */}
       {!isSearching && !showAll && (
         <>
-          <p className="px-1 font-mono text-[13px] font-semibold">热门品牌</p>
+          <p className="px-1 font-mono text-[13px] font-semibold">{t("热门品牌")}</p>
           <div className="grid grid-cols-4 gap-2">
             {HOT_MAKES.map((make) => {
               const logo = getBrandLogoUrl(make);
@@ -623,7 +638,7 @@ export function BrandDrawerContent({
                       <Car className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
                     )}
                   </span>
-                  <span className="font-mono text-[10px] leading-tight">{MAKES_ZH[make]}</span>
+                  <span className="font-mono text-[10px] leading-tight">{t(MAKES_ZH[make])}</span>
                 </button>
               );
             })}
@@ -634,7 +649,7 @@ export function BrandDrawerContent({
             style={{ marginBottom: 'env(safe-area-inset-bottom, 0px)' }}
             onClick={() => setShowAll(true)}
           >
-            全部品牌
+            {t("全部品牌")}
             <ChevronRight className="h-3.5 w-3.5" strokeWidth={1.5} />
           </button>
         </>
@@ -649,7 +664,7 @@ export function BrandDrawerContent({
               className={`mb-2 rounded-full px-3.5 py-2 font-mono text-[13px] text-muted-foreground transition-colors active:text-foreground ${IOS_FILL}`}
               onClick={() => setShowAll(false)}
             >
-              ← 返回热门
+              {t("← 返回热门")}
             </button>
           )}
           <button
@@ -660,7 +675,7 @@ export function BrandDrawerContent({
               onUpdate("make", "");
             }}
           >
-            <span>不限品牌</span>
+            <span>{t("不限品牌")}</span>
             {!filters.make && <Check className="h-4 w-4 text-brand-ink" strokeWidth={2} />}
           </button>
           {displayMakes.map((make) => (
@@ -693,6 +708,7 @@ export function MobileFilterDrawer({
   /** 车辆配置标签选项（带数量），browse 页统计传入 */
   featureOptions?: CountOption[];
 }) {
+  const { t, locale } = useI18n();
   function update(key: keyof Filters, value: string) {
     const next = { ...filters, [key]: value };
     if (key === "fuelType" && value === "纯电") {
@@ -718,8 +734,8 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<MapPin className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-blue-500"
-        label="地区"
-        value={getLocationLabel(filters)}
+        label={t("地区")}
+        value={getLocationLabel(filters, t)}
         active={!!filters.location}
       >
         <LocationDrawerContent filters={filters} onUpdate={update} />
@@ -729,8 +745,8 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<Car className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-red-500"
-        label="品牌"
-        value={getBrandLabel(filters)}
+        label={t("品牌")}
+        value={getBrandLabel(filters, t, locale)}
         active={!!filters.make}
       >
         <BrandDrawerContent filters={filters} onUpdate={update} />
@@ -741,8 +757,8 @@ export function MobileFilterDrawer({
         <FilterRow
           icon={<CarFront className="h-[18px] w-[18px]" strokeWidth={1.5} />}
           color="text-teal-500"
-          label="车型"
-          value={getModelLabel(filters)}
+          label={t("车型")}
+          value={getModelLabel(filters, t)}
           active={!!filters.model}
         >
           <CountPillSelect
@@ -758,8 +774,8 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<CarFront className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-indigo-500"
-        label="车身类型"
-        value={getBodyStyleSummary(filters)}
+        label={t("车身类型")}
+        value={getBodyStyleSummary(filters, t)}
         active={!!filters.bodyStyle}
       >
         <PillSelect
@@ -773,17 +789,17 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<DollarSign className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-green-600"
-        label="价格 / 月供"
-        value={getPriceYearLabel(filters)}
+        label={t("价格 / 月供")}
+        value={getPriceYearLabel(filters, t)}
         active={!!(filters.minPrice || filters.maxPrice || filters.maxPayment || filters.minYear || filters.maxYear)}
       >
         <div className="space-y-6">
           {/* Price */}
           <div>
-            <SectionTitle>价格范围</SectionTitle>
+            <SectionTitle>{t("价格范围")}</SectionTitle>
             <div className="mt-2.5 flex items-center gap-2">
               <FilterInput
-                placeholder="最低价"
+                placeholder={t("最低价")}
                 inputMode="numeric"
                 value={filters.minPrice}
                 onChange={(e) => {
@@ -793,7 +809,7 @@ export function MobileFilterDrawer({
               />
               <span className="font-mono text-xs text-muted-foreground">-</span>
               <FilterInput
-                placeholder="最高价"
+                placeholder={t("最高价")}
                 inputMode="numeric"
                 value={filters.maxPrice}
                 onChange={(e) => {
@@ -823,7 +839,7 @@ export function MobileFilterDrawer({
 
           {/* Monthly payment budget */}
           <div>
-            <SectionTitle>月供预算</SectionTitle>
+            <SectionTitle>{t("月供预算")}</SectionTitle>
             <div className="mt-2.5 flex flex-wrap gap-2">
               <button
                 type="button"
@@ -833,7 +849,7 @@ export function MobileFilterDrawer({
                   update("maxPayment", "");
                 }}
               >
-                不限
+                {t("不限")}
               </button>
               {PAYMENT_PRESETS.map((v) => (
                 <button
@@ -845,13 +861,13 @@ export function MobileFilterDrawer({
                     update("maxPayment", v);
                   }}
                 >
-                  ≤${v}/月
+                  {t("≤${n}/月", { n: v })}
                 </button>
               ))}
             </div>
             <FilterInput
               className="mt-2.5"
-              placeholder="自定义月供 ($/月)"
+              placeholder={t("自定义月供 ($/月)")}
               inputMode="numeric"
               value={filters.maxPayment}
               onChange={(e) => {
@@ -860,16 +876,16 @@ export function MobileFilterDrawer({
               }}
             />
             <p className="mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
-              按 0 首付 / 6.5% APR / 60 期估算
+              {t("按 0 首付 / 6.5% APR / 60 期估算")}
             </p>
           </div>
 
           {/* Year */}
           <div>
-            <SectionTitle>年份范围</SectionTitle>
+            <SectionTitle>{t("年份范围")}</SectionTitle>
             <div className="mt-2.5 flex items-center gap-2">
               <FilterInput
-                placeholder="最早年份"
+                placeholder={t("最早年份")}
                 inputMode="numeric"
                 maxLength={4}
                 value={filters.minYear}
@@ -880,7 +896,7 @@ export function MobileFilterDrawer({
               />
               <span className="font-mono text-xs text-muted-foreground">-</span>
               <FilterInput
-                placeholder="最新年份"
+                placeholder={t("最新年份")}
                 inputMode="numeric"
                 maxLength={4}
                 value={filters.maxYear}
@@ -913,14 +929,14 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<Gauge className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-orange-500"
-        label="最高里程"
-        value={filters.maxMileage ? `≤${(Number(filters.maxMileage) / 10000).toFixed(0)}万mi` : "不限"}
+        label={t("最高里程")}
+        value={filters.maxMileage ? t("≤{n}万mi", { n: (Number(filters.maxMileage) / 10000).toFixed(0) }) : t("不限")}
         active={!!filters.maxMileage}
       >
         <div>
-          <SectionTitle>最高里程</SectionTitle>
+          <SectionTitle>{t("最高里程")}</SectionTitle>
           <p className={`mt-1.5 font-mono text-[13px] ${filters.maxMileage ? "text-brand-ink" : "text-muted-foreground"}`}>
-            {formatMileageLabel(MILEAGE_STOPS[mileageIdx])}
+            {formatMileageLabel(MILEAGE_STOPS[mileageIdx], t)}
           </p>
           <Slider
             className="mt-4"
@@ -944,40 +960,40 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-purple-500"
-        label="车辆参数"
-        value={getSpecsLabel(filters)}
+        label={t("车辆参数")}
+        value={getSpecsLabel(filters, t)}
         active={!!(filters.fuelType || filters.transmission || filters.drivetrain || filters.exteriorColor || filters.interiorColor)}
       >
         <div className="space-y-5">
           {/* Fuel */}
           <div>
-            <p className="mb-2.5 font-mono text-[13px] font-semibold">燃油类型</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("燃油类型")}</p>
             <PillSelect options={FUEL_OPTIONS} value={filters.fuelType} onChange={(v) => update("fuelType", v)} />
           </div>
 
           {/* Transmission — hidden when exclusively electric */}
           {!isElectric && (
             <div>
-              <p className="mb-2.5 font-mono text-[13px] font-semibold">变速箱</p>
+              <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("变速箱")}</p>
               <PillSelect options={TRANSMISSION_OPTIONS} value={filters.transmission} onChange={(v) => update("transmission", v)} />
             </div>
           )}
 
           {/* Drivetrain */}
           <div>
-            <p className="mb-2.5 font-mono text-[13px] font-semibold">驱动方式</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("驱动方式")}</p>
             <PillSelect options={DRIVETRAIN_OPTIONS} value={filters.drivetrain} onChange={(v) => update("drivetrain", v)} />
           </div>
 
           {/* Exterior Color */}
           <div>
-            <p className="mb-2.5 font-mono text-[13px] font-semibold">外观颜色</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("外观颜色")}</p>
             <ColorPillSelect options={COLOR_OPTIONS} value={filters.exteriorColor} onChange={(v) => update("exteriorColor", v)} />
           </div>
 
           {/* Interior Color */}
           <div>
-            <p className="mb-2.5 font-mono text-[13px] font-semibold">内饰颜色</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("内饰颜色")}</p>
             <ColorPillSelect options={INTERIOR_COLOR_OPTIONS} value={filters.interiorColor} onChange={(v) => update("interiorColor", v)} />
           </div>
         </div>
@@ -987,8 +1003,8 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<Users className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-sky-500"
-        label="卖家类型"
-        value={getSellerLabel(filters)}
+        label={t("卖家类型")}
+        value={getSellerLabel(filters, t)}
         active={!!filters.sellerType}
       >
         <PillSelect
@@ -1006,8 +1022,8 @@ export function MobileFilterDrawer({
         <FilterRow
           icon={<ListChecks className="h-[18px] w-[18px]" strokeWidth={1.5} />}
           color="text-amber-500"
-          label="车辆配置"
-          value={getFeaturesLabel(filters)}
+          label={t("车辆配置")}
+          value={getFeaturesLabel(filters, t)}
           active={!!filters.features}
         >
           <div>
@@ -1016,7 +1032,7 @@ export function MobileFilterDrawer({
               value={filters.features}
               onChange={(v) => update("features", v)}
             />
-            <p className="mt-2 px-1 font-mono text-[11px] text-muted-foreground">需同时满足所选配置</p>
+            <p className="mt-2 px-1 font-mono text-[11px] text-muted-foreground">{t("需同时满足所选配置")}</p>
           </div>
         </FilterRow>
       )}
@@ -1025,36 +1041,36 @@ export function MobileFilterDrawer({
       <FilterRow
         icon={<BadgePercent className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-pink-500"
-        label="更多条件"
-        value={getMoreLabel(filters)}
+        label={t("更多条件")}
+        value={getMoreLabel(filters, t)}
         active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.hasVideo || filters.hasPrice)}
       >
         <div className="space-y-5">
           {/* Deal rating & price dropped toggles — iOS 分组开关卡 */}
           <div className={`overflow-hidden rounded-[22px] ${IOS_FILL}`}>
             <ToggleRow
-              label="只看好价（好价及以上）"
+              label={t("只看好价（好价及以上）")}
               checked={filters.dealRating === "good"}
               onChange={(v) => update("dealRating", v ? "good" : "")}
             />
             <ToggleRow
-              label="只看降价车源"
+              label={t("只看降价车源")}
               checked={filters.priceDropped === "true"}
               onChange={(v) => update("priceDropped", v ? "true" : "")}
             />
-            {CONDITION_TOGGLES.map((t) => (
+            {CONDITION_TOGGLES.map((tog) => (
               <ToggleRow
-                key={t.key}
-                label={t.label}
-                checked={filters[t.key] === "true"}
-                onChange={(v) => update(t.key, v ? "true" : "")}
+                key={tog.key}
+                label={t(tog.label)}
+                checked={filters[tog.key] === "true"}
+                onChange={(v) => update(tog.key, v ? "true" : "")}
               />
             ))}
           </div>
 
           {/* Listed within */}
           <div>
-            <p className="mb-2.5 font-mono text-[13px] font-semibold">上架时间</p>
+            <p className="mb-2.5 font-mono text-[13px] font-semibold">{t("上架时间")}</p>
             <div className="flex flex-wrap gap-2">
               {LISTED_WITHIN_OPTIONS.map((opt) => (
                 <button
@@ -1066,7 +1082,7 @@ export function MobileFilterDrawer({
                     update("listedWithin", opt.value);
                   }}
                 >
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
               ))}
             </div>
@@ -1085,7 +1101,7 @@ export function MobileFilterDrawer({
               onFilter({ ...INITIAL_FILTERS, keyword: filters.keyword });
             }}
           >
-            清除全部筛选 ({activeCount})
+            {t("清除全部筛选 ({n})", { n: activeCount })}
           </button>
         </div>
       )}

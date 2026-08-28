@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter } from "@/components/localized-navigation";
 import { X, GitCompare, Trash2, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { CompareContent } from "@/components/compare-content";
 import { getCompareIds, removeFromCompare, clearCompare } from "@/lib/compare";
 import { useCarOverlay } from "@/components/car-overlay-provider";
+import { useI18n } from "@/components/i18n-provider";
+import { carTitle } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import type { DbCar } from "@/lib/types";
 
@@ -21,6 +23,7 @@ export function CompareBar() {
   // 移动端详情浮层(swipe-sheet, z-60)打开时:提层到其上方,并贴屏幕底(导航已被浮层盖住)
   // enabled = 移动端(<md):「对比」在 drawer 里打开,不跳 /compare(浮层下跳页看不见)
   const { enabled: isMobile, overlayOpen } = useCarOverlay();
+  const { t, locale } = useI18n();
   const [mounted, setMounted] = useState(false);
   const [ids, setIds] = useState<string[]>([]);
   const [cars, setCars] = useState<Map<string, DbCar>>(new Map());
@@ -116,7 +119,7 @@ export function CompareBar() {
           >
             <span className="hidden shrink-0 items-center gap-1.5 font-mono text-[11px] text-muted-foreground md:flex">
               <GitCompare className="h-4 w-4" strokeWidth={1.5} />
-              车辆对比
+              {t("车辆对比")}
             </span>
 
             {/* 已选车辆 */}
@@ -131,7 +134,7 @@ export function CompareBar() {
                     {car?.image_url ? (
                       <img
                         src={car.image_url}
-                        alt={car.title_zh || ""}
+                        alt={carTitle(car, locale)}
                         className="h-8 w-11 rounded-lg object-cover"
                       />
                     ) : (
@@ -140,12 +143,12 @@ export function CompareBar() {
                       </span>
                     )}
                     <span className="hidden max-w-[110px] truncate font-mono text-[11px] md:block">
-                      {car?.title_zh || "加载中..."}
+                      {car ? carTitle(car, locale) : t("加载中...")}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeFromCompare(id)}
-                      aria-label="移出对比"
+                      aria-label={t("移出对比")}
                       className="p-0.5 text-muted-foreground transition-colors hover:text-foreground"
                     >
                       <X className="h-3.5 w-3.5" strokeWidth={2} />
@@ -155,7 +158,7 @@ export function CompareBar() {
               })}
               {ids.length < 3 && (
                 <span className="shrink-0 font-mono text-[10px] text-muted-foreground/70">
-                  还可加 {3 - ids.length} 辆
+                  {t("还可加 {n} 辆", { n: 3 - ids.length })}
                 </span>
               )}
             </div>
@@ -165,8 +168,8 @@ export function CompareBar() {
               <button
                 type="button"
                 onClick={() => clearCompare()}
-                title="取消对比"
-                aria-label="取消对比"
+                title={t("取消对比")}
+                aria-label={t("取消对比")}
                 className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
                 <Trash2 className="h-3.5 w-3.5" strokeWidth={1.5} />
@@ -180,7 +183,7 @@ export function CompareBar() {
                   else router.push("/compare");
                 }}
               >
-                对比 ({ids.length})
+                {t("对比")} ({ids.length})
                 <ArrowRight className="h-3.5 w-3.5" strokeWidth={1.5} />
               </Button>
             </div>
@@ -204,7 +207,7 @@ export function CompareBar() {
         >
           <X className="h-4 w-4" strokeWidth={1.5} />
         </button>
-        <span className="font-mono text-sm font-semibold">车辆对比</span>
+        <span className="font-mono text-sm font-semibold">{t("车辆对比")}</span>
         <div className="h-8 w-8" />
       </div>
       <div className="overflow-y-auto px-4 pb-8">

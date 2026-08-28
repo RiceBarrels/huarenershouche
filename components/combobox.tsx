@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { match } from "pinyin-pro";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/components/i18n-provider";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +53,7 @@ export function Combobox({
   emptyText = "未找到结果",
   className,
 }: ComboboxProps) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -79,10 +81,10 @@ export function Combobox({
       {selected ? (
         <span className="flex items-center gap-2 truncate">
           {selected.icon}
-          {selected.label}
+          {t(selected.label)}
         </span>
       ) : (
-        placeholder
+        t(placeholder)
       )}
       <ChevronsUpDown className="ml-1 h-3 w-3 shrink-0 opacity-50" />
     </Button>
@@ -92,7 +94,7 @@ export function Combobox({
   const list = (mobile: boolean) => (
     <Command filter={pinyinFilter} className={mobile ? "bg-transparent" : undefined}>
       <CommandInput
-        placeholder={searchPlaceholder}
+        placeholder={t(searchPlaceholder)}
         className={mobile ? "text-[15px]" : "font-mono text-xs"}
       />
       <CommandList className={mobile ? "max-h-[45vh]" : undefined}>
@@ -102,7 +104,7 @@ export function Combobox({
             mobile ? "text-sm" : "font-mono text-xs"
           )}
         >
-          {emptyText}
+          {t(emptyText)}
         </CommandEmpty>
         <CommandGroup className={mobile ? "px-2" : undefined}>
           {options.map((option) => (
@@ -117,7 +119,7 @@ export function Combobox({
             >
               <span className="flex flex-1 items-center gap-2">
                 {option.icon}
-                {option.label}
+                {t(option.label)}
               </span>
               <Check
                 className={cn(
@@ -139,7 +141,7 @@ export function Combobox({
         <DrawerTrigger asChild>{trigger}</DrawerTrigger>
         <DrawerContent>
           <DrawerHeader className="pb-1 pt-3">
-            <DrawerTitle>{placeholder.replace(/\s*\*$/, "")}</DrawerTitle>
+            <DrawerTitle>{t(placeholder.replace(/\s*\*$/, ""))}</DrawerTitle>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-hidden px-2 pb-[max(env(safe-area-inset-bottom,0px),0.5rem)]">
             {list(true)}

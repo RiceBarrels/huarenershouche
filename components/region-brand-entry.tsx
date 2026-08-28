@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/localized-navigation";
 import { MapPin } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useI18n } from "@/components/i18n-provider";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -27,6 +28,7 @@ const METRO_AREAS: { nameZh: string; locationMatch: string }[] = [
 ];
 
 export function RegionBrandEntry() {
+  const { t } = useI18n();
   const [regions, setRegions] = useState<RegionData[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,10 +66,10 @@ export function RegionBrandEntry() {
         {/* 手机保留小图标标题;桌面统一用 SectionHeader,与其他楼层同一套视觉语言 */}
         <div className="mb-4 flex items-center gap-2 md:hidden">
           <MapPin className="h-4 w-4" strokeWidth={1.5} />
-          <h2 className="font-mono text-sm font-medium">按地区找车</h2>
+          <h2 className="font-mono text-sm font-medium">{t("按地区找车")}</h2>
         </div>
         <div className="hidden md:block">
-          <SectionHeader label="Regions" title="按地区找车" className="mb-6" />
+          <SectionHeader label="Regions" title={t("按地区找车")} className="mb-6" />
         </div>
 
         {loading ? (
@@ -89,10 +91,10 @@ export function RegionBrandEntry() {
                 className="group flex shrink-0 flex-col items-center justify-center rounded-xl bg-card px-6 py-3 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50 md:px-4"
               >
                 <span className="font-mono text-sm font-medium group-hover:text-foreground">
-                  {region.nameZh}
+                  {t(region.nameZh)}
                 </span>
                 <span className="mt-1 font-mono text-[10px] text-muted-foreground">
-                  {region.count > 0 ? `${region.count} 辆在售` : "暂无车源"}
+                  {region.count > 0 ? t("{n} 辆在售", { n: region.count }) : t("暂无车源")}
                 </span>
               </Link>
             ))}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter } from "@/components/localized-navigation";
 import { WifiOff, RefreshCw } from "lucide-react";
 import {
   setupStatusBar,
@@ -16,16 +16,18 @@ import {
 import { initDeviceCorner } from "@/lib/device-corner";
 import { WelcomeScreen } from "@/components/welcome-screen";
 import { PermissionPrompt } from "@/components/permission-prompt";
+import { useI18n } from "@/components/i18n-provider";
 
 function OfflinePage() {
+  const { t } = useI18n();
   const [retrying, setRetrying] = useState(false);
 
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-6 font-mono">
       <WifiOff className="h-12 w-12 text-muted-foreground" strokeWidth={1} />
-      <h1 className="mt-6 text-xl font-semibold">无法连接网络</h1>
+      <h1 className="mt-6 text-xl font-semibold">{t("无法连接网络")}</h1>
       <p className="mt-2 text-center text-sm text-muted-foreground">
-        请检查你的网络连接后重试
+        {t("请检查你的网络连接后重试")}
       </p>
       <button
         type="button"
@@ -43,9 +45,9 @@ function OfflinePage() {
         className="mt-8 flex items-center gap-2 bg-muted px-6 py-2.5 text-sm transition-colors hover:bg-muted/70 active:bg-muted/70 disabled:opacity-50"
       >
         <RefreshCw className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} strokeWidth={1.5} />
-        {retrying ? "正在重试..." : "重试"}
+        {retrying ? t("正在重试...") : t("重试")}
       </button>
-      <p className="mt-12 text-[10px] text-muted-foreground">常來車網 · CLC Auto</p>
+      <p className="mt-12 text-[10px] text-muted-foreground">{t("常來車網")} · CLC Auto</p>
     </div>
   );
 }

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/components/i18n-provider";
 import {
   fetchVehicleHistory,
   type VehicleHistory as VehicleHistoryData,
@@ -25,8 +26,9 @@ import {
 } from "@/lib/vehicle-history";
 
 function RatingStars({ rating }: { rating: string }) {
+  const { t } = useI18n();
   const num = parseInt(rating);
-  if (!num || num < 1) return <span className="font-mono text-[11px] text-muted-foreground">未评级</span>;
+  if (!num || num < 1) return <span className="font-mono text-[11px] text-muted-foreground">{t("未评级")}</span>;
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((i) => (
@@ -44,6 +46,7 @@ function RatingStars({ rating }: { rating: string }) {
 }
 
 function RecallCard({ recall }: { recall: RecallItem }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   return (
     // 整卡可点展开:hover 轻微变色提示可交互(触屏无 hover,不影响手机)
@@ -77,18 +80,18 @@ function RecallCard({ recall }: { recall: RecallItem }) {
           >
             <div className="mt-3 space-y-2 border-t border-border pt-3">
               <div>
-                <span className="font-mono text-[10px] font-medium text-muted-foreground">问题描述</span>
+                <span className="font-mono text-[10px] font-medium text-muted-foreground">{t("问题描述")}</span>
                 <p className="mt-0.5 font-mono text-[11px] leading-relaxed">{recall.summary}</p>
               </div>
               {recall.consequence && (
                 <div>
-                  <span className="font-mono text-[10px] font-medium text-red-500">潜在后果</span>
+                  <span className="font-mono text-[10px] font-medium text-red-500">{t("潜在后果")}</span>
                   <p className="mt-0.5 font-mono text-[11px] leading-relaxed">{recall.consequence}</p>
                 </div>
               )}
               {recall.remedy && (
                 <div>
-                  <span className="font-mono text-[10px] font-medium text-green-600 dark:text-green-400">解决方案</span>
+                  <span className="font-mono text-[10px] font-medium text-green-600 dark:text-green-400">{t("解决方案")}</span>
                   <p className="mt-0.5 font-mono text-[11px] leading-relaxed">{recall.remedy}</p>
                 </div>
               )}
@@ -101,6 +104,7 @@ function RecallCard({ recall }: { recall: RecallItem }) {
 }
 
 function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
   const hasSeverity = complaint.crash || complaint.injuries > 0 || complaint.deaths > 0;
   return (
@@ -121,12 +125,12 @@ function ComplaintCard({ complaint }: { complaint: ComplaintItem }) {
             {complaint.crash && (
               <span className="flex items-center gap-0.5 font-mono text-[10px] font-semibold text-red-500">
                 <CarFront className="h-2.5 w-2.5" strokeWidth={2} />
-                碰撞
+                {t("碰撞")}
               </span>
             )}
             {complaint.injuries > 0 && (
               <span className="font-mono text-[10px] font-semibold text-red-500">
-                {complaint.injuries} 人受伤
+                {t("{n} 人受伤", { n: complaint.injuries })}
               </span>
             )}
           </div>
@@ -164,6 +168,7 @@ interface VehicleHistoryProps {
 }
 
 export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: VehicleHistoryProps) {
+  const { t } = useI18n();
   const [data, setData] = useState<VehicleHistoryData | null>(null);
   const [loading, setLoading] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -193,7 +198,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
         onClick={handleLoad}
       >
         <Search className="h-3 w-3" strokeWidth={1.5} />
-        查询该车型的 NHTSA 召回与安全评级（针对车型年款，非本车记录）
+        {t("查询该车型的 NHTSA 召回与安全评级（针对车型年款，非本车记录）")}
       </button>
     );
   }
@@ -203,7 +208,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
       <div className="flex items-center gap-2 py-4">
         <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
         <span className="font-mono text-xs text-muted-foreground">
-          正在查询 {year} {make} {model} 的记录...
+          {t("正在查询 {year} {make} {model} 的记录...", { year, make, model })}
         </span>
       </div>
     );
@@ -225,7 +230,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
         <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <FileWarning className="h-3.5 w-3.5 text-amber-500" strokeWidth={1.5} />
-            <span className="font-mono text-[10px] text-muted-foreground">安全召回</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{t("安全召回")}</span>
           </div>
           <p className={`mt-1 font-mono text-lg font-bold tabular-nums ${data.recalls.length > 0 ? "text-amber-600 dark:text-amber-400" : ""}`}>
             {data.recalls.length}
@@ -234,14 +239,14 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
         <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <CircleAlert className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={1.5} />
-            <span className="font-mono text-[10px] text-muted-foreground">投诉记录</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{t("投诉记录")}</span>
           </div>
           <p className="mt-1 font-mono text-lg font-bold tabular-nums">{data.complaints.length}</p>
         </div>
         <div className="rounded-xl bg-card p-3">
           <div className="flex items-center gap-1.5">
             <CarFront className="h-3.5 w-3.5 text-red-500" strokeWidth={1.5} />
-            <span className="font-mono text-[10px] text-muted-foreground">涉及碰撞</span>
+            <span className="font-mono text-[10px] text-muted-foreground">{t("涉及碰撞")}</span>
           </div>
           <p className={`mt-1 font-mono text-lg font-bold tabular-nums ${crashComplaints.length > 0 ? "text-red-500" : ""}`}>
             {crashComplaints.length}
@@ -254,35 +259,35 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
         <div className="rounded-xl bg-card p-4">
           <h3 className="flex items-center gap-1.5 font-mono text-xs font-semibold">
             <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />
-            NHTSA 安全评级
+            {t("NHTSA 安全评级")}
           </h3>
           <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div>
-              <span className="font-mono text-[10px] text-muted-foreground">综合评分</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{t("综合评分")}</span>
               <div className="mt-1">
                 <RatingStars rating={data.safetyRating.overallRating} />
               </div>
             </div>
             <div>
-              <span className="font-mono text-[10px] text-muted-foreground">正面碰撞</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{t("正面碰撞")}</span>
               <div className="mt-1">
                 <RatingStars rating={data.safetyRating.frontCrashRating} />
               </div>
             </div>
             <div>
-              <span className="font-mono text-[10px] text-muted-foreground">侧面碰撞</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{t("侧面碰撞")}</span>
               <div className="mt-1">
                 <RatingStars rating={data.safetyRating.sideCrashRating} />
               </div>
             </div>
             <div>
-              <span className="font-mono text-[10px] text-muted-foreground">翻车风险</span>
+              <span className="font-mono text-[10px] text-muted-foreground">{t("翻车风险")}</span>
               <div className="mt-1">
                 <RatingStars rating={data.safetyRating.rolloverRating} />
               </div>
               {data.safetyRating.rolloverPossibility > 0 && (
                 <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
-                  翻车概率 {(data.safetyRating.rolloverPossibility * 100).toFixed(1)}%
+                  {t("翻车概率 {pct}%", { pct: (data.safetyRating.rolloverPossibility * 100).toFixed(1) })}
                 </p>
               )}
             </div>
@@ -291,13 +296,13 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
             <div className="mt-3 flex gap-2 overflow-x-auto">
               <img
                 src={data.safetyRating.frontCrashPicture}
-                alt="正面碰撞测试"
+                alt={t("正面碰撞测试")}
                 className="h-20 rounded-lg border border-border object-cover"
               />
               {data.safetyRating.sideCrashPicture && (
                 <img
                   src={data.safetyRating.sideCrashPicture}
-                  alt="侧面碰撞测试"
+                  alt={t("侧面碰撞测试")}
                   className="h-20 rounded-lg border border-border object-cover"
                 />
               )}
@@ -318,7 +323,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            召回记录 ({data.recalls.length})
+            {t("召回记录")} ({data.recalls.length})
           </button>
           <button
             type="button"
@@ -329,7 +334,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            投诉记录 ({data.complaints.length})
+            {t("投诉记录")} ({data.complaints.length})
           </button>
         </div>
 
@@ -345,7 +350,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
               <div className="flex items-center gap-2 py-6">
                 <ShieldCheck className="h-4 w-4 text-green-500" strokeWidth={1.5} />
                 <span className="font-mono text-xs text-muted-foreground">
-                  该车型暂无安全召回记录
+                  {t("该车型暂无安全召回记录")}
                 </span>
               </div>
             )
@@ -364,7 +369,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
                     className="w-full font-mono text-[11px] text-muted-foreground"
                     onClick={() => setComplaintsShown((n) => n + 20)}
                   >
-                    加载更多 ({data.complaints.length - complaintsShown} 条剩余)
+                    {t("加载更多 ({n} 条剩余)", { n: data.complaints.length - complaintsShown })}
                   </Button>
                 )}
               </div>
@@ -372,7 +377,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
               <div className="flex items-center gap-2 py-6">
                 <ShieldCheck className="h-4 w-4 text-green-500" strokeWidth={1.5} />
                 <span className="font-mono text-xs text-muted-foreground">
-                  该车型暂无投诉记录
+                  {t("该车型暂无投诉记录")}
                 </span>
               </div>
             )
@@ -382,7 +387,7 @@ export function VehicleHistoryPanel({ make, model, year, autoLoad = false }: Veh
 
       {/* Disclaimer */}
       <p className="font-mono text-[10px] text-muted-foreground">
-        数据来源: NHTSA (美国国家公路交通安全管理局)。召回和投诉数据针对该品牌车型年款，并非特定于某辆车。如需查询特定车辆的事故历史，请使用 CarFax 或 AutoCheck。
+        {t("数据来源: NHTSA (美国国家公路交通安全管理局)。召回和投诉数据针对该品牌车型年款，并非特定于某辆车。如需查询特定车辆的事故历史，请使用 CarFax 或 AutoCheck。")}
       </p>
     </motion.div>
   );
