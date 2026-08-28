@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Bagel_Fat_One } from "next/font/google";
 import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
@@ -21,6 +21,16 @@ const zcoolQingKe = localFont({
   src: "./fonts/ZCOOLQingKeHuangYou-Regular.woff2",
   variable: "--font-zcool",
   weight: "400",
+  display: "swap",
+  preload: false,
+});
+
+// 韩文品牌字体 Bagel Fat One:排在 logo 字体栈 ZCOOL 之后,谚文字形(또와카)
+// 自动落到它,中文/拉丁照旧走 ZCOOL,无需按语言切换
+const bagelFatOne = Bagel_Fat_One({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-korean-logo",
   display: "swap",
   preload: false,
 });
@@ -135,7 +145,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} ${bagelFatOne.variable} antialiased`}
       >
         {/* 语言树([locale]/layout)自带其余 Provider;ThemeProvider 留在根上,
             让入口重定向页也有正确的暗色背景,避免 App 启动白闪 */}

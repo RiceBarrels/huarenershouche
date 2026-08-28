@@ -61,7 +61,7 @@ import type { DbCar, DbCommunityPost } from "@/lib/types";
 import { Heart } from "lucide-react";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle } from "@/lib/i18n";
+import { carTitle, brandLogoSrc } from "@/lib/i18n";
 
 // Map city names to Chinese region names, with NYC borough detection
 const CITY_ZH_MAP: Record<string, string> = {
@@ -489,7 +489,7 @@ export default function Home() {
               }}
               className="flex items-center gap-2 px-3 py-2"
             >
-              <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" />
+              <Image src={brandLogoSrc(locale)} alt="" width={20} height={20} className="h-5 w-5 shrink-0 object-contain" />
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" strokeWidth={1.5} />
                 <Input
@@ -538,7 +538,7 @@ export default function Home() {
                   : "North America · Used Car Marketplace"}
             </p>
             <span className="flex items-center gap-1.5 md:hidden">
-              <Image src="/logo.png" alt={t("常來車網")} width={22} height={22} className="h-[22px] w-[22px] object-contain" />
+              <Image src={brandLogoSrc(locale)} alt={t("常來車網")} width={22} height={22} className="h-[22px] w-[22px] object-contain" />
               <span className="font-logo text-lg">{t("常來車網")}</span>
             </span>
             <div className="hidden items-center gap-1.5 md:flex">

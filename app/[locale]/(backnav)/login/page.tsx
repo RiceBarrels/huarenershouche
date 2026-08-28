@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLogoSrc } from "@/lib/i18n";
 import { EASE } from "@/lib/motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -41,7 +42,7 @@ function GoogleIcon({ className }: { className?: string }) {
 
 export default function LoginPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   // 一步一个输入:先邮箱,再密码
   const [step, setStep] = useState<"email" | "password">("email");
   const [email, setEmail] = useState("");
@@ -131,7 +132,7 @@ export default function LoginPage() {
       <Header />
       <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-5 py-12">
         <div className="flex flex-col items-center">
-          <Image src="/logo.png" alt="常來車網" width={48} height={48} className="h-12 w-12 object-contain" />
+          <Image src={brandLogoSrc(locale)} alt={t("常來車網")} width={48} height={48} className="h-12 w-12 object-contain" />
           <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">
             {t("登录")}
           </h1>

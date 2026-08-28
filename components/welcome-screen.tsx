@@ -7,6 +7,7 @@ import { ChevronRight, Loader2, MapPin, Shield, Zap } from "lucide-react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLogoSrc } from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 
@@ -43,7 +44,7 @@ const SLIDES = [
 ];
 
 export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -147,7 +148,7 @@ export function WelcomeScreen({ onComplete }: { onComplete: () => void }) {
                       {Icon ? (
                         <Icon className="h-9 w-9 text-foreground" strokeWidth={1.2} />
                       ) : (
-                        <Image src="/logo.png" alt="常來車網" width={48} height={48} className="h-12 w-12 object-contain" />
+                        <Image src={brandLogoSrc(locale)} alt={t("常來車網")} width={48} height={48} className="h-12 w-12 object-contain" />
                       )}
                     </div>
                     <h1 className="mt-8 text-center font-logo text-2xl tracking-tight">

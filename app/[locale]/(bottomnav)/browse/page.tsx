@@ -12,6 +12,7 @@ import { getCarSuggestionPool, logCarSearchTerm } from "@/lib/car-search-suggest
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
+import { brandShortLabel, brandLogoSrc } from "@/lib/i18n";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -338,7 +339,7 @@ function BrowseContent() {
     const chips: { key: string; label: string }[] = [];
     if (filters.make) {
       for (const m of filters.make.split(",")) {
-        chips.push({ key: "make", label: locale === "en" ? m : MAKES_ZH[m] || m });
+        chips.push({ key: "make", label: brandShortLabel(m, MAKES_ZH[m], t, locale) });
       }
     }
     if (filters.model) {
@@ -468,7 +469,7 @@ function BrowseContent() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 2xl:max-w-[88rem] min-[1920px]:max-w-[104rem] min-[2560px]:max-w-[120rem]">
           <div>
             <div className="flex items-center gap-2">
-              <Image src="/logo.png" alt="" width={20} height={20} className="h-5 w-5 object-contain" />
+              <Image src={brandLogoSrc(locale)} alt="" width={20} height={20} className="h-5 w-5 object-contain" />
               <p className="font-mono text-sm font-semibold">常來車網</p>
             </div>
             <p className="font-mono text-[11px] text-muted-foreground">

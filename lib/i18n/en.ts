@@ -1792,4 +1792,6 @@ export const en: Record<string, string> = {
   "已从英文翻译": "Translated from English",
   "显示原文": "Show original",
   "显示翻译": "Show translation",
+  "常來車網": "CLCAuto",
+  "常來車網 CLCAuto": "CLCAuto",
 };

@@ -13,6 +13,14 @@ export function getPlatform(): string {
   return Capacitor.getPlatform();
 }
 
+/**
+ * API 根地址:网页端返回 ""(同源相对路径,本地 dev/预发都命中当前环境);
+ * 原生壳静态导出里没有 /api,必须打线上站。
+ */
+export function apiOrigin(): string {
+  return isNative() ? "https://www.clcauto.com" : "";
+}
+
 /** Safe status bar setup — only runs on native */
 export async function setupStatusBar() {
   if (!isNative()) return;

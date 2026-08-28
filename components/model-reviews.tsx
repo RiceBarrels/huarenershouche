@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
-import { Heart } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
-import { communityPostLink } from "@/lib/static-link";
-import { timeAgo } from "@/lib/format";
+import { PostCard } from "@/components/post-card";
+import { usePostTranslations, type PostI18nMap } from "@/hooks/use-post-translations";
 import type { DbCommunityPost } from "@/lib/types";
 
 interface ModelReviewsProps {
@@ -15,12 +14,13 @@ interface ModelReviewsProps {
 }
 
 /**
- * 车主口碑：来自社区的车评（type='review'）。
+ * 车主口碑：来自社区的车评（type='review'），直接复用社区帖子卡片
+ * （含非中文界面的 AI 翻译 + 显示原文切换）。
  * 优先同 make+model，没有则退回同 make（标注"同品牌车主评价"）。
  * 一条都没有时不渲染。
  */
 export function ModelReviews({ make, model }: ModelReviewsProps) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [makeLevelOnly, setMakeLevelOnly] = useState(false);
 
@@ -30,10 +30,11 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
     async function load() {
       if (!make) return;
 
+      // PostCard 需要完整字段(作者/图片/计数/翻译缓存)
       const baseQuery = () =>
         supabase
           .from("community_posts")
-          .select("id, title, content, likes_count, created_at, make, model")
+          .select("*, profiles!user_id(username, avatar_url)")
           .eq("type", "review")
           .eq("status", "active")
           .ilike("make", make)
@@ -65,6 +66,19 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
     };
   }, [make, model]);
 
+  // 非中文界面:批量翻译并合并回状态(缓存全站共享)
+  const mergeI18n = useCallback(
+    (map: PostI18nMap) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
+        )
+      );
+    },
+    [locale]
+  );
+  usePostTranslations(posts, locale, mergeI18n);
+
   if (posts.length === 0) return null;
 
   return (
@@ -76,28 +90,10 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
         </span>
       </div>
 
-      {/* 桌面卡片内边距/间距与"相似车辆"网格的密度对齐(手机保持 p-3/gap-3) */}
-      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3 md:gap-4">
+      {/* 直接用社区帖子卡片;点赞在此为只读展示(不传 onLike) */}
+      <div className="mt-3 space-y-3 md:space-y-4">
         {posts.map((post) => (
-          <Link
-            key={post.id}
-            href={communityPostLink(post.id)}
-            className="block rounded-xl bg-card p-3 transition-colors hover:bg-muted/40 md:p-4"
-          >
-            <h3 className="line-clamp-1 font-mono text-xs font-semibold leading-tight">
-              {post.title}
-            </h3>
-            <p className="mt-1.5 line-clamp-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-              {post.content}
-            </p>
-            <div className="mt-2.5 flex items-center gap-3 font-mono text-[10px] text-muted-foreground/70">
-              <span className="flex items-center gap-0.5">
-                <Heart className="h-2.5 w-2.5" strokeWidth={1.5} />
-                {post.likes_count || 0}
-              </span>
-              <span>{timeAgo(post.created_at, t)}</span>
-            </div>
-          </Link>
+          <PostCard key={post.id} post={post} />
         ))}
       </div>
 

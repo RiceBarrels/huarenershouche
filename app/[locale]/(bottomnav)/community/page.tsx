@@ -41,7 +41,9 @@ import {
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { timeAgo } from "@/lib/format";
-import { carTitle } from "@/lib/i18n";
+import { carTitle, needsContentTranslation } from "@/lib/i18n";
+import { PostCard } from "@/components/post-card";
+import { apiOrigin } from "@/lib/capacitor";
 import { useI18n } from "@/components/i18n-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -171,6 +173,55 @@ function CommunityFeedPage() {
   const [followingPosts, setFollowingPosts] = useState<DbCommunityPost[]>([]);
   const [followingLoading, setFollowingLoading] = useState(false);
   const [followingLoaded, setFollowingLoaded] = useState(false);
+
+  // ---- 列表卡片按需 AI 翻译:非中文界面,把已加载且未翻译的帖子分批(12/批)
+  // 送 /api/translate-post 批量翻译,结果合并回两条流;in-flight 集合防重复请求 ----
+  const cardTranslating = useRef<Set<string>>(new Set());
+  useEffect(() => {
+
+    const all = [...posts, ...followingPosts];
+    // other_i18n[locale] === undefined 表示"从未尝试";失败会写入 {} 标记,
+    // 让卡片 skeleton 收起、回退原文,且不再重试
+    const need = all.filter(
+      (p) =>
+        needsContentTranslation(`${p.title}\n${p.content}`, locale) &&
+        p.other_i18n?.[locale] === undefined &&
+        !cardTranslating.current.has(p.id)
+    );
+    if (need.length === 0) return;
+    const ids = need.slice(0, 12).map((p) => p.id);
+    ids.forEach((id) => cardTranslating.current.add(id));
+    const applyMap = (map: Record<string, { title?: string | null; content?: string | null }>) => {
+      const merge = (list: DbCommunityPost[]) =>
+        list.map((p) =>
+          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
+        );
+      setPosts(merge);
+      setFollowingPosts(merge);
+    };
+    fetch(`${apiOrigin()}/api/translate-post`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ postIds: ids, locale }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then(
+        (json: {
+          ok?: boolean;
+          i18n?: Record<string, { title?: string | null; content?: string | null }>;
+        } | null) => {
+          const map = { ...(json?.ok ? json.i18n : undefined) };
+          for (const id of ids) if (!(id in map)) map[id] = {};
+          applyMap(map);
+        }
+      )
+      .catch(() => {
+        applyMap(Object.fromEntries(ids.map((id) => [id, {}])));
+      })
+      .finally(() => {
+        ids.forEach((id) => cardTranslating.current.delete(id));
+      });
+  }, [posts, followingPosts, locale]);
   // 展示着缓存数据、后台刷新中(顶部小 spinner,即下拉刷新的那种加载)
   const [refreshing, setRefreshing] = useState(false);
   const [followingRefreshing, setFollowingRefreshing] = useState(false);
@@ -1638,186 +1689,6 @@ function CommunityFeedPage() {
         document.body,
       )}
     </PullToRefresh>
-  );
-}
-
-function PostCard({
-  post,
-  liked,
-  onLike,
-}: {
-  post: DbCommunityPost;
-  liked: boolean;
-  onLike: () => void;
-}) {
-  const router = useRouter();
-  const { t } = useI18n();
-  const { enabled: overlayEnabled, openPost, openUser } = useOverlay();
-  const media = post.images || [];
-  const shown = media.slice(0, 4);
-
-  // 点头像/名字进作者主页(浮层可用时用浮层)
-  function goProfile(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (overlayEnabled) openUser(post.user_id);
-    else router.push(userLink(post.user_id));
-  }
-
-  return (
-    <Link
-      href={communityPostLink(post.id)}
-      onClick={(e) => {
-        // 移动端:在当前页浮层打开(从卡片放大);桌面端正常跳转
-        if (overlayEnabled) {
-          e.preventDefault();
-          const r = e.currentTarget.getBoundingClientRect();
-          openPost(post, { top: r.top, left: r.left, width: r.width, height: r.height }, e.currentTarget.outerHTML, e.currentTarget);
-        }
-      }}
-      /* 桌面:hover 细描边 + 点按变深,鼠标环境下给出更明确的可点击反馈(工具感 1px 边,非发光) */
-      className="block p-3 bg-card rounded-xl transition-colors hover:bg-muted/30 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
-    >
-      <div className="flex gap-3">
-        {/* 头像列 */}
-        <button
-          type="button"
-          onClick={goProfile}
-          aria-label={t("查看主页")}
-          className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted transition-opacity hover:opacity-80"
-        >
-          <img
-            src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
-            alt=""
-            className="h-full w-full object-cover"
-          />
-        </button>
-
-        <div className="min-w-0 flex-1 pr-3 pt-1">
-          {/* X 式头部行:名字 · 时间(类型收进正文右上不再占位) */}
-          <div className="flex items-center gap-1 font-mono text-[15px] leading-5">
-            <button
-              type="button"
-              onClick={goProfile}
-              className="min-w-0 truncate font-bold text-foreground hover:underline"
-            >
-              {post.profiles?.username || t("匿名")}
-            </button>
-            <span className="shrink-0 text-muted-foreground">
-              · {timeAgo(post.created_at, t)}
-            </span>
-          </div>
-
-          {/* 正文:X 式全色文字,标题加粗、内容常规 */}
-          {post.title && (
-            <h3 className="font-mono text-[15px] font-semibold leading-snug text-foreground py-2">
-              {post.title}
-            </h3>
-          )}
-          {post.content && (
-            <p className="mt-0.5 line-clamp-4 whitespace-pre-line font-mono text-[15px] leading-relaxed text-foreground">
-              <HashtagText text={post.content} />
-            </p>
-          )}
-
-          {/* 媒体:单图原比例,多图 2 列网格,超过 4 张盖 +N;X 式细描边圆角 */}
-          {shown.length > 0 && (
-            <div
-              className={`mt-2.5 overflow-hidden rounded-2xl ring-1 ring-border/60 ${
-                shown.length > 1 ? "grid grid-cols-2 gap-0.5" : ""
-              } ${shown.length === 3 ? "grid-rows-2" : ""}`}
-            >
-              {shown.map((url, i) => {
-                const spanFirst = shown.length === 3 && i === 0;
-                return (
-                  <div
-                    key={i}
-                    className={`relative bg-muted ${
-                      shown.length === 1 ? "" : spanFirst ? "row-span-2 h-full" : "aspect-square"
-                    }`}
-                  >
-                    {isVideoUrl(url) ? (
-                      <>
-                        <video
-                          src={url}
-                          muted
-                          playsInline
-                          preload="metadata"
-                          className={`w-full object-cover ${shown.length === 1 ? "max-h-[420px]" : "h-full"}`}
-                        />
-                        <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm">
-                            <Play className="ml-0.5 h-4 w-4 fill-white text-white" strokeWidth={1.5} />
-                          </span>
-                        </span>
-                      </>
-                    ) : (
-                      <img
-                        src={url}
-                        alt=""
-                        className={`w-full object-cover ${shown.length === 1 ? "max-h-[420px]" : "h-full"}`}
-                        loading="lazy"
-                      />
-                    )}
-                    {i === 3 && media.length > 4 && (
-                      <span className="absolute inset-0 flex items-center justify-center bg-black/50 font-mono text-sm font-medium text-white">
-                        +{media.length - 4}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* X 式操作行:评论 / 点赞 / 分享,横向铺开 */}
-          <div className="mt-2 flex max-w-xs items-center justify-start gap-4 text-muted-foreground">
-            <span className="group flex items-center font-mono text-[13px] transition-colors hover:text-brand-ink">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/30">
-                <MessageCircle className="h-[18px] w-[18px]" strokeWidth={1.5} />
-              </span>
-              {post.comments_count || 0}
-            </span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onLike();
-              }}
-              aria-label={liked ? t("取消点赞") : t("点赞")}
-              className={`group flex items-center gap-1 font-mono text-[13px] transition-colors ${
-                liked ? "text-red-500" : "hover:text-red-500"
-              }`}
-            >
-              <span className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${liked ? "" : "group-hover:bg-red-500/10"}`}>
-                <Heart className={`h-[18px] w-[18px] ${liked ? "fill-current" : ""}`} strokeWidth={1.5} />
-              </span>
-              {post.likes_count || 0}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const url = `${window.location.origin}/community/${post.id}`;
-                if (navigator.share) {
-                  navigator.share({ title: post.title, url }).catch(() => {});
-                } else {
-                  navigator.clipboard?.writeText(url).catch(() => {});
-                }
-              }}
-              aria-label={t("分享")}
-              className="group flex items-center font-mono text-[13px] transition-colors hover:text-brand-ink"
-            >
-              <span className="flex h-8 w-8 items-center justify-center rounded-full transition-colors group-hover:bg-primary/30">
-                <Share className="h-4 w-4" strokeWidth={1.5} />
-              </span>
-            </button>
-          </div>
-        </div>
-      </div>
-    </Link>
   );
 }
 

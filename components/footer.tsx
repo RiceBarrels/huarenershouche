@@ -7,6 +7,7 @@ import { useMemo } from "react";
 import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, SEO_MODELS, HOT_STATE_ABBRS } from "@/lib/seo-pages";
 import { HOT_MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLogoSrc } from "@/lib/i18n";
 
 const buyLinks = [
   { label: "搜索车辆", href: "/browse" },
@@ -80,7 +81,8 @@ export function Footer() {
         <div className="select-none pb-10">
           {/* 宽屏容器已放大到 88/104rem,水印跟着升一档,否则左侧字、右侧大片空白 */}
           <p className="whitespace-nowrap font-logo text-5xl leading-none tracking-tighter text-foreground/[0.07] lg:text-7xl 2xl:text-8xl">
-            {t("常來車網")} / CLCAUTO
+            {/* en 词典把品牌翻成 CLCAuto,再拼 / CLCAUTO 会重复,直接单写 */}
+            {locale === "en" ? "CLCAUTO" : `${t("常來車網")} / CLCAUTO`}
           </p>
         </div>
 
@@ -89,7 +91,7 @@ export function Footer() {
           {/* Brand */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="inline-flex items-center gap-2">
-              <Image src="/logo.png" alt={t("常來車網")} width={24} height={24} className="h-6 w-6 object-contain" />
+              <Image src={brandLogoSrc(locale)} alt={t("常來車網")} width={24} height={24} className="h-6 w-6 object-contain" />
               <span className="font-logo text-base">{t("常來車網")}</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">

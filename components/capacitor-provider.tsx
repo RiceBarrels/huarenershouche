@@ -19,7 +19,7 @@ import { PermissionPrompt } from "@/components/permission-prompt";
 import { useI18n } from "@/components/i18n-provider";
 
 function OfflinePage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [retrying, setRetrying] = useState(false);
 
   return (
@@ -47,7 +47,9 @@ function OfflinePage() {
         <RefreshCw className={`h-4 w-4 ${retrying ? "animate-spin" : ""}`} strokeWidth={1.5} />
         {retrying ? t("正在重试...") : t("重试")}
       </button>
-      <p className="mt-12 text-[10px] text-muted-foreground">{t("常來車網")} · CLC Auto</p>
+      <p className="mt-12 text-[10px] text-muted-foreground">
+        {locale === "en" ? "CLC Auto" : `${t("常來車網")} · CLC Auto`}
+      </p>
     </div>
   );
 }

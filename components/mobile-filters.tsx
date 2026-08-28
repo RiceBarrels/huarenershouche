@@ -11,7 +11,7 @@ import {
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { match } from "pinyin-pro";
 import { useI18n } from "@/components/i18n-provider";
-import { interpolate, type Locale } from "@/lib/i18n";
+import { interpolate, brandLabel, brandShortLabel, type Locale } from "@/lib/i18n";
 import { triggerHaptic } from "@/lib/haptics";
 import { IOSSwitch } from "@/components/ios-settings";
 
@@ -114,7 +114,7 @@ export function getLocationLabel(filters: Filters, t: TFn = interpolate): string
 export function getBrandLabel(filters: Filters, t: TFn = interpolate, locale: Locale = "zh"): string {
   if (!filters.make) return t("不限");
   const items = filters.make.split(",");
-  const labels = items.map((m) => (locale === "en" ? m : MAKES_ZH[m] || m));
+  const labels = items.map((m) => brandShortLabel(m, MAKES_ZH[m], t, locale));
   return labels.length <= 2
     ? labels.join(t("、"))
     : t("{first}等{n}个", { first: labels[0], n: labels.length });
@@ -528,7 +528,7 @@ export function LocationDrawerContent({
 
 // --- Brand drawer content with search ---
 function BrandItem({ make, selected, onToggle }: { make: string; selected: boolean; onToggle: () => void }) {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const logo = getBrandLogoUrl(make);
   return (
     <button
@@ -546,7 +546,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
           <Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
         )}
       </span>
-      <span className="flex-1 text-left">{locale === "en" ? make : `${MAKES_ZH[make]} ${make}`}</span>
+      <span className="flex-1 text-left">{brandLabel(make, MAKES_ZH[make], t, locale)}</span>
       {selected && <Check className="h-4 w-4 shrink-0 text-brand-ink" strokeWidth={2} />}
     </button>
   );
@@ -593,7 +593,7 @@ export function BrandDrawerContent({
               {getBrandLogoUrl(make) && (
                 <img src={getBrandLogoUrl(make)!} alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
               )}
-              {locale === "en" ? make : MAKES_ZH[make] || make}
+              {brandShortLabel(make, MAKES_ZH[make], t, locale)}
               <X className="h-3 w-3" strokeWidth={2} />
             </button>
           ))}

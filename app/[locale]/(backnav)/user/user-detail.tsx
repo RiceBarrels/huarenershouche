@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "@/components/localized-navigation";
 import { skipNextTransition } from "@/components/page-transition";
@@ -10,13 +10,13 @@ import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation } from "lucid
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
-import { timeAgo } from "@/lib/format";
-import { communityPostLink } from "@/lib/static-link";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { useI18n } from "@/components/i18n-provider";
 
 import { CarCard } from "@/components/car-card";
+import { PostCard } from "@/components/post-card";
+import { usePostTranslations, type PostI18nMap } from "@/hooks/use-post-translations";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { ChatThread } from "@/components/chat-thread";
 import { AvatarViewer } from "@/components/avatar-viewer";
@@ -26,15 +26,13 @@ import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { OpenInMaps } from "@/components/open-in-maps";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
-import { Heart, MessageSquare, Play } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 
 // leaflet 不能 SSR,按需加载
 const StoreMap = dynamic(
   () => import("@/components/store-map").then((m) => m.StoreMap),
   { ssr: false },
 );
-
-const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 
 interface SellerProfile {
   id: string;
@@ -110,6 +108,19 @@ export default function UserProfilePage({
     }
   }
   const router = useRouter();
+
+  // 非中文界面:帖子批量 AI 翻译并合并回状态(缓存全站共享,见 use-post-translations)
+  const mergeI18n = useCallback(
+    (map: PostI18nMap) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
+        )
+      );
+    },
+    [locale]
+  );
+  usePostTranslations(posts, locale, mergeI18n);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setAuthId(data.user?.id ?? null));
@@ -194,7 +205,8 @@ export default function UserProfilePage({
           .eq("dealer_id", userId),
         supabase
           .from("community_posts")
-          .select("*")
+          // PostCard 需要作者信息(profiles)与翻译缓存(other_i18n,含在 * 中)
+          .select("*, profiles!user_id(username, avatar_url)")
           .eq("user_id", userId)
           .eq("status", "active")
           .order("created_at", { ascending: false })
@@ -553,87 +565,14 @@ export default function UserProfilePage({
               )
             )}
 
-            {/* 帖子 tab:X 式圆角卡片列表 */}
+            {/* 帖子 tab:直接复用社区帖子卡片(含非中文界面 AI 翻译 + 显示原文切换);
+                点赞在此为只读展示(不传 onLike) */}
             {tab === "posts" && (
               posts.length > 0 ? (
                 <div className="mt-3 space-y-3">
-                  {posts.map((post) => {
-                    const cover = post.images?.[0];
-                    return (
-                      <Link
-                        key={post.id}
-                        href={communityPostLink(post.id)}
-                        /* 桌面:补齐水平内边距(px-1 在卡片底色下左右几乎贴边),
-                           并加与社区 feed 卡一致的 hover 描边/点按反馈 */
-                        className="flex gap-3 px-1 py-3.5 bg-card rounded-xl transition-colors hover:bg-muted/30 md:px-3 md:ring-1 md:ring-transparent md:hover:ring-border/70 md:active:bg-muted/50"
-                      >
-                        <span className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-muted">
-                          <img
-                            src={avatarUrl(profile.avatar_url, profile.username)}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1 font-mono text-[13px]">
-                            <span className="min-w-0 truncate font-semibold text-foreground">
-                              {profile.username}
-                            </span>
-                            <span className="shrink-0 text-muted-foreground/60">
-                              · {timeAgo(post.created_at, t)}
-                            </span>
-                          </div>
-                          {post.title && (
-                            <p className="mt-0.5 font-mono text-[15px] font-medium leading-snug">
-                              {post.title}
-                            </p>
-                          )}
-                          {post.content && (
-                            <p className="mt-0.5 line-clamp-3 whitespace-pre-line font-mono text-sm leading-relaxed text-muted-foreground">
-                              {post.content}
-                            </p>
-                          )}
-                          {cover && (
-                            <div className="relative mt-2.5 overflow-hidden rounded-xl bg-muted">
-                              {VIDEO_RE.test(cover) ? (
-                                <>
-                                  <video
-                                    src={cover}
-                                    muted
-                                    playsInline
-                                    preload="metadata"
-                                    className="max-h-[420px] w-full object-cover"
-                                  />
-                                  <span className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 backdrop-blur-sm">
-                                      <Play className="ml-0.5 h-4 w-4 fill-white text-white" strokeWidth={1.5} />
-                                    </span>
-                                  </span>
-                                </>
-                              ) : (
-                                <img
-                                  src={cover}
-                                  alt=""
-                                  className="max-h-[420px] w-full object-cover"
-                                  loading="lazy"
-                                />
-                              )}
-                            </div>
-                          )}
-                          <div className="mt-2.5 flex items-center gap-12 text-muted-foreground">
-                            <span className="flex items-center gap-1.5 font-mono text-xs">
-                              <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
-                              {post.comments_count || 0}
-                            </span>
-                            <span className="flex items-center gap-1.5 font-mono text-xs">
-                              <Heart className="h-4 w-4" strokeWidth={1.5} />
-                              {post.likes_count || 0}
-                            </span>
-                          </div>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                  {posts.map((post) => (
+                    <PostCard key={post.id} post={post} />
+                  ))}
                 </div>
               ) : (
                 <p className="py-12 text-center font-mono text-xs text-muted-foreground">

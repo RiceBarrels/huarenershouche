@@ -20,3 +20,10 @@ ALTER TABLE public.community_posts
 
 COMMENT ON COLUMN public.community_posts.other_i18n IS
   '按需翻译的帖子内容缓存,如 {"en": {"title": "...", "content": "..."}};由 /api/translate-post 写入';
+
+-- 评论翻译缓存(社区帖评论 + 车源评论),由 /api/translate-comments 批量写入
+ALTER TABLE public.post_comments
+  ADD COLUMN IF NOT EXISTS other_i18n jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE public.comments
+  ADD COLUMN IF NOT EXISTS other_i18n jsonb NOT NULL DEFAULT '{}'::jsonb;

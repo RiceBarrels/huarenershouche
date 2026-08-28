@@ -4,7 +4,7 @@
 // server 模式下由 [id]/page.tsx 服务端预取传入 initial(可被爬虫直接抓到);
 // 静态导出(Capacitor)模式下无 initial,客户端自行拉取。
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { Heart, Play } from "lucide-react";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +12,9 @@ import { avatarUrl } from "@/lib/avatar";
 import { communityPostLink } from "@/lib/static-link";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { useI18n } from "@/components/i18n-provider";
+import { needsContentTranslation } from "@/lib/i18n";
+import { usePostTranslations, type PostI18nMap } from "@/hooks/use-post-translations";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCommunityPost } from "@/lib/types";
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
@@ -38,8 +41,23 @@ export function RelatedPosts({
   className = "",
 }: RelatedPostsProps) {
   const [posts, setPosts] = useState<DbCommunityPost[]>(initial ?? []);
+  // 每条「显示原文」切换状态(id 集合,避免为每条拆子组件)
+  const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
   const { enabled: overlayEnabled, openPost } = useOverlay();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+
+  // 非中文界面:批量 AI 翻译并合并回状态(缓存全站共享,见 use-post-translations)
+  const mergeI18n = useCallback(
+    (map: PostI18nMap) => {
+      setPosts((prev) =>
+        prev.map((p) =>
+          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
+        )
+      );
+    },
+    [locale]
+  );
+  usePostTranslations(posts, locale, mergeI18n);
 
   useEffect(() => {
     if (initial && initial.length > 0) return;
@@ -114,6 +132,24 @@ export function RelatedPosts({
       <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-3">
         {posts.map((post) => {
           const cover = post.images?.[0];
+          // AI 翻译消费:other_i18n[locale] === undefined 表示在途(skeleton),
+          // {} 标记表示尝试失败(回退原文),有译文时可切回原文
+          const needsTranslation = needsContentTranslation(
+            `${post.title}\n${post.content}`,
+            locale,
+          );
+          const i18n = needsTranslation ? post.other_i18n?.[locale] : undefined;
+          const hasTranslation = !!(i18n?.content || i18n?.title);
+          const translationPending =
+            needsTranslation && post.other_i18n?.[locale] === undefined;
+          const showOriginal = showOriginalIds.has(post.id);
+          const sourceIsCJK = /[一-鿿]/.test(`${post.title}${post.content}`);
+          const displayTitle =
+            hasTranslation && !showOriginal ? i18n?.title || post.title : post.title;
+          const displayContent =
+            hasTranslation && !showOriginal
+              ? i18n?.content || post.content
+              : post.content;
           return (
             <Link
               key={post.id}
@@ -173,13 +209,53 @@ export function RelatedPosts({
                     {t(TYPE_LABELS[post.type] || post.type)}
                   </span>
                 )}
-                <h3 className="line-clamp-2 font-mono text-xs font-medium leading-snug">
-                  {post.title}
-                </h3>
-                {!cover && (
-                  <p className="mt-1 line-clamp-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
-                    {post.content}
-                  </p>
+                {/* AI 翻译标注 + 显示原文切换(卡片在 Link 里,按钮要阻止跳转) */}
+                {hasTranslation && (
+                  <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+                    <span className="truncate">
+                      {sourceIsCJK ? t("已从中文翻译") : t("已从英文翻译")}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowOriginalIds((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(post.id)) next.delete(post.id);
+                          else next.add(post.id);
+                          return next;
+                        });
+                      }}
+                      className="shrink-0 text-brand-ink underline-offset-2 hover:underline"
+                    >
+                      {showOriginal ? t("显示翻译") : t("显示原文")}
+                    </button>
+                  </div>
+                )}
+                {translationPending ? (
+                  /* 翻译在途:标题(+ 无封面时的内容)骨架 */
+                  <div className="space-y-1.5">
+                    <Skeleton className="h-3.5 w-full" />
+                    <Skeleton className="h-3.5 w-2/3" />
+                    {!cover && (
+                      <>
+                        <Skeleton className="h-3 w-full" />
+                        <Skeleton className="h-3 w-5/6" />
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <h3 className="line-clamp-2 font-mono text-xs font-medium leading-snug">
+                      {displayTitle}
+                    </h3>
+                    {!cover && (
+                      <p className="mt-1 line-clamp-3 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                        {displayContent}
+                      </p>
+                    )}
+                  </>
                 )}
                 <div className="mt-2 flex items-center gap-1.5">
                   <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">

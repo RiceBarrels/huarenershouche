@@ -45,6 +45,7 @@ import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
 import { Header } from "@/components/header";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLabel } from "@/lib/i18n";
 import { useIdentity } from "@/components/identity-provider";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
@@ -316,7 +317,12 @@ const STEPS: { id: StepId; title: string; sub?: string; optional?: boolean }[] =
 
 export default function PostCarPage() {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  // 品牌下拉:zh「宝马 BMW」/ ko「도요타 Toyota」/ en「Toyota」(value 写库不变)
+  const localizedMakeOptions = useMemo(
+    () => makeOptions.map((o) => ({ ...o, label: brandLabel(o.value, MAKES_ZH[o.value], t, locale) })),
+    [t, locale]
+  );
   const { actingId, authId, isActingAsClaimed } = useIdentity();
   const [user, setUser] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1369,7 +1375,7 @@ export default function PostCarPage() {
                   {current.id === "carinfo" && (
                     <div className="space-y-3">
                       <Combobox
-                        options={makeOptions}
+                        options={localizedMakeOptions}
                         value={form.make}
                         onValueChange={(v) => {
                           update("make", v);

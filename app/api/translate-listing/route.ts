@@ -64,7 +64,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 英文优先作源文(小语种译文通常从英文更稳),缺英文再用中文
+  // 英文优先作源文(小语种译文通常从英文更稳),缺英文再用中文。
+  // locale=en 时这里的"英文列"实际是中文脏数据,同样直接翻
   const translated = await translateListingInto(locale, {
     title: car.title || car.title_zh || null,
     description: car.description || car.description_zh || null,

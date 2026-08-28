@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ThemeOptions } from "@/components/theme-options";
 import { LanguageOptions } from "@/components/language-options";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLogoSrc } from "@/lib/i18n";
 import { avatarUrl } from "@/lib/avatar";
 import { useIdentity } from "@/components/identity-provider";
 import { useShowNavBack } from "@/components/nav-back-context";
@@ -43,7 +44,7 @@ export function Header() {
   const [query, setQuery] = useState("");
   const pathname = usePathname();
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   // (backnav) 布局组内:导航链接行最左侧显示统一的返回按钮
   const showNavBack = useShowNavBack();
 
@@ -112,7 +113,7 @@ export function Header() {
         {/* 第一行:logo + 搜索框 + 操作区(瓜子式) */}
         <div className="flex h-14 items-center gap-4 lg:gap-6">
           <Link href="/" className="flex shrink-0 items-center gap-2">
-            <Image src="/logo.png" alt={t("常來車網")} width={24} height={24} className="h-6 w-6" />
+            <Image src={brandLogoSrc(locale)} alt={t("常來車網")} width={24} height={24} className="h-6 w-6" />
             <span className="font-logo text-base tracking-tight">
               {t("常來車網")}
               <span className="animate-cursor-blink text-brand-ink">_</span>
@@ -147,14 +148,15 @@ export function Header() {
           {mounted && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
+                {/* 图标按钮统一浅底圆钮(与主页搜索胶囊、用户主页操作钮同语言),
+                    裸图标飘在导航上会显得散 */}
+                <button
+                  type="button"
                   aria-label={t("个性化")}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-foreground transition-colors hover:bg-muted"
                 >
-                  <Palette className="h-3.5 w-3.5" strokeWidth={1.5} />
-                </Button>
+                  <Palette className="h-4 w-4" strokeWidth={1.5} />
+                </button>
               </PopoverTrigger>
               {/* sideOffset 让下拉与 header 分隔线保持呼吸感,不贴边 */}
               <PopoverContent align="end" sideOffset={8} className="w-48 p-1.5 font-mono">
@@ -238,15 +240,12 @@ export function Header() {
                 </Popover>
               )}
               <Link href="/messages" className="relative" aria-label={t("消息")}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
+                <span
                   title={t("消息")}
-                  tabIndex={-1}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-foreground transition-colors hover:bg-muted"
                 >
-                  <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                </Button>
+                  <MessageSquare className="h-4 w-4" strokeWidth={1.5} />
+                </span>
                 {unreadCount > 0 && (
                   <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 font-mono text-[10px] font-medium text-white">
                     {/* 三位数会撑破圆形徽标,封顶展示 */}

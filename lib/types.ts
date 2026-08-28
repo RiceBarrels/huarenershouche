@@ -147,6 +147,8 @@ export interface DbComment {
   car_id: string;
   user_id: string;
   content: string;
+  // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
+  other_i18n?: Record<string, { content?: string | null }> | null;
   created_at: string;
   // Joined
   profiles?: { username: string; avatar_url: string | null };
@@ -192,6 +194,8 @@ export interface DbPostComment {
   parent_id: string | null;
   content: string;
   likes_count: number;
+  // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
+  other_i18n?: Record<string, { content?: string | null }> | null;
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
 }

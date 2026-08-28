@@ -16,7 +16,7 @@ import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
 import { useIdentity } from "@/components/identity-provider";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle } from "@/lib/i18n";
+import { carTitle, brandLabel } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -77,7 +77,16 @@ export default function EditCarPage() {
   // 下拉选项按当前语言本地化展示(value 保持中文原值写库)
   const localize = (opts: ComboboxOption[]) => opts.map((o) => ({ ...o, label: t(o.label) }));
   /* eslint-disable react-hooks/exhaustive-deps -- localize 仅依赖 t */
-  const tMakeOptions = useMemo(() => localize(makeOptions), [t]);
+  // 品牌:zh「宝马 BMW」/ ko「도요타 Toyota」/ en「Toyota」;"其他品牌"走词典
+  const tMakeOptions = useMemo(
+    () =>
+      makeOptions.map((o) =>
+        o.value === "Other"
+          ? { ...o, label: t("其他品牌") }
+          : { ...o, label: brandLabel(o.value, MAKES_ZH[o.value], t, locale) }
+      ),
+    [t, locale]
+  );
   const tFuelOptions = useMemo(() => localize(fuelOptions), [t]);
   const tTransmissionOptions = useMemo(() => localize(transmissionOptions), [t]);
   const tExteriorColorOptions = useMemo(() => localize(exteriorColorOptions), [t]);

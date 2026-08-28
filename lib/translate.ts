@@ -1,4 +1,4 @@
-// 车辆文案双语翻译 —— 服务端专用(经 OpenRouter 调用 inclusionai/ling-2.6-flash)。
+// 车辆文案双语翻译 —— 服务端专用(经 OpenRouter 调用,模型见 MODEL 常量)。
 // 绝不要在客户端组件里 import:OPENROUTER_API_KEY 必须留在服务端。
 //
 // localizeListing() 一次调用即补全 title / title_zh / description / description_zh,
@@ -6,7 +6,8 @@
 // 未配置 OPENROUTER_API_KEY 时优雅降级:原样返回,不影响发布/同步。
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = "inclusionai/ling-2.6-flash";
+// ling-2.6-flash 已转付费下架(2026-08 起 404),换成低价多语言强的 flash-lite
+const MODEL = "google/gemini-2.5-flash-lite";
 const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 4;
 const MAX_TOKENS = 8000;
@@ -248,6 +249,7 @@ export async function localizeListing(input: ListingFields): Promise<LocalizedFi
 // ---- 小语种按需翻译(cars.other_i18n 缓存用) ----
 
 const TARGET_LANG_NAMES: Record<string, string> = {
+  zh: "Simplified Chinese",
   en: "English",
   ko: "Korean",
   es: "Spanish",
@@ -273,7 +275,7 @@ export async function translateListingInto(
     messages: [
       {
         role: "system",
-        content: `You are a precise translator for a used-car marketplace. Translate into natural ${lang}. Keep vehicle brand / model / trim / year / VIN / units (mi, AWD, 1.5L...) unchanged in English. Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
+        content: `You are a precise translator for a used-car marketplace. Translate into natural ${lang}. Every sentence of the output MUST be written in ${lang} — do not leave sentences in the source language or in English (proper nouns, brand/model/trim names, VIN and units like mi, AWD, 1.5L stay as-is). Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
       },
       {
         role: "user",
@@ -355,7 +357,7 @@ export async function translatePostInto(
     messages: [
       {
         role: "system",
-        content: `You are a precise translator for a used-car community forum. Translate into natural ${lang}. Keep #hashtags, @mentions, URLs, and vehicle brand/model/trim names unchanged. Preserve line breaks. Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
+        content: `You are a precise translator for a used-car community forum. Translate into natural ${lang}. Every sentence of the output MUST be written in ${lang} — do not leave sentences in the source language or in English (#hashtags, @mentions, URLs, and vehicle brand/model/trim names stay as-is). Preserve line breaks. Never add or omit information. Output ONLY a raw JSON object — no markdown, no commentary.`,
       },
       {
         role: "user",
@@ -415,4 +417,81 @@ export async function translatePostInto(
     title: asStr(parsed.title) ?? input.title,
     content: asStr(parsed.content) ?? input.content,
   };
+}
+
+/**
+ * 批量短文本翻译(评论用):一次模型调用翻一批,输入/输出都是 {id: 文本}。
+ * 失败返回 null;成功时只包含模型给出的 key(缺的由调用方回退原文)。
+ */
+export async function translateTextsInto(
+  target: string,
+  texts: Record<string, string>
+): Promise<Record<string, string> | null> {
+  const key = process.env.OPENROUTER_API_KEY;
+  const lang = TARGET_LANG_NAMES[target];
+  const ids = Object.keys(texts);
+  if (!key || !lang || ids.length === 0) return null;
+
+  const body = JSON.stringify({
+    model: MODEL,
+    temperature: 0,
+    max_tokens: MAX_TOKENS,
+    messages: [
+      {
+        role: "system",
+        content: `You are a precise translator for a used-car community. Translate each value into natural ${lang}. Every output value MUST be written in ${lang} — do not leave text in the source language or in English (#hashtags, @mentions, and vehicle brand/model names stay as-is). Never add or omit information. Output ONLY a raw JSON object with the SAME keys — no markdown, no commentary.`,
+      },
+      {
+        role: "user",
+        content: `Translate every value of this JSON object into ${lang}, keeping the same keys:\n${JSON.stringify(texts)}`,
+      },
+    ],
+  });
+
+  let content: string | null = null;
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    try {
+      const res = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": "https://clcauto.com",
+          "X-Title": "CLCAuto Comment Translation",
+        },
+        body,
+      });
+      clearTimeout(timer);
+      if (res.status === 429 || res.status >= 500) {
+        if (attempt < MAX_ATTEMPTS - 1) {
+          await sleep(backoffMs(attempt));
+          continue;
+        }
+        return null;
+      }
+      if (!res.ok) return null;
+      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      content = json.choices?.[0]?.message?.content ?? null;
+      break;
+    } catch {
+      clearTimeout(timer);
+      if (attempt < MAX_ATTEMPTS - 1) {
+        await sleep(backoffMs(attempt));
+        continue;
+      }
+      return null;
+    }
+  }
+
+  const parsed = extractJson(content);
+  if (!parsed) return null;
+  const out: Record<string, string> = {};
+  for (const id of ids) {
+    const v = asStr(parsed[id]);
+    if (v) out[id] = v;
+  }
+  return out;
 }

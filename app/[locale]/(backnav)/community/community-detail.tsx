@@ -33,6 +33,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { timeAgo } from "@/lib/format";
 import { SITE_URL } from "@/lib/seo-pages";
+import { apiOrigin } from "@/lib/capacitor";
+import { needsContentTranslation } from "@/lib/i18n";
 import { userLink } from "@/lib/static-link";
 import type { DbCommunityPost, DbPostComment } from "@/lib/types";
 
@@ -109,40 +111,92 @@ export default function CommunityDetailPage({
   // ---- 帖子 AI 翻译(en/ko):原文已是目标语言则不翻;结果缓存在 other_i18n ----
   const postText = post ? `${post.title}\n${post.content}` : "";
   const sourceIsCJK = /[一-鿿]/.test(postText);
-  const needsTranslation =
-    !!post &&
-    locale !== "zh" &&
-    postText.trim() !== "" &&
-    (locale === "en" ? sourceIsCJK : !/[가-힣]/.test(postText));
+  // 先检测源语言再决定翻译(helper 支持 zh:中文界面看英文帖同样翻)
+  const needsTranslation = !!post && needsContentTranslation(postText, locale);
   const translation = needsTranslation ? post?.other_i18n?.[locale] : undefined;
   const showTranslated = needsTranslation && !!translation?.content && !showOriginal;
+  // 翻译在途(尚无任何尝试结果):正文区显示 skeleton
+  const postTranslationPending = needsTranslation && post?.other_i18n?.[locale] === undefined;
+  const postTranslateAttempted = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!post?.id || !needsTranslation || post.other_i18n?.[locale]?.content) return;
+    if (!post?.id || !needsTranslation) return;
+    if (post.other_i18n?.[locale] !== undefined) return; // 已有译文或已尝试(失败标记 {})
+    const key = `${post.id}:${locale}`;
+    if (postTranslateAttempted.current.has(key)) return;
+    postTranslateAttempted.current.add(key);
     let cancelled = false;
-    // SITE_URL 绝对地址:Capacitor 静态导出里没有 /api,必须打到线上站
-    fetch(`${SITE_URL}/api/translate-post`, {
+    const pid = post.id;
+    // 失败也写入 {} 标记:skeleton 收起、回退原文、不再重试
+    const markFailed = () =>
+      setPost((prev) =>
+        prev && prev.id === pid
+          ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: {} } }
+          : prev
+      );
+    // 网页端走同源相对路径;仅原生壳用线上绝对地址(静态导出没有 /api)
+    fetch(`${apiOrigin()}/api/translate-post`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postId: post.id, locale }),
+      body: JSON.stringify({ postId: pid, locale }),
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { ok?: boolean; i18n?: { title?: string | null; content?: string | null } } | null) => {
+        if (cancelled) return;
         const i18n = json?.ok ? json.i18n : undefined;
-        if (cancelled || !i18n) return;
+        if (!i18n) return markFailed();
         setPost((prev) =>
-          prev && prev.id === post.id
+          prev && prev.id === pid
             ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: i18n } }
             : prev
         );
       })
       .catch(() => {
-        // 翻译失败静默,继续显示原文
+        if (!cancelled) markFailed();
       });
     return () => {
       cancelled = true;
     };
   }, [post?.id, post?.other_i18n, needsTranslation, locale]);
+
+  // ---- 评论按需批量翻译(40/批,一次模型调用),结果合并回 comments ----
+  const commentTranslating = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (comments.length === 0) return;
+    // undefined = 从未尝试;失败写入 {} 标记(skeleton 收起、回退原文、不再重试)
+    const need = comments.filter(
+      (c) =>
+        needsContentTranslation(c.content, locale) &&
+        c.other_i18n?.[locale] === undefined &&
+        !commentTranslating.current.has(c.id)
+    );
+    if (need.length === 0) return;
+    const ids = need.slice(0, 40).map((c) => c.id);
+    ids.forEach((id) => commentTranslating.current.add(id));
+    const applyMap = (map: Record<string, { content?: string | null }>) =>
+      setComments((prev) =>
+        prev.map((c) =>
+          map[c.id] ? { ...c, other_i18n: { ...(c.other_i18n ?? {}), [locale]: map[c.id] } } : c
+        )
+      );
+    fetch(`${apiOrigin()}/api/translate-comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kind: "post", ids, locale }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((json: { ok?: boolean; i18n?: Record<string, { content?: string | null }> } | null) => {
+        const map = { ...(json?.ok ? json.i18n : undefined) };
+        for (const id of ids) if (!(id in map)) map[id] = {};
+        applyMap(map);
+      })
+      .catch(() => {
+        applyMap(Object.fromEntries(ids.map((id) => [id, {}])));
+      })
+      .finally(() => {
+        ids.forEach((id) => commentTranslating.current.delete(id));
+      });
+  }, [comments, locale]);
 
   // Auth
   useEffect(() => {
@@ -563,12 +617,24 @@ export default function CommunityDetailPage({
             </button>
           </div>
         )}
-        <h1 className="mt-3 font-mono text-lg font-bold leading-snug md:text-xl">
-          {showTranslated && translation?.title ? translation.title : post.title}
-        </h1>
-        <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground md:mt-2 md:leading-[1.8]">
-          <HashtagText text={showTranslated && translation?.content ? translation.content : post.content} />
-        </div>
+        {postTranslationPending ? (
+          /* 翻译在途:标题 + 正文骨架,避免先闪原文再跳变 */
+          <div className="mt-3 space-y-2.5">
+            <Skeleton className="h-6 w-3/4" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ) : (
+          <>
+            <h1 className="mt-3 font-mono text-lg font-bold leading-snug md:text-xl">
+              {showTranslated && translation?.title ? translation.title : post.title}
+            </h1>
+            <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground md:mt-2 md:leading-[1.8]">
+              <HashtagText text={showTranslated && translation?.content ? translation.content : post.content} />
+            </div>
+          </>
+        )}
 
         {/* Hashtags:可点击,跳社区搜索该话题(HashtagText 会先清浮层栈) */}
         {post.tags && post.tags.length > 0 && (
@@ -906,7 +972,16 @@ function CommentRow({
   onDelete: () => void;
 }) {
   const avatarSize = isReply ? "h-6 w-6" : "h-8 w-8";
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  // 非中文界面显示 AI 译文(父组件批量拉取写入 other_i18n),可切回原文
+  const [showOriginal, setShowOriginal] = useState(false);
+  const commentNeedsTranslation = needsContentTranslation(comment.content, locale);
+  const translatedContent = commentNeedsTranslation
+    ? comment.other_i18n?.[locale]?.content
+    : undefined;
+  // 翻译在途:内容行显示 skeleton
+  const commentPending = commentNeedsTranslation && comment.other_i18n?.[locale] === undefined;
+  const commentIsCJK = /[一-鿿]/.test(comment.content);
   const { enabled: overlayEnabled, openUser } = useOverlay();
   const onUser = (e: React.MouseEvent) => {
     if (overlayEnabled) {
@@ -935,9 +1010,28 @@ function CommentRow({
         >
           {comment.profiles?.username || t("匿名")}
         </Link>
-        <p className="mt-0.5 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/90">
-          {comment.content}
-        </p>
+        {commentPending ? (
+          <div className="mt-1 space-y-1.5">
+            <Skeleton className="h-3.5 w-full" />
+            <Skeleton className="h-3.5 w-2/3" />
+          </div>
+        ) : (
+          <p className="mt-0.5 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/90">
+            {translatedContent && !showOriginal ? translatedContent : comment.content}
+          </p>
+        )}
+        {translatedContent && (
+          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
+            <span>{commentIsCJK ? t("已从中文翻译") : t("已从英文翻译")}</span>
+            <button
+              type="button"
+              onClick={() => setShowOriginal((v) => !v)}
+              className="text-brand-ink underline-offset-2 hover:underline"
+            >
+              {showOriginal ? t("显示翻译") : t("显示原文")}
+            </button>
+          </div>
+        )}
         <div className="mt-1 flex items-center gap-3">
           <span className="font-mono text-[10px] text-muted-foreground">
             {timeAgo(comment.created_at, t)}

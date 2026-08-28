@@ -4,6 +4,7 @@ import { X, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { useI18n } from "@/components/i18n-provider";
+import { brandLabel } from "@/lib/i18n";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 
@@ -469,7 +470,7 @@ export function SearchFilters({
                 <span className="flex h-4 w-4 shrink-0 items-center justify-center">
                   {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
                 </span>
-                <span className="flex-1 text-left">{locale === "en" ? make : `${MAKES_ZH[make]} ${make}`}</span>
+                <span className="flex-1 text-left">{brandLabel(make, MAKES_ZH[make], t, locale)}</span>
                 {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0 text-brand-ink" strokeWidth={2} />}
               </button>
             );

@@ -10,7 +10,7 @@ import { getCompareIds, removeFromCompare } from "@/lib/compare";
 import { Badge } from "@/components/ui/badge";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { useI18n } from "@/components/i18n-provider";
-import { carLocation, carTitle, type Locale } from "@/lib/i18n";
+import { carLocation, carTitle, brandLabel, type Locale } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -48,7 +48,8 @@ function getCellValue(
 ): string {
   switch (key) {
     case "make_zh":
-      return `${MAKES_ZH[car.make] || car.make} ${car.make}`;
+      // zh「宝马 BMW」/ ko「도요타 Toyota」/ en「Toyota」
+      return brandLabel(car.make, MAKES_ZH[car.make], t, locale);
     case "price":
       return formatPrice(car.price);
     case "mileage":

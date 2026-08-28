@@ -17,7 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { LargeTitle } from "@/components/ios-settings";
 import { useCachedData } from "@/lib/use-cached-data";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle, carLocation } from "@/lib/i18n";
+import { carTitle, carLocation, brandShortLabel } from "@/lib/i18n";
 import { MAKES_ZH } from "@/lib/mock-data";
 import type { DbCar } from "@/lib/types";
 
@@ -156,7 +156,7 @@ export default function ListingsPage() {
               <div className="flex-1">
                 <Badge variant="outline" className="font-mono text-[10px]">{t("草稿")}</Badge>
                 <p className="mt-1 font-mono text-sm font-semibold">
-                  {[draft.form?.year, draft.form?.make ? (MAKES_ZH[draft.form.make] || draft.form.make) : null, draft.form?.model].filter(Boolean).join(" ") || t("未填写")}
+                  {[draft.form?.year, draft.form?.make ? brandShortLabel(draft.form.make, MAKES_ZH[draft.form.make], t, locale) : null, draft.form?.model].filter(Boolean).join(" ") || t("未填写")}
                 </p>
                 <div className="mt-2 flex gap-2">
                   <Link href="/post"><Button size="sm" className="h-8 px-4 font-mono text-xs">{t("继续编辑")}</Button></Link>

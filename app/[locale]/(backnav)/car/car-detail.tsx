@@ -79,8 +79,9 @@ import { ModelReviews } from "@/components/model-reviews";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { useIdentity } from "@/components/identity-provider";
+import { apiOrigin } from "@/lib/capacitor";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle, carDescription, carLocation, LAZY_CONTENT_LOCALES } from "@/lib/i18n";
+import { carTitle, carDescription, carLocation, LAZY_CONTENT_LOCALES, needsContentTranslation } from "@/lib/i18n";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -163,34 +164,59 @@ export default function CarDetailPage({
   const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
   const mobileGalleryRef = useRef<HTMLDivElement>(null);
 
-  // 小语种(ko 等)内容惰性翻译:缓存未命中时请求服务端翻译并写回 other_i18n。
-  // 用 SITE_URL 绝对地址:Capacitor 静态导出里没有 /api,必须打到线上站
+  // 内容惰性翻译:ko 恒需;en 是兜底(英文双列实际是中文脏数据时)。
+  // 判定用 needsContentTranslation:显示内容已是目标语言就不翻。
+  // 失败时写入空对象标记"已尝试",配合 attemptedRef 防止无限重试;
+  // 翻译在途(other_i18n[locale] 尚为 undefined)期间描述区显示 skeleton。
+  // 判定源 = 该语言实际会显示的内容(zh 界面判 zh 列的回退结果,en 同理),
+  // 语言不匹配才翻(如 zh 列缺失回退成英文、en 列缺失回退成中文)
+  const carContentSource = car
+    ? locale === "zh"
+      ? `${car.title_zh || car.title || ""}\n${car.description_zh || car.description || ""}`
+      : `${car.title || car.title_zh || ""}\n${car.description || car.description_zh || ""}`
+    : "";
+  const carNeedsTranslation =
+    !!car &&
+    (LAZY_CONTENT_LOCALES as string[]).includes(locale) &&
+    needsContentTranslation(carContentSource, locale);
+  const carTranslationPending = carNeedsTranslation && car?.other_i18n?.[locale] === undefined;
+  const translateAttempted = useRef<Set<string>>(new Set());
   useEffect(() => {
-    if (!car?.id || !(LAZY_CONTENT_LOCALES as string[]).includes(locale)) return;
-    if (car.other_i18n?.[locale]?.title) return;
+    if (!car?.id || !carNeedsTranslation) return;
+    if (car.other_i18n?.[locale] !== undefined) return; // 已有译文或已尝试过
+    const key = `${car.id}:${locale}`;
+    if (translateAttempted.current.has(key)) return;
+    translateAttempted.current.add(key);
     let cancelled = false;
-    fetch(`${SITE_URL}/api/translate-listing`, {
+    const carId = car.id;
+    fetch(`${apiOrigin()}/api/translate-listing`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ carId: car.id, locale }),
+      body: JSON.stringify({ carId, locale }),
     })
       .then((res) => (res.ok ? res.json() : null))
       .then((json: { ok?: boolean; i18n?: { title?: string | null; description?: string | null } } | null) => {
-        const i18n = json?.ok ? json.i18n : undefined;
-        if (cancelled || !i18n) return;
+        if (cancelled) return;
+        // 失败也写入 {} 标记,让 skeleton 收起、回退显示原文
+        const i18n = (json?.ok ? json.i18n : undefined) ?? {};
         setCar((prev) =>
-          prev && prev.id === car.id
+          prev && prev.id === carId
             ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: i18n } }
             : prev
         );
       })
       .catch(() => {
-        // 翻译失败静默,carTitle/carDescription 会回退英文
+        if (cancelled) return;
+        setCar((prev) =>
+          prev && prev.id === carId
+            ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: {} } }
+            : prev
+        );
       });
     return () => {
       cancelled = true;
     };
-  }, [car?.id, car?.other_i18n, locale]);
+  }, [car?.id, car?.other_i18n, carNeedsTranslation, locale]);
 
   useEffect(() => {
     async function load() {
@@ -853,9 +879,19 @@ export default function CarDetailPage({
                   <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     {t("车辆描述")}
                   </h2>
-                  <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
-                    {carDescription(car, locale)}
-                  </p>
+                  {carTranslationPending ? (
+                    /* 翻译在途:骨架占位,避免先闪原文再跳变 */
+                    <div className="mt-2 space-y-2">
+                      <Skeleton className="h-4 w-full" />
+                      <Skeleton className="h-4 w-11/12" />
+                      <Skeleton className="h-4 w-4/5" />
+                      <Skeleton className="h-4 w-2/3" />
+                    </div>
+                  ) : (
+                    <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
+                      {carDescription(car, locale)}
+                    </p>
+                  )}
                 </div>
               </Reveal>
             )}
