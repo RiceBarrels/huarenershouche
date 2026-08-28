@@ -43,6 +43,7 @@ import { MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { decodeVin, isValidVinFormat, hasVinData } from "@/lib/vin";
 import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummary, type CarfaxSummary } from "@/lib/carfax";
+import { Header } from "@/components/header";
 import { useIdentity } from "@/components/identity-provider";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
@@ -1040,6 +1041,7 @@ export default function PostCarPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
+      <Header />
       {!user ? (
         <main className="mx-auto w-full max-w-2xl flex-1 px-5 py-6">
           <div className="mt-8 flex flex-col items-center rounded-2xl bg-card p-8">
