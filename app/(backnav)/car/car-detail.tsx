@@ -774,6 +774,24 @@ export default function CarDetailPage({
               </div>
             </Reveal>
 
+            {car.vin && (
+              <Reveal>
+                <Separator className="my-6" />
+                <div>
+                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                    VIN 认证
+                  </h2>
+                  <p className="mt-2 font-mono text-sm text-muted-foreground">
+                    {car.vin}
+                  </p>
+                  <VinCheck
+                    vin={car.vin}
+                    car={{ make: car.make, year: car.year, model: car.model }}
+                  />
+                </div>
+              </Reveal>
+            )}
+
             {/* Features */}
             {car.features && car.features.length > 0 && (
               <Reveal>
@@ -808,24 +826,6 @@ export default function CarDetailPage({
                   <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
                     {car.description_zh || car.description}
                   </p>
-                </div>
-              </Reveal>
-            )}
-
-            {car.vin && (
-              <Reveal>
-                <Separator className="my-6" />
-                <div>
-                  <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                    VIN 认证
-                  </h2>
-                  <p className="mt-2 font-mono text-sm text-muted-foreground">
-                    {car.vin}
-                  </p>
-                  <VinCheck
-                    vin={car.vin}
-                    car={{ make: car.make, year: car.year, model: car.model }}
-                  />
                 </div>
               </Reveal>
             )}
