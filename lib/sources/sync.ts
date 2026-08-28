@@ -7,6 +7,7 @@ import { getAdapter } from "./index";
 import { fetchHtml, type ParsedListing, type SourceListingRef } from "./types";
 import { createServiceClient } from "./service-client";
 import { localizeListing } from "@/lib/translate";
+import { mirrorCarImages, cleanupRemovedMirrors, deleteMirroredImages, isMirroredUrl } from "./images";
 
 /** 有界并发:同时最多 concurrency 个 worker 处理队列,全部完成后返回。 */
 async function runPool<T>(
@@ -32,6 +33,8 @@ export interface SyncResult {
   inserted: number;
   updated: number;
   delisted: number;
+  /** 本轮完成图片转存(压缩入库)的车辆数 */
+  mirrored: number;
   errors: string[];
   duration_ms: number;
 }
@@ -46,6 +49,11 @@ export interface SyncOptions {
 const EXPIRY_DAYS = 30;
 /** Sources synced within this window are skipped unless force (cron runs daily). */
 const MIN_SYNC_GAP_MS = 0.9 * 24 * 60 * 60 * 1000;
+/**
+ * 每个源每轮最多转存图片的车辆数(控制单次 /api/sync 时长,maxDuration=300s)。
+ * 存量车源会在之后的每日同步中逐批补齐;管理员也可连续手动触发加速。
+ */
+const MIRROR_CARS_PER_RUN = 30;
 
 function expiresAt(): string {
   return new Date(Date.now() + EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -57,6 +65,12 @@ interface ExistingCar {
   status: string;
   price: number;
   description_zh: string | null;
+  images: string[] | null;
+  source_images: string[] | null;
+}
+
+function sameArray(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
 /** 常用华人聚居城市中文名（location_zh 用），未命中则回退英文 */
@@ -134,6 +148,7 @@ export async function syncSource(
     inserted: 0,
     updated: 0,
     delisted: 0,
+    mirrored: 0,
     errors: [],
     duration_ms: 0,
   };
@@ -143,7 +158,8 @@ export async function syncSource(
     result.duration_ms = Date.now() - started;
     console.log(
       `[sync:${source.key}] DONE status=${status} found=${result.found} inserted=${result.inserted} ` +
-        `updated=${result.updated} delisted=${result.delisted} errors=${result.errors.length} in ${result.duration_ms}ms`,
+        `updated=${result.updated} delisted=${result.delisted} mirrored=${result.mirrored} ` +
+        `errors=${result.errors.length} in ${result.duration_ms}ms`,
     );
     await supabase
       .from("listing_sources")
@@ -155,6 +171,7 @@ export async function syncSource(
           inserted: result.inserted,
           updated: result.updated,
           delisted: result.delisted,
+          mirrored: result.mirrored,
           errors: result.errors.slice(0, 10),
           duration_ms: result.duration_ms,
         },
@@ -210,7 +227,7 @@ export async function syncSource(
     // 3. Load our existing copies for this source
     const { data: existingRows, error: existingErr } = await supabase
       .from("cars")
-      .select("id, source_listing_id, status, price, description_zh")
+      .select("id, source_listing_id, status, price, description_zh, images, source_images")
       .eq("source_id", source.id);
     if (existingErr) throw new Error(`load existing cars: ${existingErr.message}`);
     const existing = new Map<string, ExistingCar>();
@@ -222,6 +239,8 @@ export async function syncSource(
     const now = new Date().toISOString();
     const total = crawl.refs.length;
     let done = 0;
+    // 图片转存预算:每轮最多处理 MIRROR_CARS_PER_RUN 辆(超出的保持源站外链,下轮续)
+    let mirrorBudget = MIRROR_CARS_PER_RUN;
     log(`processing ${total} listings with concurrency=${concurrency}…`);
 
     const processRef = async (ref: SourceListingRef): Promise<void> => {
@@ -263,24 +282,38 @@ export async function syncSource(
 
       try {
         if (!current) {
-          const { error } = await supabase.from("cars").insert({
-            ...parsed,
-            ...locationOverride,
-            seller_id: source.system_account_id,
-            status: "active",
-            expires_at: expiresAt(),
-            last_seen_at: now,
-            source_id: source.id,
-          });
+          // 先按源站外链入库(图片立即可见),拿到 id 后再压缩转存并回写
+          const { data: inserted, error } = await supabase
+            .from("cars")
+            .insert({
+              ...parsed,
+              ...locationOverride,
+              seller_id: source.system_account_id,
+              status: "active",
+              expires_at: expiresAt(),
+              last_seen_at: now,
+              source_id: source.id,
+              source_images: parsed.images,
+            })
+            .select("id")
+            .single();
           if (error) throw new Error(error.message);
           result.inserted++;
+          if (inserted?.id && parsed.images.length > 0 && mirrorBudget > 0) {
+            mirrorBudget--;
+            const m = await mirrorCarImages(supabase, inserted.id, parsed.images);
+            const { error: imgErr } = await supabase
+              .from("cars")
+              .update({ images: m.images, image_url: m.image_url })
+              .eq("id", inserted.id);
+            if (imgErr) result.errors.push(`${ref.sourceListingId}: mirror write: ${imgErr.message}`);
+            else if (m.mirrored > 0) result.mirrored++;
+          }
           log(`(${++done}/${total}) + new ${parsed.title_zh || parsed.title}`);
         } else {
           const update: Record<string, unknown> = {
             title: parsed.title,
             mileage: parsed.mileage,
-            image_url: parsed.image_url,
-            images: parsed.images,
             description: parsed.description,
             exterior_color: parsed.exterior_color,
             interior_color: parsed.interior_color,
@@ -289,6 +322,26 @@ export async function syncSource(
             expires_at: expiresAt(),
             ...locationOverride,
           };
+          // 图片:已全量转存且源站图未变 → 不动;否则(未转存/换图/预算内)重新压缩转存,
+          // 预算用完时保持源站外链,下轮同步续传
+          const alreadyMirrored = (current.images ?? []).some(isMirroredUrl);
+          const sourceChanged = !sameArray(parsed.images, current.source_images ?? []);
+          if (!alreadyMirrored || sourceChanged) {
+            if (parsed.images.length > 0 && mirrorBudget > 0) {
+              mirrorBudget--;
+              // 源站换图:先清掉旧转存文件(新列表可能更短,避免孤儿文件)
+              if (alreadyMirrored && sourceChanged) await deleteMirroredImages(supabase, current.id);
+              const m = await mirrorCarImages(supabase, current.id, parsed.images);
+              update.images = m.images;
+              update.image_url = m.image_url;
+              update.source_images = parsed.images;
+              if (m.mirrored > 0) result.mirrored++;
+            } else {
+              update.images = parsed.images;
+              update.image_url = parsed.image_url;
+              update.source_images = parsed.images;
+            }
+          }
           // 只有在本轮做了翻译时才写中文/双语字段,否则保留库里已翻译好的内容
           if (needsTranslation) {
             update.title_zh = parsed.title_zh;
@@ -371,6 +424,7 @@ export async function syncAll(opts: SyncAllOptions = {}): Promise<SyncResult[]> 
         inserted: 0,
         updated: 0,
         delisted: 0,
+        mirrored: 0,
         errors: [],
         duration_ms: 0,
       });
@@ -397,10 +451,23 @@ export async function syncAll(opts: SyncAllOptions = {}): Promise<SyncResult[]> 
         inserted: 0,
         updated: 0,
         delisted: 0,
+        mirrored: 0,
         errors: [message],
         duration_ms: 0,
       });
     }
+  }
+
+  // 收尾:已下架车源(源站消失 sync delist / 30 天过期 pg_cron)的转存图片
+  // 删除 Storage 文件并回退源站外链,释放存储空间
+  try {
+    const { cleaned, errors } = await cleanupRemovedMirrors(supabase);
+    if (cleaned > 0 || errors.length > 0) {
+      console.log(`[sync] mirror cleanup: cleaned=${cleaned} errors=${errors.length}`);
+      for (const e of errors.slice(0, 5)) console.log(`[sync] ${e}`);
+    }
+  } catch (err) {
+    console.log(`[sync] mirror cleanup failed: ${err instanceof Error ? err.message : String(err)}`);
   }
 
   return results;
