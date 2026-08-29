@@ -1,4 +1,7 @@
-import type { MetadataRoute } from "next";
+// /sitemap.xml — 自定义 route handler(替代 Next 的 app/sitemap.ts 约定)。
+// 原因:Next 的 metadata sitemap 只会输出压缩单行 XML,这里手工序列化,
+// 输出人类可读的 pretty print 格式(搜索引擎两种都认)。
+
 import { SEO_PAGES, SITE_URL } from "@/lib/seo-pages";
 import { LOCALES } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
@@ -7,10 +10,27 @@ import { supabase } from "@/lib/supabase";
 // （社区帖子在 build 时从 Supabase 拉取,随每次部署刷新）
 export const dynamic = "force-static";
 
-export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+type Freq = "daily" | "weekly" | "monthly";
+
+interface Entry {
+  url: string;
+  lastModified: Date;
+  changeFrequency: Freq;
+  priority: number;
+}
+
+function esc(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+export async function GET(): Promise<Response> {
   const now = new Date();
 
-  const staticRoutes: MetadataRoute.Sitemap = [
+  const staticRoutes: Entry[] = [
     { path: "", changeFrequency: "daily" as const, priority: 1.0 },
     { path: "/browse", changeFrequency: "daily" as const, priority: 0.9 },
     { path: "/cars", changeFrequency: "daily" as const, priority: 0.9 },
@@ -31,7 +51,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority,
   }));
 
-  const seoRoutes: MetadataRoute.Sitemap = SEO_PAGES.map((p) => ({
+  const seoRoutes: Entry[] = SEO_PAGES.map((p) => ({
     url: `${SITE_URL}/cars/${p.slug}`,
     lastModified: now,
     changeFrequency: "daily" as const,
@@ -39,8 +59,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // 每辆在售车源详情页(核心内容页,SEO 主力)+ 有在售车的卖家主页
-  let carRoutes: MetadataRoute.Sitemap = [];
-  let userRoutes: MetadataRoute.Sitemap = [];
+  let carRoutes: Entry[] = [];
+  let userRoutes: Entry[] = [];
   try {
     const { data } = await supabase
       .from("cars")
@@ -76,7 +96,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
 
   // 社区帖子详情页(内容页,SEO 长尾)
-  let postRoutes: MetadataRoute.Sitemap = [];
+  let postRoutes: Entry[] = [];
   try {
     const { data } = await supabase
       .from("community_posts")
@@ -94,22 +114,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
   }
 
-  // 路径级 i18n:每个 URL 按语言拆成 /zh /en /ko 多条,并互挂 hreflang
+  // 路径级 i18n:每个 URL 按语言拆成 /zh /en /ko /ja /es /fr 多条,并互挂 hreflang
   const all = [...staticRoutes, ...seoRoutes, ...carRoutes, ...userRoutes, ...postRoutes];
-  return all.flatMap((entry) => {
+  const blocks = all.flatMap((entry) => {
     const path = entry.url.slice(SITE_URL.length);
-    const languages = {
-      "zh-CN": `${SITE_URL}/zh${path}`,
-      en: `${SITE_URL}/en${path}`,
-      ko: `${SITE_URL}/ko${path}`,
-      "x-default": `${SITE_URL}/zh${path}`,
-    };
-    return LOCALES.map((loc) => ({
-      ...entry,
-      url: `${SITE_URL}/${loc}${path}`,
+    const alternates = [
+      ...LOCALES.map(
+        (loc) =>
+          `    <xhtml:link rel="alternate" hreflang="${loc === "zh" ? "zh-CN" : loc}" href="${esc(`${SITE_URL}/${loc}${path}`)}"/>`
+      ),
+      `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(`${SITE_URL}/zh${path}`)}"/>`,
+    ].join("\n");
+    return LOCALES.map((loc) => {
       // 翻译树权重略降,避免稀释中文主站
-      priority: loc === "zh" ? entry.priority : Math.max(0.1, (entry.priority ?? 0.5) - 0.2),
-      alternates: { languages },
-    }));
+      const priority = loc === "zh" ? entry.priority : Math.max(0.1, entry.priority - 0.2);
+      return [
+        "  <url>",
+        `    <loc>${esc(`${SITE_URL}/${loc}${path}`)}</loc>`,
+        alternates,
+        `    <lastmod>${entry.lastModified.toISOString()}</lastmod>`,
+        `    <changefreq>${entry.changeFrequency}</changefreq>`,
+        `    <priority>${priority.toFixed(1)}</priority>`,
+        "  </url>",
+      ].join("\n");
+    });
+  });
+
+  const xml =
+    `<?xml version="1.0" encoding="UTF-8"?>\n` +
+    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
+    blocks.join("\n") +
+    `\n</urlset>\n`;
+
+  return new Response(xml, {
+    headers: { "Content-Type": "application/xml; charset=utf-8" },
   });
 }
