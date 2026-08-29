@@ -1794,4 +1794,9 @@ export const en: Record<string, string> = {
   "显示翻译": "Show translation",
   "常來車網": "CLCAuto",
   "常來車網 CLCAuto": "CLCAuto",
+  "页面不存在": "Page not found",
+  "你访问的页面可能已被移除，或链接有误。": "The page you're looking for may have been removed, or the link is incorrect.",
+  "浏览车源": "Browse cars",
+  "页面出错了": "Something went wrong",
+  "页面加载出了点问题，请重试。": "Something went wrong while loading this page. Please try again.",
 };
