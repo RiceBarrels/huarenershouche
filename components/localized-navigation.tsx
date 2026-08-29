@@ -23,8 +23,8 @@ const Link = forwardRef<HTMLAnchorElement, NextLinkProps>(function LocalizedLink
   { href, ...rest },
   ref
 ) {
-  const { locale } = useI18n();
-  const localized = typeof href === "string" ? localizePath(href, locale) : href;
+  const { pathLocale } = useI18n();
+  const localized = typeof href === "string" ? localizePath(href, pathLocale) : href;
   return <NextLink ref={ref} href={localized} {...rest} />;
 });
 
@@ -38,15 +38,15 @@ export function usePathname(): string {
 /** push/replace/prefetch 自动补语言前缀;back/forward/refresh 原样透传 */
 export function useRouter(): ReturnType<typeof useRawRouter> {
   const raw = useRawRouter();
-  const { locale } = useI18n();
+  const { pathLocale } = useI18n();
   return useMemo(
     () => ({
       ...raw,
-      push: (href, options) => raw.push(localizePath(href, locale), options),
-      replace: (href, options) => raw.replace(localizePath(href, locale), options),
-      prefetch: (href, options) => raw.prefetch(localizePath(href, locale), options),
+      push: (href, options) => raw.push(localizePath(href, pathLocale), options),
+      replace: (href, options) => raw.replace(localizePath(href, pathLocale), options),
+      prefetch: (href, options) => raw.prefetch(localizePath(href, pathLocale), options),
     }),
-    [raw, locale]
+    [raw, pathLocale]
   );
 }
 

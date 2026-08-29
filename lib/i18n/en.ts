@@ -1799,4 +1799,9 @@ export const en: Record<string, string> = {
   "浏览车源": "Browse cars",
   "页面出错了": "Something went wrong",
   "页面加载出了点问题，请重试。": "Something went wrong while loading this page. Please try again.",
+  "确定": "OK",
+  "切换语言": "Switch language",
+  "将切换到该语言并返回首页。": "The site will switch to this language and return to the home page.",
+  "App 语言跟随系统设置。": "The app language follows your system settings.",
+  "去系统设置更改语言": "Change language in Settings",
 };

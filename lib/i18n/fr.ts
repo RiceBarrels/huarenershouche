@@ -1799,4 +1799,9 @@ export const fr: Record<string, string> = {
   "浏览车源": "Voir les véhicules",
   "页面出错了": "Une erreur s'est produite",
   "页面加载出了点问题，请重试。": "Un problème est survenu lors du chargement de la page. Veuillez réessayer.",
+  "确定": "OK",
+  "切换语言": "Changer de langue",
+  "将切换到该语言并返回首页。": "Le site passera à cette langue et reviendra à la page d'accueil.",
+  "App 语言跟随系统设置。": "La langue de l'application suit les réglages du système.",
+  "去系统设置更改语言": "Changer la langue dans Réglages",
 };

@@ -9,11 +9,17 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { LOCALE_STORAGE_KEY, LOCALES, detectLocale, type Locale } from "@/lib/i18n";
+import { isNative } from "@/lib/capacitor";
 
 export default function RootRedirect() {
   const router = useRouter();
 
   useEffect(() => {
+    // 原生壳:静态导出只有 zh 一棵树,显示语言由 Provider 按系统语言纯客户端切换
+    if (isNative()) {
+      router.replace("/zh");
+      return;
+    }
     let locale: string | null = null;
     try {
       locale = localStorage.getItem(LOCALE_STORAGE_KEY);

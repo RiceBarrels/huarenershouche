@@ -13,6 +13,12 @@ export type Locale = "zh" | "en" | "ko" | "ja" | "es" | "fr";
 export const LOCALES: Locale[] = ["zh", "en", "ko", "ja", "es", "fr"];
 export const LOCALE_STORAGE_KEY = "clc_locale";
 
+// 构建期实际生成的语言树:静态导出(Capacitor)只出 zh 一棵树——
+// 原生端显示语言跟随系统、由 t() 纯客户端切换,不需要 6 份页面(体积 1/6);
+// 网页端(Vercel)仍按全部语言预渲染,保证 SEO。
+export const BUILD_LOCALES: Locale[] =
+  process.env.NEXT_PUBLIC_OUTPUT === "static" ? ["zh"] : LOCALES;
+
 // 内容惰性翻译语言:首次有人用该语言浏览时经 /api/translate-listing
 // 翻译并缓存进 cars.other_i18n。zh/en 是兜底——正常车源有双列,
 // 只有对应列缺失或语言不对(历史翻译管线故障的脏数据)才会触发。

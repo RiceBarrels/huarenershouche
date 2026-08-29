@@ -24,7 +24,8 @@ export default function AppearanceSettingsPage() {
           {t("语言")}
         </p>
         <SettingsGroup className="mt-2 p-2">
-          <LanguageOptions />
+          {/* 手机设置页:选语言先弹确认框,确定后回首页 */}
+          <LanguageOptions confirmGoHome />
         </SettingsGroup>
       </main>
       <Footer />

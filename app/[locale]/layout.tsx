@@ -14,13 +14,13 @@ import { KeyboardSpacer } from "@/components/keyboard-spacer";
 import { StatusBarMask } from "@/components/status-bar-mask";
 import { Analytics } from "@vercel/analytics/next";
 import { OpenPanelAnalytics } from "@/components/openpanel";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { LOCALES, BUILD_LOCALES, type Locale } from "@/lib/i18n";
 
 // 路径级 i18n:/zh/... 与 /en/... 各自预渲染一份 HTML(SEO 关键)。
 // Capacitor 静态导出同样生成两棵树,原生端由入口页 + Provider 内的
 // 原生分支处理语言(切换不跳转,直接替换文案)。
 export function generateStaticParams() {
-  return LOCALES.map((locale) => ({ locale }));
+  return BUILD_LOCALES.map((locale) => ({ locale }));
 }
 
 // 英文树的站点级 metadata 覆盖(zh 沿用根 layout 的默认值)
