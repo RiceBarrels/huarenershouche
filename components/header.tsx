@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, User, Plus, Palette, MessageSquare, Store, ChevronDown, Repeat, Search, ArrowLeft } from "lucide-react";
+import { LogOut, User, Plus, Languages, MessageSquare, Store, ChevronDown, Repeat, Search, ArrowLeft } from "lucide-react";
 import Image from "next/image";
 import Link from "@/components/localized-navigation";
 import { useEffect, useState } from "react";
@@ -8,7 +8,6 @@ import { usePathname, useRouter } from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ThemeOptions } from "@/components/theme-options";
 import { LanguageOptions } from "@/components/language-options";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLogoSrc } from "@/lib/i18n";
@@ -152,19 +151,15 @@ export function Header() {
                     裸图标飘在导航上会显得散 */}
                 <button
                   type="button"
-                  aria-label={t("个性化")}
+                  aria-label={t("语言")}
                   className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-foreground transition-colors hover:bg-muted"
                 >
-                  <Palette className="h-4 w-4" strokeWidth={1.5} />
+                  <Languages className="h-4 w-4" strokeWidth={1.5} />
                 </button>
               </PopoverTrigger>
               {/* sideOffset 让下拉与 header 分隔线保持呼吸感,不贴边 */}
               <PopoverContent align="end" sideOffset={8} className="w-48 p-1.5 font-mono">
                 <p className="px-3 pb-1 pt-1.5 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-                  {t("个性化")}
-                </p>
-                <ThemeOptions />
-                <p className="border-t border-border px-3 pb-1 pt-2 text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
                   {t("语言")}
                 </p>
                 <LanguageOptions />
@@ -269,16 +264,15 @@ export function Header() {
                   {t("发布车辆")}
                 </Button>
               </Link>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="font-mono text-xs text-muted-foreground"
+              <button
+                type="button"
                 onClick={handleLogout}
                 aria-label={t("退出登录")}
                 title={t("退出登录")}
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               >
-                <LogOut className="h-3.5 w-3.5" strokeWidth={1.5} />
-              </Button>
+                <LogOut className="h-4 w-4" strokeWidth={1.5} />
+              </button>
             </>
           ) : (
             <>

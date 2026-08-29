@@ -28,10 +28,13 @@ import {
 } from "@/lib/i18n";
 import { en } from "@/lib/i18n/en";
 import { ko } from "@/lib/i18n/ko";
+import { ja } from "@/lib/i18n/ja";
+import { es } from "@/lib/i18n/es";
+import { fr } from "@/lib/i18n/fr";
 import { isNative } from "@/lib/capacitor";
 
-// 非中文语言的 UI 词典(key 均为中文原文;缺失回退中文)
-const DICTS: Partial<Record<Locale, Record<string, string>>> = { en, ko };
+// 非中文语言的 UI 词典(key 均为中文原文;缺失先回退英文,再回退中文)
+const DICTS: Partial<Record<Locale, Record<string, string>>> = { en, ko, ja, es, fr };
 
 type TranslateFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -95,7 +98,9 @@ export function I18nProvider({
 
   const t = useCallback<TranslateFn>(
     (text, vars) => {
-      const translated = DICTS[locale]?.[text] ?? text;
+      // 缺词回退链:目标语言 → 英文 → 中文原文(zh 直接原样返回)
+      const translated =
+        locale === "zh" ? text : DICTS[locale]?.[text] ?? en[text] ?? text;
       return interpolate(translated, vars);
     },
     [locale]

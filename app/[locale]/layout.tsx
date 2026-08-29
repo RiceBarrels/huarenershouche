@@ -82,6 +82,51 @@ export async function generateMetadata({
       },
     };
   }
+  // ja 品牌名「常来カーネット」,es/fr 用 CLCAuto,结构同上
+  const SITE_META: Record<string, { title: string; template: string; siteName: string; description: string; ogLocale: string; keywords: string[] }> = {
+    ja: {
+      title: "常来カーネット - 北米の中古車マーケットプレイス | 購入・売却・無料掲載",
+      template: "%s | 常来カーネット",
+      siteName: "常来カーネット",
+      description:
+        "常来カーネット(CLCAuto)は北米の信頼できる中古車マーケットプレイスです。LA、サンフランシスコ、ニューヨーク、シアトル、ダラスなどで個人・ディーラーの車両を検索。無料掲載、VIN リコール検索、Carfax レポート対応。",
+      ogLocale: "ja_JP",
+      keywords: ["北米 中古車", "アメリカ 中古車", "中古車 購入", "中古車 売却", "常来カーネット", "CLCAuto"],
+    },
+    es: {
+      title: "CLCAuto - Mercado de autos usados en Norteamérica | Compra, vende, publica gratis",
+      template: "%s | CLCAuto",
+      siteName: "CLCAuto",
+      description:
+        "CLCAuto es un mercado confiable de autos usados en Norteamérica. Explora autos de vendedores particulares y concesionarios en LA, SF, NYC, Seattle, Dallas y más — publicaciones gratis, verificación de VIN y reportes Carfax.",
+      ogLocale: "es_US",
+      keywords: ["autos usados", "carros usados Estados Unidos", "comprar auto usado", "vender mi auto", "CLCAuto"],
+    },
+    fr: {
+      title: "CLCAuto - Marché de voitures d'occasion en Amérique du Nord | Achat, vente, annonces gratuites",
+      template: "%s | CLCAuto",
+      siteName: "CLCAuto",
+      description:
+        "CLCAuto est un marché fiable de voitures d'occasion en Amérique du Nord. Parcourez les annonces de particuliers et de concessionnaires à LA, SF, NYC, Seattle, Dallas et plus — annonces gratuites, vérification VIN, rapports Carfax.",
+      ogLocale: "fr_CA",
+      keywords: ["voiture d'occasion", "auto usagée Amérique du Nord", "acheter voiture d'occasion", "vendre ma voiture", "CLCAuto"],
+    },
+  };
+  const m = SITE_META[locale];
+  if (m) {
+    return {
+      title: { absolute: m.title, template: m.template },
+      keywords: m.keywords,
+      description: m.description,
+      openGraph: {
+        type: "website",
+        locale: m.ogLocale,
+        siteName: m.siteName,
+        title: m.title,
+        description: m.description,
+      },
+    };
+  }
   return {};
 }
 

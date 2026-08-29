@@ -9,6 +9,9 @@ const OPTIONS: { value: Locale; label: string }[] = [
   { value: "zh", label: "中文" },
   { value: "en", label: "English" },
   { value: "ko", label: "한국어" },
+  { value: "ja", label: "日本語" },
+  { value: "es", label: "Español" },
+  { value: "fr", label: "Français" },
 ];
 
 /** 语言二选一,样式与 ThemeOptions 对齐,Popover 和设置页共用 */

@@ -34,7 +34,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { timeAgo } from "@/lib/format";
 import { SITE_URL } from "@/lib/seo-pages";
 import { apiOrigin } from "@/lib/capacitor";
-import { needsContentTranslation } from "@/lib/i18n";
+import { needsContentTranslation, dateLocale } from "@/lib/i18n";
 import { userLink } from "@/lib/static-link";
 import type { DbCommunityPost, DbPostComment } from "@/lib/types";
 
@@ -713,7 +713,7 @@ export default function CommunityDetailPage({
 
         {/* X 式绝对时间行 */}
         <p className="mt-3 font-mono text-[13px] text-muted-foreground">
-          {new Date(post.created_at).toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
+          {new Date(post.created_at).toLocaleString(dateLocale(locale), {
             year: "numeric",
             month: "long",
             day: "numeric",

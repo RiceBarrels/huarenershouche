@@ -8,15 +8,22 @@
 // localizePath() 自动补当前语言前缀;Capacitor 原生端切换语言不跳转,
 // 由 I18nProvider 的原生分支直接替换文案。
 
-export type Locale = "zh" | "en" | "ko";
+export type Locale = "zh" | "en" | "ko" | "ja" | "es" | "fr";
 
-export const LOCALES: Locale[] = ["zh", "en", "ko"];
+export const LOCALES: Locale[] = ["zh", "en", "ko", "ja", "es", "fr"];
 export const LOCALE_STORAGE_KEY = "clc_locale";
 
 // 内容惰性翻译语言:首次有人用该语言浏览时经 /api/translate-listing
 // 翻译并缓存进 cars.other_i18n。zh/en 是兜底——正常车源有双列,
 // 只有对应列缺失或语言不对(历史翻译管线故障的脏数据)才会触发。
-export const LAZY_CONTENT_LOCALES: Locale[] = ["zh", "en", "ko"];
+export const LAZY_CONTENT_LOCALES: Locale[] = ["zh", "en", "ko", "ja", "es", "fr"];
+
+/** 界面语言 → Intl/toLocaleDateString 用的 BCP 47 区域标签 */
+export function dateLocale(locale: Locale): string {
+  return (
+    { zh: "zh-CN", en: "en-US", ko: "ko-KR", ja: "ja-JP", es: "es-US", fr: "fr-CA" } as const
+  )[locale];
+}
 
 /** {name} 占位符插值;缺失的变量原样保留,便于发现问题 */
 export function interpolate(text: string, vars?: Record<string, string | number>): string {
@@ -32,11 +39,14 @@ export function detectLocale(languages: readonly string[]): Locale {
     if (/^zh\b/i.test(lang)) return "zh";
     if (/^en\b/i.test(lang)) return "en";
     if (/^ko\b/i.test(lang)) return "ko";
+    if (/^ja\b/i.test(lang)) return "ja";
+    if (/^es\b/i.test(lang)) return "es";
+    if (/^fr\b/i.test(lang)) return "fr";
   }
   return "zh";
 }
 
-const LOCALE_PREFIX_RE = /^\/(zh|en|ko)(?=\/|$|\?|#)/;
+const LOCALE_PREFIX_RE = /^\/(zh|en|ko|ja|es|fr)(?=\/|$|\?|#)/;
 
 /** 去掉路径上的语言前缀:"/en/browse" → "/browse","/zh" → "/" */
 export function stripLocale(pathname: string): string {
@@ -78,7 +88,9 @@ export function needsContentTranslation(text: string, locale: Locale): boolean {
   if (locale === "zh") return !/[一-鿿]/.test(trimmed) && /[A-Za-z가-힣]/.test(trimmed);
   if (locale === "en") return /[一-鿿]/.test(trimmed);
   if (locale === "ko") return !/[가-힣]/.test(trimmed);
-  // 未来新增语言:默认都翻(无法检测目标语言时宁可多翻,结果有缓存)
+  // 日文:原文含假名视为已是日文(汉字与中文重叠,无法只靠汉字判断)
+  if (locale === "ja") return !/[ぁ-ゖァ-ヺ]/.test(trimmed);
+  // es/fr 等拉丁语种无法与英文可靠区分:默认都翻(结果有缓存,宁可多翻)
   return true;
 }
 
@@ -114,11 +126,12 @@ export function brandShortLabel(
   return localized;
 }
 
-/** 品牌 logo 图片按语言切换:zh 中文字样、en「CLC」、ko「또와카」(public/ 下同风格生成) */
+/** 品牌 logo 图片按语言切换:zh 中文字样、en「CLC」、ko「또와카」(public/ 下同风格生成);
+ *  其余语言(ja/es/fr)沿用英文版 logo */
 export function brandLogoSrc(locale: Locale): string {
-  if (locale === "en") return "/logo-en.png";
+  if (locale === "zh") return "/logo.png";
   if (locale === "ko") return "/logo-ko.png";
-  return "/logo.png";
+  return "/logo-en.png";
 }
 
 /** cars.other_i18n 列的形状:{ ko: { title, description }, ... } 按需翻译缓存 */

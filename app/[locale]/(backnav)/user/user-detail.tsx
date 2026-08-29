@@ -9,6 +9,7 @@ import dynamic from "next/dynamic";
 import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation } from "lucide-react";
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
+import { dateLocale } from "@/lib/i18n";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -256,7 +257,7 @@ export default function UserProfilePage({
   })();
 
   const memberSince = profile
-    ? new Date(profile.created_at).toLocaleDateString(locale === "zh" ? "zh-CN" : "en-US", {
+    ? new Date(profile.created_at).toLocaleDateString(dateLocale(locale), {
         year: "numeric",
         month: "long",
       })

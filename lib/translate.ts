@@ -252,7 +252,9 @@ const TARGET_LANG_NAMES: Record<string, string> = {
   zh: "Simplified Chinese",
   en: "English",
   ko: "Korean",
-  es: "Spanish",
+  ja: "Japanese",
+  es: "Spanish (Latin American)",
+  fr: "French",
 };
 
 /**
