@@ -1,150 +1,27 @@
-// /sitemap.xml — 自定义 route handler(替代 Next 的 app/sitemap.ts 约定)。
-// 原因:Next 的 metadata sitemap 只会输出压缩单行 XML,这里手工序列化,
-// 输出人类可读的 pretty print 格式(搜索引擎两种都认)。
+// /sitemap.xml — sitemap index,指向按语言拆分的六个子 sitemap。
+// 全量单文件(6 语言 × 全部 URL × hreflang)接近 20MB 会撞
+// Vercel ISR 响应上限(FALLBACK_BODY_TOO_LARGE),必须分片。
 
-import { SEO_PAGES, SITE_URL } from "@/lib/seo-pages";
+import { SITE_URL } from "@/lib/seo-pages";
 import { LOCALES } from "@/lib/i18n";
-import { supabase } from "@/lib/supabase";
 
-// 静态导出（Capacitor / output: "export"）下必须是纯静态 sitemap
-// （社区帖子在 build 时从 Supabase 拉取,随每次部署刷新）
+// 静态导出（Capacitor / output: "export"）下必须是纯静态
 export const dynamic = "force-static";
 
-type Freq = "daily" | "weekly" | "monthly";
-
-interface Entry {
-  url: string;
-  lastModified: Date;
-  changeFrequency: Freq;
-  priority: number;
-}
-
-function esc(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;");
-}
-
 export async function GET(): Promise<Response> {
-  const now = new Date();
-
-  const staticRoutes: Entry[] = [
-    { path: "", changeFrequency: "daily" as const, priority: 1.0 },
-    { path: "/browse", changeFrequency: "daily" as const, priority: 0.9 },
-    { path: "/cars", changeFrequency: "daily" as const, priority: 0.9 },
-    { path: "/post", changeFrequency: "weekly" as const, priority: 0.7 },
-    { path: "/guide", changeFrequency: "weekly" as const, priority: 0.7 },
-    { path: "/community", changeFrequency: "daily" as const, priority: 0.7 },
-    { path: "/qa", changeFrequency: "daily" as const, priority: 0.7 },
-    { path: "/compare", changeFrequency: "weekly" as const, priority: 0.6 },
-    { path: "/vin", changeFrequency: "weekly" as const, priority: 0.6 },
-    { path: "/services", changeFrequency: "weekly" as const, priority: 0.6 },
-    { path: "/contact", changeFrequency: "monthly" as const, priority: 0.5 },
-    { path: "/business", changeFrequency: "monthly" as const, priority: 0.5 },
-    { path: "/terms", changeFrequency: "monthly" as const, priority: 0.5 },
-  ].map(({ path, changeFrequency, priority }) => ({
-    url: `${SITE_URL}${path}`,
-    lastModified: now,
-    changeFrequency,
-    priority,
-  }));
-
-  const seoRoutes: Entry[] = SEO_PAGES.map((p) => ({
-    url: `${SITE_URL}/cars/${p.slug}`,
-    lastModified: now,
-    changeFrequency: "daily" as const,
-    priority: p.slug.includes("/") ? 0.6 : 0.8,
-  }));
-
-  // 每辆在售车源详情页(核心内容页,SEO 主力)+ 有在售车的卖家主页
-  let carRoutes: Entry[] = [];
-  let userRoutes: Entry[] = [];
-  try {
-    const { data } = await supabase
-      .from("cars")
-      .select("id, updated_at, source_id, seller_id")
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .order("created_at", { ascending: false })
-      .limit(50000);
-    carRoutes = (data ?? []).map((c) => ({
-      url: `${SITE_URL}/car/${c.id}`,
-      lastModified: c.updated_at ? new Date(c.updated_at) : now,
-      changeFrequency: "daily" as const,
-      // 用户自发车源权重略高于转载车源
-      priority: c.source_id ? 0.7 : 0.8,
-    }));
-
-    // 卖家/车行主页:去重 seller_id,lastModified 取其最新车源更新时间
-    const sellers = new Map<string, Date>();
-    for (const c of data ?? []) {
-      if (!c.seller_id) continue;
-      const t = c.updated_at ? new Date(c.updated_at) : now;
-      const prev = sellers.get(c.seller_id);
-      if (!prev || t > prev) sellers.set(c.seller_id, t);
-    }
-    userRoutes = [...sellers.entries()].map(([id, lastModified]) => ({
-      url: `${SITE_URL}/user/${id}`,
-      lastModified,
-      changeFrequency: "weekly" as const,
-      priority: 0.6,
-    }));
-  } catch {
-    // 构建环境无法访问 Supabase 时降级
-  }
-
-  // 社区帖子详情页(内容页,SEO 长尾)
-  let postRoutes: Entry[] = [];
-  try {
-    const { data } = await supabase
-      .from("community_posts")
-      .select("id, updated_at")
-      .eq("status", "active")
-      .order("created_at", { ascending: false })
-      .limit(5000);
-    postRoutes = (data ?? []).map((p) => ({
-      url: `${SITE_URL}/community/${p.id}`,
-      lastModified: p.updated_at ? new Date(p.updated_at) : now,
-      changeFrequency: "weekly" as const,
-      priority: 0.6,
-    }));
-  } catch {
-    // 构建环境无法访问 Supabase 时降级为纯静态 sitemap
-  }
-
-  // 路径级 i18n:每个 URL 按语言拆成 /zh /en /ko /ja /es /fr 多条,并互挂 hreflang
-  const all = [...staticRoutes, ...seoRoutes, ...carRoutes, ...userRoutes, ...postRoutes];
-  const blocks = all.flatMap((entry) => {
-    const path = entry.url.slice(SITE_URL.length);
-    const alternates = [
-      ...LOCALES.map(
-        (loc) =>
-          `    <xhtml:link rel="alternate" hreflang="${loc === "zh" ? "zh-CN" : loc}" href="${esc(`${SITE_URL}/${loc}${path}`)}"/>`
-      ),
-      `    <xhtml:link rel="alternate" hreflang="x-default" href="${esc(`${SITE_URL}/zh${path}`)}"/>`,
-    ].join("\n");
-    return LOCALES.map((loc) => {
-      // 翻译树权重略降,避免稀释中文主站
-      const priority = loc === "zh" ? entry.priority : Math.max(0.1, entry.priority - 0.2);
-      return [
-        "  <url>",
-        `    <loc>${esc(`${SITE_URL}/${loc}${path}`)}</loc>`,
-        alternates,
-        `    <lastmod>${entry.lastModified.toISOString()}</lastmod>`,
-        `    <changefreq>${entry.changeFrequency}</changefreq>`,
-        `    <priority>${priority.toFixed(1)}</priority>`,
-        "  </url>",
-      ].join("\n");
-    });
-  });
-
+  const lastmod = new Date().toISOString();
   const xml =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n` +
-    blocks.join("\n") +
-    `\n</urlset>\n`;
+    `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
+    LOCALES.map((loc) =>
+      [
+        "  <sitemap>",
+        `    <loc>${SITE_URL}/sitemaps/${loc}.xml</loc>`,
+        `    <lastmod>${lastmod}</lastmod>`,
+        "  </sitemap>",
+      ].join("\n")
+    ).join("\n") +
+    `\n</sitemapindex>\n`;
 
   return new Response(xml, {
     headers: { "Content-Type": "application/xml; charset=utf-8" },
