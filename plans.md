@@ -51,6 +51,9 @@
 
 ## 中期 (1-2 months)
 
+### 4.5 Public API + 车行自动上传(idea 阶段,2026-09-02)
+开发者 API key(所有用户可开读写;个人档每天限新传 10 台、更改 30 次,已认证车行不限档)+ 库存写接口(`PUT /api/v1/inventory/{external_id}` 幂等 upsert),复用 sync 引擎的翻译/图片转存/AI 审核链;P1 加 DMS feed 拉取模式给没开发能力的车行。完整设计见 `docs/public-api-v0.md`。
+
 ### 5. AI 一键生成车辆描述
 卖家上传照片 + 填基本信息后，AI 自动生成中英双语描述。降低发帖门槛，提高listing质量。可以用 Claude API 实现。
 
