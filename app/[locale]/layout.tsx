@@ -13,6 +13,7 @@ import { CompareBar } from "@/components/compare-bar";
 import { KeyboardSpacer } from "@/components/keyboard-spacer";
 import { StatusBarMask } from "@/components/status-bar-mask";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { OpenPanelAnalytics } from "@/components/openpanel";
 import { LOCALES, BUILD_LOCALES, type Locale } from "@/lib/i18n";
 
@@ -165,6 +166,7 @@ export default async function LocaleLayout({
                 <RealtimeNotifications />
                 <CompareBar />
                 <Analytics />
+                <SpeedInsights />
                 <OpenPanelAnalytics />
               </CarOverlayProvider>
             </IdentityProvider>
