@@ -202,7 +202,7 @@ function caseTitleTokens(h1Tokens: string[], description: string | null): string
   });
 }
 
-function decodeEntities(text: string): string {
+export function decodeEntities(text: string): string {
   return text
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
@@ -214,7 +214,7 @@ function decodeEntities(text: string): string {
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)));
 }
 
-function stripTags(html: string): string {
+export function stripTags(html: string): string {
   return decodeEntities(
     html
       .replace(/<br\s*\/?>/gi, "\n")
@@ -225,7 +225,7 @@ function stripTags(html: string): string {
     .trim();
 }
 
-function stripComments(html: string): string {
+export function stripComments(html: string): string {
   return html.replace(/<!--[\s\S]*?-->/g, "");
 }
 
@@ -235,7 +235,7 @@ function parseIntStrict(text: string | undefined | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function mapColor(raw: string | null): string | null {
+export function mapColor(raw: string | null): string | null {
   if (!raw) return null;
   const v = decodeEntities(raw).trim();
   if (!v || v === "-") return null;

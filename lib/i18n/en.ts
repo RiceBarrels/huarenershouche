@@ -376,6 +376,7 @@ export const en: Record<string, string> = {
   "混动": "Hybrid",
   "插电混动": "Plug-in hybrid",
   "柴油": "Diesel",
+  "氢燃料": "Hydrogen fuel cell",
   "AT 自动": "Automatic (AT)",
   "手动挡": "Manual",
   "CVT 无级变速": "CVT",

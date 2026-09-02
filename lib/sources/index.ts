@@ -3,6 +3,7 @@
 import type { SourceAdapter } from "./types";
 import { createDealerCenterAdapter } from "./dealercenter-wp";
 import { createOneNeAutoAdapter } from "./onenauto";
+import { createDealerSyncAdapter } from "./dealersync";
 
 // 同一套 DealerCenter WordPress 模板的站点：加一家 = 加一份配置。
 // location/联系字段是兜底值 —— 系统账号有门店记录时同步引擎会以门店地址覆盖。
@@ -59,6 +60,17 @@ const SITES: SourceAdapter[] = [
   }),
   // 1neAuto —— JSON API,经 ScrapingAnt 绕过 Cloudflare(见 onenauto.ts)
   createOneNeAutoAdapter(),
+  // DealerSync 模板站(JSON 列表接口 + 详情页图库,见 dealersync.ts)
+  createDealerSyncAdapter({
+    key: "westcoastauto",
+    baseUrl: "https://www.westcoastauto.com",
+    location: "Montclair, CA",
+    location_zh: "加州蒙特克莱尔",
+    lat: 34.0723,
+    lng: -117.6905,
+    seller_name: "Westcoast Auto Sales",
+    phone: "(909) 900-0000",
+  }),
 ];
 
 export const adapters: Record<string, SourceAdapter> = Object.fromEntries(

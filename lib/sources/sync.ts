@@ -92,6 +92,8 @@ const CITY_ZH: Record<string, string> = {
   Irvine: "尔湾",
   "Rowland Heights": "罗兰岗",
   Arcadia: "亚凯迪亚",
+  Montclair: "蒙特克莱尔",
+  Ontario: "安大略",
   "San Jose": "圣何塞",
   "San Francisco": "旧金山",
   Fremont: "弗里蒙特",

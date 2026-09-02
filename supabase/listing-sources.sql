@@ -57,7 +57,9 @@ DECLARE
     '2|ideal-bensonhurst|iDeal Auto Sales Bensonhurst|https://idealautosalesbensonhurst.com|(718) 888-8188|8635 18th Ave, Brooklyn, NY 11214|11214|40.6034|-73.9995|Brooklyn, NY|纽约布鲁克林',
     '3|ideal-statenisland|iDeal Auto Sales Staten Island|https://idealautosalesstatenisland.com|(718) 898-8618|2083 Hylan Blvd, Staten Island, NY 10306|10306|40.5797|-74.1012|Staten Island, NY|纽约史泰登岛',
     '4|ideal-nj|iDeal Auto Sales NJ|https://idealautosalesnj.com|(201) 991-0047|154 Belgrove Dr, Kearny, NJ 07032|07032|40.7676|-74.1454|Kearny, NJ|新泽西卡尼',
-    '5|ideal-rosemead|iDeal Auto Sales Rosemead|https://idealautosalesrosemead.com|(626) 929-0008|9510 Valley Blvd, Rosemead, CA 91770|91770|34.0686|-118.0834|Rosemead, CA|洛杉矶罗斯米德'
+    '5|ideal-rosemead|iDeal Auto Sales Rosemead|https://idealautosalesrosemead.com|(626) 929-0008|9510 Valley Blvd, Rosemead, CA 91770|91770|34.0686|-118.0834|Rosemead, CA|洛杉矶罗斯米德',
+    -- 6: DealerSync 模板站(westcoastauto.com/pre-owned-cars),适配器 lib/sources/dealersync.ts
+    '6|westcoastauto|Westcoast Auto Sales|https://www.westcoastauto.com|(909) 900-0000|5180 Holt Blvd, Montclair, CA 91763|91763|34.0723|-117.6905|Montclair, CA|加州蒙特克莱尔'
   ];
   r text;
   f text[];
