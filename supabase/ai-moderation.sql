@@ -1,6 +1,6 @@
 -- AI 内容审核(手动在 Supabase SQL Editor 执行)
 -- 用户发布内容(车辆、社区帖子、评论)后,客户端调用 /api/moderate,
--- 服务端用 Gemini(经 OpenRouter)按社区规范判定;违规内容自动屏蔽
+-- 服务端用 DeepSeek(经 OpenRouter)按社区规范判定;违规内容自动屏蔽
 -- (cars→removed / community_posts→hidden / 评论→blocked)并写入
 -- ai_moderation 表,管理后台「AI 审核」tab 复核:恢复或确认屏蔽。
 -- 依赖:admin-expiry.sql 中的 public.is_admin()。

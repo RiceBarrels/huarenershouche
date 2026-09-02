@@ -1,13 +1,15 @@
-// AI 内容审核 —— 服务端专用(经 OpenRouter 调用 Gemini,多模态)。
+// AI 内容审核 —— 服务端专用(经 OpenRouter 调用 DeepSeek,纯文本)。
 // 绝不要在客户端组件里 import:OPENROUTER_API_KEY 必须留在服务端。
 //
-// moderateContent() 把文本(+ 最多 3 张图)交给模型按社区规范判定;
+// moderateContent() 把文本交给模型按社区规范判定(模型不支持图片时图片被忽略);
 // 只在明确违规时返回 violation=true,拿不准一律放行(误杀比漏杀伤害大)。
 // 未配置 OPENROUTER_API_KEY 或调用失败时返回 null:调用方视为放行。
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-// 审核需要多模态 + 判断力,比翻译用的 flash-lite 高半档
-export const MODERATION_MODEL = "google/gemini-2.5-flash";
+// 2026-09 起全站统一用 DeepSeek V4 Flash。该模型只收文本:图片不送审,
+// 纯图片无文字的内容直接放行。要恢复图片审核可换 deepseek-v4-flash-vision-exp 并把下面开关打开。
+export const MODERATION_MODEL = "deepseek/deepseek-v4-flash-0731";
+const MODERATION_SUPPORTS_IMAGES = false;
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_ATTEMPTS = 2;
 const MAX_IMAGES = 3;
@@ -73,9 +75,10 @@ export async function moderateContent(
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) return null;
   const trimmed = text.trim().slice(0, MAX_TEXT_CHARS);
-  if (!trimmed && imageUrls.length === 0) return null;
-
-  const images = imageUrls.filter((u) => u && !isVideoUrl(u)).slice(0, MAX_IMAGES);
+  const images = MODERATION_SUPPORTS_IMAGES
+    ? imageUrls.filter((u) => u && !isVideoUrl(u)).slice(0, MAX_IMAGES)
+    : [];
+  if (!trimmed && images.length === 0) return null;
   const userContent: Array<
     { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } }
   > = [

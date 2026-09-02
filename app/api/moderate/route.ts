@@ -1,4 +1,4 @@
-// /api/moderate — 发布后 AI 审核(Gemini 经 OpenRouter,见 lib/moderate.ts)。
+// /api/moderate — 发布后 AI 审核(DeepSeek 经 OpenRouter,见 lib/moderate.ts)。
 // 客户端在车辆/帖子/评论 insert 成功后调用;服务端按 id 从库里重新取内容送审,
 // 判定违规则先写 ai_moderation 记录、再自动屏蔽
 // (cars→removed / community_posts→hidden / 评论→blocked),

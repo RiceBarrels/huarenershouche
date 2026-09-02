@@ -346,7 +346,7 @@ export default function NewPostPage() {
         setError(t("发布失败: {msg}", { msg: insertError.message }));
       }
     } else if (data) {
-      // AI 审核(Gemini):违规帖自动屏蔽,不进入社区流,由管理员复核
+      // AI 审核(DeepSeek):违规帖自动屏蔽,不进入社区流,由管理员复核
       const mod = await requestModeration("post", data.id);
       setLoading(false);
       if (mod.blocked) {

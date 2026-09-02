@@ -1,4 +1,4 @@
-// 发布成功后触发 AI 审核(/api/moderate,服务端 Gemini 判定)。
+// 发布成功后触发 AI 审核(/api/moderate,服务端 DeepSeek 判定)。
 // 任何失败都静默放行:审核挂了绝不能挡住用户发布。
 
 import { apiOrigin } from "@/lib/capacitor";

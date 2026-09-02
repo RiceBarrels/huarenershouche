@@ -6,8 +6,8 @@
 // 未配置 OPENROUTER_API_KEY 时优雅降级:原样返回,不影响发布/同步。
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-// ling-2.6-flash 已转付费下架(2026-08 起 404),换成低价多语言强的 flash-lite
-const MODEL = "google/gemini-2.5-flash-lite";
+// 2026-09 起全站统一用 DeepSeek V4 Flash(纯文本,便宜且多语言强)
+const MODEL = "deepseek/deepseek-v4-flash-0731";
 const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 4;
 const MAX_TOKENS = 8000;
