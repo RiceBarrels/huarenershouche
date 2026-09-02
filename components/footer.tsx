@@ -200,6 +200,10 @@ export function Footer() {
             <Link href="/terms" className="transition-colors hover:text-foreground">
               {t("隐私政策")}
             </Link>
+            <span className="text-border">|</span>
+            <Link href="/developers" className="transition-colors hover:text-foreground">
+              {t("开发者 / API")}
+            </Link>
           </div>
         </div>
       </div>
