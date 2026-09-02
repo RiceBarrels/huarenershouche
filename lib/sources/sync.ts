@@ -194,6 +194,16 @@ export async function syncSource(
     .eq("id", source.id);
 
   try {
+    // 0a. 系统账号沟通语言：源站配置声明了 languages 且账号还没填过时补上
+    //     （管理员在后台改过的保留，不覆盖）
+    if (adapter.languages && adapter.languages.length > 0) {
+      await supabase
+        .from("profiles")
+        .update({ languages: adapter.languages })
+        .eq("id", source.system_account_id)
+        .eq("languages", "{}");
+    }
+
     // 0. 门店地址优先：有门店记录则车辆定位跟随门店
     const storeLoc = await loadStoreLocation(supabase, source.system_account_id);
     const locationOverride = storeLoc

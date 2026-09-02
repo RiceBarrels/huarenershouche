@@ -7,6 +7,8 @@ import { createDealerSyncAdapter } from "./dealersync";
 
 // 同一套 DealerCenter WordPress 模板的站点：加一家 = 加一份配置。
 // location/联系字段是兜底值 —— 系统账号有门店记录时同步引擎会以门店地址覆盖。
+// languages：该车行能用的语言，同步时补到系统账号 profiles.languages（为空才写），
+// 浏览/推荐会把会说当前界面语言的卖家排在前面。
 const SITES: SourceAdapter[] = [
   createDealerCenterAdapter({
     key: "ideal-bayside",
@@ -17,6 +19,7 @@ const SITES: SourceAdapter[] = [
     lng: -73.7864,
     seller_name: "iDeal Auto Sales Bayside",
     phone: "(718) 313-9239",
+    languages: ["zh", "en"],
   }),
   createDealerCenterAdapter({
     key: "ideal-bensonhurst",
@@ -27,6 +30,7 @@ const SITES: SourceAdapter[] = [
     lng: -73.9995,
     seller_name: "iDeal Auto Sales Bensonhurst",
     phone: "(718) 888-8188",
+    languages: ["zh", "en"],
   }),
   createDealerCenterAdapter({
     key: "ideal-statenisland",
@@ -37,6 +41,7 @@ const SITES: SourceAdapter[] = [
     lng: -74.1012,
     seller_name: "iDeal Auto Sales Staten Island",
     phone: "(718) 898-8618",
+    languages: ["zh", "en"],
   }),
   createDealerCenterAdapter({
     key: "ideal-nj",
@@ -47,6 +52,7 @@ const SITES: SourceAdapter[] = [
     lng: -74.1454,
     seller_name: "iDeal Auto Sales NJ",
     phone: "(201) 991-0047",
+    languages: ["zh", "en"],
   }),
   createDealerCenterAdapter({
     key: "ideal-rosemead",
@@ -57,6 +63,7 @@ const SITES: SourceAdapter[] = [
     lng: -118.0834,
     seller_name: "iDeal Auto Sales Rosemead",
     phone: "(626) 929-0008",
+    languages: ["zh", "en"],
   }),
   // 1neAuto —— JSON API,经 ScrapingAnt 绕过 Cloudflare(见 onenauto.ts)
   createOneNeAutoAdapter(),
@@ -70,6 +77,7 @@ const SITES: SourceAdapter[] = [
     lng: -117.6905,
     seller_name: "Westcoast Auto Sales",
     phone: "(909) 900-0000",
+    languages: ["zh", "en"],
   }),
 ];
 

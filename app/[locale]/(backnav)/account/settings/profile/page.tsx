@@ -12,6 +12,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SettingsGroup, GroupFooter } from "@/components/ios-settings";
+import { LanguagePicker } from "@/components/language-picker";
 import { useI18n } from "@/components/i18n-provider";
 import type { DbProfile } from "@/lib/types";
 
@@ -46,7 +47,7 @@ export default function ProfileSettingsPage() {
   const { t } = useI18n();
   const [user, setUser] = useState<string | null>(null);
   const [profile, setProfile] = useState<DbProfile | null>(null);
-  const [form, setForm] = useState({ username: "", phone: "", location: "" });
+  const [form, setForm] = useState({ username: "", phone: "", location: "", languages: [] as string[] });
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ export default function ProfileSettingsPage() {
       setSaving(true);
       await supabase
         .from("profiles")
-        .update({ username: f.username, phone: f.phone, location: f.location })
+        .update({ username: f.username, phone: f.phone, location: f.location, languages: f.languages })
         .eq("id", user);
       setSaving(false);
     }, 800);
@@ -89,6 +90,7 @@ export default function ProfileSettingsPage() {
           username: data.username || "",
           phone: data.phone || "",
           location: data.location || "",
+          languages: (data.languages as string[] | null) || [],
         });
       }
       setLoading(false);
@@ -169,6 +171,15 @@ export default function ProfileSettingsPage() {
               <FieldRow id="location" label={t("地区")} value={form.location} placeholder={t("例如: Los Angeles, CA")} onChange={(v) => update({ location: v })} />
             </SettingsGroup>
             <GroupFooter>{t("修改会自动保存。昵称与地区会展示在你的主页和车源信息里。")}</GroupFooter>
+
+            {/* 沟通语言:买家按界面语言浏览时,会说该语言的卖家车源排在前面 */}
+            <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">{t("沟通语言")}</h2>
+            <SettingsGroup className="mt-2">
+              <div className="px-4 py-3">
+                <LanguagePicker value={form.languages} onChange={(v) => update({ languages: v })} />
+              </div>
+            </SettingsGroup>
+            <GroupFooter>{t("选择你能沟通的语言。买家用对应语言浏览时,你的车源会优先展示,并在车辆详情和主页标注。")}</GroupFooter>
           </>
         )}
       </main>

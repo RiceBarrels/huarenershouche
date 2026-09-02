@@ -49,7 +49,14 @@ export interface DbCar {
   // Owner-disabled syndicated listing (excluded from public queries; untouched by the sync engine)
   owner_hidden: boolean;
   // Joined from profiles
-  profiles?: { account_type: "private" | "dealer"; avatar_url?: string | null; is_system?: boolean; claimed_by?: string | null };
+  profiles?: {
+    account_type: "private" | "dealer";
+    avatar_url?: string | null;
+    is_system?: boolean;
+    claimed_by?: string | null;
+    // 卖家沟通语言(浏览/推荐按当前界面语言优先排序时需要 join 出来)
+    languages?: string[] | null;
+  };
 }
 
 export interface DbProfile {
@@ -59,6 +66,8 @@ export interface DbProfile {
   avatar_url: string | null;
   location: string | null;
   preferred_language: string;
+  // 卖家会说的语言代码(lib/i18n/languages.ts),空 = 未声明;见 supabase/seller-languages.sql
+  languages: string[];
   account_type: "private" | "dealer";
   role: "user" | "admin";
   banned: boolean;
@@ -110,6 +119,29 @@ export interface DbDealerStore {
   created_at: string;
 }
 
+// 用户屏蔽(拉黑),见 supabase/blocks.sql
+export interface DbBlock {
+  blocker_id: string;
+  blocked_id: string;
+  created_at: string;
+  // Joined
+  blocked_profile?: { username: string; avatar_url: string | null };
+}
+
+// 系统账号自助认领申请(supabase/claim-requests.sql)。通过即写 profiles.claimed_by。
+export interface DbClaimRequest {
+  id: string;
+  system_id: string;
+  requester_id: string;
+  message: string | null;
+  contact: string | null;
+  status: "pending" | "approved" | "rejected";
+  admin_note: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+}
+
 export interface DbAdminAction {
   id: string;
   admin_id: string;
@@ -149,6 +181,8 @@ export interface DbComment {
   content: string;
   // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
   other_i18n?: Record<string, { content?: string | null }> | null;
+  // AI 审核屏蔽(supabase/ai-moderation.sql);列可能尚未创建,故可选
+  status?: "active" | "blocked";
   created_at: string;
   // Joined
   profiles?: { username: string; avatar_url: string | null };
@@ -196,8 +230,26 @@ export interface DbPostComment {
   likes_count: number;
   // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
   other_i18n?: Record<string, { content?: string | null }> | null;
+  // AI 审核屏蔽(supabase/ai-moderation.sql);列可能尚未创建,故可选
+  status?: "active" | "blocked";
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
+}
+
+// AI 审核拦截记录(supabase/ai-moderation.sql):只记违规,admin「AI 审核」tab 复核
+export interface DbAiModeration {
+  id: string;
+  target_type: "car" | "post" | "car_comment" | "post_comment";
+  target_id: string;
+  user_id: string | null;
+  content: string;
+  categories: string[];
+  reason: string | null;
+  model: string | null;
+  status: "pending" | "restored" | "confirmed";
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
 }
 
 export interface DbQaQuestion {

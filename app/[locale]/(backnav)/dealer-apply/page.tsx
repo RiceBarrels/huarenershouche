@@ -21,6 +21,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { SettingsGroup, GroupFooter, LargeTitle, FieldRow } from "@/components/ios-settings";
+import { LanguagePicker } from "@/components/language-picker";
 import { useI18n } from "@/components/i18n-provider";
 import type { DbDealerStore, DbProfile } from "@/lib/types";
 
@@ -63,6 +64,8 @@ export default function DealerApplyPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  // 车行沟通语言:随申请写入 profiles.languages(买家按界面语言浏览时优先展示)
+  const [languages, setLanguages] = useState<string[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -82,6 +85,7 @@ export default function DealerApplyPage() {
           .order("created_at", { ascending: false }),
       ]);
       setProfile((profileRes.data as DbProfile) || null);
+      setLanguages(((profileRes.data as DbProfile | null)?.languages as string[] | undefined) || []);
       setStores((storesRes.data as DbDealerStore[]) || []);
       setLoading(false);
     }
@@ -125,6 +129,8 @@ export default function DealerApplyPage() {
     if (err) {
       setError(t("提交失败，请稍后再试"));
     } else if (data) {
+      // 语言写到账号资料(与门店无关,认证前也生效;失败不阻塞申请)
+      await supabase.from("profiles").update({ languages }).eq("id", user);
       setStores((prev) => [data as DbDealerStore, ...prev]);
       setSubmitted(true);
     }
@@ -236,6 +242,14 @@ export default function DealerApplyPage() {
                 <FieldRow label={t("微信号")} placeholder="WeChat ID" value={form.wechat} onChange={(v) => update("wechat", v)} />
               </SettingsGroup>
               <GroupFooter>{t("车行名称、街道地址、城市、州与邮编为必填。")}</GroupFooter>
+
+              <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">{t("沟通语言")}</h2>
+              <SettingsGroup className="mt-2">
+                <div className="px-4 py-3">
+                  <LanguagePicker value={languages} onChange={setLanguages} />
+                </div>
+              </SettingsGroup>
+              <GroupFooter>{t("车行能用哪些语言接待买家。买家用对应语言浏览时,你的车源会优先展示。")}</GroupFooter>
 
               {error && (
                 <div className="mt-3 rounded-xl bg-destructive/10 px-3 py-2.5">

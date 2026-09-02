@@ -55,6 +55,11 @@ export type FetchHtml = (url: string) => Promise<string>;
 export interface SourceAdapter {
   /** Matches listing_sources.key */
   key: string;
+  /**
+   * 该车行会说的语言(lib/i18n/languages.ts 代码)。同步引擎在系统账号
+   * profiles.languages 为空时写入;管理员在后台改过的不覆盖。
+   */
+  languages?: string[];
   listAll(fetchHtml: FetchHtml): Promise<CrawlResult>;
   fetchDetail(fetchHtml: FetchHtml, ref: SourceListingRef): Promise<ParsedListing>;
 }

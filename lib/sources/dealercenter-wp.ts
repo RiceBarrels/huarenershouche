@@ -24,6 +24,8 @@ export interface DealerCenterSiteConfig {
   lng: number;
   seller_name: string;
   phone: string;
+  /** 车行沟通语言,见 SourceAdapter.languages */
+  languages?: string[];
 }
 
 // Slug form (UPPER, hyphenated) → display form. Longest keys matched first.
@@ -517,6 +519,7 @@ async function fetchDetail(
 export function createDealerCenterAdapter(config: DealerCenterSiteConfig): SourceAdapter {
   return {
     key: config.key,
+    languages: config.languages,
     listAll: (fetchHtml) => listAll(config, fetchHtml),
     fetchDetail: (fetchHtml, ref) => fetchDetail(config, fetchHtml, ref),
   };

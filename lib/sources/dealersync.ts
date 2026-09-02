@@ -31,6 +31,8 @@ export interface DealerSyncSiteConfig {
   lng: number;
   seller_name: string;
   phone: string;
+  /** 车行沟通语言,见 SourceAdapter.languages */
+  languages?: string[];
 }
 
 /** Subset of the /Inventory/Search vehicle record we read. */
@@ -339,5 +341,5 @@ export function createDealerSyncAdapter(config: DealerSyncSiteConfig): SourceAda
     };
   }
 
-  return { key: config.key, listAll, fetchDetail };
+  return { key: config.key, languages: config.languages, listAll, fetchDetail };
 }

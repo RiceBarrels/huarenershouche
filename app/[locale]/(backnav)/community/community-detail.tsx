@@ -17,16 +17,20 @@ import {
   ImageIcon,
   Share,
   X,
+  Flag,
 } from "lucide-react";
 import { useRouteParams } from "@/lib/use-route-params";
 import { useI18n } from "@/components/i18n-provider";
 import { supabase } from "@/lib/supabase";
+import { requestModeration } from "@/lib/moderation-client";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { RelatedPosts } from "@/components/related-posts";
 import { HashtagText } from "@/components/hashtag-text";
 import { FollowButton } from "@/components/follow-button";
+import { ReportDialog } from "@/components/report-dialog";
+import { useBlockedIds } from "@/lib/blocks";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { ImageLightbox } from "@/components/image-lightbox";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +102,8 @@ export default function CommunityDetailPage({
   const [userId, setUserId] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
+  // AI 审核拦截提示(评论已被屏蔽时展示在输入框上方)
+  const [modNotice, setModNotice] = useState("");
   const [tableError, setTableError] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
@@ -303,21 +309,28 @@ export default function CommunityDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, commentsLoading]);
 
+  // 被屏蔽用户的评论、AI 审核屏蔽的评论不展示(blocks 表 / ai-moderation.sql)
+  const { blockedIds } = useBlockedIds();
+  const visibleComments = useMemo(
+    () => comments.filter((c) => !blockedIds.has(c.user_id) && c.status !== "blocked"),
+    [comments, blockedIds],
+  );
+
   // 楼中楼结构:顶层 + 按 parent_id 分组的回复
   const topLevel = useMemo(
-    () => comments.filter((c) => !c.parent_id),
-    [comments],
+    () => visibleComments.filter((c) => !c.parent_id),
+    [visibleComments],
   );
   const repliesByParent = useMemo(() => {
     const map = new Map<string, DbPostComment[]>();
-    for (const c of comments) {
+    for (const c of visibleComments) {
       if (!c.parent_id) continue;
       const list = map.get(c.parent_id) ?? [];
       list.push(c);
       map.set(c.parent_id, list);
     }
     return map;
-  }, [comments]);
+  }, [visibleComments]);
 
   async function handleLike() {
     if (!postId) return;
@@ -425,6 +438,7 @@ export default function CommunityDetailPage({
       return;
     }
     setSending(true);
+    setModNotice("");
 
     const body =
       replyTo?.isNested && !content.trim().startsWith("回复 @")
@@ -449,6 +463,13 @@ export default function CommunityDetailPage({
       }
       setContent("");
       setReplyTo(null);
+      // AI 审核(不阻塞发送):违规评论就地屏蔽并从列表移除
+      requestModeration("post_comment", data.id).then((mod) => {
+        if (mod.blocked) {
+          setComments((prev) => prev.filter((c) => c.id !== data.id));
+          setModNotice(t("评论涉嫌违规，已被系统拦截"));
+        }
+      });
     }
 
     setSending(false);
@@ -590,6 +611,17 @@ export default function CommunityDetailPage({
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-2">
             <FollowButton userId={post.user_id} />
+            {userId !== post.user_id && (
+              <ReportDialog targetType="post" targetId={post.id}>
+                <button
+                  type="button"
+                  aria-label={t("举报此帖子")}
+                  className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 hover:text-foreground"
+                >
+                  <Flag className="h-3.5 w-3.5" strokeWidth={1.5} />
+                </button>
+              </ReportDialog>
+            )}
             <button
               type="button"
               onClick={handleShare}
@@ -742,7 +774,7 @@ export default function CommunityDetailPage({
           className="mt-5 scroll-mt-16 border-t border-border pt-4"
         >
           <h2 className="font-mono text-xs text-muted-foreground">
-            {t("共 {n} 条评论", { n: comments.length })}
+            {t("共 {n} 条评论", { n: visibleComments.length })}
           </h2>
 
           {/* 桌面楼层间距略放大,楼与楼的层级分隔更清晰 */}
@@ -852,6 +884,9 @@ export default function CommunityDetailPage({
       >
         {/* 桌面底栏纵向多给一点呼吸,输入框不贴边 */}
         <div className="mx-auto w-full max-w-2xl px-4 py-2 md:py-3">
+          {modNotice && (
+            <p className="mb-1.5 font-mono text-[11px] text-red-600 dark:text-red-400">{modNotice}</p>
+          )}
           {replyTo && (
             <div className="mb-1.5 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
               <span className="truncate">{t("回复 @{name}", { name: replyTo.name })}</span>
@@ -936,7 +971,7 @@ export default function CommunityDetailPage({
                   className="flex shrink-0 items-center gap-1 py-2 font-mono text-xs text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <MessageSquare className="h-4.5 w-4.5" strokeWidth={1.5} />
-                  <span className="tabular-nums">{comments.length}</span>
+                  <span className="tabular-nums">{visibleComments.length}</span>
                 </button>
               </>
             )}
@@ -1043,7 +1078,7 @@ function CommentRow({
           >
             {t("回复")}
           </button>
-          {userId === comment.user_id && (
+          {userId === comment.user_id ? (
             <button
               type="button"
               onClick={onDelete}
@@ -1052,6 +1087,16 @@ function CommentRow({
             >
               <Trash2 className="h-3 w-3" strokeWidth={1.5} />
             </button>
+          ) : (
+            <ReportDialog targetType="post_comment" targetId={comment.id}>
+              <button
+                type="button"
+                className="text-muted-foreground transition-colors hover:text-foreground"
+                aria-label={t("举报此评论")}
+              >
+                <Flag className="h-3 w-3" strokeWidth={1.5} />
+              </button>
+            </ReportDialog>
           )}
         </div>
       </div>

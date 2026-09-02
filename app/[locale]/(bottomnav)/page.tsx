@@ -34,6 +34,7 @@ import { TrustReviews } from "@/components/trust-reviews";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasUserHistory, rankCars, getFavoriteIds } from "@/lib/recommendations";
+import { sortCars } from "@/lib/car-filters";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import {
   Drawer,
@@ -342,7 +343,7 @@ export default function Home() {
       const [carsRes, countRes, postsRes] = await Promise.all([
         supabase
           .from("cars")
-          .select("*, profiles!seller_id(account_type, avatar_url)")
+          .select("*, profiles!seller_id(account_type, avatar_url, languages)")
           .eq("status", "active")
           .eq("owner_hidden", false)
           .order("created_at", { ascending: false })
@@ -363,10 +364,9 @@ export default function Home() {
       ]);
 
       const cars = (carsRes.data as DbCar[]) || [];
-      // 个人/车行直发优先于系统检索转载(稳定排序保持组内最新在前)
-      const prioritized = [...cars].sort(
-        (a, b) => Number(!!a.source_id) - Number(!!b.source_id)
-      );
+      // 卖家会说当前界面语言的优先,其次个人/车行直发优先于系统检索转载
+      // (稳定排序保持组内最新在前)
+      const prioritized = sortCars(cars, "newest", new Map(), locale);
       // 取 8 张:普通桌面 3 列展示前 6,带鱼屏 4 列展示 8
       const featuredNext = prioritized.slice(0, 8);
       setFeatured(featuredNext);
@@ -389,7 +389,7 @@ export default function Home() {
 
         // 不把已经看过的车再推给用户;多排一些供手机端 tab 流无限滑
         const excludeIds = new Set(recentIds);
-        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 30 });
+        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 30, locale });
         setRecommended(recommendedNext);
       }
 
@@ -403,7 +403,7 @@ export default function Home() {
       setCommunityPosts(postsNext);
 
       if (featuredNext.length > 0) {
-        writeDualCache<HomeCache>(HOME_CACHE_KEY, {
+        writeDualCache<HomeCache>(`${HOME_CACHE_KEY}_${locale}`, {
           featured: featuredNext,
           recommended: recommendedNext,
           carCount: countNext,
@@ -413,7 +413,8 @@ export default function Home() {
     }
 
     // 双层缓存(社区同款):本会话拉过就直接复用;localStorage 兜底数据先展示、后台刷新
-    const cached = readDualCache<HomeCache>(HOME_CACHE_KEY);
+    // 缓存按界面语言分开:首页排序会按卖家语言优先,不同语言顺序不同
+    const cached = readDualCache<HomeCache>(`${HOME_CACHE_KEY}_${locale}`);
     if (cached && cached.data.featured.length > 0) {
       setFeatured(cached.data.featured);
       setRecommended(cached.data.recommended || []);
@@ -431,6 +432,8 @@ export default function Home() {
       })
       .finally(() => setLocationLoading(false));
 
+    // locale 只在原生端应用内切语言时变化;首页缓存按语言分 key,下次进入首页即按新语言排序
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 定位权限刚被授予(权限弹窗/设置页开启)时重新检测——mount 时那次可能因无权限失败

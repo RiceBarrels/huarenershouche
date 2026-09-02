@@ -125,15 +125,18 @@ BEGIN
 END $$;
 
 -- ---------- 5. update_claimed_profile:认领人编辑被认领账号的安全列 ----------
--- 只允许改 username/avatar_url/phone/location/preferred_language,
+-- 只允许改 username/avatar_url/phone/location/preferred_language/languages,
 -- 绝不碰 is_system/role/claimed_by/banned。传 null 表示保持原值。
+-- (languages 列由 seller-languages.sql 增加;两处定义保持一致)
+DROP FUNCTION IF EXISTS public.update_claimed_profile(uuid, text, text, text, text, text);
 CREATE OR REPLACE FUNCTION public.update_claimed_profile(
   target uuid,
   new_username text DEFAULT NULL,
   new_avatar_url text DEFAULT NULL,
   new_phone text DEFAULT NULL,
   new_location text DEFAULT NULL,
-  new_preferred_language text DEFAULT NULL
+  new_preferred_language text DEFAULT NULL,
+  new_languages text[] DEFAULT NULL
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -151,13 +154,14 @@ BEGIN
     phone              = COALESCE(new_phone, phone),
     location           = COALESCE(new_location, location),
     preferred_language = COALESCE(new_preferred_language, preferred_language),
+    languages          = COALESCE(new_languages, languages),
     updated_at         = now()
   WHERE id = target;
 END;
 $$;
 
-REVOKE EXECUTE ON FUNCTION public.update_claimed_profile(uuid, text, text, text, text, text) FROM public;
-GRANT EXECUTE ON FUNCTION public.update_claimed_profile(uuid, text, text, text, text, text) TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.update_claimed_profile(uuid, text, text, text, text, text, text[]) FROM public;
+GRANT EXECUTE ON FUNCTION public.update_claimed_profile(uuid, text, text, text, text, text, text[]) TO authenticated;
 
 -- ---------- 6. get_unread_count_for:某身份(本人或被认领账号)的未读私信数 ----------
 -- 现有无参 get_unread_count 只认 auth.uid();切换身份后需按 target 计数。

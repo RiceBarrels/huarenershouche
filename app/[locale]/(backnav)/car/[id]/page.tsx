@@ -16,7 +16,7 @@ const getCar = cache(async (id: string): Promise<DbCar | null> => {
   try {
     const { data } = await supabase
       .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by)")
+      .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by, languages)")
       .eq("id", id)
       .maybeSingle();
     return (data as DbCar | null) ?? null;

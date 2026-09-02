@@ -2,12 +2,13 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "@/components/localized-navigation";
-import { ArrowLeft, Send, Loader2, Plus } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Plus, Flag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
 import { userLink } from "@/lib/static-link";
 import { Button } from "@/components/ui/button";
+import { ReportDialog } from "@/components/report-dialog";
 import type { DbMessage } from "@/lib/types";
 
 // 媒体消息:内容为存储桶里的图片/视频公开 URL,渲染时直接展示
@@ -194,6 +195,17 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             )}
             <span className="truncate font-mono text-sm font-medium">{otherUsername}</span>
           </button>
+          {otherUserId && (
+            <ReportDialog targetType="user" targetId={otherUserId}>
+              <button
+                type="button"
+                aria-label={t("举报此用户")}
+                className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Flag className="h-4 w-4" strokeWidth={1.5} />
+              </button>
+            </ReportDialog>
+          )}
         </div>
       )}
 

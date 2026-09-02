@@ -7,6 +7,7 @@ import { carLink } from "@/lib/static-link";
 import { MapPin, Gauge, Fuel, Calendar, Navigation, Heart, GitCompare, Check, Flame, Phone, ArrowUpRight } from "lucide-react";
 import { avatarUrl } from "@/lib/avatar";
 import { Badge } from "@/components/ui/badge";
+import { sellerSpeaksLocale, localeLanguageCodes, languageLabel } from "@/lib/i18n/languages";
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
@@ -311,6 +312,12 @@ export function CarCard({
                   className="bg-background/90 font-mono text-[11px] font-medium"
                 >
                   {t("个人")}
+                </Badge>
+              )}
+              {/* 非中文界面:卖家明确会说当前语言时标注(中文站默认视为会中文,不标) */}
+              {locale !== "zh" && !!car.profiles?.languages?.length && sellerSpeaksLocale(car.profiles.languages, locale) && (
+                <Badge variant="secondary" className="font-mono text-[11px] font-medium">
+                  {languageLabel(localeLanguageCodes(locale)[0])} OK
                 </Badge>
               )}
               {distance !== undefined && (

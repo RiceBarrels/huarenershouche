@@ -194,7 +194,7 @@ function BrowseContent() {
   async function fetchCars() {
     const { data } = await supabase
       .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url)")
+      .select("*, profiles!seller_id(account_type, avatar_url, languages)")
       .eq("status", "active")
       .eq("owner_hidden", false)
       .order("created_at", { ascending: false });
@@ -428,8 +428,8 @@ function BrowseContent() {
       fetchedAt,
     });
     // If location yielded no results and we have coords, sort by distance
-    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances);
-  }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt]);
+    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances, locale);
+  }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt, locale]);
 
   // 地图找车入口:携带当前筛选条件跳转 /browse/map
   const mapHref = useMemo(() => {

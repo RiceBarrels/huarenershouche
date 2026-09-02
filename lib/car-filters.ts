@@ -10,6 +10,8 @@ import { carHasVideo } from "@/lib/saved-searches";
 import { getPriceInsight, type PriceInsight } from "@/lib/price-insight";
 import type { Filters } from "@/components/search-filters";
 import type { DbCar } from "@/lib/types";
+import type { Locale } from "@/lib/i18n";
+import { sellerSpeaksLocale } from "@/lib/i18n/languages";
 
 // 复用 components/search-filters 的规范定义,方便调用方单点导入
 export type { Filters } from "@/components/search-filters";
@@ -300,8 +302,14 @@ export function applyCarFilters(
   return { cars: result, forcedDistanceSort: usingDistanceFallback && !!userCoords };
 }
 
-// 排序(纯函数,返回新数组)
-export function sortCars(cars: DbCar[], sort: SortKey, distances: Map<string, number>): DbCar[] {
+// 排序(纯函数,返回新数组)。locale 传入时,默认排序把「卖家会说当前界面语言」
+// 的车排在最前(卖家语言见 profiles.languages / lib/i18n/languages.ts)。
+export function sortCars(
+  cars: DbCar[],
+  sort: SortKey,
+  distances: Map<string, number>,
+  locale?: Locale,
+): DbCar[] {
   const sorted = [...cars];
   switch (sort) {
     case "price-asc":
@@ -324,8 +332,15 @@ export function sortCars(cars: DbCar[], sort: SortKey, distances: Map<string, nu
       });
       break;
     default:
-      // 默认排序:个人/车行直发排在系统检索转载之前,各自组内按最新
+      // 默认排序:① 卖家会说当前界面语言的优先(含系统检索账号声明的语言)
+      // ② 个人/车行直发排在系统检索转载之前 ③ 各自组内按最新
       sorted.sort((a, b) => {
+        if (locale) {
+          const lang =
+            Number(sellerSpeaksLocale(b.profiles?.languages, locale)) -
+            Number(sellerSpeaksLocale(a.profiles?.languages, locale));
+          if (lang !== 0) return lang;
+        }
         const tier = Number(!!a.source_id) - Number(!!b.source_id);
         if (tier !== 0) return tier;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();

@@ -71,6 +71,8 @@ begin
   delete from public.qa_questions where user_id = uid;
 
   -- 其他用户数据
+  delete from public.blocks           where blocker_id = uid or blocked_id = uid;
+  delete from public.reports          where target_type = 'user' and target_id = uid;
   delete from public.dealer_reviews   where user_id = uid or dealer_id = uid;
   delete from public.dealer_stores    where owner_id = uid;
   delete from public.platform_reviews where user_id = uid;

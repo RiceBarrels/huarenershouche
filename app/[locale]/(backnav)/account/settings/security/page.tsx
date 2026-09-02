@@ -12,7 +12,7 @@ import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SettingsGroup, GroupFooter, LargeTitle } from "@/components/ios-settings";
+import { SettingsGroup, GroupFooter, LargeTitle, SettingsRow } from "@/components/ios-settings";
 import { ACTING_KEY } from "@/components/identity-provider";
 import { useI18n } from "@/components/i18n-provider";
 
@@ -122,6 +122,11 @@ export default function SecuritySettingsPage() {
                 {t("更改邮箱后需要在新邮箱中点击验证链接才会生效。")}
               </p>
             )}
+
+            {/* 屏蔽名单(App Store UGC 合规:屏蔽机制的管理入口) */}
+            <SettingsGroup capsule className="mt-6">
+              <SettingsRow label={t("屏蔽名单")} href="/account/settings/blocked" />
+            </SettingsGroup>
 
             {/* 删除账号(危险区):收起时单行胶囊,展开成表单后回到大圆角卡 */}
             <SettingsGroup capsule={!deleteOpen} className="mt-6">

@@ -1,14 +1,17 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Trash2, Send, Loader2 } from "lucide-react";
+import { Trash2, Send, Loader2, Flag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestModeration } from "@/lib/moderation-client";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
 import { needsContentTranslation } from "@/lib/i18n";
 import { apiOrigin } from "@/lib/capacitor";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReportDialog } from "@/components/report-dialog";
+import { useBlockedIds } from "@/lib/blocks";
 import Link from "@/components/localized-navigation";
 import type { DbComment } from "@/lib/types";
 
@@ -33,6 +36,8 @@ export function CommentSection({ carId }: { carId: string }) {
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  // AI 审核拦截提示(评论已被屏蔽时展示在输入框下方)
+  const [modNotice, setModNotice] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
   // 逐条「显示原文」切换(评论列表是内联 map,状态集中放父组件)
   const [showOriginalIds, setShowOriginalIds] = useState<Set<string>>(new Set());
@@ -110,7 +115,7 @@ export function CommentSection({ carId }: { carId: string }) {
             .select("*, profiles!user_id(username, avatar_url)")
             .eq("id", payload.new.id)
             .single();
-          if (data) {
+          if (data && (data as DbComment).status !== "blocked") {
             setComments((prev) => {
               if (prev.some((c) => c.id === data.id)) return prev;
               return [...prev, data as DbComment];
@@ -135,13 +140,27 @@ export function CommentSection({ carId }: { carId: string }) {
   async function handleSubmit() {
     if (!content.trim() || !userId) return;
     setSending(true);
-    const { error } = await supabase.from("comments").insert({
-      car_id: carId,
-      user_id: userId,
-      content: content.trim(),
-    });
+    setModNotice("");
+    const { data, error } = await supabase
+      .from("comments")
+      .insert({
+        car_id: carId,
+        user_id: userId,
+        content: content.trim(),
+      })
+      .select("id")
+      .single();
     if (!error) {
       setContent("");
+      // AI 审核(不阻塞发送):违规评论就地屏蔽并从列表移除
+      if (data) {
+        requestModeration("car_comment", data.id).then((mod) => {
+          if (mod.blocked) {
+            setComments((prev) => prev.filter((c) => c.id !== data.id));
+            setModNotice(t("评论涉嫌违规，已被系统拦截"));
+          }
+        });
+      }
     }
     setSending(false);
     inputRef.current?.focus();
@@ -152,10 +171,16 @@ export function CommentSection({ carId }: { carId: string }) {
     setComments((prev) => prev.filter((c) => c.id !== commentId));
   }
 
+  // 被屏蔽用户的评论、AI 审核屏蔽的评论不展示(blocks 表 / ai-moderation.sql)
+  const { blockedIds } = useBlockedIds();
+  const visibleComments = comments.filter(
+    (c) => !blockedIds.has(c.user_id) && c.status !== "blocked"
+  );
+
   return (
     <section className="mt-8 border-t border-border pt-6">
       <h2 className="font-mono text-sm font-semibold">
-        {t("评论")} ({comments.length})
+        {t("评论")} ({visibleComments.length})
       </h2>
 
       {/* Comment input */}
@@ -196,18 +221,21 @@ export function CommentSection({ carId }: { carId: string }) {
             {t("登录后发表评论")}
           </Link>
         )}
+        {modNotice && (
+          <p className="mt-1.5 font-mono text-[11px] text-red-600 dark:text-red-400">{modNotice}</p>
+        )}
       </div>
 
       {/* Comments list — 桌面条目间距略放大,长列表扫读更省力 */}
       <div className="mt-4 space-y-3 md:mt-5 md:space-y-4">
         {loading ? (
           <p className="font-mono text-xs text-muted-foreground">{t("加载中...")}</p>
-        ) : comments.length === 0 ? (
+        ) : visibleComments.length === 0 ? (
           <p className="py-6 text-center font-mono text-xs text-muted-foreground">
             {t("暂无评论，来说两句吧")}
           </p>
         ) : (
-          comments.map((comment) => {
+          visibleComments.map((comment) => {
             // 非中文界面显示 AI 译文,可按条切回原文;翻译在途显示 skeleton
             const cNeeds = needsContentTranslation(comment.content, locale);
             const translated = cNeeds ? comment.other_i18n?.[locale]?.content : undefined;
@@ -230,13 +258,23 @@ export function CommentSection({ carId }: { carId: string }) {
                   <span className="font-mono text-[10px] text-muted-foreground">
                     {timeAgo(comment.created_at, t)}
                   </span>
-                  {userId === comment.user_id && (
+                  {userId === comment.user_id ? (
                     <button
                       onClick={() => handleDelete(comment.id)}
                       className="ml-auto text-muted-foreground transition-colors hover:text-destructive"
                     >
                       <Trash2 className="h-3 w-3" strokeWidth={1.5} />
                     </button>
+                  ) : (
+                    <ReportDialog targetType="car_comment" targetId={comment.id}>
+                      <button
+                        type="button"
+                        className="ml-auto text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label={t("举报此评论")}
+                      >
+                        <Flag className="h-3 w-3" strokeWidth={1.5} />
+                      </button>
+                    </ReportDialog>
                   )}
                 </div>
                 {cPending ? (

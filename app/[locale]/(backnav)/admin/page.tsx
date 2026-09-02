@@ -6,7 +6,7 @@ import Link from "@/components/localized-navigation";
 import {
   ShieldCheck, Users, Car, Flag, Store, Ban, Eye, Trash2, Check, X,
   Loader2, ChevronRight, AlertTriangle, Clock, XCircle, MessageSquare,
-  Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink,
+  Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink, Bot,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
@@ -17,9 +17,20 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbProfile, DbCar, DbDealerStore, DbListingSource } from "@/lib/types";
+import type { DbProfile, DbCar, DbDealerStore, DbListingSource, DbAiModeration, DbClaimRequest } from "@/lib/types";
 
-type Tab = "verifications" | "users" | "cars" | "reports" | "tickets" | "sources";
+type Tab = "verifications" | "claims" | "users" | "cars" | "reports" | "aimod" | "tickets" | "sources";
+
+// AI 审核拦截目标 → 展示标签 + 恢复时写回的表/状态(supabase/ai-moderation.sql)
+const AIMOD_TARGETS: Record<
+  DbAiModeration["target_type"],
+  { label: string; table: string; restore: Record<string, string>; link?: (id: string) => string }
+> = {
+  car: { label: "车辆", table: "cars", restore: { status: "active" }, link: (id) => `/car/${id}` },
+  post: { label: "帖子", table: "community_posts", restore: { status: "active" }, link: (id) => `/community/${id}` },
+  car_comment: { label: "评论", table: "comments", restore: { status: "active" } },
+  post_comment: { label: "评论", table: "post_comments", restore: { status: "active" } },
+};
 
 // 用户群体筛选:与搜索独立,可单独按群体过滤用户列表
 type UserSegment = "all" | "personal" | "dealer" | "system" | "admin" | "banned";
@@ -67,13 +78,23 @@ function relativeTime(iso: string, t: (text: string, vars?: Record<string, strin
 
 interface Report {
   id: string;
-  car_id: string;
+  car_id: string | null;
+  // 举报泛化(supabase/content-reports.sql):car / post / post_comment / car_comment / user
+  target_type?: string;
+  target_id?: string | null;
   user_id: string | null;
   reason: string;
   detail: string | null;
   created_at: string;
   cars?: { id: string; title_zh: string; image_url: string | null; seller_id: string };
 }
+
+const REPORT_TYPE_LABELS: Record<string, string> = {
+  post: "帖子举报",
+  post_comment: "评论举报",
+  car_comment: "评论举报",
+  user: "用户举报",
+};
 
 interface Ticket {
   id: string;
@@ -88,6 +109,12 @@ interface Ticket {
   status: "open" | "closed";
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
+}
+
+// 认领申请 + 手动 join 的申请人/目标系统账号(supabase/claim-requests.sql)
+interface ClaimRequestRow extends DbClaimRequest {
+  requester?: { username: string; avatar_url: string | null };
+  system?: { username: string; avatar_url: string | null; claimed_by: string | null };
 }
 
 interface StoreWithOwner extends DbDealerStore {
@@ -106,6 +133,8 @@ export default function AdminPage() {
   const [users, setUsers] = useState<DbProfile[]>([]);
   const [cars, setCars] = useState<DbCar[]>([]);
   const [reports, setReports] = useState<Report[]>([]);
+  const [aiFlags, setAiFlags] = useState<DbAiModeration[]>([]);
+  const [claims, setClaims] = useState<ClaimRequestRow[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [sources, setSources] = useState<DbListingSource[]>([]);
   const [sourcesLoaded, setSourcesLoaded] = useState(false);
@@ -127,7 +156,7 @@ export default function AdminPage() {
   const [rejectNote, setRejectNote] = useState<Record<string, string>>({});
 
   // Counts
-  const [counts, setCounts] = useState({ verifications: 0, reports: 0, tickets: 0 });
+  const [counts, setCounts] = useState({ verifications: 0, claims: 0, reports: 0, aimod: 0, tickets: 0 });
 
   useEffect(() => {
     async function init() {
@@ -153,7 +182,7 @@ export default function AdminPage() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [storesRes, reportsRes, ticketsRes] = await Promise.all([
+    const [storesRes, reportsRes, ticketsRes, aiRes, claimsRes] = await Promise.all([
       supabase
         .from("dealer_stores")
         .select("*")
@@ -170,7 +199,41 @@ export default function AdminPage() {
         .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(50),
+      // AI 拦截待复核(表可能还没建,error 时静默为空)
+      supabase
+        .from("ai_moderation")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      // 认领申请待审(表可能还没建,error 时静默为空)
+      supabase
+        .from("claim_requests")
+        .select("*")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true })
+        .limit(50),
     ]);
+
+    // 认领申请:手动 join 申请人与目标系统账号(两列都指向 profiles,避免 FK 歧义)
+    const claimRows = (claimsRes.data || []) as ClaimRequestRow[];
+    if (claimRows.length > 0) {
+      const ids = [...new Set(claimRows.flatMap((c) => [c.requester_id, c.system_id]))];
+      const { data: claimProfiles } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url, claimed_by")
+        .in("id", ids);
+      if (claimProfiles) {
+        const pm = new Map(claimProfiles.map((p) => [p.id, p]));
+        claimRows.forEach((c) => {
+          const r = pm.get(c.requester_id);
+          const sys = pm.get(c.system_id);
+          if (r) c.requester = { username: r.username, avatar_url: r.avatar_url };
+          if (sys) c.system = { username: sys.username, avatar_url: sys.avatar_url, claimed_by: sys.claimed_by };
+        });
+      }
+    }
+    setClaims(claimRows);
 
     // Manually join profiles for stores (owner_id FK points to auth.users, not profiles)
     const stores = (storesRes.data || []) as StoreWithOwner[];
@@ -191,9 +254,12 @@ export default function AdminPage() {
     setPendingStores(stores);
     setReports((reportsRes.data as Report[]) || []);
     setTickets((ticketsRes.data as Ticket[]) || []);
+    setAiFlags((aiRes.data as DbAiModeration[]) || []);
     setCounts({
       verifications: storesRes.data?.length || 0,
+      claims: claimRows.length,
       reports: reportsRes.data?.length || 0,
+      aimod: aiRes.data?.length || 0,
       tickets: ticketsRes.data?.length || 0,
     });
   }, []);
@@ -247,6 +313,34 @@ export default function AdminPage() {
   }
 
   // === Admin Actions ===
+
+  // 认领申请:通过 → profiles.claimed_by = 申请人;拒绝可附原因(可选)
+  async function reviewClaim(req: ClaimRequestRow, approve: boolean) {
+    setActionLoading(req.id);
+    const note = (rejectNote[req.id] || "").trim();
+    const { error } = await supabase.rpc("admin_review_claim", {
+      request_id: req.id,
+      approve,
+      note: approve ? null : note || null,
+    });
+    if (error) {
+      setActionLoading(null);
+      alert(error.message);
+      return;
+    }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      await supabase.from("admin_actions").insert({
+        admin_id: user.id,
+        action: approve ? "approve_claim" : "reject_claim",
+        target_type: "user",
+        target_id: req.system_id,
+        detail: approve ? req.requester_id : note || req.requester_id,
+      });
+    }
+    setActionLoading(null);
+    await loadAll();
+  }
 
   async function approveStore(storeId: string) {
     setActionLoading(storeId);
@@ -437,6 +531,56 @@ export default function AdminPage() {
     setActionLoading(null);
   }
 
+  // AI 拦截复核:恢复(误杀)—— 内容状态写回 active,记录标记 restored
+  async function restoreAiFlag(flag: DbAiModeration) {
+    setActionLoading(flag.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    const target = AIMOD_TARGETS[flag.target_type];
+    // 车辆恢复上架同时续期 30 天(与 restoreCar 一致)
+    const restore = flag.target_type === "car"
+      ? { ...target.restore, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }
+      : target.restore;
+    await supabase.from(target.table).update(restore).eq("id", flag.target_id);
+    await supabase
+      .from("ai_moderation")
+      .update({ status: "restored", reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
+      .eq("id", flag.id);
+    if (user) {
+      await supabase.from("admin_actions").insert({
+        admin_id: user.id,
+        action: "restore_ai_flag",
+        target_type: flag.target_type,
+        target_id: flag.target_id,
+        detail: flag.reason,
+      });
+    }
+    setAiFlags((prev) => prev.filter((f) => f.id !== flag.id));
+    setCounts((c) => ({ ...c, aimod: c.aimod - 1 }));
+    setActionLoading(null);
+  }
+
+  // AI 拦截复核:确认违规 —— 内容保持屏蔽,记录标记 confirmed
+  async function confirmAiFlag(flag: DbAiModeration) {
+    setActionLoading(flag.id);
+    const { data: { user } } = await supabase.auth.getUser();
+    await supabase
+      .from("ai_moderation")
+      .update({ status: "confirmed", reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
+      .eq("id", flag.id);
+    if (user) {
+      await supabase.from("admin_actions").insert({
+        admin_id: user.id,
+        action: "confirm_ai_flag",
+        target_type: flag.target_type,
+        target_id: flag.target_id,
+        detail: flag.reason,
+      });
+    }
+    setAiFlags((prev) => prev.filter((f) => f.id !== flag.id));
+    setCounts((c) => ({ ...c, aimod: c.aimod - 1 }));
+    setActionLoading(null);
+  }
+
   async function closeTicket(ticketId: string) {
     setActionLoading(ticketId);
     await supabase.from("support_tickets").update({ status: "closed" }).eq("id", ticketId);
@@ -567,9 +711,11 @@ export default function AdminPage() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
     { key: "verifications", label: t("认证"), icon: <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.verifications },
+    { key: "claims", label: t("认领"), icon: <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.claims },
     { key: "users", label: t("用户"), icon: <Users className="h-3.5 w-3.5" strokeWidth={1.5} /> },
     { key: "cars", label: t("车辆"), icon: <Car className="h-3.5 w-3.5" strokeWidth={1.5} /> },
     { key: "reports", label: t("举报"), icon: <Flag className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.reports },
+    { key: "aimod", label: t("AI 审核"), icon: <Bot className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.aimod },
     { key: "tickets", label: t("工单"), icon: <Headset className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.tickets },
     { key: "sources", label: t("数据源"), icon: <DatabaseZap className="h-3.5 w-3.5" strokeWidth={1.5} /> },
   ];
@@ -645,10 +791,12 @@ export default function AdminPage() {
 
           <div className="min-w-0 flex-1">
           {/* 桌面:待办统计卡,点击直达对应板块 */}
-          <div className="hidden grid-cols-3 gap-3 md:grid">
+          <div className="hidden grid-cols-5 gap-3 md:grid">
             {([
               { key: "verifications" as Tab, label: t("待审核认证"), value: counts.verifications },
+              { key: "claims" as Tab, label: t("待审核认领"), value: counts.claims },
               { key: "reports" as Tab, label: t("未处理举报"), value: counts.reports },
+              { key: "aimod" as Tab, label: t("AI 拦截待复核"), value: counts.aimod },
               { key: "tickets" as Tab, label: t("开放工单"), value: counts.tickets },
             ]).map((stat) => (
               <button
@@ -736,6 +884,92 @@ export default function AdminPage() {
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* === Claims Tab(系统账号自助认领申请) === */}
+        {tab === "claims" && (
+          <div className="mt-4 space-y-3">
+            {claims.length === 0 ? (
+              <p className="py-12 text-center text-xs text-muted-foreground">{t("暂无待审核的认领申请")}</p>
+            ) : (
+              claims.map((cr) => {
+                const takenByOther = !!cr.system?.claimed_by && cr.system.claimed_by !== cr.requester_id;
+                return (
+                  <div key={cr.id} className="rounded-xl bg-card p-3">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={avatarUrl(cr.system?.avatar_url ?? null, cr.system?.username || "?")}
+                        alt=""
+                        className="h-10 w-10 shrink-0 rounded-full object-cover"
+                      />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          <Link href={adminUserLink(cr.system_id)} className="text-sm font-medium hover:underline">
+                            {cr.system?.username || cr.system_id.slice(0, 8)}
+                          </Link>
+                          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                            {t("系统账号")}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground">
+                            {relativeTime(cr.created_at, t)}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 space-y-0.5">
+                          <p className="text-[11px]">
+                            <span className="text-muted-foreground">{t("申请人:")}</span>{" "}
+                            <Link href={adminUserLink(cr.requester_id)} className="hover:underline">
+                              {cr.requester?.username || cr.requester_id.slice(0, 8)}
+                            </Link>
+                          </p>
+                          {cr.contact && (
+                            <p className="text-[11px]">
+                              <span className="text-muted-foreground">{t("联系方式:")}</span> {cr.contact}
+                            </p>
+                          )}
+                        </div>
+                        {cr.message && (
+                          <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed">{cr.message}</p>
+                        )}
+                        {takenByOther && (
+                          <p className="mt-1.5 flex items-center gap-1 text-[11px] text-amber-600">
+                            <AlertTriangle className="h-3 w-3" strokeWidth={1.5} />
+                            {t("该账号已被其他用户认领")}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Input
+                        value={rejectNote[cr.id] || ""}
+                        onChange={(e) => setRejectNote((prev) => ({ ...prev, [cr.id]: e.target.value }))}
+                        placeholder={t("拒绝原因（可选）")}
+                        className="h-7 flex-1 text-[11px]"
+                      />
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-[11px] text-destructive"
+                        onClick={() => reviewClaim(cr, false)}
+                        disabled={actionLoading === cr.id}
+                      >
+                        <X className="h-3 w-3" strokeWidth={2} />
+                        {t("拒绝")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() => reviewClaim(cr, true)}
+                        disabled={actionLoading === cr.id || takenByOther}
+                      >
+                        {actionLoading === cr.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={2} />}
+                        {t("通过")}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         )}
@@ -986,7 +1220,11 @@ export default function AdminPage() {
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-xs font-medium">{r.cars?.title_zh || t("未知车辆")}</p>
+                      <p className="truncate text-xs font-medium">
+                        {(r.target_type ?? "car") === "car"
+                          ? r.cars?.title_zh || t("未知车辆")
+                          : t(REPORT_TYPE_LABELS[r.target_type!] || r.target_type!)}
+                      </p>
                       <div className="mt-0.5 flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-0.5 rounded-full bg-red-500/10 px-1 py-0.5 text-[10px] text-red-600 dark:text-red-400">
                           <AlertTriangle className="h-2.5 w-2.5" strokeWidth={2} />
@@ -1031,9 +1269,101 @@ export default function AdminPage() {
                         {t("查看")}
                       </Button>
                     )}
+                    {!r.cars && r.target_id && (r.target_type === "post" || r.target_type === "user") && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-[11px]"
+                        onClick={() =>
+                          window.open(
+                            r.target_type === "post"
+                              ? `/community/${r.target_id}`
+                              : `/user/${r.target_id}`,
+                            "_blank",
+                          )
+                        }
+                      >
+                        <Eye className="h-3 w-3" strokeWidth={1.5} />
+                        {t("查看")}
+                      </Button>
+                    )}
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        )}
+
+        {/* === AI Moderation Tab === */}
+        {tab === "aimod" && (
+          <div className="mt-4 space-y-3">
+            {aiFlags.length === 0 ? (
+              <p className="py-12 text-center text-xs text-muted-foreground">{t("暂无 AI 拦截内容")}</p>
+            ) : (
+              aiFlags.map((f) => {
+                const target = AIMOD_TARGETS[f.target_type];
+                return (
+                  <div key={f.id} className="rounded-xl bg-card p-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+                        <Bot className="h-2.5 w-2.5" strokeWidth={1.5} />
+                        {t(target.label)}
+                      </span>
+                      {f.categories.map((c) => (
+                        <span key={c} className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">
+                          {c}
+                        </span>
+                      ))}
+                      <span className="ml-auto text-[10px] text-muted-foreground">
+                        {new Date(f.created_at).toLocaleString("zh-CN")}
+                      </span>
+                    </div>
+                    {f.reason && (
+                      <p className="mt-1.5 flex items-start gap-1 text-[11px] text-red-600 dark:text-red-400">
+                        <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
+                        {f.reason}
+                      </p>
+                    )}
+                    {/* 被拦内容快照(拦截时的原文,恢复前唯一可读处) */}
+                    <p className="mt-1.5 line-clamp-4 whitespace-pre-wrap rounded-lg bg-muted/50 p-2 text-[11px] leading-relaxed text-muted-foreground">
+                      {f.content}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 gap-1 px-2 text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                        onClick={() => restoreAiFlag(f)}
+                        disabled={actionLoading === f.id}
+                      >
+                        {actionLoading === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={2} />}
+                        {t("恢复")}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
+                        onClick={() => confirmAiFlag(f)}
+                        disabled={actionLoading === f.id}
+                      >
+                        <Ban className="h-3 w-3" strokeWidth={1.5} />
+                        {t("确认屏蔽")}
+                      </Button>
+                      {target.link && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          onClick={() => window.open(target.link!(f.target_id), "_blank")}
+                        >
+                          <Eye className="h-3 w-3" strokeWidth={1.5} />
+                          {t("查看")}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
         )}

@@ -12,6 +12,8 @@
 import { getRecentlyViewed } from "./recently-viewed";
 import { getSearchHistory } from "./search-history";
 import { classifyBodyStyle } from "./body-style";
+import { sellerSpeaksLocale } from "./i18n/languages";
+import type { Locale } from "./i18n";
 import type { DbCar } from "./types";
 
 const FAVORITES_KEY = "huaren_favorites";
@@ -34,6 +36,7 @@ const W_DRIVETRAIN = 5;
 const W_SEARCH = 8; // 命中搜索历史关键词
 const W_RECENCY = 5; // 新上架轻微加成
 const W_USER_POSTED = 12; // 个人/车行直发优先于系统检索转载车源
+const W_LANGUAGE = 14; // 卖家会说当前界面语言(profiles.languages)
 const W_DISTANCE_DEFAULT = 6; // 距离加成上限(默认很小)
 
 export function getFavoriteIds(): string[] {
@@ -175,6 +178,7 @@ export interface RankOpts {
   distanceWeight?: number; // 距离加成上限,默认 6(很小)
   distanceHalfMi?: number; // 加成衰减半径,默认 40 英里
   limit?: number;
+  locale?: Locale; // 传入时,卖家会说该语言的车加 W_LANGUAGE 分
 }
 
 // 对单台候选车打分(0 起,越高越推荐)。
@@ -206,6 +210,9 @@ export function scoreCar(car: DbCar, profile: TasteProfile, opts?: RankOpts): nu
 
   // 个人/车行直发优先于系统检索转载
   if (!car.source_id) score += W_USER_POSTED;
+
+  // 卖家会说用户当前界面语言:优先推荐能直接沟通的卖家
+  if (opts?.locale && sellerSpeaksLocale(car.profiles?.languages, opts.locale)) score += W_LANGUAGE;
 
   // 新近度:新上架轻微加成
   const daysOld = (Date.now() - new Date(car.created_at).getTime()) / 86400000;

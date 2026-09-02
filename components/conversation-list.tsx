@@ -11,13 +11,14 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence } from "framer-motion";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Flag } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle } from "@/lib/i18n";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChatThread, CHAT_MEDIA_RE } from "@/components/chat-thread";
+import { ReportDialog } from "@/components/report-dialog";
 import { SwipeSheet } from "@/components/swipe-sheet";
 import { useOverlay } from "@/components/car-overlay-provider";
 import {
@@ -25,6 +26,7 @@ import {
   OverlayLayerZCtx,
 } from "@/components/overlay-stack";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
+import { useBlockedIds } from "@/lib/blocks";
 import { useCachedData } from "@/lib/use-cached-data";
 import { triggerHaptic } from "@/lib/haptics";
 import type { DbConversation } from "@/lib/types";
@@ -123,7 +125,11 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
     () => fetchConversations(userId),
     [userId],
   );
-  const conversations = data || [];
+  // 被屏蔽用户的会话不展示(blocks 表,见 supabase/blocks.sql)
+  const { blockedIds } = useBlockedIds();
+  const conversations = (data || []).filter(
+    (c) => !blockedIds.has(c.buyer_id === userId ? c.seller_id : c.buyer_id),
+  );
 
   // 手动/实时刷新:重拉并写回缓存(失败时保持现有列表)
   const refresh = useCallback(async () => {
@@ -233,6 +239,11 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
       ? activeConv.seller_profile
       : activeConv.buyer_profile
     : undefined;
+  const activeOtherId = activeConv
+    ? activeConv.buyer_id === userId
+      ? activeConv.seller_id
+      : activeConv.buyer_id
+    : null;
 
   let body: React.ReactNode;
   if (activeConversation && !mobileOverlay) {
@@ -392,6 +403,17 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                     <span className="truncate font-mono text-sm font-medium">
                       {activeOtherName || t("用户")}
                     </span>
+                    {activeOtherId && (
+                      <ReportDialog targetType="user" targetId={activeOtherId}>
+                        <button
+                          type="button"
+                          aria-label={t("举报此用户")}
+                          className="ml-auto shrink-0 text-muted-foreground transition-colors hover:text-foreground"
+                        >
+                          <Flag className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
+                      </ReportDialog>
+                    )}
                   </div>
                 }
               >

@@ -156,6 +156,7 @@ export function createOneNeAutoAdapter(): SourceAdapter {
   let cache = new Map<string, ParsedListing>();
   return {
     key: "1neauto",
+    languages: ["zh", "en"],
     async listAll(): Promise<CrawlResult> {
       const records = await fetchRecords();
       cache = new Map();

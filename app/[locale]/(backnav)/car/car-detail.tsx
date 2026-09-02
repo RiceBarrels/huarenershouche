@@ -34,6 +34,7 @@ import {
   Check,
   X,
   Navigation,
+  Languages,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
@@ -82,6 +83,8 @@ import { useIdentity } from "@/components/identity-provider";
 import { apiOrigin } from "@/lib/capacitor";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle, carDescription, carLocation, LAZY_CONTENT_LOCALES, needsContentTranslation } from "@/lib/i18n";
+import { sellerSpeaksLocale } from "@/lib/i18n/languages";
+import { languageList } from "@/components/language-picker";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -222,7 +225,7 @@ export default function CarDetailPage({
     async function load() {
       const { data } = await supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by)")
+        .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by, languages)")
         .eq("id", carId)
         .single();
       setCar(data as DbCar);
@@ -978,6 +981,20 @@ export default function CarDetailPage({
                   {carLocation(car, locale)}
                 </p>
               )}
+              {/* 卖家沟通语言;会说当前界面语言时高亮提示 */}
+              {!!car.profiles?.languages?.length && (
+                <p className="mt-1.5 flex items-start gap-1.5 font-mono text-[11px] text-muted-foreground">
+                  <Languages className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
+                  <span>
+                    {languageList(car.profiles.languages)}
+                    {locale !== "zh" && sellerSpeaksLocale(car.profiles.languages, locale) && (
+                      <span className="ml-1.5 rounded-sm bg-primary/15 px-1 py-px text-[10px] font-medium text-foreground">
+                        {t("可用你的语言沟通")}
+                      </span>
+                    )}
+                  </span>
+                </p>
+              )}
 
               {storeAddress && (
                 <OpenInMaps
@@ -1239,7 +1256,7 @@ export default function CarDetailPage({
                   />
                 </div>
 
-                <ReportDialog carId={carId}>
+                <ReportDialog targetType="car" targetId={carId}>
                   <Button
                     variant="ghost"
                     className="w-full gap-1.5 font-mono text-xs text-muted-foreground"

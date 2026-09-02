@@ -1,6 +1,7 @@
 "use client";
 
-// 举报车辆:用 Drawer 呈现(Dialog z-50 会被移动端详情浮层 z-60 盖住)
+// 举报(车辆/帖子/评论/用户):用 Drawer 呈现(Dialog z-50 会被移动端详情浮层 z-60 盖住)
+// reports 表见 supabase/content-reports.sql;车辆举报同时写 car_id 兼容 admin 页 join
 
 import { useState } from "react";
 import { Flag, Loader2, CheckCircle, X } from "lucide-react";
@@ -14,7 +15,9 @@ import {
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
 
-const REPORT_REASONS = [
+export type ReportTargetType = "car" | "post" | "post_comment" | "car_comment" | "user";
+
+const CAR_REASONS = [
   "虚假信息 / 诈骗",
   "价格不真实",
   "图片与实车不符",
@@ -24,13 +27,41 @@ const REPORT_REASONS = [
   "其他",
 ];
 
-export function ReportDialog({ carId, children }: { carId: string; children: React.ReactNode }) {
+// 帖子/评论/用户共用的 UGC 举报原因
+const UGC_REASONS = [
+  "垃圾广告",
+  "辱骂或骚扰",
+  "色情或不当内容",
+  "虚假信息 / 诈骗",
+  "侵犯隐私",
+  "其他",
+];
+
+const TITLES: Record<ReportTargetType, string> = {
+  car: "举报此车辆",
+  post: "举报此帖子",
+  post_comment: "举报此评论",
+  car_comment: "举报此评论",
+  user: "举报此用户",
+};
+
+export function ReportDialog({
+  targetType = "car",
+  targetId,
+  children,
+}: {
+  targetType?: ReportTargetType;
+  targetId: string;
+  children: React.ReactNode;
+}) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState("");
   const [detail, setDetail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
+
+  const reasons = targetType === "car" ? CAR_REASONS : UGC_REASONS;
 
   async function handleSubmit() {
     if (!selected) return;
@@ -39,7 +70,9 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
     const { data: { user } } = await supabase.auth.getUser();
 
     await supabase.from("reports").insert({
-      car_id: carId,
+      car_id: targetType === "car" ? targetId : null,
+      target_type: targetType,
+      target_id: targetId,
       user_id: user?.id || null,
       reason: selected,
       detail: detail || null,
@@ -70,7 +103,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
           </DrawerClose>
           <span className="flex items-center gap-1.5 font-mono text-sm font-semibold">
             <Flag className="h-4 w-4" strokeWidth={1.5} />
-            {t("举报此车辆")}
+            {t(TITLES[targetType])}
           </span>
           <div className="h-8 w-8" />
         </div>
@@ -84,7 +117,7 @@ export function ReportDialog({ carId, children }: { carId: string; children: Rea
           ) : (
             <div className="space-y-4">
               <div className="space-y-2">
-                {REPORT_REASONS.map((reason) => (
+                {reasons.map((reason) => (
                   <button
                     key={reason}
                     type="button"

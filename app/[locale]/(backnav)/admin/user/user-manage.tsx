@@ -17,6 +17,7 @@ import { carLink, carEditLink } from "@/lib/static-link";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { LanguagePicker } from "@/components/language-picker";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbProfile, DbCar, DbDealerStore } from "@/lib/types";
@@ -26,6 +27,7 @@ interface EditForm {
   phone: string;
   location: string;
   preferred_language: string;
+  languages: string[];
   account_type: "private" | "dealer";
   is_system: boolean;
   role: "user" | "admin";
@@ -128,6 +130,7 @@ export default function AdminUserManagePage() {
         phone: p.phone || "",
         location: p.location || "",
         preferred_language: p.preferred_language || "zh",
+        languages: (p.languages as string[] | null) || [],
         account_type: p.account_type || "private",
         is_system: !!p.is_system,
         role: p.role || "user",
@@ -175,6 +178,7 @@ export default function AdminUserManagePage() {
         phone: form.phone || null,
         location: form.location || null,
         preferred_language: form.preferred_language,
+        languages: form.languages,
         account_type: form.account_type,
         is_system: form.is_system,
         role: form.role,
@@ -445,6 +449,10 @@ export default function AdminUserManagePage() {
                 <option value="zh">{t("中文")}</option>
                 <option value="en">English</option>
               </select>
+            </div>
+            <div className="col-span-2">
+              <Label className="text-[11px] text-muted-foreground">{t("沟通语言")}</Label>
+              <LanguagePicker size="sm" className="mt-1.5" value={form.languages} onChange={(v) => upd("languages", v)} />
             </div>
             <div>
               <Label className="text-[11px] text-muted-foreground">{t("账号类型")}</Label>

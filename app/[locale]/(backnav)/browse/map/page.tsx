@@ -138,7 +138,7 @@ function groupKey(car: DbCar): string {
 }
 
 function BrowseMapContent() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const searchParams = useSearchParams();
   const { enabled: overlayEnabled, openUser } = useCarOverlay();
 
@@ -235,7 +235,7 @@ function BrowseMapContent() {
     const [carsRes, storesRes] = await Promise.all([
       supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url)")
+        .select("*, profiles!seller_id(account_type, avatar_url, languages)")
         .eq("status", "active")
         .eq("owner_hidden", false)
         .gte("lat", r.south)
@@ -403,8 +403,8 @@ function BrowseMapContent() {
       distances,
       fetchedAt,
     });
-    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances);
-  }, [cars, filters, userCoords, distances, fetchedAt, sort]);
+    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances, locale);
+  }, [cars, filters, userCoords, distances, fetchedAt, sort, locale]);
 
   // 坐标分组 → 地图标记
   const groups = useMemo(() => {
@@ -741,7 +741,7 @@ function BrowseMapContent() {
       setCamera(cameraFor(store.lat, store.lng));
       supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url)")
+        .select("*, profiles!seller_id(account_type, avatar_url, languages)")
         .eq("status", "active")
         .eq("owner_hidden", false)
         .eq("seller_id", store.owner_id)

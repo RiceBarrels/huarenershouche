@@ -43,6 +43,7 @@ import { avatarUrl } from "@/lib/avatar";
 import { timeAgo } from "@/lib/format";
 import { carTitle, needsContentTranslation } from "@/lib/i18n";
 import { PostCard } from "@/components/post-card";
+import { useBlockedIds } from "@/lib/blocks";
 import { apiOrigin } from "@/lib/capacitor";
 import { useI18n } from "@/components/i18n-provider";
 import { Header } from "@/components/header";
@@ -829,9 +830,16 @@ function CommunityFeedPage() {
     await loadFeed();
   }, [searching, loadFeed]);
 
+  // 被屏蔽用户的帖子不展示(blocks 表,见 supabase/blocks.sql)
+  const { blockedIds } = useBlockedIds();
+  const visiblePosts = useMemo(
+    () => posts.filter((p) => !blockedIds.has(p.user_id)),
+    [posts, blockedIds],
+  );
+
   // 帖子 + 穿插车源合成瀑布流(搜索时不插车源卡)
   const feed = useMemo<FeedItem[]>(() => {
-    const items: FeedItem[] = posts.map((post) => ({ kind: "post", post }));
+    const items: FeedItem[] = visiblePosts.map((post) => ({ kind: "post", post }));
     if (!searching) {
       nearbyCars.forEach((entry, i) => {
         const at = FIRST_CAR_AT + i * CAR_EVERY;
@@ -841,7 +849,7 @@ function CommunityFeedPage() {
       });
     }
     return items;
-  }, [posts, nearbyCars, searching]);
+  }, [visiblePosts, nearbyCars, searching]);
 
   // 正在关注流:先还原缓存(有缓存立即展示 + 顶部小 spinner 后台刷新,
   // 无缓存整屏 loading),数据按最近发布排布;fetchFollowingPosts 内部会回写缓存
@@ -888,9 +896,11 @@ function CommunityFeedPage() {
     return authors;
   }, [followingPosts, t]);
 
-  const shownFollowingPosts = selectedAuthor
-    ? followingPosts.filter((p) => p.user_id === selectedAuthor)
-    : followingPosts;
+  const shownFollowingPosts = (
+    selectedAuthor
+      ? followingPosts.filter((p) => p.user_id === selectedAuthor)
+      : followingPosts
+  ).filter((p) => !blockedIds.has(p.user_id));
 
   // —— 搜索 UI 共享片段:桌面内联面板与移动浮层各渲染一处(同一时刻只挂一份)——
 
@@ -984,7 +994,7 @@ function CommunityFeedPage() {
         <div className="flex justify-center py-8">
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" strokeWidth={1.5} />
         </div>
-      ) : posts.length === 0 ? (
+      ) : visiblePosts.length === 0 ? (
         <div className="mt-8 flex flex-col items-center py-12">
           <MessageSquare className="h-8 w-8 text-muted-foreground/50" strokeWidth={1.5} />
           <p className="mt-3 font-mono text-sm text-muted-foreground">{t("没有找到相关帖子")}</p>
@@ -996,7 +1006,7 @@ function CommunityFeedPage() {
           animate={{ opacity: loading ? 0.55 : 1 }}
           transition={{ duration: 0.2, ease: EASE }}
         >
-          {posts.map((post) => (
+          {visiblePosts.map((post) => (
             <div key={post.id} className="mb-3">
               <PostCard
                 post={post}

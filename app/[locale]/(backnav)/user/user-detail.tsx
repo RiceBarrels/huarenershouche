@@ -6,7 +6,8 @@ import { useRouter } from "@/components/localized-navigation";
 import { skipNextTransition } from "@/components/page-transition";
 import { useRouteParams } from "@/lib/use-route-params";
 import dynamic from "next/dynamic";
-import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation } from "lucide-react";
+import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation, Flag, Ban, Languages, Handshake, Clock } from "lucide-react";
+import { languageList } from "@/components/language-picker";
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
 import { dateLocale } from "@/lib/i18n";
@@ -22,11 +23,15 @@ import { DealerReviews } from "@/components/dealer-reviews";
 import { ChatThread } from "@/components/chat-thread";
 import { AvatarViewer } from "@/components/avatar-viewer";
 import { ProfileBadges } from "@/components/profile-badges";
+import { ReportDialog } from "@/components/report-dialog";
+import { blockUser, unblockUser } from "@/lib/blocks";
 import { Button } from "@/components/ui/button";
 import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { OpenInMaps } from "@/components/open-in-maps";
-import type { DbCar, DbCommunityPost } from "@/lib/types";
+import type { DbCar, DbClaimRequest, DbCommunityPost } from "@/lib/types";
 import { MessageSquare } from "lucide-react";
 
 // leaflet 不能 SSR,按需加载
@@ -43,6 +48,7 @@ interface SellerProfile {
   account_type: "private" | "dealer";
   is_system: boolean;
   claimed_by?: string | null;
+  languages?: string[] | null;
   created_at: string;
 }
 
@@ -86,7 +92,17 @@ export default function UserProfilePage({
   const [following, setFollowing] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
+  // 屏蔽(拉黑):blocks 表,见 supabase/blocks.sql
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [blockBusy, setBlockBusy] = useState(false);
   const [tab, setTab] = useState<"cars" | "posts" | "reviews">(initialTab);
+  // 自助认领系统账号:本人对该账号最近一条申请(claim_requests 表,见 supabase/claim-requests.sql)
+  const [claimReq, setClaimReq] = useState<Pick<DbClaimRequest, "id" | "status" | "admin_note"> | null>(null);
+  const [claimOpen, setClaimOpen] = useState(false);
+  const [claimMsg, setClaimMsg] = useState("");
+  const [claimContact, setClaimContact] = useState("");
+  const [claimBusy, setClaimBusy] = useState(false);
+  const [claimError, setClaimError] = useState("");
 
   // 切 tab:内容用原生 View Transition 交叉淡入,URL 同步成对应动态链接
   // (/user/[id]/posts 等)。replaceState 是浅更新,必须先 skipNextTransition()
@@ -127,6 +143,26 @@ export default function UserProfilePage({
     supabase.auth.getUser().then(({ data }) => setAuthId(data.user?.id ?? null));
   }, []);
 
+  // 未认领系统账号:查本人是否已提交过认领申请(表未建时静默)
+  useEffect(() => {
+    if (!authId || !profile?.is_system || profile.claimed_by) return;
+    let cancelled = false;
+    supabase
+      .from("claim_requests")
+      .select("id, status, admin_note")
+      .eq("system_id", userId)
+      .eq("requester_id", authId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setClaimReq((data as Pick<DbClaimRequest, "id" | "status" | "admin_note">) ?? null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authId, userId, profile?.is_system, profile?.claimed_by]);
+
   // 关注/粉丝数(表未建或查询失败时静默为 0)
   useEffect(() => {
     async function loadFollowCounts() {
@@ -150,6 +186,38 @@ export default function UserProfilePage({
       .eq("followee_id", userId)
       .then(({ count }) => setIsFollowing((count || 0) > 0));
   }, [authId, userId]);
+
+  // 我是否已屏蔽该用户(表未建时静默)
+  useEffect(() => {
+    if (!authId || authId === userId) return;
+    supabase
+      .from("blocks")
+      .select("*", { count: "exact", head: true })
+      .eq("blocker_id", authId)
+      .eq("blocked_id", userId)
+      .then(({ count }) => setIsBlocked((count || 0) > 0))
+      .then(undefined, () => {});
+  }, [authId, userId]);
+
+  // 屏蔽/取消屏蔽:乐观更新,失败回滚
+  async function toggleBlock() {
+    if (!authId) {
+      router.push("/login");
+      return;
+    }
+    if (blockBusy || authId === userId) return;
+    setBlockBusy(true);
+    if (isBlocked) {
+      setIsBlocked(false);
+      const { error } = await unblockUser(authId, userId);
+      if (error) setIsBlocked(true);
+    } else {
+      setIsBlocked(true);
+      const { error } = await blockUser(authId, userId);
+      if (error) setIsBlocked(false);
+    }
+    setBlockBusy(false);
+  }
 
   // 关注/取关:乐观更新,失败回滚
   async function toggleFollow() {
@@ -190,7 +258,7 @@ export default function UserProfilePage({
       const [profileRes, carsRes, reviewsRes, postsRes, storeRes] = await Promise.all([
         supabase
           .from("profiles")
-          .select("id, username, avatar_url, location, account_type, is_system, claimed_by, created_at")
+          .select("id, username, avatar_url, location, account_type, is_system, claimed_by, languages, created_at")
           .eq("id", userId)
           .maybeSingle(),
         supabase
@@ -265,6 +333,43 @@ export default function UserProfilePage({
 
   // 可私信:已登录、不是本人、且不是未认领的系统账号(没人收消息)
   const canMessage = authId !== userId && !isUnclaimedSystem;
+
+  function openClaim() {
+    if (!authId) {
+      router.push("/login");
+      return;
+    }
+    setClaimError("");
+    setClaimOpen(true);
+  }
+
+  async function submitClaim() {
+    if (!authId || claimBusy) return;
+    setClaimBusy(true);
+    setClaimError("");
+    const { data, error } = await supabase.rpc("request_claim", {
+      target: userId,
+      note: claimMsg.trim() || null,
+      contact_info: claimContact.trim() || null,
+    });
+    setClaimBusy(false);
+    if (error) {
+      setClaimError(error.message);
+      return;
+    }
+    setClaimReq({ id: data as string, status: "pending", admin_note: null });
+    setClaimMsg("");
+    setClaimContact("");
+    setClaimOpen(false);
+  }
+
+  async function withdrawClaim() {
+    if (!claimReq || claimBusy) return;
+    setClaimBusy(true);
+    const { error } = await supabase.from("claim_requests").delete().eq("id", claimReq.id);
+    setClaimBusy(false);
+    if (!error) setClaimReq(null);
+  }
 
   async function startChat() {
     if (!authId) {
@@ -375,6 +480,32 @@ export default function UserProfilePage({
                   />
                 </button>
                 <div className="flex items-center gap-2 pt-3">
+                  {authId !== userId && (
+                    <>
+                      <ReportDialog targetType="user" targetId={userId}>
+                        <button
+                          type="button"
+                          aria-label={t("举报此用户")}
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-foreground transition-colors hover:bg-muted active:bg-muted"
+                        >
+                          <Flag className="h-4 w-4" strokeWidth={1.5} />
+                        </button>
+                      </ReportDialog>
+                      <button
+                        type="button"
+                        onClick={toggleBlock}
+                        disabled={blockBusy}
+                        aria-label={isBlocked ? t("取消屏蔽") : t("屏蔽用户")}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full transition-colors ${
+                          isBlocked
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted/60 text-foreground hover:bg-muted active:bg-muted"
+                        }`}
+                      >
+                        <Ban className="h-4 w-4" strokeWidth={1.5} />
+                      </button>
+                    </>
+                  )}
                   {canMessage && (
                     <button
                       type="button"
@@ -447,6 +578,12 @@ export default function UserProfilePage({
                       {profile.location}
                     </span>
                   )}
+                  {!!profile.languages?.length && (
+                    <span className="flex items-center gap-1 font-mono text-xs">
+                      <Languages className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      {languageList(profile.languages)}
+                    </span>
+                  )}
                 </div>
 
                 {/* 关注统计:X 式「N 正在关注 · N 粉丝」 */}
@@ -474,6 +611,45 @@ export default function UserProfilePage({
                         <ExternalLink className="h-3 w-3 shrink-0" strokeWidth={1.5} />
                         {t("访问车行官网")} · {sourceSite.host}
                       </a>
+                    )}
+                    {/* 自助认领:任何登录用户都可申请,管理员审核后生效 */}
+                    {authId !== userId && (
+                      <div className="pt-1.5">
+                        {claimReq?.status === "pending" ? (
+                          <div className="flex flex-wrap items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                            <span className="inline-flex items-center gap-1">
+                              <Clock className="h-3 w-3" strokeWidth={1.5} />
+                              {t("认领申请审核中")}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={withdrawClaim}
+                              disabled={claimBusy}
+                              className="underline underline-offset-2 hover:text-foreground disabled:opacity-50"
+                            >
+                              {t("撤回申请")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {claimReq?.status === "rejected" && (
+                              <p className="font-mono text-[11px] text-destructive">
+                                {t("认领申请未通过")}
+                                {claimReq.admin_note ? `：${claimReq.admin_note}` : ""}
+                              </p>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              className="h-8 gap-1.5 px-3 font-mono text-xs"
+                              onClick={openClaim}
+                            >
+                              <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />
+                              {claimReq?.status === "rejected" ? t("重新申请认领") : t("我是该车行，申请认领")}
+                            </Button>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -590,6 +766,59 @@ export default function UserProfilePage({
         )}
       </main>
       {showChrome && <Footer />}
+
+      {/* 认领申请表单 */}
+      <NonModalDrawer open={claimOpen} onOpenChange={setClaimOpen}>
+        <div className="space-y-3 p-4 font-mono">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <Handshake className="h-4 w-4" strokeWidth={1.5} />
+            {t("认领此车行账号")}
+          </h2>
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            {t("认领后可以车行身份管理本页车源、发布新车并接收买家私信。请说明您与该车行的关系及可核实的联系方式，管理员审核通过后生效。")}
+          </p>
+          <div className="space-y-1">
+            <label className="text-[11px] text-muted-foreground" htmlFor="claim-contact">
+              {t("联系方式（电话或邮箱）")}
+            </label>
+            <Input
+              id="claim-contact"
+              value={claimContact}
+              onChange={(e) => setClaimContact(e.target.value)}
+              placeholder={t("便于管理员核实身份")}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[11px] text-muted-foreground" htmlFor="claim-message">
+              {t("说明（可选）")}
+            </label>
+            <Textarea
+              id="claim-message"
+              value={claimMsg}
+              onChange={(e) => setClaimMsg(e.target.value)}
+              placeholder={t("例如：我是该车行的负责人 / 销售经理")}
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+          {claimError && <p className="text-[11px] text-destructive">{claimError}</p>}
+          <div className="flex justify-end gap-2 pt-1">
+            <Button size="sm" variant="ghost" className="h-8 px-3 text-xs" onClick={() => setClaimOpen(false)}>
+              {t("取消")}
+            </Button>
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 px-3 text-xs"
+              disabled={claimBusy || !claimContact.trim()}
+              onClick={submitClaim}
+            >
+              {claimBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />}
+              {t("提交申请")}
+            </Button>
+          </div>
+        </div>
+      </NonModalDrawer>
 
       {/* 手机端:与卖家的对话直接在 drawer 里进行 */}
       <NonModalDrawer open={chatOpen} onOpenChange={setChatOpen}>

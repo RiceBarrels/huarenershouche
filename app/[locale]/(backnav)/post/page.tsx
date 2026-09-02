@@ -20,6 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestModeration } from "@/lib/moderation-client";
 import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -978,10 +979,17 @@ export default function PostCarPage() {
       .select("id")
       .single();
 
-    setLoading(false);
     if (insertError) {
+      setLoading(false);
       setError(t("发布失败: {msg}", { msg: insertError.message }));
     } else if (data) {
+      // AI 审核(Gemini):违规车源自动下架,由管理员复核
+      const mod = await requestModeration("car", data.id);
+      setLoading(false);
+      if (mod.blocked) {
+        setError(t("内容涉嫌违反社区规范，已被系统拦截，将由管理员复核"));
+        return;
+      }
       if (draftId) deleteDraft(draftId);
       router.push(`/car/${data.id}`);
     }
