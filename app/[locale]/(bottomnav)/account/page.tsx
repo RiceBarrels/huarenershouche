@@ -11,8 +11,9 @@ import { useTheme } from "next-themes";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
   FileText, ChevronRight, Car, Palette, ShieldCheck,
-  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText,
+  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText, Code2,
 } from "lucide-react";
+import { isNative } from "@/lib/capacitor";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
@@ -379,6 +380,14 @@ function AccountContent() {
                 label={t("商业合作")}
                 href="/business"
               />
+              {/* 开发者门户仅网页端(Capacitor 静态导出里隐藏);mounted 后再判断避免水合不一致 */}
+              {mounted && !isNative() && (
+                <SettingsRow
+                  icon={<Code2 className={`${iconCls} text-slate-500`} strokeWidth={1.5} />}
+                  label={t("开发者 / API")}
+                  href={user ? "/developers" : "/login"}
+                />
+              )}
             </SettingsGroup>
           </div>
 

@@ -25,6 +25,13 @@
 - [1万美元以下二手车](https://www.clcauto.com/cars/under-10000)
 - [留学生代步车](https://www.clcauto.com/cars/student-cars)
 
+## 开发者 / Public API
+
+- 只读车源 / 车行数据接口 + 车行库存自动上传接口(REST,JSON,API key 鉴权)。
+- 给 AI 助手的完整调用说明(可直接读取): https://www.clcauto.com/api/v1/llms.txt
+- OpenAPI 3.1: https://www.clcauto.com/api/v1/openapi.json
+- 文档与 API key 管理: https://www.clcauto.com/zh/developers
+
 ## 联系 / Contact
 
 - Email: contact@clcauto.com

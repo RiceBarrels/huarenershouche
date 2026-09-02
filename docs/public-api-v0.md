@@ -1,6 +1,6 @@
 # Public API + 车行自动上传 — 初代设计(v0 idea)
 
-> 状态:idea 整理,未实现。目标是先把边界、数据模型、端点和分期定下来,再动手。
+> 状态:2026-09-02 已实现 P0 + P1 的 batch / reconcile / images / 用量页(代码在 `lib/api/*`、`app/api/v1/*`、`app/[locale]/(backnav)/developers/*`,SQL 在 `supabase/api-keys.sql` 需手动执行)。未做:Feed 拉取模式、admin 全站用量、沙盒 key、webhooks。OpenAPI 源是 `lib/api/openapi.ts`(经 `/api/v1/openapi.json` 输出),没有单独的 yaml 文件。下文保留原设计。
 
 ## 1. 为什么做
 

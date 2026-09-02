@@ -74,7 +74,7 @@ function sameArray(a: string[], b: string[]): boolean {
 }
 
 /** 常用华人聚居城市中文名（location_zh 用），未命中则回退英文 */
-const CITY_ZH: Record<string, string> = {
+export const CITY_ZH: Record<string, string> = {
   Flushing: "法拉盛",
   "New York": "纽约",
   Brooklyn: "布鲁克林",

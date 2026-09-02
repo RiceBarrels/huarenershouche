@@ -48,6 +48,10 @@ export interface DbCar {
   last_seen_at: string | null;
   // Owner-disabled syndicated listing (excluded from public queries; untouched by the sync engine)
   owner_hidden: boolean;
+  // Public API 上传(supabase/api-keys.sql):车行自己的库存编号,同 seller 内唯一,PUT upsert 依据
+  external_id?: string | null;
+  // 写入这条记录的 API key(null = 手动发帖 / 爬虫转载)
+  api_key_id?: string | null;
   // Joined from profiles
   profiles?: {
     account_type: "private" | "dealer";
@@ -292,4 +296,31 @@ export interface DbPlatformReview {
   status: string;
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
+}
+
+// ---------- Public API(docs/public-api-v0.md,supabase/api-keys.sql)----------
+
+export interface DbApiKey {
+  id: string;
+  owner_id: string;
+  name: string;
+  // 明文前 12 位(clc_live_xxx),仅展示用;明文只在创建时返回一次
+  prefix: string;
+  scopes: string[];
+  ip_allowlist: string[] | null;
+  rate_limit_per_min: number;
+  expires_at: string | null;
+  revoked_at: string | null;
+  last_used_at: string | null;
+  request_count: number;
+  created_at: string;
+}
+
+export interface DbApiUsageDaily {
+  api_key_id: string;
+  day: string;
+  requests: number;
+  errors: number;
+  inserts: number;
+  updates: number;
 }
