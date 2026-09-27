@@ -98,6 +98,9 @@ export async function moderateContent(
         },
         body: JSON.stringify({
           model: MODERATION_MODEL,
+          // 关闭默认推理:审核只需分类,推理会把延迟拉到数十秒(见 lib/translate.ts ROUTING)
+          reasoning: { enabled: false },
+          provider: { sort: "throughput" },
           max_tokens: 500,
           temperature: 0,
           messages: [

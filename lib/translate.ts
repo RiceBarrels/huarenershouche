@@ -8,6 +8,10 @@
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 // 2026-09 起全站统一用 DeepSeek V4 Flash(纯文本,便宜且多语言强)
 const MODEL = "deepseek/deepseek-v4-flash-0731";
+// 该模型默认先「思考」再作答:一句话翻译都要近千 reasoning token、50s+,长描述会撞超时或
+// 被 max_tokens 截断成半截 JSON(日志「could not parse model output」)。翻译不需要推理 →
+// 关闭 reasoning,并让 OpenRouter 路由到吞吐最高的供应商(实测 54s → <1.5s)。
+const ROUTING = { reasoning: { enabled: false }, provider: { sort: "throughput" } } as const;
 const REQUEST_TIMEOUT_MS = 45_000;
 const MAX_ATTEMPTS = 4;
 const MAX_TOKENS = 8000;
@@ -168,6 +172,7 @@ export async function localizeListing(input: ListingFields): Promise<LocalizedFi
 
   const body = JSON.stringify({
     model: MODEL,
+    ...ROUTING,
     temperature: 0,
     max_tokens: MAX_TOKENS,
     messages: [
@@ -272,6 +277,7 @@ export async function translateListingInto(
 
   const body = JSON.stringify({
     model: MODEL,
+    ...ROUTING,
     temperature: 0,
     max_tokens: MAX_TOKENS,
     messages: [
@@ -354,6 +360,7 @@ export async function translatePostInto(
 
   const body = JSON.stringify({
     model: MODEL,
+    ...ROUTING,
     temperature: 0,
     max_tokens: MAX_TOKENS,
     messages: [
@@ -436,6 +443,7 @@ export async function translateTextsInto(
 
   const body = JSON.stringify({
     model: MODEL,
+    ...ROUTING,
     temperature: 0,
     max_tokens: MAX_TOKENS,
     messages: [
