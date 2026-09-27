@@ -1,6 +1,6 @@
 // /api/sync — listing-source sync trigger.
 // GET:  Vercel Cron 每小时(Authorization: Bearer <CRON_SECRET>, sent automatically);
-//       每个源仍约每天一次(MIN_SYNC_GAP_MS),每轮只处理到期的源、按预算截止。
+//       每个源约两天一次(MIN_SYNC_GAP_MS),每轮只处理到期的源、按预算截止。
 // POST: manual trigger — CRON_SECRET or an admin's Supabase access token.
 
 import { NextRequest, NextResponse } from "next/server";

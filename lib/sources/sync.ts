@@ -47,8 +47,11 @@ export interface SyncOptions {
 }
 
 const EXPIRY_DAYS = 30;
-/** Sources synced within this window are skipped unless force (cron runs daily). */
-const MIN_SYNC_GAP_MS = 0.9 * 24 * 60 * 60 * 1000;
+/**
+ * 每个源的同步间隔:约两天一次(1.9 天,留出 cron 整点对齐的余量)。
+ * cron 每小时检查一次,只处理到期的源;未到期时直接跳过,几乎零开销。
+ */
+const MIN_SYNC_GAP_MS = 1.9 * 24 * 60 * 60 * 1000;
 /**
  * 每个源每轮最多转存图片的车辆数(控制单次 /api/sync 时长,maxDuration=300s)。
  * 存量车源会在之后的每日同步中逐批补齐;管理员也可连续手动触发加速。
