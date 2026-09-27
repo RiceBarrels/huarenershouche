@@ -411,6 +411,11 @@ export async function syncSource(
 export interface SyncAllOptions {
   force?: boolean;
   onlyKey?: string;
+  /**
+   * 时间预算(ms):超过后不再开始新的数据源(已开始的跑完)。Vercel 函数 300s 上限下,
+   * 一次调用跑不完全部源 —— cron 每小时触发,每轮按「最久未同步」优先接着跑。
+   */
+  budgetMs?: number;
 }
 
 export async function syncAll(opts: SyncAllOptions = {}): Promise<SyncResult[]> {
@@ -421,8 +426,14 @@ export async function syncAll(opts: SyncAllOptions = {}): Promise<SyncResult[]> 
   const { data, error } = await query;
   if (error) throw new Error(`load listing_sources: ${error.message}`);
 
-  const sources = (data ?? []) as DbListingSource[];
+  // 最久未同步(含从未同步 / 上轮超时中断)的源优先
+  const sources = ((data ?? []) as DbListingSource[]).sort(
+    (a, b) =>
+      (a.last_sync_at ? new Date(a.last_sync_at).getTime() : 0) -
+      (b.last_sync_at ? new Date(b.last_sync_at).getTime() : 0)
+  );
   const results: SyncResult[] = [];
+  const startedAt = Date.now();
 
   for (const source of sources) {
     const recentlySynced =
@@ -441,6 +452,11 @@ export async function syncAll(opts: SyncAllOptions = {}): Promise<SyncResult[]> 
         duration_ms: 0,
       });
       continue;
+    }
+
+    if (opts.budgetMs != null && Date.now() - startedAt > opts.budgetMs) {
+      console.log(`[sync] budget ${opts.budgetMs}ms used — deferring ${source.key} to next run`);
+      break;
     }
 
     try {

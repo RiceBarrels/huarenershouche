@@ -1,5 +1,6 @@
 // /api/sync — listing-source sync trigger.
-// GET:  Vercel Cron (Authorization: Bearer <CRON_SECRET>, sent automatically).
+// GET:  Vercel Cron 每小时(Authorization: Bearer <CRON_SECRET>, sent automatically);
+//       每个源仍约每天一次(MIN_SYNC_GAP_MS),每轮只处理到期的源、按预算截止。
 // POST: manual trigger — CRON_SECRET or an admin's Supabase access token.
 
 import { NextRequest, NextResponse } from "next/server";
@@ -7,6 +8,8 @@ import { syncAll } from "@/lib/sources/sync";
 import { createServiceClient } from "@/lib/sources/service-client";
 
 export const maxDuration = 300;
+// 超过此预算不再开始新数据源,给进行中的源留 ~150s 跑完;剩余的由下一小时的 cron 接续
+const BUDGET_MS = 150_000;
 export const dynamic = "force-dynamic";
 
 function bearerToken(req: NextRequest): string | null {
@@ -25,7 +28,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   try {
-    const results = await syncAll({ force: false });
+    const results = await syncAll({ force: false, budgetMs: BUDGET_MS });
     return NextResponse.json({ ok: true, results });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -64,7 +67,7 @@ export async function POST(req: NextRequest) {
       // empty body is fine
     }
 
-    const results = await syncAll({ onlyKey: body.key, force: body.force ?? false });
+    const results = await syncAll({ onlyKey: body.key, force: body.force ?? false, budgetMs: BUDGET_MS });
     return NextResponse.json({ ok: true, results });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
