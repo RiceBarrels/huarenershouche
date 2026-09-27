@@ -107,30 +107,26 @@ function createPillIcon(m: AppMapMarker) {
 }
 
 // Tile layers
-// 浅色走矢量底图(OpenFreeMap + 自托管 ZCOOL 字形,标注用品牌字体);
-// 深色及矢量加载失败时回退 CARTO 栅格瓦片
-const TILES = {
-  light: {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution:
-      '&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  },
-  dark: {
-    url: "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    attribution:
-      '&copy; <a href="https://openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-  },
+// 浅色/深色均走矢量底图(OpenFreeMap + 自托管 ZCOOL 字形,标注用品牌字体);
+// 矢量加载失败(无 WebGL 等)时回退 OSM 标准栅格瓦片,深色靠 CSS 反色。
+// (CARTO basemaps 已改为需 API key,不再使用)
+const RASTER_FALLBACK = {
+  url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
+  attribution: '&copy; <a href="https://openstreetmap.org/copyright">OSM</a>',
 };
 
-const VECTOR_STYLE_URL = "/map-styles/clc-light.json";
+const VECTOR_STYLE_URL = {
+  light: "/map-styles/clc-light.json",
+  dark: "/map-styles/clc-dark.json",
+};
 const VECTOR_ATTRIBUTION =
   '&copy; <a href="https://openfreemap.org">OpenFreeMap</a> &copy; <a href="https://openmaptiles.org">OpenMapTiles</a> &copy; <a href="https://openstreetmap.org/copyright">OSM</a>';
 
 // 矢量品牌底图:动态加载 maplibre(体积大,按需),样式里的 __ORIGIN__
 // 替换为当前源(字形 PBF 自托管于 public/map-glyphs)
-async function createVectorLayer(): Promise<L.Layer> {
+async function createVectorLayer(dark: boolean): Promise<L.Layer> {
   await import("@maplibre/maplibre-gl-leaflet");
-  const res = await fetch(VECTOR_STYLE_URL);
+  const res = await fetch(dark ? VECTOR_STYLE_URL.dark : VECTOR_STYLE_URL.light);
   if (!res.ok) throw new Error(`style ${res.status}`);
   const style = await res.json();
   style.glyphs = String(style.glyphs).replace("__ORIGIN__", window.location.origin);
@@ -306,7 +302,6 @@ export function AppMap({
     if (platform !== "web" || dark === null || !containerRef.current) return;
 
     const container = containerRef.current;
-    const tile = dark ? TILES.dark : TILES.light;
     const map = L.map(container, {
       scrollWheelZoom: mode === "fullscreen" && interactive,
       zoomControl: false,
@@ -332,25 +327,20 @@ export function AppMap({
     let disposed = false;
     function addRasterLayer() {
       container.classList.add("clc-map--raster");
-      attribution.addAttribution(tile.attribution);
-      L.tileLayer(tile.url, { maxZoom: 19, subdomains: "abcd" }).addTo(map);
+      attribution.addAttribution(RASTER_FALLBACK.attribution);
+      L.tileLayer(RASTER_FALLBACK.url, { maxZoom: 19 }).addTo(map);
     }
 
-    if (dark) {
-      // 深色暂无品牌矢量样式,沿用 CARTO 暗色瓦片
-      addRasterLayer();
-    } else {
-      createVectorLayer()
-        .then((layer) => {
-          if (disposed) return;
-          attribution.addAttribution(VECTOR_ATTRIBUTION);
-          layer.addTo(map);
-        })
-        .catch(() => {
-          // WebGL 不可用 / 样式加载失败 → 回退栅格
-          if (!disposed) addRasterLayer();
-        });
-    }
+    createVectorLayer(!!dark)
+      .then((layer) => {
+        if (disposed) return;
+        attribution.addAttribution(VECTOR_ATTRIBUTION);
+        layer.addTo(map);
+      })
+      .catch(() => {
+        // WebGL 不可用 / 样式加载失败 → 回退栅格
+        if (!disposed) addRasterLayer();
+      });
 
     const group = L.layerGroup().addTo(map);
     layerGroupRef.current = group;
@@ -679,7 +669,7 @@ export function AppMap({
             filter: saturate(0.72) contrast(0.98) brightness(1.02);
           }
           .dark .clc-map--raster .leaflet-tile-pane {
-            filter: saturate(0.8);
+            filter: invert(1) hue-rotate(180deg) saturate(0.35) brightness(0.9) contrast(0.9);
           }
           /* 淡淡的品牌绿罩层(在瓦片之上、标注之下) */
           .clc-map::after {
