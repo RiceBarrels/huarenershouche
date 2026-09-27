@@ -204,8 +204,8 @@ export async function syncSource(
         .eq("languages", "{}");
     }
 
-    // 0. 门店地址优先：有门店记录则车辆定位跟随门店
-    const storeLoc = await loadStoreLocation(supabase, source.system_account_id);
+    // 0. 门店地址优先：有门店记录则车辆定位跟随门店(多门店源保留每辆车自己的门店定位)
+    const storeLoc = adapter.multiLocation ? null : await loadStoreLocation(supabase, source.system_account_id);
     const locationOverride = storeLoc
       ? {
           location: storeLoc.location,

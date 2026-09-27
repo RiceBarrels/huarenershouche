@@ -4,6 +4,11 @@ import type { SourceAdapter } from "./types";
 import { createDealerCenterAdapter } from "./dealercenter-wp";
 import { createOneNeAutoAdapter } from "./onenauto";
 import { createDealerSyncAdapter } from "./dealersync";
+import { SITES as AUTOMANAGER_SITES } from "./sites-automanager";
+import { SITES as DCS_SITES } from "./sites-dealercarsearch";
+import { SITES as DC_PROXY_SITES } from "./sites-dealercenter-proxy";
+import { SITES as CUSTOM_A_SITES } from "./sites-custom-a";
+import { SITES as CUSTOM_B_SITES } from "./sites-custom-b";
 
 // 同一套 DealerCenter WordPress 模板的站点：加一家 = 加一份配置。
 // location/联系字段是兜底值 —— 系统账号有门店记录时同步引擎会以门店地址覆盖。
@@ -79,6 +84,23 @@ const SITES: SourceAdapter[] = [
     phone: "(909) 900-0000",
     languages: ["zh", "en"],
   }),
+  createDealerSyncAdapter({
+    key: "sdautofinders",
+    baseUrl: "https://www.sandiegoautofinders.com",
+    location: "San Diego, CA",
+    location_zh: "加州圣地亚哥",
+    lat: 32.8233,
+    lng: -117.1553,
+    seller_name: "San Diego Auto Finders",
+    phone: "(858) 279-6862",
+    languages: ["zh", "en"],
+  }),
+  // 2026-09 全美华人车行调研批量接入(按建站平台分文件)
+  ...AUTOMANAGER_SITES,
+  ...DCS_SITES,
+  ...DC_PROXY_SITES,
+  ...CUSTOM_A_SITES,
+  ...CUSTOM_B_SITES,
 ];
 
 export const adapters: Record<string, SourceAdapter> = Object.fromEntries(

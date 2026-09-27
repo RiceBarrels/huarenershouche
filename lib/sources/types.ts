@@ -60,6 +60,8 @@ export interface SourceAdapter {
    * profiles.languages 为空时写入;管理员在后台改过的不覆盖。
    */
   languages?: string[];
+  /** 多门店车行:每辆车的 location/lat/lng 由适配器按所在门店给出,同步引擎不以系统账号门店地址覆盖 */
+  multiLocation?: boolean;
   listAll(fetchHtml: FetchHtml): Promise<CrawlResult>;
   fetchDetail(fetchHtml: FetchHtml, ref: SourceListingRef): Promise<ParsedListing>;
 }
@@ -90,4 +92,30 @@ export const fetchHtml: FetchHtml = async (url: string): Promise<string> => {
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+const SCRAPINGANT = "https://api.scrapingant.com/v2/general";
+
+/**
+ * 经 ScrapingAnt 代理抓取(Cloudflare 挑战站点直连 403 时用)。需 SCRAPINGANT_API_KEY。
+ * 按请求计费(浏览器渲染更贵),adapter 应尽量少发请求:能从列表页拿全字段就别逐辆抓详情。
+ * browser=false 走纯代理(便宜,多数 CF「Just a moment」仍需 browser=true)。
+ */
+export function createProxyFetch(opts: { browser?: boolean; timeoutMs?: number } = {}): FetchHtml {
+  const browser = opts.browser ?? true;
+  const timeoutMs = opts.timeoutMs ?? 90_000;
+  return async (url: string): Promise<string> => {
+    const key = process.env.SCRAPINGANT_API_KEY;
+    if (!key) throw new Error("SCRAPINGANT_API_KEY not set — 该数据源需经 ScrapingAnt 代理(Cloudflare)");
+    const proxied = `${SCRAPINGANT}?url=${encodeURIComponent(url)}&browser=${browser}&x-api-key=${key}`;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(proxied, { signal: controller.signal });
+      if (!res.ok) throw new Error(`ScrapingAnt HTTP ${res.status} for ${url}`);
+      return await res.text();
+    } finally {
+      clearTimeout(timer);
+    }
+  };
 }

@@ -169,20 +169,23 @@ function mapPaint(raw: string | null): string | null {
 const NON_PHOTO_RE =
   /ds_generated|monroney|wca_|_wca|money.?back|guarantee|maintenance|zero.?games|carfax|kbb|reviews|ratings|awards|summary|approved|value.?service|posi|poist|postion|\.png$|\.gif$/i;
 
+const MARKETING_TRIM_RE = /\d{3}[\s.-]?\d{3}[\s.-]?\d{4}|financ|call|loaded|like new|warranty|,/i;
+
 /** Gallery photos in page order, deduped, marketing slides removed. */
 function parsePhotos(html: string, vehicleId: string): string[] {
-  const re = new RegExp(`images\\.dealersync\\.com/3/Photos/${vehicleId}/([^"'?\\s,)]+)`, "g");
+  // 路径首段是 DealerSync 的车行 ID(westcoastauto=3,sdautofinders=2234)
+  const re = new RegExp(`images\\.dealersync\\.com/(\\d+)/Photos/${vehicleId}/([^"'?\\s,)]+)`, "g");
   const seen = new Set<string>();
   const out: string[] = [];
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
-    const file = m[1];
+    const [, dealerId, file] = m;
     if (NON_PHOTO_RE.test(file)) continue;
     // Same camera frame re-uploaded into another slot ("…_IMG_9180.jpg") → one photo
     const dedupeKey = file.match(/(_IMG_\d+\.\w+)$/i)?.[1]?.toUpperCase() ?? file;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
-    out.push(`${IMAGE_HOST}/3/Photos/${vehicleId}/${file}`);
+    out.push(`${IMAGE_HOST}/${dealerId}/Photos/${vehicleId}/${file}`);
   }
   return out;
 }
@@ -290,9 +293,12 @@ export function createDealerSyncAdapter(config: DealerSyncSiteConfig): SourceAda
     const year = parseInt(String(rec.Year), 10);
     if (!Number.isFinite(year) || year < 1950) throw new Error(`invalid year "${rec.Year}"`);
     const make = canonicalMake(rec.Make || "");
-    const model = (rec.Model || "").replace(/\s+/g, " ").trim();
+    // 部分车行把营销语塞进 Model/Trim("Charger Daytona R/T AWD, Gorgeous, Like New" /
+    // "Easy Finance Call 858 279 6862"):Model 取首个逗号前,Trim 含电话/营销词则丢弃
+    const model = (rec.Model || "").split(",")[0].replace(/\s+/g, " ").trim();
     if (!make || !model) throw new Error(`missing make/model for ${ref.sourceListingId}`);
-    const trim = (rec.Trim || "").replace(/\s+/g, " ").trim() || null;
+    const rawTrim = (rec.Trim || "").replace(/\s+/g, " ").trim();
+    const trim = rawTrim && !MARKETING_TRIM_RE.test(rawTrim) ? rawTrim : null;
 
     const price = Math.round(rec.InternetPrice ?? rec.SalePrice ?? 0);
     if (!(price > 0)) throw new Error("no price found");
@@ -300,7 +306,9 @@ export function createDealerSyncAdapter(config: DealerSyncSiteConfig): SourceAda
     const vin = (rec.Vin || "").toUpperCase();
     if (!/^[A-HJ-NPR-Z0-9]{17}$/.test(vin)) throw new Error(`invalid VIN "${vin}"`);
 
-    const images = parsePhotos(html, ref.sourceListingId);
+    // wm_ 开头是车行加水印的封面图,排到最后,封面用无水印原图
+    const photos = parsePhotos(html, ref.sourceListingId);
+    const images = [...photos.filter((u) => !/\/wm_/.test(u)), ...photos.filter((u) => /\/wm_/.test(u))];
     if (images.length === 0) throw new Error("no photos found");
 
     const fuel_type = mapFuel(rec.Fuel, make);

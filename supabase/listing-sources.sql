@@ -59,7 +59,22 @@ DECLARE
     '4|ideal-nj|iDeal Auto Sales NJ|https://idealautosalesnj.com|(201) 991-0047|154 Belgrove Dr, Kearny, NJ 07032|07032|40.7676|-74.1454|Kearny, NJ|新泽西卡尼',
     '5|ideal-rosemead|iDeal Auto Sales Rosemead|https://idealautosalesrosemead.com|(626) 929-0008|9510 Valley Blvd, Rosemead, CA 91770|91770|34.0686|-118.0834|Rosemead, CA|洛杉矶罗斯米德',
     -- 6: DealerSync 模板站(westcoastauto.com/pre-owned-cars),适配器 lib/sources/dealersync.ts
-    '6|westcoastauto|Westcoast Auto Sales|https://www.westcoastauto.com|(909) 900-0000|5180 Holt Blvd, Montclair, CA 91763|91763|34.0723|-117.6905|Montclair, CA|加州蒙特克莱尔'
+    '6|westcoastauto|Westcoast Auto Sales|https://www.westcoastauto.com|(909) 900-0000|5180 Holt Blvd, Montclair, CA 91763|91763|34.0723|-117.6905|Montclair, CA|加州蒙特克莱尔',
+    -- 7+: 2026-09 全美华人车行调研批量接入(适配器见 lib/sources/sites-*.ts)
+    '7|topline168|Topline Automotive|https://www.topline168.com|(626) 572-8888|840 E Garvey Ave, Monterey Park, CA 91755|91755|34.0627|-118.1153|Monterey Park, CA|加州蒙特利公园',
+    '8|yesnewyork|Yes Auto Inc|https://www.yesnewyork.com|(718) 685-0168|74-02 Queens Blvd, Elmhurst, NY 11373|11373|40.7397|-73.8886|Elmhurst, NY|纽约艾姆赫斯特',
+    '10|nysrauto|SR Auto Group 纽约SR车行|https://nysrauto.com|(516) 962-9399|202-10 Northern Blvd, Bayside, NY 11361|11361|40.7624|-73.7838|Bayside, NY|纽约贝赛',
+    '11|hautodeal|East West Trust 华诚车行|https://hautodeal.com|(909) 524-2699|2700 N San Gabriel Blvd, Rosemead, CA 91770|91770|34.0608|-118.0905|Rosemead, CA|洛杉矶罗斯米德',
+    '12|fengauto|Feng Auto Sales 亚洲车行|https://fengauto.com|(773) 523-3388|3290 S Archer Ave, Chicago, IL 60608|60608|41.8344|-87.6722|Chicago, IL|芝加哥',
+    '14|sdautofinders|San Diego Auto Finders|https://www.sandiegoautofinders.com|(858) 279-6862|4606 Convoy St, San Diego, CA 92111|92111|32.8233|-117.1553|San Diego, CA|加州圣地亚哥',
+    '17|fjmotorgroup|FJ Motor Group|https://www.fjmotorgroup.com|(626) 787-6160|7850 Garvey Ave, Rosemead, CA 91770|91770|34.0626|-118.0878|Rosemead, CA|洛杉矶罗斯米德',
+    '18|kopautoinc|KOP Auto Inc. 靠谱汽车|https://www.kopautoinc.com|(626) 542-3861|10503 Garvey Ave, El Monte, CA 91733|91733|34.0636|-118.0421|El Monte, CA|洛杉矶埃尔蒙特',
+    '19|automaxsd|Auto Max Inc.|https://www.automaxsd.com|(619) 666-8383|7990 Dagget St, San Diego, CA 92111|92111|32.8253|-117.1475|San Diego, CA|加州圣地亚哥',
+    '20|nyautodepot|纽约百车汇 New York Auto Depot|https://www.nyautodepot.com|(631) 888-6331|1849 Morris Ave, Union, NJ 07083|07083|40.6962|-74.2638|Union, NJ|新泽西尤宁',
+    '21|txdautogroup|TXD Auto Group|https://www.txdautogroup.com|(713) 900-9460|9243 Clay Rd, Houston, TX 77080|77080|29.8286|-95.5268|Houston, TX|德州休斯顿',
+    '23|autocac|CAC Auto Group 友车哒|https://autocac.com|(765) 471-0700|3617 US Hwy 52 S, Lafayette, IN 47905|47905|40.379|-86.843|Lafayette, IN|印第安纳州拉法叶',
+    '28|idealmotorgroup|Ideal Motor Group|https://idealmotorgroup.com|(626) 285-6628|650 E Las Tunas Dr, San Gabriel, CA 91776|91776|34.1037|-118.0955|San Gabriel, CA|加州圣盖博',
+    '29|lansdale|Lansdale Speed Motor 速达车行|https://www.lansdalespeed.com|(267) 222-8391|1107 N Broad St, Lansdale, PA 19446|19446|40.253|-75.294|Lansdale, PA|宾州兰斯代尔'
   ];
   r text;
   f text[];
