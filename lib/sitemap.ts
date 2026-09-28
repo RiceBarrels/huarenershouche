@@ -14,6 +14,8 @@ export interface SitemapEntry {
   lastModified: Date;
   changeFrequency: Freq;
   priority: number;
+  /** 正文只有中文(/cars/* 落地页、条款):只进 zh 分片、不带 hreflang,与页面 canonical 一致 */
+  zhOnly?: boolean;
 }
 
 export function esc(s: string): string {
@@ -31,7 +33,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
   const staticRoutes: SitemapEntry[] = [
     { path: "", changeFrequency: "daily" as Freq, priority: 1.0 },
     { path: "/browse", changeFrequency: "daily" as Freq, priority: 0.9 },
-    { path: "/cars", changeFrequency: "daily" as Freq, priority: 0.9 },
+    { path: "/cars", changeFrequency: "daily" as Freq, priority: 0.9, zhOnly: true },
     { path: "/post", changeFrequency: "weekly" as Freq, priority: 0.7 },
     { path: "/guide", changeFrequency: "weekly" as Freq, priority: 0.7 },
     { path: "/community", changeFrequency: "daily" as Freq, priority: 0.7 },
@@ -41,7 +43,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     { path: "/services", changeFrequency: "weekly" as Freq, priority: 0.6 },
     { path: "/contact", changeFrequency: "monthly" as Freq, priority: 0.5 },
     { path: "/business", changeFrequency: "monthly" as Freq, priority: 0.5 },
-    { path: "/terms", changeFrequency: "monthly" as Freq, priority: 0.5 },
+    { path: "/terms", changeFrequency: "monthly" as Freq, priority: 0.5, zhOnly: true },
   ].map((r) => ({ ...r, lastModified: now }));
 
   const seoRoutes: SitemapEntry[] = SEO_PAGES.map((p) => ({
@@ -49,6 +51,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     lastModified: now,
     changeFrequency: "daily" as Freq,
     priority: p.slug.includes("/") ? 0.6 : 0.8,
+    zhOnly: true,
   }));
 
   // 每辆在售车源详情页(核心内容页,SEO 主力)+ 有在售车的卖家主页
@@ -112,8 +115,8 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
 
 /** 渲染某一语言的子 sitemap(每条带全语言 hreflang 互链),pretty print */
 export function renderLocaleSitemap(loc: Locale, entries: SitemapEntry[]): string {
-  const blocks = entries.map((entry) => {
-    const alternates = [
+  const blocks = entries.filter((e) => loc === "zh" || !e.zhOnly).map((entry) => {
+    const alternates = entry.zhOnly ? "" : [
       ...LOCALES.map(
         (l) =>
           `    <xhtml:link rel="alternate" hreflang="${l === "zh" ? "zh-CN" : l}" href="${esc(`${SITE_URL}/${l}${entry.path}`)}"/>`
@@ -125,7 +128,7 @@ export function renderLocaleSitemap(loc: Locale, entries: SitemapEntry[]): strin
     return [
       "  <url>",
       `    <loc>${esc(`${SITE_URL}/${loc}${entry.path}`)}</loc>`,
-      alternates,
+      ...(alternates ? [alternates] : []),
       `    <lastmod>${entry.lastModified.toISOString()}</lastmod>`,
       `    <changefreq>${entry.changeFrequency}</changefreq>`,
       `    <priority>${priority.toFixed(1)}</priority>`,

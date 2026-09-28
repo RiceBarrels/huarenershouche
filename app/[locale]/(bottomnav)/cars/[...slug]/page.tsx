@@ -8,6 +8,7 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { SeoCarList } from "@/components/seo-car-list";
 import {
+  localeAlternates,
   SEO_PAGES,
   SITE_URL,
   SITE_NAME,
@@ -26,16 +27,16 @@ export function generateStaticParams() {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ locale: string; slug: string[] }>;
 }): Promise<Metadata> {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const def = getSeoPage(slug);
   if (!def) return {};
   return {
     // def.title 已含「| 站名」,absolute 跳过 layout 的 %s 模板,避免站名重复两次
     title: { absolute: def.title },
     description: def.description,
-    alternates: { canonical: `${SITE_URL}/cars/${def.slug}` },
+    alternates: localeAlternates(locale, `/cars/${def.slug}`, { zhOnly: true }),
     openGraph: { title: def.title, description: def.description },
   };
 }

@@ -5,6 +5,7 @@ import Link from "@/components/localized-navigation";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import {
+  localeAlternates,
   SEO_PAGES,
   SITE_URL,
   SITE_NAME,
@@ -13,11 +14,18 @@ import {
   type SeoPageKind,
 } from "@/lib/seo-pages";
 
-export const metadata: Metadata = {
-  title: `二手车分类导航 - 按品牌、地区、价格找车 | ${SITE_NAME}`,
-  description: `${SITE_NAME}二手车分类导航：按丰田、本田、宝马等热门品牌，加州、纽约、德州等地区，以及车身类型、预算、年份、新能源快速找到适合你的二手车，北美华人买车卖车更放心。`,
-  alternates: { canonical: `${SITE_URL}/cars` },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  return {
+    title: `二手车分类导航 - 按品牌、地区、价格找车 | ${SITE_NAME}`,
+    description: `${SITE_NAME}二手车分类导航：按丰田、本田、宝马等热门品牌，加州、纽约、德州等地区，以及车身类型、预算、年份、新能源快速找到适合你的二手车，北美华人买车卖车更放心。`,
+    alternates: localeAlternates(locale, "/cars", { zhOnly: true }),
+  };
+}
 
 const SECTIONS: { title: string; kind: SeoPageKind }[] = [
   { title: "热门品牌", kind: "make" },

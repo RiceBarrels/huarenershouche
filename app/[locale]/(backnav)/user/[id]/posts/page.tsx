@@ -5,7 +5,8 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { serverT } from "@/lib/i18n/translate";
 import type { DbCommunityPost } from "@/lib/types";
 import UserProfilePage from "../../user-detail";
 
@@ -55,31 +56,44 @@ const getData = cache(
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { locale, id } = await params;
+  const t = serverT(locale);
   const { profile, posts } = await getData(id);
 
   if (!profile || profile.banned) {
-    return { title: "用户不存在", robots: { index: false, follow: false } };
+    return { title: t("用户不存在"), robots: { index: false, follow: false } };
   }
 
-  const title = `${profile.username} 的帖子 (${posts.length})`;
-  const highlights = posts.slice(0, 3).map((p) => p.title).join("、");
+  const title =
+    locale === "zh"
+      ? `${profile.username} 的帖子 (${posts.length})`
+      : t("{name} 的帖子 ({n})", { name: profile.username, n: posts.length });
+  const highlights = posts
+    .slice(0, 3)
+    .map((p) => (locale === "zh" ? p.title : p.other_i18n?.[locale]?.title || p.title))
+    .join(locale === "zh" ? "、" : ", ");
   const description =
-    `${profile.username} 在常來車網社区发布的 ${posts.length} 篇帖子` +
-    (highlights ? `:${highlights}${posts.length > 3 ? " 等" : ""}` : "") +
-    "。北美华人二手车社区,车评、晒车、用车讨论。";
+    locale === "zh"
+      ? `${profile.username} 在常來車網社区发布的 ${posts.length} 篇帖子` +
+        (highlights ? `:${highlights}${posts.length > 3 ? " 等" : ""}` : "") +
+        "。北美华人二手车社区,车评、晒车、用车讨论。"
+      : t("{name} 在 {site} 社区发布的 {n} 篇帖子", {
+          name: profile.username,
+          site: t("常來車網"),
+          n: posts.length,
+        }) + (highlights ? `: ${highlights}` : "");
 
   return {
     title,
     description: description.slice(0, 160),
-    alternates: { canonical: `/user/${profile.id}/posts` },
+    alternates: localeAlternates(locale, `/user/${profile.id}/posts`),
     openGraph: {
       type: "profile",
       title,
       description: description.slice(0, 160),
-      url: `${SITE_URL}/user/${profile.id}/posts`,
+      url: `${SITE_URL}/${locale}/user/${profile.id}/posts`,
       siteName: SITE_NAME,
       ...(profile.avatar_url && {
         images: [{ url: profile.avatar_url, alt: profile.username }],

@@ -8,6 +8,28 @@ import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 export const SITE_URL = "https://www.clcauto.com";
 export const SITE_NAME = "常來車網";
 
+// 与 lib/i18n LOCALES 保持一致(这里不 import,避免纯数据模块拉进 i18n)
+const SEO_LOCALES = ["zh", "en", "ko", "ja", "es", "fr"] as const;
+
+/**
+ * 页面级 canonical + hreflang。canonical 必须带语言前缀指向「本语言」自身:
+ * 指向无前缀路径会被 vercel.json 308 到 /zh,Google 就把所有外语页当成
+ * 中文页的重复而只收录中文。
+ * zhOnly:正文只有中文的页面(/cars/* 落地页、条款),外语树 canonical 回 /zh、不声明 hreflang。
+ */
+export function localeAlternates(
+  locale: string,
+  path: string,
+  opts: { zhOnly?: boolean } = {}
+): { canonical: string; languages?: Record<string, string> } {
+  const href = (l: string) => `${SITE_URL}/${l}${path === "/" ? "" : path}`;
+  if (opts.zhOnly) return { canonical: href("zh") };
+  const languages: Record<string, string> = {};
+  for (const l of SEO_LOCALES) languages[l === "zh" ? "zh-CN" : l] = href(l);
+  languages["x-default"] = href("zh");
+  return { canonical: href(locale), languages };
+}
+
 // ── 州数据（与 browse 页 location 代码一致）──
 export interface SeoState {
   abbr: string; // browse 页 location 参数

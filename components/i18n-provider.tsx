@@ -27,15 +27,8 @@ import {
   stripLocale,
   detectLocale,
 } from "@/lib/i18n";
-import { en } from "@/lib/i18n/en";
-import { ko } from "@/lib/i18n/ko";
-import { ja } from "@/lib/i18n/ja";
-import { es } from "@/lib/i18n/es";
-import { fr } from "@/lib/i18n/fr";
+import { translate } from "@/lib/i18n/translate";
 import { isNative } from "@/lib/capacitor";
-
-// 非中文语言的 UI 词典(key 均为中文原文;缺失先回退英文,再回退中文)
-const DICTS: Partial<Record<Locale, Record<string, string>>> = { en, ko, ja, es, fr };
 
 type TranslateFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -104,15 +97,7 @@ export function I18nProvider({
     [native, locale, pathname, router]
   );
 
-  const t = useCallback<TranslateFn>(
-    (text, vars) => {
-      // 缺词回退链:目标语言 → 英文 → 中文原文(zh 直接原样返回)
-      const translated =
-        locale === "zh" ? text : DICTS[locale]?.[text] ?? en[text] ?? text;
-      return interpolate(translated, vars);
-    },
-    [locale]
-  );
+  const t = useCallback<TranslateFn>((text, vars) => translate(locale, text, vars), [locale]);
 
   // 原生端 URL 永远指向静态导出的那棵树(initialLocale=zh),显示语言另走 override
   const pathLocale = native ? initialLocale : locale;

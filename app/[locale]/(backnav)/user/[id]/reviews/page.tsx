@@ -5,7 +5,8 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { serverT } from "@/lib/i18n/translate";
 import UserProfilePage from "../../user-detail";
 
 const getData = cache(async (id: string) => {
@@ -42,29 +43,40 @@ const getData = cache(async (id: string) => {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { locale, id } = await params;
+  const t = serverT(locale);
   const { profile, rating } = await getData(id);
 
   if (!profile || profile.banned) {
-    return { title: "用户不存在", robots: { index: false, follow: false } };
+    return { title: t("用户不存在"), robots: { index: false, follow: false } };
   }
 
-  const title = `${profile.username} 的评价${rating ? ` - ${rating.avg.toFixed(1)} 分 (${rating.count} 条)` : ""}`;
-  const description = `${profile.username} 在常來車網的买家评价${
-    rating ? `,综合评分 ${rating.avg.toFixed(1)}/5,共 ${rating.count} 条` : ""
-  }。北美华人二手车买卖,真实交易评价。`;
+  const title =
+    locale === "zh"
+      ? `${profile.username} 的评价${rating ? ` - ${rating.avg.toFixed(1)} 分 (${rating.count} 条)` : ""}`
+      : t("{name} 的评价", { name: profile.username }) +
+        (rating ? ` - ${rating.avg.toFixed(1)}/5 (${rating.count})` : "");
+  const description =
+    locale === "zh"
+      ? `${profile.username} 在常來車網的买家评价${
+          rating ? `,综合评分 ${rating.avg.toFixed(1)}/5,共 ${rating.count} 条` : ""
+        }。北美华人二手车买卖,真实交易评价。`
+      : t("{name} 在 {site} 的买家评价", { name: profile.username, site: t("常來車網") }) +
+        (rating
+          ? `. ${t("综合评分 {avg}/5,共 {n} 条", { avg: rating.avg.toFixed(1), n: rating.count })}`
+          : "");
 
   return {
     title,
     description: description.slice(0, 160),
-    alternates: { canonical: `/user/${profile.id}/reviews` },
+    alternates: localeAlternates(locale, `/user/${profile.id}/reviews`),
     openGraph: {
       type: "profile",
       title,
       description: description.slice(0, 160),
-      url: `${SITE_URL}/user/${profile.id}/reviews`,
+      url: `${SITE_URL}/${locale}/user/${profile.id}/reviews`,
       siteName: SITE_NAME,
       ...(profile.avatar_url && {
         images: [{ url: profile.avatar_url, alt: profile.username }],

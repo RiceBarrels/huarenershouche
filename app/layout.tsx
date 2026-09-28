@@ -76,15 +76,6 @@ export const metadata: Metadata = {
     description:
       "北美华人二手车买卖平台：覆盖洛杉矶、旧金山、纽约等华人社区，个人与车行直售，免费发布，VIN 召回查询，全中文服务。",
   },
-  alternates: {
-    canonical: "/",
-    // 站点存在 zh/en 两个语言树(/zh/... 与 /en/...);具体页面级 hreflang 由 sitemap 提供
-    languages: {
-      "zh-CN": "/zh",
-      en: "/en",
-      "x-default": "/zh",
-    },
-  },
   robots: {
     index: true,
     follow: true,

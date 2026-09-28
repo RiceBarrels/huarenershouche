@@ -5,7 +5,8 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { serverT } from "@/lib/i18n/translate";
 import { avatarUrl } from "@/lib/avatar";
 import type { DbCar } from "@/lib/types";
 import UserProfilePage from "../user-detail";
@@ -69,7 +70,25 @@ function isDealer(p: SellerProfile): boolean {
 }
 
 /** 面向搜索/分享的一句话描述:身份 + 在售车亮点 + 地区。 */
-function buildDescription(p: SellerProfile, cars: DbCar[]): string {
+function buildDescription(p: SellerProfile, cars: DbCar[], locale: string): string {
+  if (locale !== "zh") {
+    const t = serverT(locale);
+    const parts: string[] = [
+      t(isDealer(p) ? "{name} · {site} 车行" : "{name} · {site} 个人卖家", {
+        name: p.username,
+        site: t("常來車網"),
+      }),
+    ];
+    if (cars.length > 0) {
+      const highlights = cars
+        .slice(0, 3)
+        .map((c) => `${c.year} ${c.make} ${c.model}`)
+        .join(", ");
+      parts.push(t("在售 {n} 辆二手车:{list}", { n: cars.length, list: highlights }));
+    }
+    if (p.location) parts.push(p.location);
+    return parts.join(". ").slice(0, 160);
+  }
   const who = isDealer(p) ? "车行" : "个人卖家";
   const parts: string[] = [`${p.username} · 常來車網${who}`];
   if (cars.length > 0) {
@@ -87,20 +106,30 @@ function buildDescription(p: SellerProfile, cars: DbCar[]): string {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { locale, id } = await params;
+  const t = serverT(locale);
   const { profile, cars } = await getSeller(id);
 
   if (!profile || profile.banned) {
-    return { title: "用户不存在", robots: { index: false, follow: false } };
+    return { title: t("用户不存在"), robots: { index: false, follow: false } };
   }
 
   const who = isDealer(profile) ? "车行主页" : "个人主页";
   const carLabel = cars.length > 0 ? ` - 在售${cars.length}辆二手车` : "";
-  const title = `${profile.username} 的${who}${carLabel}${profile.location ? ` - ${profile.location}` : ""}`;
-  const description = buildDescription(profile, cars);
-  const url = `${SITE_URL}/user/${profile.id}`;
+  const title =
+    locale === "zh"
+      ? `${profile.username} 的${who}${carLabel}${profile.location ? ` - ${profile.location}` : ""}`
+      : [
+          t(isDealer(profile) ? "{name} 的车行主页" : "{name} 的个人主页", { name: profile.username }),
+          cars.length > 0 && t("在售 {n} 辆二手车", { n: cars.length }),
+          profile.location,
+        ]
+          .filter(Boolean)
+          .join(" - ");
+  const description = buildDescription(profile, cars, locale);
+  const url = `${SITE_URL}/${locale}/user/${profile.id}`;
   const image = profile.avatar_url || cars.find((c) => c.image_url)?.image_url || null;
 
   return {
@@ -108,13 +137,12 @@ export async function generateMetadata({
     description,
     keywords: [
       profile.username,
-      isDealer(profile) ? "华人车行" : "华人卖车",
+      locale === "zh" ? (isDealer(profile) ? "华人车行" : "华人卖车") : t("二手车"),
       profile.location,
       ...cars.slice(0, 5).map((c) => `${c.make} ${c.model}`),
-      "北美华人二手车",
-      "二手车",
+      ...(locale === "zh" ? ["北美华人二手车", "二手车"] : [t("常來車網")]),
     ].filter(Boolean) as string[],
-    alternates: { canonical: `/user/${profile.id}` },
+    alternates: localeAlternates(locale, `/user/${profile.id}`),
     openGraph: {
       type: "profile",
       title,

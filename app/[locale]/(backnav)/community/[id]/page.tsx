@@ -5,7 +5,9 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { serverT } from "@/lib/i18n/translate";
+import { dateLocale, type Locale } from "@/lib/i18n";
 import type { DbCommunityPost } from "@/lib/types";
 import CommunityDetail from "../community-detail";
 
@@ -84,34 +86,37 @@ function excerpt(content: string, len = 120): string {
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
-  const { id } = await params;
+  const { locale, id } = await params;
+  const t = serverT(locale);
   const post = await getPost(id);
 
   if (!post) {
-    return { title: "帖子不存在", robots: { index: false, follow: false } };
+    return { title: t("帖子不存在"), robots: { index: false, follow: false } };
   }
 
-  const description = excerpt(post.content);
+  // 非中文界面用 AI 翻译缓存(没有就用原文,首次有人浏览后会翻译写入)
+  const tr = locale === "zh" ? undefined : post.other_i18n?.[locale];
+  const postTitle = tr?.title || post.title;
+  const description = excerpt(tr?.content || post.content);
+  const section = t(TYPE_LABELS[post.type] || "社区");
   const cover = post.images?.find((u) => !VIDEO_RE.test(u));
-  const url = `${SITE_URL}/community/${post.id}`;
+  const url = `${SITE_URL}/${locale}/community/${post.id}`;
 
-  const author = post.profiles?.username || "匿名用户";
+  const author = post.profiles?.username || t("匿名用户");
 
   return {
-    title: `${post.title} - ${TYPE_LABELS[post.type] || "社区"}`,
+    title: `${postTitle} - ${section}`,
     description,
     keywords: [
       ...(post.tags || []),
       post.make,
       post.model,
-      "北美华人",
-      "二手车",
-      "汽车社区",
+      ...(locale === "zh" ? ["北美华人", "二手车", "汽车社区"] : [t("二手车"), t("社区")]),
     ].filter(Boolean) as string[],
-    authors: [{ name: author, url: `${SITE_URL}/user/${post.user_id}` }],
-    alternates: { canonical: `/community/${post.id}` },
+    authors: [{ name: author, url: `${SITE_URL}/${locale}/user/${post.user_id}` }],
+    alternates: localeAlternates(locale, `/community/${post.id}`),
     robots: {
       index: true,
       follow: true,
@@ -120,21 +125,21 @@ export async function generateMetadata({
     },
     openGraph: {
       type: "article",
-      title: post.title,
+      title: postTitle,
       description,
       url,
       siteName: SITE_NAME,
-      locale: "zh_CN",
+      locale: dateLocale(locale as Locale).replace("-", "_"),
       publishedTime: post.created_at,
       modifiedTime: post.updated_at,
-      authors: [`${SITE_URL}/user/${post.user_id}`],
-      section: TYPE_LABELS[post.type] || "社区",
+      authors: [`${SITE_URL}/${locale}/user/${post.user_id}`],
+      section,
       tags: post.tags || [],
       ...(cover && { images: [{ url: cover }] }),
     },
     twitter: {
       card: cover ? "summary_large_image" : "summary",
-      title: post.title,
+      title: postTitle,
       description,
       ...(cover && { images: [cover] }),
     },
