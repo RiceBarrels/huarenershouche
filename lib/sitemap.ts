@@ -43,6 +43,7 @@ export async function collectSitemapEntries(): Promise<SitemapEntry[]> {
     { path: "/services", changeFrequency: "weekly" as Freq, priority: 0.6 },
     { path: "/contact", changeFrequency: "monthly" as Freq, priority: 0.5 },
     { path: "/business", changeFrequency: "monthly" as Freq, priority: 0.5 },
+    { path: "/about", changeFrequency: "monthly" as Freq, priority: 0.4 },
     { path: "/terms", changeFrequency: "monthly" as Freq, priority: 0.5, zhOnly: true },
   ].map((r) => ({ ...r, lastModified: now }));
 

@@ -2,7 +2,7 @@
 
 // 我的账户(iOS 26 风格):个人资料头卡 + 数据条 + 白色分组
 // 菜单。原「设置」中间页已拆进本页 —— 账号与安全 / 通知 / 个性化 /
-// 门店认证 / 客服 / 协议 均为本页分组行,子页保留原路由。
+// 门店认证 / 客服 / 协议 / 关于我们 均为本页分组行,子页保留原路由。
 
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "@/components/localized-navigation";
@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
   FileText, ChevronRight, Car, Palette, ShieldCheck,
-  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText, Code2,
+  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText, Code2, Info,
 } from "lucide-react";
 import { isNative } from "@/lib/capacitor";
 import { Button } from "@/components/ui/button";
@@ -447,6 +447,11 @@ function AccountContent() {
                 icon={<ScrollText className={`${iconCls} text-stone-400`} strokeWidth={1.5} />}
                 label={t("用户协议")}
                 href="/terms"
+              />
+              <SettingsRow
+                icon={<Info className={`${iconCls} text-indigo-400`} strokeWidth={1.5} />}
+                label={t("关于我们")}
+                href="/about"
               />
             </SettingsGroup>
 

@@ -8,7 +8,7 @@
 // 控件一律胶囊形。
 
 import Link from "@/components/localized-navigation";
-import { ChevronRight } from "lucide-react";
+import { ArrowUpRight, ChevronRight } from "lucide-react";
 import { triggerHaptic } from "@/lib/haptics";
 
 /* 白色分组卡。iOS 26 圆角规律:多行分组卡 26px 大圆角;只有一行的
@@ -23,6 +23,13 @@ export function SettingsGroup({ children, className = "", capsule = false }: {
     <div className={`overflow-hidden bg-card ${capsule ? "rounded-full" : "rounded-[26px]"} ${className}`}>
       {children}
     </div>
+  );
+}
+
+/* 分组标题(iOS 卡片上方灰色小字,与卡内文字对齐) */
+export function GroupHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-2 mt-6 px-5 font-mono text-xs font-medium text-muted-foreground">{children}</h2>
   );
 }
 
@@ -47,14 +54,16 @@ export function LargeTitle({ title, subtitle, trailing }: { title: string; subti
 }
 
 /* iOS 设置行:彩色线条图标(无底色)+ 标题 + 右侧值 + chevron。
-   分隔线从文字起始处缩进,末行无线 */
+   分隔线从文字起始处缩进,末行无线。external:href 为站外链接 / mailto,
+   用原生 <a>(不补语言前缀),尾部换成 ↗ */
 export function SettingsRow({
-  icon, label, value, href, onClick, destructive, trailing, disabled,
+  icon, label, value, href, external, onClick, destructive, trailing, disabled,
 }: {
   icon?: React.ReactNode;
   label: string;
   value?: string | React.ReactNode;
   href?: string;
+  external?: boolean;
   onClick?: () => void;
   destructive?: boolean;
   trailing?: React.ReactNode;
@@ -72,10 +81,21 @@ export function SettingsRow({
         {value && (
           <span className="max-w-[45%] shrink-0 truncate font-mono text-sm tabular-nums text-muted-foreground">{value}</span>
         )}
-        {trailing ?? (interactive && <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2} />)}
+        {trailing ?? (interactive && (external
+          ? <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2} />
+          : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40" strokeWidth={2} />))}
       </span>
     </>
   );
+  if (href && !disabled && external) {
+    // 原生壳里 http(s) 外链由 CapacitorProvider 统一拦截走系统打开
+    const blank = /^https?:\/\//i.test(href);
+    return (
+      <a href={href} target={blank ? "_blank" : undefined} rel={blank ? "noopener noreferrer" : undefined} className={cls}>
+        {inner}
+      </a>
+    );
+  }
   if (href && !disabled) return <Link href={href} className={cls}>{inner}</Link>;
   if (interactive) {
     return (

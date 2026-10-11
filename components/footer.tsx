@@ -28,6 +28,7 @@ const helpLinks = [
   { label: "联系我们", href: "/contact" },
   { label: "使用条款", href: "/terms" },
   { label: "商业合作", href: "/business" },
+  { label: "关于我们", href: "/about" },
 ];
 
 export function Footer() {
