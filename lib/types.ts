@@ -80,6 +80,8 @@ export interface DbProfile {
   is_system: boolean;
   // Set (to a real user's profile id) when an admin links this system account to an owner.
   claimed_by: string | null;
+  // 用户确认过用户名的时间;为空 = 新用户还没取名(UsernameGate 弹框),见 supabase/username-onboarding.sql
+  username_set_at?: string | null;
   created_at: string;
   updated_at: string;
 }

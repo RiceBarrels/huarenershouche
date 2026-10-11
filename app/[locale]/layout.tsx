@@ -4,6 +4,7 @@ import { I18nProvider } from "@/components/i18n-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 import { IdentityProvider } from "@/components/identity-provider";
+import { UsernameGate } from "@/components/username-gate";
 import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import { InitHaptic } from "@/components/init-haptic";
 import { CommunityPrefetch } from "@/components/community-prefetch";
@@ -164,6 +165,8 @@ export default async function LocaleLayout({
                 <SplashAd />
                 <InitHaptic />
                 <RealtimeNotifications />
+                {/* Google/Apple 新用户首次登录强制取名(默认随机名) */}
+                <UsernameGate />
                 <CompareBar />
                 <Analytics />
                 <SpeedInsights />

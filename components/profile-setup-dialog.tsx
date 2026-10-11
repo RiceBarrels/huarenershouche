@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import type { User as SupaUser } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
+import { UsernameInput } from "@/components/username-input";
+import { useRandomUsername } from "@/hooks/use-random-username";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,16 +21,23 @@ interface ProfileSetupDialogProps {
   open: boolean;
   onComplete: () => void;
   userId: string;
+  /** 用于随机名的 Google/Apple 姓名线索;邮箱注册时已在注册页取过名(metadata.username)则跳过取名步 */
+  user?: SupaUser | null;
 }
 
 export function ProfileSetupDialog({
   open,
   onComplete,
   userId,
+  user,
 }: ProfileSetupDialogProps) {
   const { t } = useI18n();
-  const [step, setStep] = useState<"name" | "type" | "dealer-form" | "submitted">("name");
-  const [username, setUsername] = useState("");
+  const nameChosen = !!user?.user_metadata?.username;
+  const [step, setStep] = useState<"name" | "type" | "dealer-form" | "submitted">(
+    nameChosen ? "type" : "name",
+  );
+  // 默认填入随机用户名(会用上 OAuth 的姓/名),骰子按钮换一个
+  const { username, setUsername, reroll } = useRandomUsername(user, !nameChosen);
   const [accountType, setAccountType] = useState<"private" | "dealer">("private");
   const [loading, setLoading] = useState(false);
 
@@ -45,7 +55,7 @@ export function ProfileSetupDialog({
     setLoading(true);
     await supabase
       .from("profiles")
-      .update({ username: username.trim() })
+      .update({ username: username.trim(), username_set_at: new Date().toISOString() })
       .eq("id", userId);
     setLoading(false);
     setStep("type");
@@ -100,12 +110,13 @@ export function ProfileSetupDialog({
                 <Label className="font-mono text-[11px] text-muted-foreground">
                   {t("用户名")} *
                 </Label>
-                <Input
-                  className="mt-1 font-mono text-sm"
+                <UsernameInput
+                  containerClassName="mt-1"
+                  className="font-mono text-sm"
                   placeholder={t("输入你的用户名")}
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  autoFocus
+                  onValueChange={setUsername}
+                  onReroll={reroll}
                 />
               </div>
               <Button

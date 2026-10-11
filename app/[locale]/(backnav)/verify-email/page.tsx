@@ -4,6 +4,7 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "@/components/localized-navigation";
 import Link from "@/components/localized-navigation";
 import { Loader2, Mail, CheckCircle } from "lucide-react";
+import type { User as SupaUser } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
 import { Header } from "@/components/header";
@@ -43,7 +44,7 @@ function VerifyEmailContent() {
   const [success, setSuccess] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [userId, setUserId] = useState("");
+  const [user, setUser] = useState<SupaUser | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Countdown timer for resend
@@ -127,7 +128,7 @@ function VerifyEmailContent() {
       setSuccess(true);
       setLoading(false);
       if (data.user) {
-        setUserId(data.user.id);
+        setUser(data.user);
         setShowProfileSetup(true);
       } else {
         setTimeout(() => {
@@ -168,10 +169,11 @@ function VerifyEmailContent() {
         </main>
         <Footer />
 
-        {showProfileSetup && userId && (
+        {showProfileSetup && user && (
           <ProfileSetupDialog
             open={showProfileSetup}
-            userId={userId}
+            userId={user.id}
+            user={user}
             onComplete={() => {
               setShowProfileSetup(false);
               router.push("/");

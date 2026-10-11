@@ -12,6 +12,8 @@ import { brandLogoSrc } from "@/lib/i18n";
 import { EASE } from "@/lib/motion";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { UsernameInput } from "@/components/username-input";
+import { useRandomUsername } from "@/hooks/use-random-username";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -39,7 +41,8 @@ export default function RegisterPage() {
   const [step, setStep] = useState<Step>("username");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
+  // 默认填入随机用户名(形容词 + IP 地区 + …),骰子按钮换一个
+  const { username, setUsername, reroll } = useRandomUsername();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -185,11 +188,13 @@ export default function RegisterPage() {
                     <Label className="font-mono text-xs text-muted-foreground">
                       {t("用户名")}
                     </Label>
-                    <Input
-                      className={bigInput}
+                    <UsernameInput
+                      containerClassName="mt-1.5"
+                      className="h-12 font-mono text-base"
                       placeholder={t("你的用户名")}
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onValueChange={setUsername}
+                      onReroll={reroll}
                       required
                     />
                   </div>

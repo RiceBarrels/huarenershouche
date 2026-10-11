@@ -15,6 +15,9 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { ProfileSetupDialog } from "@/components/profile-setup-dialog";
+import { UsernameInput } from "@/components/username-input";
+import { useRandomUsername } from "@/hooks/use-random-username";
+import type { User as SupaUser } from "@supabase/supabase-js";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -38,13 +41,14 @@ export function AuthDialog({
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
   const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [newUserId, setNewUserId] = useState("");
+  const [newUser, setNewUser] = useState<SupaUser | null>(null);
+  // 注册模式默认填入随机用户名,骰子按钮换一个
+  const { username, setUsername, reroll } = useRandomUsername(null, mode === "register");
 
   async function handleGoogleLogin() {
     setGoogleLoading(true);
@@ -107,7 +111,7 @@ export function AuthDialog({
           username: username,
         });
         setOpen(false);
-        setNewUserId(data.user.id);
+        setNewUser(data.user);
         setShowProfileSetup(true);
       }
     }
@@ -158,11 +162,13 @@ export function AuthDialog({
                 <Label className="font-mono text-[11px] text-muted-foreground">
                   {t("用户名")}
                 </Label>
-                <Input
-                  className="mt-1.5 h-12 font-mono text-base"
+                <UsernameInput
+                  containerClassName="mt-1.5"
+                  className="h-12 font-mono text-base"
                   placeholder={t("你的用户名")}
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onValueChange={setUsername}
+                  onReroll={reroll}
                   required
                 />
               </div>
@@ -224,10 +230,11 @@ export function AuthDialog({
         </DialogContent>
       </Dialog>
 
-      {showProfileSetup && newUserId && (
+      {showProfileSetup && newUser && (
         <ProfileSetupDialog
           open={showProfileSetup}
-          userId={newUserId}
+          userId={newUser.id}
+          user={newUser}
           onComplete={() => {
             setShowProfileSetup(false);
             onSuccess?.();

@@ -300,6 +300,8 @@ export const es: Record<string, string> = {
   "已有账号？点击登录": "¿Ya tienes cuenta? Inicia sesión",
   "设置你的名字": "Elige tu nombre",
   "输入你的用户名": "Ingresa tu nombre de usuario",
+  "换一个": "Otro nombre",
+  "随机起的名字，可以直接改": "Nombre aleatorio: puedes cambiarlo",
   "保存中...": "Guardando...",
   "下一步": "Siguiente",
   "选择账户类型": "Elige el tipo de cuenta",
