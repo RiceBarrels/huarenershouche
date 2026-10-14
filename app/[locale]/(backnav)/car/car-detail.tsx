@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "@/components/localized-navigation";
 import nextDynamic from "next/dynamic";
 import { useRouteParams } from "@/lib/use-route-params";
@@ -81,6 +81,7 @@ import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { useIdentity } from "@/components/identity-provider";
 import { apiOrigin } from "@/lib/capacitor";
+import { trackCarView } from "@/lib/analytics/client";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle, carDescription, carLocation, LAZY_CONTENT_LOCALES, needsContentTranslation } from "@/lib/i18n";
 import { sellerSpeaksLocale } from "@/lib/i18n/languages";
@@ -124,8 +125,10 @@ export default function CarDetailPage({
   onClose?: () => void;
 } = {}) {
   const params = useRouteParams<{ id: string }>();
-  // SSR 预取时用路由参数兜底(静态导出下 params 才需客户端解析)
-  const carId = (params.id as string) || initialCar?.id || "";
+  // initialCar(浮层传入 / 服务端预取)优先:useParams() 是整棵路由树共用的,布局里渲染的浮层
+  // 会读到当前页面的 [id](/car/A 上点相似车 B、/user/U 上点车都会错成 A / U);
+  // 只有静态导出的 /car?id= 整页没有 initialCar,才靠路由参数
+  const carId = initialCar?.id || (params.id as string) || "";
   const router = useRouter();
   const { t, locale } = useI18n();
   const showChrome = !embedded;
@@ -221,6 +224,9 @@ export default function CarDetailPage({
     };
   }, [car?.id, car?.other_i18n, carNeedsTranslation, locale]);
 
+  // 访问统计的车辆浏览(手机浮层打开车辆不改 URL,只能在这里打点);取最新界面语言,但不让 load 随语言重跑
+  const reportCarView = useEffectEvent((id: string) => trackCarView(id, locale));
+
   useEffect(() => {
     async function load() {
       const { data } = await supabase
@@ -236,6 +242,7 @@ export default function CarDetailPage({
         supabase.rpc("increment_views", { car_id: carId }).then(() => {
           setCar((prev) => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : prev);
         });
+        reportCarView(carId);
         addRecentlyViewed(carId);
         recordPrice(carId, data.title, data.price);
 

@@ -6,7 +6,7 @@ import Link from "@/components/localized-navigation";
 import {
   ShieldCheck, Users, Car, Flag, Store, Ban, Eye, Trash2, Check, X,
   Loader2, ChevronRight, AlertTriangle, Clock, XCircle, MessageSquare,
-  Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink, Bot,
+  Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink, Bot, BarChart3,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
@@ -17,9 +17,15 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbProfile, DbCar, DbDealerStore, DbListingSource, DbAiModeration, DbClaimRequest } from "@/lib/types";
+import type { DbProfile, DbCar, DbDealerStore, DbListingSource, DbAiModeration, DbClaimRequest, DbUserIpGeo } from "@/lib/types";
+import { fetchUserIpGeo } from "@/lib/analytics/admin";
+import { formatGeoWithFlag } from "@/lib/analytics/geo";
+import { AnalyticsDashboard } from "@/components/admin/analytics/analytics-dashboard";
+import { CarViewersSheet } from "@/components/admin/analytics/car-viewers-sheet";
+import { DbIpAttribution } from "@/components/admin/analytics/user-activity";
+import { cityFromAddress } from "@/components/admin/analytics/user-region";
 
-type Tab = "verifications" | "claims" | "users" | "cars" | "reports" | "aimod" | "tickets" | "sources";
+type Tab = "analytics" | "verifications" | "claims" | "users" | "cars" | "reports" | "aimod" | "tickets" | "sources";
 
 // AI 审核拦截目标 → 展示标签 + 恢复时写回的表/状态(supabase/ai-moderation.sql)
 const AIMOD_TARGETS: Record<
@@ -131,7 +137,12 @@ export default function AdminPage() {
   // Data
   const [pendingStores, setPendingStores] = useState<StoreWithOwner[]>([]);
   const [users, setUsers] = useState<DbProfile[]>([]);
+  // 用户地区:IP 定位(user_ip_geo)+ 系统账号门店城市(无 IP、无资料地区时回退)
+  const [userGeo, setUserGeo] = useState<Record<string, DbUserIpGeo>>({});
+  const [storeCities, setStoreCities] = useState<Record<string, string>>({});
   const [cars, setCars] = useState<DbCar[]>([]);
+  // 车辆浏览者面板(CarViewersSheet)
+  const [viewersCar, setViewersCar] = useState<{ id: string; title: string } | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [aiFlags, setAiFlags] = useState<DbAiModeration[]>([]);
   const [claims, setClaims] = useState<ClaimRequestRow[]>([]);
@@ -270,7 +281,31 @@ export default function AdminPage() {
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
-    setUsers((data as DbProfile[]) || []);
+    const list = (data as DbProfile[]) || [];
+    setUsers(list);
+    await loadUserRegions(list);
+  }
+
+  // 用户地区按 IP 判定(user_ip_geo,表未建时为空);系统账号不登录、没有 IP,多半也没填地区,
+  // 回退到门店地址里的「城市, 州」(取最早建的一家能解析的门店)
+  async function loadUserRegions(list: DbProfile[]) {
+    const geoPromise = fetchUserIpGeo(list.map((u) => u.id)).catch(() => ({}) as Record<string, DbUserIpGeo>);
+    const sysIds = list.filter((u) => u.is_system && !u.location).map((u) => u.id);
+    if (sysIds.length > 0) {
+      const { data: stores } = await supabase
+        .from("dealer_stores")
+        .select("owner_id, address")
+        .in("owner_id", sysIds)
+        .order("created_at", { ascending: true });
+      const cities: Record<string, string> = {};
+      for (const s of (stores as Pick<DbDealerStore, "owner_id" | "address">[] | null) || []) {
+        if (cities[s.owner_id]) continue;
+        const city = cityFromAddress(s.address);
+        if (city) cities[s.owner_id] = city;
+      }
+      setStoreCities(cities);
+    }
+    setUserGeo(await geoPromise);
   }
 
   async function loadCars() {
@@ -693,6 +728,13 @@ export default function AdminPage() {
       )
     : cars;
 
+  // 用户地区:IP 定位 > 资料里填的地区 > 系统账号门店城市 > 未知地区
+  function userRegion(u: DbProfile): React.ReactNode {
+    const ip = userGeo[u.id] ? formatGeoWithFlag(userGeo[u.id], locale) : "";
+    if (ip) return <span title={t("IP 定位")}>{ip}</span>;
+    return u.location || storeCities[u.id] || t("未知地区");
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen flex-col bg-background px-4 py-4 font-mono">
@@ -710,6 +752,7 @@ export default function AdminPage() {
   if (!isAdmin) return null;
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode; count?: number }[] = [
+    { key: "analytics", label: t("访问统计"), icon: <BarChart3 className="h-3.5 w-3.5" strokeWidth={1.5} /> },
     { key: "verifications", label: t("认证"), icon: <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.verifications },
     { key: "claims", label: t("认领"), icon: <Handshake className="h-3.5 w-3.5" strokeWidth={1.5} />, count: counts.claims },
     { key: "users", label: t("用户"), icon: <Users className="h-3.5 w-3.5" strokeWidth={1.5} /> },
@@ -815,6 +858,13 @@ export default function AdminPage() {
               </button>
             ))}
           </div>
+
+        {/* === Analytics Tab(访问统计)=== */}
+        {tab === "analytics" && (
+          <div className="mt-4">
+            <AnalyticsDashboard />
+          </div>
+        )}
 
         {/* === Verifications Tab === */}
         {tab === "verifications" && (
@@ -1008,8 +1058,9 @@ export default function AdminPage() {
                 <p className="py-12 text-center text-xs text-muted-foreground">{t("无匹配用户")}</p>
               ) : (
                 filteredUsers.map((u) => (
-                  <div key={u.id} className={`flex items-center justify-between rounded-xl p-3 ${u.banned ? "bg-red-50 dark:bg-red-950/20" : "bg-card"}`}>
-                    <div className="min-w-0 flex-1">
+                  // 手机上按钮换到第二行,让地区(IP 定位)等信息占满整行宽度,不被按钮挤成「U…」
+                  <div key={u.id} className={`flex flex-wrap items-center justify-between gap-y-2 rounded-xl p-3 sm:flex-nowrap ${u.banned ? "bg-red-50 dark:bg-red-950/20" : "bg-card"}`}>
+                    <div className="min-w-0 flex-1 basis-full sm:basis-0">
                       <Link href={adminUserLink(u.id)} className="flex items-center gap-2 hover:opacity-80">
                         <img src={avatarUrl(u.avatar_url, u.username)} alt="" className="h-8 w-8 shrink-0 rounded-full bg-muted object-cover" />
                         <div className="min-w-0">
@@ -1028,7 +1079,7 @@ export default function AdminPage() {
                             )}
                           </div>
                           <p className="truncate text-[10px] text-muted-foreground">
-                            {u.id.slice(0, 8)}... · {u.location || t("未知地区")} · {new Date(u.created_at).toLocaleDateString("zh-CN")}
+                            {userRegion(u)} · {new Date(u.created_at).toLocaleDateString("zh-CN")} · {u.id.slice(0, 8)}...
                           </p>
                         </div>
                       </Link>
@@ -1036,7 +1087,7 @@ export default function AdminPage() {
                         <p className="mt-1 text-[10px] text-red-600 dark:text-red-400">{t("封禁原因:")} {u.banned_reason}</p>
                       )}
                     </div>
-                    <div className="ml-2 flex shrink-0 gap-1">
+                    <div className="flex shrink-0 basis-full justify-end gap-1 sm:ml-2 sm:basis-auto">
                       <Link href={adminUserLink(u.id)}>
                         <Button
                           size="sm"
@@ -1103,6 +1154,12 @@ export default function AdminPage() {
                 ))
               )}
             </div>
+            {/* 列表里有离线回填的 IP 地区(DB-IP Lite,CC BY 4.0)时署名 */}
+            {filteredUsers.some((u) => userGeo[u.id]?.source === "backfill") && (
+              <p className="mt-2 text-right text-[10px] text-muted-foreground">
+                <DbIpAttribution />
+              </p>
+            )}
           </div>
         )}
 
@@ -1142,7 +1199,19 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        ${car.price?.toLocaleString()} · {car.mileage?.toLocaleString()}mi · {car.location}
+                        ${car.price?.toLocaleString()} · {car.mileage?.toLocaleString()}mi · {car.location} ·{" "}
+                        {/* 浏览数即「浏览者」入口(手机上不再多占一个图标按钮的宽度) */}
+                        <button
+                          type="button"
+                          onClick={() => setViewersCar({ id: car.id, title: carTitle(car, locale) })}
+                          title={t("浏览者")}
+                          className="inline-flex items-baseline gap-0.5 whitespace-nowrap rounded-sm text-foreground/80 underline decoration-dotted underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+                        >
+                          <Users className="h-3 w-3 self-center" strokeWidth={1.5} aria-hidden="true" />
+                          {(car.views_count ?? 0) === 1
+                            ? t("1 次浏览")
+                            : t("{n} 次浏览", { n: (car.views_count ?? 0).toLocaleString() })}
+                        </button>
                       </p>
                     </div>
                     <div className="flex shrink-0 gap-1">
@@ -1586,6 +1655,15 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* 车辆浏览者面板(车辆 tab 里点「N 次浏览」打开) */}
+      <CarViewersSheet
+        carId={viewersCar?.id ?? null}
+        title={viewersCar?.title}
+        onOpenChange={(open) => {
+          if (!open) setViewersCar(null);
+        }}
+      />
     </div>
   );
 }

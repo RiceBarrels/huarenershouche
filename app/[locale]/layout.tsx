@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { I18nProvider } from "@/components/i18n-provider";
 import { MotionProvider } from "@/components/motion-provider";
@@ -16,6 +17,7 @@ import { StatusBarMask } from "@/components/status-bar-mask";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { OpenPanelAnalytics } from "@/components/openpanel";
+import { AnalyticsTracker } from "@/components/analytics-tracker";
 import { LOCALES, BUILD_LOCALES, type Locale } from "@/lib/i18n";
 
 // 路径级 i18n:/zh/... 与 /en/... 各自预渲染一份 HTML(SEO 关键)。
@@ -171,6 +173,10 @@ export default async function LocaleLayout({
                 <Analytics />
                 <SpeedInsights />
                 <OpenPanelAnalytics />
+                {/* 第一方访问统计(/api/vt);useSearchParams 需要 Suspense 边界 */}
+                <Suspense fallback={null}>
+                  <AnalyticsTracker />
+                </Suspense>
               </CarOverlayProvider>
             </IdentityProvider>
           </CapacitorProvider>

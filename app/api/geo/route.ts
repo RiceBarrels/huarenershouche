@@ -1,7 +1,9 @@
 // /api/geo — 访客 IP 粗定位,直接读 Vercel 边缘注入的 x-vercel-ip-* 头(不调第三方)。
 // 客户端见 lib/ip-geo.ts;本地开发没有这些头,全部返回 null。
+// 读头逻辑与访问统计埋点(/api/vt)共用 lib/analytics/server.ts 的 readEdgeGeo。
 
 import { NextRequest, NextResponse } from "next/server";
+import { readEdgeGeo } from "@/lib/analytics/server";
 
 export const dynamic = "force-dynamic";
 
@@ -17,20 +19,5 @@ export async function OPTIONS() {
 }
 
 export async function GET(req: NextRequest) {
-  const h = req.headers;
-  // 城市名是 URL 编码的("San%20Jose")
-  let city = h.get("x-vercel-ip-city");
-  try {
-    city = city ? decodeURIComponent(city) : null;
-  } catch {
-    /* 保留原值 */
-  }
-  return NextResponse.json(
-    {
-      country: h.get("x-vercel-ip-country"),
-      region: h.get("x-vercel-ip-country-region"),
-      city,
-    },
-    { headers: HEADERS },
-  );
+  return NextResponse.json(readEdgeGeo(req.headers), { headers: HEADERS });
 }

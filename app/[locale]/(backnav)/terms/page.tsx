@@ -7,7 +7,7 @@ export default function TermsPage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 md:py-8">
-        <LargeTitle title="用户协议" subtitle="Terms of Service · 最后更新 2025年3月" />
+        <LargeTitle title="用户协议" subtitle="Terms of Service · 最后更新 2026年10月" />
 
         {/* 条款正文放进 iOS 白色大圆角卡 */}
         <div className="mt-5 space-y-6 rounded-[26px] bg-card p-6 font-mono text-sm leading-relaxed text-muted-foreground">
@@ -96,6 +96,16 @@ export default function TermsPage() {
             <p className="mt-2">
               我们重视您的隐私。本平台收集的用户信息仅用于提供和改进服务，不会出售给第三方。详情请参阅我们的隐私政策。
             </p>
+            {/* 访问统计说明须与 supabase/analytics.sql 的实际行为一致:保留期、删号处理、卖家身份开关 analytics_seller_identity_enabled() 等变化时同步修改,并更新页首日期 */}
+            <p className="mt-2">
+              为了解平台使用情况并向卖家提供车辆浏览数据，我们会记录访问统计：
+            </p>
+            <ul className="mt-2 list-inside list-disc space-y-1">
+              <li>包括浏览的页面（含搜索与筛选条件）与车辆、访问时间、来源网站与推广链接参数、设备、浏览器、操作系统与界面语言，以及根据 IP 地址推断的大致地区（国家、州/省、城市）；访问统计不保存 IP 地址。</li>
+              <li>我们通过保存在您浏览器或 App 中的随机标识识别同一访客；登录后，同一浏览器或 App 上的访问记录（包括未登录时的浏览）会与您的账号关联。您的账号还会保存最近一次登录使用时的大致地区（部分账号根据登录记录中的 IP 推断，IP 定位数据由 DB-IP 提供）。</li>
+              <li>完整访问记录与账号的大致地区仅平台管理员可查看。卖家可在「数据面板」查看名下车辆的浏览统计：浏览者以匿名编号区分，不显示用户名或头像，但会显示其浏览时间、是否已登录、大致地区、设备、界面语言与来源。</li>
+              <li>访问记录保存 180 天后自动删除；账号的大致地区保留到账号删除为止。删除账号时，与该账号关联的访问记录（包括同一浏览器或 App 上未登录时的浏览）一并删除。</li>
+            </ul>
           </section>
 
           <section>

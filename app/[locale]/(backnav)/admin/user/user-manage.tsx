@@ -7,7 +7,7 @@ import { useRouteParams } from "@/lib/use-route-params";
 import {
   Ban, Check, Loader2, Trash2, Eye, Pencil, Store,
   MessageSquare, Car, AlertTriangle, Save, Mail, Phone, Clock,
-  Handshake, Link2, Unlink,
+  Handshake, Link2, Unlink, MapPin,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
@@ -20,7 +20,11 @@ import { Input } from "@/components/ui/input";
 import { LanguagePicker } from "@/components/language-picker";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbProfile, DbCar, DbDealerStore } from "@/lib/types";
+import type { DbProfile, DbCar, DbDealerStore, DbUserIpGeo } from "@/lib/types";
+import { fetchUserIpGeo } from "@/lib/analytics/admin";
+import { formatGeoWithFlag } from "@/lib/analytics/geo";
+import { UserActivity } from "@/components/admin/analytics/user-activity";
+import { cityFromAddress } from "@/components/admin/analytics/user-region";
 
 interface EditForm {
   username: string;
@@ -74,6 +78,8 @@ export default function AdminUserManagePage() {
   } | null>(null);
   // 邮箱等 auth 信息的读取状态:RPC 出错时不能停留在"读取中",要把错误亮出来
   const [authState, setAuthState] = useState<"loading" | "done" | "error">("loading");
+  // IP 地区(user_ip_geo;表未建/无记录时为 null,回退资料地区 / 门店城市)
+  const [ipGeo, setIpGeo] = useState<DbUserIpGeo | null>(null);
 
   const [form, setForm] = useState<EditForm | null>(null);
   const [saving, setSaving] = useState(false);
@@ -105,6 +111,11 @@ export default function AdminUserManagePage() {
     setStores((storesRes.data as DbDealerStore[]) || []);
     setPostCount(postRes.count ?? 0);
     setConvCount((convBuyerRes.count ?? 0) + (convSellerRes.count ?? 0));
+
+    // IP 地区(与下面的 auth 信息并行,不阻塞)
+    fetchUserIpGeo([userId])
+      .then((m) => setIpGeo(m[userId] ?? null))
+      .catch(() => setIpGeo(null));
 
     // 邮箱等 auth 信息（auth.users 需经 RPC 读取;函数缺失/无权限时显式进入 error 态）
     const { data: authRows, error: authErr } = await supabase.rpc("admin_get_auth_user", { target: userId });
@@ -348,6 +359,11 @@ export default function AdminUserManagePage() {
   }
 
   const activeCount = cars.filter((c) => c.status === "active").length;
+  // 地区:IP 定位 > 资料地区 > 系统账号门店城市(stores 按创建倒序,取最早一家能解析的)
+  const ipRegion = ipGeo ? formatGeoWithFlag(ipGeo, locale) : "";
+  const storeCity = profile.is_system
+    ? stores.map((s) => cityFromAddress(s.address)).filter(Boolean).pop() ?? null
+    : null;
 
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
@@ -400,6 +416,17 @@ export default function AdminUserManagePage() {
               <Clock className="h-3 w-3 shrink-0" strokeWidth={1.5} />
               {t("注册于")} {new Date(profile.created_at).toLocaleString("zh-CN")}
               {authInfo?.last_sign_in_at && <> · {t("最近登录")} {new Date(authInfo.last_sign_in_at).toLocaleString("zh-CN")}</>}
+            </p>
+            <p className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground">
+              <MapPin className="h-3 w-3 shrink-0" strokeWidth={1.5} />
+              {ipRegion ? (
+                <>
+                  <span className="text-foreground">{ipRegion}</span>
+                  <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[9px]">{t("IP 定位")}</span>
+                </>
+              ) : (
+                profile.location || storeCity || t("未知地区")
+              )}
             </p>
           </div>
         </div>
@@ -574,6 +601,11 @@ export default function AdminUserManagePage() {
             </div>
           </div>
         )}
+
+        {/* 浏览记录(访问统计:IP 定位 + 最近事件 + 完整轨迹) */}
+        <div className="mt-6">
+          <UserActivity userId={userId} />
+        </div>
 
         {/* Stores */}
         {stores.length > 0 && (

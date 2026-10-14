@@ -6,6 +6,8 @@ import Link from "@/components/localized-navigation";
 import { carLink } from "@/lib/static-link";
 import { Eye, Heart, TrendingUp, MessageSquare, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useIdentity } from "@/components/identity-provider";
+import { SellerAnalytics } from "@/components/analytics/seller/seller-analytics";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,30 +29,32 @@ interface ListingStats {
 export default function DashboardPage() {
   const router = useRouter();
   const { t, locale } = useI18n();
-  const [user, setUser] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState<ListingStats[]>([]);
+  // 以「正在操作的账号」为准(默认本人;切换到已认领的系统车行时为该车行账号),与「我的发布」一致
+  const { actingId, authId, loading: identityLoading } = useIdentity();
+  // 统计结果记下所属账号:切换身份后旧数据立即作废(回到骨架),不会和新账号的访问统计错位
+  const [loaded, setLoaded] = useState<{ acct: string; stats: ListingStats[] } | null>(null);
+  const loading = !actingId || loaded?.acct !== actingId;
+  const stats = loaded && loaded.acct === actingId ? loaded.stats : [];
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (!data.user) { router.push("/login"); return; }
-      setUser(data.user.id);
-    });
-  }, [router]);
+    if (!identityLoading && !authId) router.push("/login");
+  }, [identityLoading, authId, router]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!actingId) return;
+    const acct = actingId;
+    let cancelled = false;
 
     async function loadStats() {
       const { data: cars } = await supabase
         .from("cars")
         .select("*")
-        .eq("seller_id", user!)
+        .eq("seller_id", acct)
         .order("created_at", { ascending: false });
+      if (cancelled) return;
 
       if (!cars || cars.length === 0) {
-        setStats([]);
-        setLoading(false);
+        setLoaded({ acct, stats: [] });
         return;
       }
 
@@ -59,23 +63,27 @@ export default function DashboardPage() {
         .from("conversations")
         .select("car_id")
         .in("car_id", carIds);
+      if (cancelled) return;
 
       const msgCountMap: Record<string, number> = {};
       for (const c of convos || []) {
         msgCountMap[c.car_id] = (msgCountMap[c.car_id] || 0) + 1;
       }
 
-      setStats(
-        (cars as DbCar[]).map((car) => ({
+      setLoaded({
+        acct,
+        stats: (cars as DbCar[]).map((car) => ({
           car,
           messageCount: msgCountMap[car.id] || 0,
-        }))
-      );
-      setLoading(false);
+        })),
+      });
     }
 
     loadStats();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [actingId]);
 
   const totalViews = stats.reduce((sum, s) => sum + (s.car.views_count || 0), 0);
   const totalFavorites = stats.reduce((sum, s) => sum + (s.car.favorites_count || 0), 0);
@@ -133,6 +141,13 @@ export default function DashboardPage() {
                   <FunnelBar label={t("收藏")} value={totalFavorites} pct={Math.round((totalFavorites / totalViews) * 100)} />
                   <FunnelBar label={t("询盘")} value={totalMessages} pct={Math.round((totalMessages / totalViews) * 100)} />
                 </div>
+              </div>
+            )}
+
+            {/* 访问统计(第一方埋点,个人与车行都显示;只看名下车辆的浏览)。还没发布过车辆时不显示 */}
+            {actingId && stats.length > 0 && (
+              <div className="mt-6">
+                <SellerAnalytics sellerId={actingId} />
               </div>
             )}
 

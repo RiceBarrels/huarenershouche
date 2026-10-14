@@ -27,6 +27,8 @@ import {
 } from "@/components/overlay-stack";
 import { acquireNativeBarHideLock } from "@/lib/liquid-glass-nav";
 import { triggerHaptic } from "@/lib/haptics";
+import { trackPageview } from "@/lib/analytics/client";
+import { useI18n } from "@/components/i18n-provider";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 // 动态载入,打断 detail → card → 本文件 的循环依赖,并分包
@@ -248,29 +250,39 @@ export function CarOverlayProvider({ children }: { children: React.ReactNode }) 
     window.history.pushState({ overlay: true }, "");
   }, []);
 
+  // 访问统计:浮层不改 URL(路由 pageview 记不到),帖子 / 主页 / 工具页按其逻辑路径各记一次 pageview;
+  // 车辆浮层不在这里记,由 car-detail 加载到车辆时记 car_view
+  const { locale } = useI18n();
+
   const openCar = useCallback(
     (car: DbCar, rect?: OriginRect | null, heroHtml?: string | null, sourceEl?: HTMLElement | null) =>
       push({ kind: "car", car, rect: rect ?? null, heroHtml: heroHtml ?? null, sourceEl }),
     [push],
   );
   const openPost = useCallback(
-    (post: DbCommunityPost, rect?: OriginRect | null, heroHtml?: string | null, sourceEl?: HTMLElement | null) =>
-      push({ kind: "post", post, rect: rect ?? null, heroHtml: heroHtml ?? null, sourceEl }),
-    [push],
+    (post: DbCommunityPost, rect?: OriginRect | null, heroHtml?: string | null, sourceEl?: HTMLElement | null) => {
+      push({ kind: "post", post, rect: rect ?? null, heroHtml: heroHtml ?? null, sourceEl });
+      trackPageview({ rawPathname: `/community/${post.id}`, search: "", locale });
+    },
+    [push, locale],
   );
   // 主页从底部滑入(头像/名字太扁,不做卡片放大)
   const openUser = useCallback(
-    (userId: string) => push({ kind: "user", userId, rect: null, heroHtml: null }),
-    [push],
+    (userId: string) => {
+      push({ kind: "user", userId, rect: null, heroHtml: null });
+      trackPageview({ rawPathname: `/user/${userId}`, search: "", locale });
+    },
+    [push, locale],
   );
   const openPage = useCallback(
     (href: string) => {
       const path = href.split("?")[0];
       if (!enabled || !PAGE_ROUTES[path]) return false;
       push({ kind: "page", href: path, rect: null, heroHtml: null });
+      trackPageview({ rawPathname: path, search: "", locale });
       return true;
     },
-    [enabled, push],
+    [enabled, push, locale],
   );
 
   // 浮层内触发了真实路由跳转(内链/按钮)时,清空浮层栈交还给页面

@@ -326,3 +326,21 @@ export interface DbApiUsageDaily {
   inserts: number;
   updates: number;
 }
+
+// ---------- 访问统计(supabase/analytics.sql)----------
+// 埋点事件表 analytics_events 的行结构与后台 RPC 返回形状见 lib/analytics/types.ts。
+
+// 用户最近一次的 IP 粗定位(仅管理员可读):/api/vt 收到登录用户的埋点时由触发器
+// 从 Vercel 边缘 x-vercel-ip-* 头写入;历史用户由 scripts/backfill-user-geo.ts 按
+// auth.sessions 里的 IP 补全(source = backfill)。
+export interface DbUserIpGeo {
+  user_id: string;
+  /** ISO 国家代码,如 "US" */
+  country: string | null;
+  /** ISO 3166-2 州/省代码(不含国家前缀),如 "NY" */
+  region: string | null;
+  /** 英文城市名,如 "Flushing" */
+  city: string | null;
+  source: "edge" | "backfill";
+  updated_at: string;
+}
