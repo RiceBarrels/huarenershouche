@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "@/components/localized-navigation";
 import {
   MessageSquare,
@@ -8,10 +8,12 @@ import {
   CheckCircle,
   Plus,
   HelpCircle,
-  User,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
+import { useLocalized, useLocalizedPrefetch } from "@/hooks/use-localized";
+import { LocalizedText } from "@/components/content/localized-text";
+import { TranslationNotice } from "@/components/content/translation-notice";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
@@ -50,12 +52,89 @@ const CATEGORY_COLORS: Record<string, string> = {
   general: "bg-gray-500/10 text-gray-600 border-transparent dark:text-gray-400",
 };
 
+/** 问题卡片:标题与摘要按界面语言显示译文(列表内容直出,不做滚动浮入,必须立即可见) */
+function QuestionCard({ q }: { q: DbQaQuestion }) {
+  const { t } = useI18n();
+  const view = useLocalized("qa_question", q.id, { title: q.title, content: q.content });
+  return (
+    <Link
+      href={`/qa/${q.id}`}
+      className="block rounded-xl bg-card p-4 transition-colors hover:bg-muted/30"
+    >
+      <div className="flex items-start gap-2">
+        <Badge
+          variant="outline"
+          className={`shrink-0 font-mono text-[10px] ${
+            CATEGORY_COLORS[q.category] || ""
+          }`}
+        >
+          {t(CATEGORY_LABELS[q.category] || q.category)}
+        </Badge>
+        <h3 className="flex-1 font-mono text-sm font-medium leading-snug">
+          <LocalizedText view={view} field="title" as="span" />
+          {q.is_resolved && (
+            <CheckCircle
+              className="ml-1.5 inline h-3.5 w-3.5 text-green-500"
+              strokeWidth={1.5}
+            />
+          )}
+        </h3>
+      </div>
+
+      {/* Content preview */}
+      <LocalizedText
+        view={view}
+        field="content"
+        as="p"
+        className="mt-1.5 line-clamp-2 pl-0 font-mono text-xs leading-relaxed text-muted-foreground"
+      />
+      {/* 译文标注 + 显示原文切换(卡片在 Link 里,按钮阻止跳转) */}
+      <TranslationNotice view={view} stopPropagation className="mt-1" />
+
+      {/* Tags */}
+      {q.tags && q.tags.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1">
+          {q.tags.slice(0, 3).map((tag) => (
+            <span
+              key={tag}
+              className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Stats row */}
+      <div className="mt-3 flex items-center gap-4">
+        <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+          <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
+          {t("{n} 回答", { n: q.answers_count || 0 })}
+        </span>
+        <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+          <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
+          {q.views_count || 0}
+        </span>
+        <span className="ml-auto flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
+          {q.profiles?.username || t("匿名")}
+          <span className="text-muted-foreground/60">
+            {timeAgo(q.created_at, t)}
+          </span>
+        </span>
+      </div>
+    </Link>
+  );
+}
+
 export default function QaBoardPage() {
   const { t } = useI18n();
   const [questions, setQuestions] = useState<DbQaQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [tableError, setTableError] = useState(false);
+  // 列表标题/摘要的译文一次批量请求(每张卡片的 useLocalized 读同一份缓存)
+  const questionIds = useMemo(() => questions.map((q) => q.id), [questions]);
+  useLocalizedPrefetch("qa_question", questionIds);
 
   useEffect(() => {
     async function load() {
@@ -173,76 +252,9 @@ export default function QaBoardPage() {
           </div>
         ) : (
           <div className="mt-4 space-y-2">
-            {questions.map((q) => {
-              const card = (
-              <Link
-                key={q.id}
-                href={`/qa/${q.id}`}
-                className="block rounded-xl bg-card p-4 transition-colors hover:bg-muted/30"
-              >
-                <div className="flex items-start gap-2">
-                  <Badge
-                    variant="outline"
-                    className={`shrink-0 font-mono text-[10px] ${
-                      CATEGORY_COLORS[q.category] || ""
-                    }`}
-                  >
-                    {t(CATEGORY_LABELS[q.category] || q.category)}
-                  </Badge>
-                  <h3 className="flex-1 font-mono text-sm font-medium leading-snug">
-                    {q.title}
-                    {q.is_resolved && (
-                      <CheckCircle
-                        className="ml-1.5 inline h-3.5 w-3.5 text-green-500"
-                        strokeWidth={1.5}
-                      />
-                    )}
-                  </h3>
-                </div>
-
-                {/* Content preview */}
-                <p className="mt-1.5 pl-0 font-mono text-xs leading-relaxed text-muted-foreground">
-                  {q.content.length > 60
-                    ? q.content.slice(0, 60) + "..."
-                    : q.content}
-                </p>
-
-                {/* Tags */}
-                {q.tags && q.tags.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {q.tags.slice(0, 3).map((tag) => (
-                      <span
-                        key={tag}
-                        className="rounded-full bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Stats row */}
-                <div className="mt-3 flex items-center gap-4">
-                  <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                    <MessageSquare className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {t("{n} 回答", { n: q.answers_count || 0 })}
-                  </span>
-                  <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                    <Eye className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {q.views_count || 0}
-                  </span>
-                  <span className="ml-auto flex items-center gap-1 font-mono text-[10px] text-muted-foreground">
-                    {q.profiles?.username || t("匿名")}
-                    <span className="text-muted-foreground/60">
-                      {timeAgo(q.created_at, t)}
-                    </span>
-                  </span>
-                </div>
-              </Link>
-              );
-              // 列表内容直出,不做滚动浮入(必须立即可见)
-              return card;
-            })}
+            {questions.map((q) => (
+              <QuestionCard key={q.id} q={q} />
+            ))}
           </div>
         )}
       </main>

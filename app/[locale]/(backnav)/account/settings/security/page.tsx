@@ -16,6 +16,25 @@ import { SettingsGroup, GroupFooter, LargeTitle, SettingsRow } from "@/component
 import { ACTING_KEY } from "@/components/identity-provider";
 import { useI18n } from "@/components/i18n-provider";
 
+// 头像 / 车源图 / 门店照片都存在各桶的 {uid}/ 目录下(一层,无子目录)
+const OWN_FILE_BUCKETS = ["avatars", "car-images", "store-photos"];
+
+async function removeOwnFiles(uid: string) {
+  for (const bucket of OWN_FILE_BUCKETS) {
+    const storage = supabase.storage.from(bucket);
+    // 每轮删掉列出的一页,直到目录清空(删除后剩余文件前移,offset 始终为 0)
+    for (let round = 0; round < 50; round++) {
+      const { data, error } = await storage.list(uid, { limit: 1000 });
+      if (error || !data?.length) break;
+      const paths = data.filter((f) => f.id).map((f) => `${uid}/${f.name}`);
+      if (paths.length === 0) break;
+      // RLS 拒绝时不报错只返回空数组,同样停止,避免反复列同一批
+      const { data: removed, error: rmErr } = await storage.remove(paths);
+      if (rmErr || !removed?.length) break;
+    }
+  }
+}
+
 export default function SecuritySettingsPage() {
   const router = useRouter();
   const { t } = useI18n();
@@ -58,6 +77,10 @@ export default function SecuritySettingsPage() {
     if (deleteConfirmText !== confirmWord || deleting) return;
     setDeleting(true);
     setDeleteError("");
+    // 先删本人上传的文件(SQL 不能直接删 storage.objects,见 supabase/delete-account.sql);
+    // 尽力而为,失败不阻止删除账号
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) await removeOwnFiles(user.id).catch(() => {});
     const { error } = await supabase.rpc("delete_account");
     if (error) {
       setDeleteError(t("删除失败: {msg}", { msg: error.message }));

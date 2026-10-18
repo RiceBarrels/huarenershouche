@@ -1,9 +1,16 @@
-// 发布成功后触发 AI 审核(/api/moderate,服务端 DeepSeek 判定)。
+// 发布 / 编辑成功后触发 AI 审核(/api/moderate,服务端判定后顺带立即翻译这一条)。
 // 任何失败都静默放行:审核挂了绝不能挡住用户发布。
 
 import { apiOrigin } from "@/lib/capacitor";
 
-export type ModerationTarget = "car" | "post" | "car_comment" | "post_comment";
+export type ModerationTarget =
+  | "car"
+  | "post"
+  | "car_comment"
+  | "post_comment"
+  | "qa_question"
+  | "qa_answer"
+  | "dealer_review";
 
 export async function requestModeration(
   targetType: ModerationTarget,

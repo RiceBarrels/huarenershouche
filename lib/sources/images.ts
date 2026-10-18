@@ -105,7 +105,7 @@ export async function deleteMirroredImages(
  * 清理已下架(status='removed')系统车源的转存图片:删除 Storage 文件,
  * images 回退为源站外链(source_images),这样管理后台仍能看图,
  * 且若源站重新上架、同步会因图片不再指向我方 Storage 而自动重新转存。
- * 覆盖两条下架路径:源站消失(sync delist)与 30 天过期(pg_cron)。
+ * 下架路径:源站消失(sync delist)或管理员手动下架。
  */
 export async function cleanupRemovedMirrors(
   supabase: SupabaseClient,

@@ -18,7 +18,7 @@ import { IOSSwitch } from "@/components/ios-settings";
 // Re-export types and constants from search-filters
 import {
   PAYMENT_PRESETS, LISTED_WITHIN_OPTIONS, CONDITION_TOGGLES, INITIAL_FILTERS,
-  isInListCI, toggleInListCI,
+  isInListCI, toggleInListCI, featureOptionLabel,
   PILL_ON, PILL_OFF, IOS_FILL,
 } from "@/components/search-filters";
 import type { Filters, CountOption } from "@/components/search-filters";
@@ -144,9 +144,13 @@ function getModelLabel(filters: Filters, t: TFn): string {
     : t("{first}等{n}个", { first: items[0], n: items.length });
 }
 
-function getFeaturesLabel(filters: Filters, t: TFn): string {
+function getFeaturesLabel(filters: Filters, t: TFn, options?: CountOption[]): string {
   if (!filters.features) return t("不限");
-  const items = filters.features.split(",").filter(Boolean);
+  // 已选配置按统计选项的本地化 label 展示(筛选值本身不变)
+  const items = filters.features
+    .split(",")
+    .filter((v) => v.trim())
+    .map((v) => featureOptionLabel(v, options, t));
   return items.length <= 2
     ? items.join(t("、"))
     : t("{first}等{n}项", { first: items[0], n: items.length });
@@ -302,12 +306,15 @@ function CountPillSelect({
   value,
   onChange,
   insensitive,
+  labelOf,
 }: {
   options: CountOption[];
   value: string;
   onChange: (v: string) => void;
-  /** 大小写不敏感匹配（车型名） */
+  /** 大小写不敏感匹配（车型名 / 配置标签） */
   insensitive?: boolean;
+  /** 选项展示文案,缺省显示 name(车型名原样);筛选值始终是 name */
+  labelOf?: (opt: CountOption) => string;
 }) {
   const { t } = useI18n();
   const selected = (name: string) => (insensitive ? isInListCI(value, name) : isInList(value, name));
@@ -334,7 +341,7 @@ function CountPillSelect({
             onChange(toggle(opt.name));
           }}
         >
-          {opt.name}
+          {labelOf ? labelOf(opt) : opt.name}
           <span className="opacity-60">{opt.count}</span>
         </button>
       ))}
@@ -1023,7 +1030,7 @@ export function MobileFilterDrawer({
           icon={<ListChecks className="h-[18px] w-[18px]" strokeWidth={1.5} />}
           color="text-amber-500"
           label={t("车辆配置")}
-          value={getFeaturesLabel(filters, t)}
+          value={getFeaturesLabel(filters, t, featureOptions)}
           active={!!filters.features}
         >
           <div>
@@ -1031,6 +1038,8 @@ export function MobileFilterDrawer({
               options={featureOptions}
               value={filters.features}
               onChange={(v) => update("features", v)}
+              insensitive
+              labelOf={(o) => o.label ?? t(o.name)}
             />
             <p className="mt-2 px-1 font-mono text-[11px] text-muted-foreground">{t("需同时满足所选配置")}</p>
           </div>

@@ -82,8 +82,22 @@ export const CONDITION_TOGGLES: {
 
 // 带数量的动态选项（车型 / 车辆配置），由 browse 页统计车源后传入
 export interface CountOption {
+  /** 筛选值(写进 URL / filters 的就是它) */
   name: string;
   count: number;
+  /** 当前界面语言的展示文案(配置按 i18n 词表本地化);缺省时显示 t(name) */
+  label?: string;
+}
+
+/** 已选配置值的展示文案:统计选项里有同名项(忽略大小写)就用它的 label,否则走词典 */
+export function featureOptionLabel(
+  value: string,
+  options: CountOption[] | undefined,
+  t: (text: string, vars?: Record<string, string | number>) => string
+): string {
+  const key = value.trim().toLowerCase();
+  const opt = options?.find((o) => o.name.trim().toLowerCase() === key);
+  return opt?.label ?? t(opt?.name ?? value.trim());
 }
 
 const COLOR_OPTIONS = [
@@ -252,10 +266,11 @@ function SidebarPillSelect({
   onChange,
   insensitive,
 }: {
-  options: { value: string; label: string; color?: string; count?: number }[];
+  /** label 为词典 key(显示 t(label));text 为已本地化的文案,有则原样显示 */
+  options: { value: string; label: string; text?: string; color?: string; count?: number }[];
   value: string;
   onChange: (v: string) => void;
-  /** 大小写不敏感匹配（车型名） */
+  /** 大小写不敏感匹配（车型名 / 配置标签） */
   insensitive?: boolean;
 }) {
   const { t } = useI18n();
@@ -283,7 +298,7 @@ function SidebarPillSelect({
               style={{ backgroundColor: opt.color }}
             />
           )}
-          {t(opt.label)}
+          {opt.text ?? t(opt.label)}
           {opt.count !== undefined && <span className="opacity-60">{opt.count}</span>}
         </button>
       ))}
@@ -314,6 +329,7 @@ export function SearchFilters({
   );
   useEffect(() => {
     if (initialFilters) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 父组件(URL/清空)改了筛选条件时同步到本地状态
       setFilters(initialFilters);
       if (/^\d{5}$/.test(initialFilters.location)) {
         setZip(initialFilters.location);
@@ -698,10 +714,12 @@ export function SearchFilters({
       {/* Features — top tags with counts, AND semantics */}
       {featureOptions && featureOptions.length > 0 && (
         <Section title={t("车辆配置")} active={!!filters.features}>
+          {/* 显示 label(词表本地化)缺省走词典;筛选值仍是 name,与 cars.features 忽略大小写比对 */}
           <SidebarPillSelect
-            options={featureOptions.map((o) => ({ value: o.name, label: o.name, count: o.count }))}
+            options={featureOptions.map((o) => ({ value: o.name, label: o.name, text: o.label, count: o.count }))}
             value={filters.features}
             onChange={(v) => update("features", v)}
+            insensitive
           />
           <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">{t("需同时满足所选配置")}</p>
         </Section>

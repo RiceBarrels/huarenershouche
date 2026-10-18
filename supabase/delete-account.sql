@@ -4,6 +4,10 @@
 -- 用户在「账号设置 → 删除账号」中调用 rpc('delete_account'),
 -- 永久删除本人全部数据 + 登录凭证(auth.users),不可恢复。
 -- 认领过的系统车行账号通过 profiles.claimed_by 的 on delete set null 自动解除认领。
+--
+-- 存储文件不在这里删:Supabase 的 storage.protect_delete 触发器禁止 SQL 直接
+-- delete storage.objects(只删元数据会留下孤儿文件)。前端在调用本函数前先用
+-- Storage API 删除本人 uid/ 目录下的文件,见文末的 DELETE 策略。
 
 create or replace function public.delete_account()
 returns void
@@ -55,16 +59,24 @@ begin
   delete from public.community_posts where user_id = uid;
 
   -- 问答:先清点赞与被采纳引用,再删回答、问题
-  delete from public.qa_answer_likes
-    where user_id = uid
-       or answer_id in (
-            select id from public.qa_answers
-             where user_id = uid
-                or question_id in (select id from public.qa_questions where user_id = uid)
-          );
+  -- 回答点赞表尚未建表(qa-detail 的点赞写入会失败回滚),存在时才清理
+  if to_regclass('public.qa_answer_likes') is not null then
+    execute $q$
+      delete from public.qa_answer_likes
+        where user_id = $1
+           or answer_id in (
+                select id from public.qa_answers
+                 where user_id = $1
+                    or question_id in (select id from public.qa_questions where user_id = $1)
+              )
+    $q$ using uid;
+  end if;
+  -- 别人的问题采纳了我的回答 → 取消采纳;我自己的问题也先解除采纳引用,
+  -- 否则删除别人在我问题下的回答时会撞 accepted_answer_id 外键
   update public.qa_questions
      set accepted_answer_id = null, is_resolved = false
-   where accepted_answer_id in (select id from public.qa_answers where user_id = uid);
+   where user_id = uid
+      or accepted_answer_id in (select id from public.qa_answers where user_id = uid);
   delete from public.qa_answers
     where user_id = uid
        or question_id in (select id from public.qa_questions where user_id = uid);
@@ -80,11 +92,6 @@ begin
   delete from public.admin_actions    where admin_id = uid;
   delete from public.push_tokens      where user_id = uid;
 
-  -- 存储文件(头像/车源图/门店照片,路径均以 uid/ 开头)
-  delete from storage.objects
-    where bucket_id in ('avatars', 'car-images', 'store-photos')
-      and (storage.foldername(name))[1] = uid::text;
-
   -- 最后删除资料与登录凭证
   delete from public.profiles where id = uid;
   delete from auth.users where id = uid;
@@ -93,3 +100,15 @@ $$;
 
 revoke all on function public.delete_account() from public, anon;
 grant execute on function public.delete_account() to authenticated;
+
+-- 存储文件(头像/车源图/门店照片,路径均以 uid/ 开头)由前端用 Storage API 删除;
+-- car-images 已有本人删除策略(car_images_delete),补上另外两个桶的
+drop policy if exists "avatars_owner_delete" on storage.objects;
+create policy "avatars_owner_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "store_photos_owner_delete" on storage.objects;
+create policy "store_photos_owner_delete" on storage.objects
+  for delete to authenticated
+  using (bucket_id = 'store-photos' and (storage.foldername(name))[1] = auth.uid()::text);

@@ -1,11 +1,13 @@
 # Public API + 车行自动上传 — 初代设计(v0 idea)
 
 > 状态:2026-09-02 已实现 P0 + P1 的 batch / reconcile / images / 用量页(代码在 `lib/api/*`、`app/api/v1/*`、`app/[locale]/(backnav)/developers/*`,SQL 在 `supabase/api-keys.sql` 需手动执行)。未做:Feed 拉取模式、admin 全站用量、沙盒 key、webhooks。OpenAPI 源是 `lib/api/openapi.ts`(经 `/api/v1/openapi.json` 输出),没有单独的 yaml 文件。下文保留原设计。
+>
+> 2026-10 内容多语言 v2(`supabase/i18n-v2.sql` + `lib/i18n-pipeline`):`description` 任一语言原样存为原文(`description_original`),审核与翻译由 i18n 管线完成;`description_lang` 弃用(接受但忽略);详情新增 `description_original` / `description_lang` / `description_translated` / `features_original`;`updated_since` 与 `updated_at` 改用内容时钟;新增 409 `listing_blocked`。见 §4.1、§4.3。
 
 ## 1. 为什么做
 
 - 现在车行车源进站只有两条路:手动在 app 发帖,或我们写爬虫适配器抓它官网(`lib/sources/*`)。爬虫每接一家要写一个 adapter,模板站一改版就断。
-- 中大型华人车行大多有 DMS(DealerCenter / DealerSync / Frazer / vAuto 等),能导出库存 feed 或有开发能力。给他们一个官方接口,库存就能自动同步,并且"官方账号"发布,而不是系统账号转载。
+- 中大型车行大多有 DMS(DealerCenter / DealerSync / Frazer / vAuto 等),能导出库存 feed 或有开发能力。给他们一个官方接口,库存就能自动同步,并且"官方账号"发布,而不是系统账号转载。
 - 顺带开放只读 API:社区工具、微信小程序、第三方比价站、AI agent 可以拉我们的车源,增加分发面。
 
 **非目标(v0 不做):** 开放写社区帖子/评论、开放私信、第三方 OAuth 代用户操作、付费计量。
@@ -104,12 +106,18 @@ create unique index if not exists cars_seller_external_uniq
 
 只返回 `status = 'active'` 且未 `owner_hidden` 的车;`phone` 等联系方式对无 key 的请求脱敏。
 
+多语言(i18n v2):
+
+- 详情的 `description` 按 `lang` 给译文(该语言 `i18n_bundle` 为 ok 时),否则给原文,**不拿原文冒充译文**;`description_translated` 标明是否为译文,`description_original` 是卖家原文(逐字),`description_lang` 是原文语言(ISO 639-1 两字母代码;检测完成前为 null,检测结果为 `und`(判断不出,如只有车型和数字)或 `other`(不认识的语言)时也为 null)。
+- `features` 是按 `lang` 的配置标签(同一配置的多语言写法合并为一个,未识别的标签原样),`features_original` 是卖家原样提交的标签;`carfax_summary` 按 `lang` 显示。
+- `updated_since` 比较内容时钟 `content_updated_at`,只有可见内容变化才前进:描述、配置标签、年份 / 品牌 / 车型 / 配置、价格与原价(`original_price`)、里程、图片、状态与车主隐藏、颜色、燃料 / 变速箱 / 驱动、位置与坐标、Carfax 链接与摘要、VIN、源站链接(`source_url`)、卖家电话(即 `i18n.cars_before` 内容时钟比较的列,`lib/api/openapi.ts` `CONTENT_CLOCK_FIELDS` 同一份清单);浏览数 / 收藏 / 翻译 / 卖家资料变化都不算。响应里的 `updated_at` 也是这个时钟。SQL 未执行时退回旧的 `updated_at`。
+
 ### 4.2 库存写入(需 `write:inventory`;个人与车行同一套端点,只差配额)
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `/api/v1/me` | 当前 key 信息、owner、门店、scopes、限额 |
-| GET | `/api/v1/inventory` | 自己名下所有车(含 pending/sold),按 external_id 查 |
+| GET | `/api/v1/inventory` | 自己名下所有车(含 pending/sold),按 external_id 查;按内容最后变化倒序 |
 | PUT | `/api/v1/inventory/{external_id}` | **幂等 upsert**。核心端点 |
 | POST | `/api/v1/inventory/batch` | 一次 ≤100 条 upsert,返回逐条结果 |
 | DELETE | `/api/v1/inventory/{external_id}` | 标记 `sold`(默认)或 `removed`(`?reason=removed`) |
@@ -130,8 +138,8 @@ create unique index if not exists cars_seller_external_uniq
   "transmission": "automatic",         // automatic|manual|cvt
   "drivetrain": "fwd",                 // fwd|rwd|awd|4wd
   "exterior_color": "white", "interior_color": "black",
-  "description": "...",                // 任一语言;缺的语言由 localizeListing 补
-  "description_lang": "en",            // 提示源语言,可省略(自动检测)
+  "description": "...",                // 任一语言,原样存为原文;其他语言由 i18n 管线翻译
+  "description_lang": "en",            // 已弃用:可传但忽略(原文语言自动检测)
   "features": ["Apple CarPlay", "Sunroof"],
   "images": ["https://cdn.dealer.com/1.jpg", "..."],   // 最多 30 张
   "carfax_url": "https://...",
@@ -144,18 +152,20 @@ create unique index if not exists cars_seller_external_uniq
 
 1. 校验 schema(zod)、VIN 格式(`isValidVinFormat`),同 seller 内 VIN 重复 → 409。
 2. 英文枚举 → DB 中文值映射(`gasoline → 汽油`),新建 `lib/api/enums.ts` 做双向表。
-3. `title`/`title_zh` 由 year/make/model/trim 自动生成(与发帖页相同规则)。
+3. `title`/`title_zh` 由 year/make/model/trim 确定性生成(`lib/i18n/car-title.ts` `buildCarTitles`,与 SQL `i18n.car_title` 一致,不经 AI)。
 4. location/lat/lng:车行取门店地址(`dealer_stores`);个人没有门店,必须在请求体传 `location`(或 zip),服务端用 `lib/geocode.ts` 解析坐标。`location_zh` 用 sync 引擎里的 `CITY_ZH` 表。
 5. `seller_name`/`phone` 取 profile。
-6. 同步写库返回 200(`status = 'active'`,`expires_at` = 30 天,和转载一致;每次 PUT 刷新)。
-7. **异步**(Next.js `after()`):`decodeVin` 校验车型一致 → `moderateContent("car")` AI 审核(违规则改 `removed` 并记 `ai_moderation`)→ `localizeListing` 翻译 → `mirrorCarImages` 转存图片。每一步失败只记日志,不影响已写入的记录。
-8. 响应里给 `id`、`url`(`/zh/car/{id}`)、`processing: ["images","translation"]` 告知哪些还在后台跑。
+6. 同步写库返回 200(`status = 'active'`;车源永久有效,`expires_at` 恒为 null)。描述 / 标签原样写原文列 `description_original` / `features_original`;`description` / `description_zh` / `features` 是 i18n 管线维护的兼容投影,API 从不写。重复 PUT 时描述与标签集合(顺序无关、大小写敏感)都没变就不写原文列 —— 原文哈希不变,不会重新翻译;再加上年份 / 品牌 / 车型 / 配置也都没变就不重新审核(`listingTextChanges`;结论按送审文本的哈希缓存,年份不在送审文本里,只改年份时直接复用原结论)。被审核或管理员下架(`removal_reason` = `moderation` / `admin`)的车再 PUT 返回 409 `listing_blocked`。
+7. **异步**(Next.js `after()`,截止请求开始 + 55 s):`decodeVin` 校验车型一致 → `mirrorCarImages` 转存图片 → i18n 管线 `moderateEntity` 审核(shadow 模式只记录;enforce 模式违规由管线下架并记 `ai_moderation`)→ `drainEntity` 翻译。batch 整批只排一个 `after()`:逐车 VIN / 转存(有界并发)→ 有界审核 → 一次 `drain({ entity: 'car', entityIds })`。单车链与 batch 一样,剩余不足 15 s 时不再开始审核。审核因与内容无关的原因没做成(未配置、审核预算用完、限流、上游故障、时间不够)时不记失败次数,这辆车这次也不翻译(翻译前要先审,接着翻只会撞上同一个失败);batch 里碰到这种失败后,其余还没送审的车也不再送审、不进这次 drain。被拦下的车同样不翻译。没做完的由 `/api/i18n/drain` cron(每 2 分钟)接着做。`I18N_DRAIN_DISABLED=1`(与 cron、`/api/sync`、`/api/moderate` 共用的紧急开关)时跳过翻译,译文留在队列,审核照常。每一步失败只记日志,不影响已写入的记录。
+8. 响应里给 `id`、`url`(`/zh/car/{id}`)、`processing: ["vin","moderation","translation","images"]` 中仍在后台跑的步骤(更新时:VIN 没变就没有 vin;描述、标签、年份 / 品牌 / 车型 / 配置都没变就没有 moderation;描述没变或没有描述就没有 translation)。`GET /inventory` 的 `processing_state`:`images_pending` = 还有外链图未转存;`translation_pending` = 描述的中文或英文译文还没生成(按当页 zh / en 的 `i18n_bundle` 判定,只对在售车)。
 
 错误格式统一:
 
 ```json
 { "error": { "code": "validation_failed", "message": "...", "details": [{ "field": "price", "issue": "required" }] } }
 ```
+
+409 有两种:`conflict`(同 VIN / external_id 冲突,附 `existing_id`)与 `listing_blocked`(审核或管理员下架的车不能经 API 重新上架,不要重试)。
 
 ## 5. 限流与防滥用
 
@@ -171,7 +181,7 @@ create unique index if not exists cars_seller_external_uniq
 - 个人档的意义:让有一两台车的人也能用脚本/第三方工具挂牌,但把"个人账号批量倒车源"的路堵死;真要走量必须走门店认证。批量端点(`batch` / `reconcile`)个人档也开放,但逐条扣配额,超出部分返回逐条 `quota_exceeded`,前面已成功的不回滚。
 - 图片:URL 必须 https,单张 ≤ 10MB,域名黑名单;转存复用 `lib/sources/images.ts` 的 sharp 压缩。
 - key 泄露处理:门户一键吊销 + 重新生成;admin 端也能吊销。
-- 写入的车照样走 AI 审核和举报流程(`ugc-moderation`),不因是 API 就跳过。
+- 写入的车照样走 AI 审核和举报流程(`ugc-moderation`),不因是 API 就跳过:送审文本是品牌 / 车型 / 配置 + 描述 + 配置标签(没有描述的车也审),其中任一变化都重新审核,结论按送审文本的哈希缓存。只有系统转载(sync 写入、带 `source_id`、且卖家就是该源站的系统账号)的车源文本被视为可信、跳过审核,API 上传不算;同步也只更新 / 下架源站系统账号名下的车,车位被别的账号占着的源站车源跳过并在同步结果里记错。
 
 ## 6. 开发者门户
 
@@ -222,7 +232,7 @@ create unique index if not exists cars_seller_external_uniq
 
 1. **只读 API 是否完全公开?** 不带 key 也能读会被同行整站扒走。倾向:无 key 只给列表基础字段 + 每 IP 20/min,详情、联系方式、图片原图要 key。
 2. **API 上传的车与手动发帖的车冲突怎么办?** 同 seller 同 VIN 已有手动帖 → 返回 409 并附现有 `id`,让车行选择"接管"(PUT `?adopt=true` 把 external_id 写到那条上)。
-3. **过期策略。** 手动帖 30 天过期需卖家续期;API 上传的车每次 PUT 自动续。若车行 feed 停了(key 30 天无请求),车自然过期下架,和转载一致,不需要额外机制。
+3. **过期策略。** 已取消 30 天自动过期(2026-10),所有车源永久保存,直到卖家下架/标记已售、API `DELETE`/`reconcile`,或转载源站下架。车行 feed 停了车也不会自动下架,需要对账清理。
 4. **限流存储**用 Postgres 够不够?按当前规模够。若接入 10+ 车行且都用 reconcile 全量推,再评估。
 5. **文档语言**:六语言全上成本高,先中英。
 6. **计费**:暂不做;`api_usage_daily` 先把数据留着。
@@ -231,8 +241,8 @@ create unique index if not exists cars_seller_external_uniq
 
 - `app/api/sync/route.ts` — bearer 解析、admin 校验写法可直接借用
 - `lib/sources/types.ts` `ParsedListing` — listing 归一化形状,API schema 以此为底
-- `lib/sources/sync.ts` — 门店地址定位、`CITY_ZH`、过期、图片转存节奏
+- `lib/sources/sync.ts` — 门店地址定位、`CITY_ZH`、图片转存节奏
 - `lib/sources/images.ts` — `mirrorCarImages` / `deleteMirroredImages`
-- `lib/translate.ts` `localizeListing`、`lib/moderate.ts` `moderateContent`、`lib/vin.ts`
+- `lib/i18n-pipeline`(`moderateEntity` / `drainEntity` / `drain`,审核与翻译)、`lib/i18n/car-title.ts` `buildCarTitles`、`lib/i18n/content/server.ts` `getBundle(s)`(详情译文、`translation_pending`)、`lib/vin.ts`
 - `lib/types.ts` — 新增 `DbApiKey`、`DbApiUsageDaily`,`DbCar` 加 `external_id` / `api_key_id`
 - `supabase/listing-sources.sql` — SQL 文件风格(幂等、手动执行)照此写 `api-keys.sql`

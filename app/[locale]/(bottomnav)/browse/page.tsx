@@ -10,15 +10,23 @@ import { ArrowUpDown, Bookmark, Check, Search, SlidersHorizontal, X, Clock, Tras
 import { match as pinyinMatch } from "pinyin-pro";
 import { getCarSuggestionPool, logCarSearchTerm } from "@/lib/car-search-suggestions";
 import Link from "@/components/localized-navigation";
-import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
-import { brandShortLabel, brandLogoSrc } from "@/lib/i18n";
-import { readDualCache, writeDualCache } from "@/lib/session-cache";
+import { brandShortLabel, brandLogoSrc, localizePath } from "@/lib/i18n";
+import { readSessionCache, writeSessionCache } from "@/lib/session-cache";
+import {
+  browseQueryKey,
+  fetchBrowseFacets,
+  fetchBrowsePage,
+  fetchCarsByIds,
+  type BrowseCar,
+  type BrowseQueryInput,
+  type FacetOption,
+} from "@/lib/browse-cars";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { CarCard } from "@/components/car-card";
 import { Reveal } from "@/components/reveal";
-import { SearchFilters, IOS_FILL } from "@/components/search-filters";
+import { SearchFilters, IOS_FILL, featureOptionLabel } from "@/components/search-filters";
 import { MobileFilterDrawer } from "@/components/mobile-filters";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,15 +40,13 @@ import { MAKES_ZH } from "@/lib/mock-data";
 import { detectUserZip, geocodeZipToCoords } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
-import { getPriceInsight, type PriceInsight } from "@/lib/price-insight";
+import { fromStoredDeal } from "@/lib/price-insight";
 import { bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
 import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT } from "@/lib/saved-searches";
 import {
-  applyCarFilters,
   buildDistances,
   filtersFromParams,
   filtersToQuery,
-  sortCars,
   INITIAL_FILTERS,
   SORT_OPTIONS,
   type Filters,
@@ -56,9 +62,16 @@ import {
 } from "@/components/ui/drawer";
 import type { DbCar } from "@/lib/types";
 
-// 车源列表双层缓存(社区同款):session 命中直接复用不重拉,
-// localStorage 冷启动兜底,先展示后台刷新
-const BROWSE_CACHE_KEY = "clc_browse_cars_v1";
+// 列表服务端分页(lib/browse-cars):只拿总数 + 一页,滑到底再拉下一页。
+// 会话缓存记下当前条件已加载的几页,返回本页时同条件直接还原不重拉
+const BROWSE_CACHE_KEY = "clc_browse_pages_v1";
+
+interface BrowseCache {
+  key: string;
+  coords: { lat: number; lng: number } | null;
+  total: number;
+  items: BrowseCar[];
+}
 
 // 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -72,19 +85,28 @@ export default function BrowsePage() {
 }
 
 function BrowseContent() {
-  const { t, locale } = useI18n();
+  const { t, locale, pathLocale } = useI18n();
   const searchParams = useSearchParams();
-  const [cars, setCars] = useState<DbCar[]>([]);
+  // 当前条件下已加载的车源(按页追加)与总数
+  const [items, setItems] = useState<BrowseCar[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  // 数据拉取时间，作为"上架时间"筛选的基准（避免在渲染期直接调用 Date.now）
-  const [fetchedAt, setFetchedAt] = useState<number | null>(null);
+  // 换条件后新结果到达前:旧列表保留但变淡
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 会话缓存还原完成后才开始按条件拉取(还原会同时带回当时的坐标,避免先按无坐标多拉一次)
+  const [cacheChecked, setCacheChecked] = useState(false);
   const [filters, setFiltersRaw] = useState<Filters>(() => filtersFromParams(searchParams));
   const [sort, setSortRaw] = useState<SortKey>(() => (searchParams.get("sort") as SortKey) || "newest");
-  // 无限滚动:增量渲染结果(数据已全量在内存,只分批挂 DOM)
-  const [visibleCount, setVisibleCount] = useState(24);
   const resultsSentinelRef = useRef<HTMLDivElement>(null);
   const [userCoords, setUserCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [recentCars, setRecentCars] = useState<DbCar[]>([]);
+  // 筛选面板选项统计(服务端算):make = 统计车型时对应的品牌
+  const [facets, setFacets] = useState<{ make: string | null; models: FacetOption[]; features: FacetOption[] }>({
+    make: null,
+    models: [],
+    features: [],
+  });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [userZip, setUserZip] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
@@ -95,11 +117,12 @@ function BrowseContent() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(() => !!(searchParams.get("q") || searchParams.get("keyword")));
 
   // Sync filters & sort to URL (replaceState avoids full Next.js re-render)
+  // 带上语言前缀:裸 /browse 刷新后会被 vercel.json 重定向到 /zh
   const syncToUrl = useCallback((f: Filters, s: SortKey) => {
     const qs = filtersToQuery(f, s);
-    const url = qs ? `/browse?${qs}` : "/browse";
+    const url = localizePath(qs ? `/browse?${qs}` : "/browse", pathLocale);
     window.history.replaceState(window.history.state, "", url);
-  }, []);
+  }, [pathLocale]);
 
   const setFilters = useCallback((next: Filters | ((prev: Filters) => Filters)) => {
     setFiltersRaw((prev) => {
@@ -178,41 +201,87 @@ function BrowseContent() {
     setSortRaw(s);
   }, [searchParams]);
 
-  function applyCars(allCars: DbCar[]) {
-    setCars(allCars);
+  // 关键词停顿 300ms 再查,其他条件即时生效
+  const [debouncedKeyword, setDebouncedKeyword] = useState(filters.keyword);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedKeyword(filters.keyword), 300);
+    return () => clearTimeout(timer);
+  }, [filters.keyword]);
+
+  const query = useMemo<BrowseQueryInput>(
+    () => ({ filters: { ...filters, keyword: debouncedKeyword }, sort, locale, coords: userCoords }),
+    [filters, debouncedKeyword, sort, locale, userCoords]
+  );
+  const queryKey = useMemo(() => browseQueryKey(query), [query]);
+  // shownKeyRef:当前 items 对应的条件;activeRef:最近一次请求的条件(过期响应直接丢弃)
+  const shownKeyRef = useRef<string | null>(null);
+  const activeRef = useRef<{ key: string; query: BrowseQueryInput } | null>(null);
+  const loadingMoreRef = useRef(false);
+
+  const loadFirstPage = useCallback(async (q: BrowseQueryInput, key: string) => {
+    activeRef.current = { key, query: q };
+    setRefreshing(true);
+    const page = await fetchBrowsePage(q, 0);
+    if (activeRef.current?.key !== key) return;
+    setRefreshing(false);
     setLoading(false);
+    // 拉取失败:保留当前列表
+    if (!page) return;
+    shownKeyRef.current = key;
+    setItems(page.items);
+    setTotal(page.total);
+    writeSessionCache<BrowseCache>(BROWSE_CACHE_KEY, { key, coords: q.coords, total: page.total, items: page.items });
+  }, []);
+
+  useEffect(() => {
+    if (!cacheChecked || queryKey === shownKeyRef.current || queryKey === activeRef.current?.key) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 条件变化 → 向服务端拉第一页
+    loadFirstPage(query, queryKey);
+  }, [cacheChecked, query, queryKey, loadFirstPage]);
+
+  // 触底拉下一页(offset = 已加载条数;去重防止两页之间有新车上架导致错位重复)
+  async function loadMore() {
+    const active = activeRef.current;
+    if (!active || active.key !== shownKeyRef.current || loadingMoreRef.current || items.length >= total) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    const page = await fetchBrowsePage(active.query, items.length);
+    loadingMoreRef.current = false;
+    setLoadingMore(false);
+    if (!page || activeRef.current?.key !== active.key) return;
+    const seen = new Set(items.map((c) => c.id));
+    const merged = [...items, ...page.items.filter((c) => !seen.has(c.id))];
+    setItems(merged);
+    setTotal(page.total);
+    writeSessionCache<BrowseCache>(BROWSE_CACHE_KEY, {
+      key: active.key,
+      coords: active.query.coords,
+      total: page.total,
+      items: merged,
+    });
+  }
+  const loadMoreRef = useRef(loadMore);
+  useEffect(() => {
+    loadMoreRef.current = loadMore;
+  });
+
+  useIsoLayoutEffect(() => {
+    // 旧版全量缓存(整表车源)已废弃,清掉占用的 localStorage
+    try { localStorage.removeItem("clc_browse_cars_v1"); } catch {}
+    // 同一组条件本会话加载过:连同当时的坐标一起还原,不重拉
+    const cached = readSessionCache<BrowseCache>(BROWSE_CACHE_KEY)?.data;
+    if (cached && cached.key === browseQueryKey({ filters, sort, locale, coords: cached.coords })) {
+      shownKeyRef.current = cached.key;
+      setItems(cached.items);
+      setTotal(cached.total);
+      setUserCoords(cached.coords);
+      setLoading(false);
+    }
+    setCacheChecked(true);
 
     const recentIds = getRecentlyViewed();
     if (recentIds.length > 0) {
-      const recent = recentIds
-        .map((id) => allCars.find((c) => c.id === id))
-        .filter(Boolean) as DbCar[];
-      setRecentCars(recent.slice(0, 6));
-    }
-  }
-
-  async function fetchCars() {
-    const { data } = await supabase
-      .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url, languages)")
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .order("created_at", { ascending: false });
-    const allCars = (data as DbCar[]) || [];
-    applyCars(allCars);
-    setFetchedAt(Date.now());
-    if (allCars.length > 0) writeDualCache(BROWSE_CACHE_KEY, allCars);
-  }
-
-  useIsoLayoutEffect(() => {
-    // 双层缓存(社区同款):本会话拉过就直接复用;localStorage 兜底数据先展示、后台刷新
-    const cached = readDualCache<DbCar[]>(BROWSE_CACHE_KEY);
-    if (cached && cached.data.length > 0) {
-      applyCars(cached.data);
-      setFetchedAt(cached.at);
-      if (cached.stale) fetchCars();
-    } else {
-      fetchCars();
+      fetchCarsByIds(recentIds).then((recent) => setRecentCars(recent.slice(0, 6)));
     }
 
     // Auto-detect user zipcode for distance calculation only (don't auto-filter)
@@ -234,63 +303,42 @@ function BrowseContent() {
 
   // 距离计算基准:优先用「位置」筛选里输入的 Zipcode,没有则用自动定位到的 zip
   const effectiveZip = /^\d{5}$/.test(filters.location) ? filters.location : userZip;
+  // 只在 zip 从有效变无效时清坐标:挂载时 zip 还没定位到,不能把缓存还原的坐标清掉
+  const prevZipRef = useRef(effectiveZip);
 
   useEffect(() => {
+    const prevZip = prevZipRef.current;
+    prevZipRef.current = effectiveZip;
     if (/^\d{5}$/.test(effectiveZip)) {
       geocodeZipToCoords(effectiveZip).then((coords) => {
         setUserCoords(coords);
       });
-    } else {
+    } else if (/^\d{5}$/.test(prevZip)) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- zip 失效时清空坐标
       setUserCoords(null);
     }
   }, [effectiveZip]);
 
-  const distances = useMemo(() => buildDistances(cars, userCoords), [cars, userCoords]);
+  // 「最近浏览」卡片的距离(列表卡片的距离由服务端算好)
+  const recentDistances = useMemo(() => buildDistances(recentCars, userCoords), [recentCars, userCoords]);
 
-  // 价格评级：以完整未过滤的车源列表为对比基准，建一张 carId -> insight 的表
-  // （筛选与卡片渲染复用，避免在 filter 循环里反复线性扫全表）
-  const insightMap = useMemo(() => {
-    const map = new Map<string, PriceInsight | null>();
-    for (const car of cars) {
-      map.set(car.id, getPriceInsight(car, cars));
-    }
-    return map;
-  }, [cars]);
-
-  // 车型选项：仅当恰好选中 1 个品牌时，统计该品牌下各车型及数量（按数量降序）
-  const modelOptions = useMemo(() => {
+  // 筛选面板选项:恰好选中 1 个品牌时统计该品牌下各车型;配置取全站最常见的 12 个
+  // (按词条归并语言孪生词,label 为当前界面语言文案,筛选值仍是 name)
+  const singleMake = useMemo(() => {
     const makes = filters.make.split(",").map((m) => m.trim()).filter(Boolean);
-    if (makes.length !== 1) return [];
-    const make = makes[0];
-    const counts = new Map<string, { name: string; count: number }>();
-    for (const car of cars) {
-      if (car.make !== make) continue;
-      const name = (car.model || "").trim();
-      if (!name) continue;
-      const key = name.toLowerCase();
-      const entry = counts.get(key);
-      if (entry) entry.count += 1;
-      else counts.set(key, { name, count: 1 });
-    }
-    return [...counts.values()].sort((a, b) => b.count - a.count);
-  }, [cars, filters.make]);
-
-  // 车辆配置选项：统计全部车源 features 标签出现次数，取前 12
-  const featureOptions = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const car of cars) {
-      for (const f of car.features || []) {
-        const tag = f.trim();
-        if (!tag) continue;
-        counts.set(tag, (counts.get(tag) || 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 12);
-  }, [cars]);
+    return makes.length === 1 ? makes[0] : null;
+  }, [filters.make]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchBrowseFacets(singleMake, locale).then((f) => {
+      if (!cancelled && f) setFacets({ make: singleMake, ...f });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [singleMake, locale]);
+  const modelOptions = singleMake && facets.make === singleMake ? facets.models : [];
+  const featureOptions = facets.features;
 
   // 保存搜索：当前筛选条件（去掉空值），与 localStorage 中的已存搜索比对
   const savedSearchParams = useMemo(() => {
@@ -409,7 +457,7 @@ function BrowseContent() {
     }
     if (filters.features) {
       for (const v of filters.features.split(",")) {
-        if (v) chips.push({ key: `features:${v}`, label: v });
+        if (v) chips.push({ key: `features:${v}`, label: featureOptionLabel(v, featureOptions, t) });
       }
     }
     if (filters.noAccident === "true") chips.push({ key: "noAccident", label: t("无事故") });
@@ -418,18 +466,7 @@ function BrowseContent() {
     if (filters.hasVideo === "true") chips.push({ key: "hasVideo", label: t("带视频") });
     if (filters.hasPrice === "true") chips.push({ key: "hasPrice", label: t("排除电议") });
     return chips;
-  }, [filters, t, locale]);
-
-  const filtered = useMemo(() => {
-    const { cars: result, forcedDistanceSort } = applyCarFilters(cars, filters, {
-      userCoords,
-      distances,
-      insightMap,
-      fetchedAt,
-    });
-    // If location yielded no results and we have coords, sort by distance
-    return sortCars(result, forcedDistanceSort ? "distance" : sort, distances, locale);
-  }, [cars, filters, sort, distances, userCoords, insightMap, fetchedAt, locale]);
+  }, [filters, t, locale, featureOptions]);
 
   // 地图找车入口:携带当前筛选条件跳转 /browse/map
   const mapHref = useMemo(() => {
@@ -437,30 +474,22 @@ function BrowseContent() {
     return qs ? `/browse/map?${qs}` : "/browse/map";
   }, [filters, sort]);
 
-  // 筛选/排序变化时回到第一批
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 条件变化重置分页
-    setVisibleCount(24);
-  }, [filters, sort]);
-
-  // 触底加载下一批
+  // 触底(提前 800px)拉下一页;每加载一页重建观察器,哨兵仍在视口内时会立刻再触发
   useEffect(() => {
     const el = resultsSentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) {
-          setVisibleCount((c) => (c < filtered.length ? c + 24 : c));
-        }
+        if (entries[0]?.isIntersecting) loadMoreRef.current();
       },
       { rootMargin: "800px 0px" }
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [filtered.length]);
+  }, [items.length, total]);
 
   return (
-    <PullToRefresh onRefresh={fetchCars}>
+    <PullToRefresh onRefresh={() => loadFirstPage(query, queryKey)}>
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
 
@@ -761,7 +790,7 @@ function BrowseContent() {
               <p className="flex items-baseline gap-1.5 font-mono text-[11px] uppercase tracking-widest text-muted-foreground">
                 <span>Results:</span>
                 <span className="font-semibold tracking-normal text-foreground">
-                  {t("共 {n} 辆", { n: filtered.length })}
+                  {t("共 {n} 辆", { n: total })}
                 </span>
               </p>
               {hasActiveFilters && (
@@ -858,25 +887,26 @@ function BrowseContent() {
                 Loading
               </p>
             </motion.div>
-          ) : filtered.length > 0 ? (
+          ) : items.length > 0 ? (
             <>
             {/* 规则网格:行行顶部对齐(替代瀑布流);列数比原来少一档,卡片更宽 */}
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 md:gap-4 xl:grid-cols-3 min-[1920px]:grid-cols-4 min-[2560px]:grid-cols-5">
-              {filtered.slice(0, visibleCount).map((car) => (
+            <div className={`grid grid-cols-1 gap-3 transition-opacity md:grid-cols-2 md:gap-4 xl:grid-cols-3 min-[1920px]:grid-cols-4 min-[2560px]:grid-cols-5 ${refreshing ? "opacity-50" : ""}`}>
+              {items.map((car) => (
                 <Reveal key={car.id}>
                   <CarCard
                     car={car}
-                    distance={distances.get(car.id)}
-                    priceInsight={insightMap.get(car.id) ?? null}
+                    distance={car.distance ?? undefined}
+                    priceInsight={fromStoredDeal(car.deal)}
                   />
                 </Reveal>
               ))}
             </div>
             {/* 无限滚动哨兵 */}
             <div ref={resultsSentinelRef} className="h-px" aria-hidden="true" />
-            {visibleCount < filtered.length && (
-              <p className="py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
-                Showing {Math.min(visibleCount, filtered.length)} / {filtered.length}
+            {items.length < total && (
+              <p className="flex items-center justify-center gap-2 py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
+                {loadingMore && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />}
+                Showing {items.length} / {total}
               </p>
             )}
             </>
@@ -930,7 +960,7 @@ function BrowseContent() {
                   <CarCard
                     key={"recent-" + car.id}
                     car={car}
-                    distance={distances.get(car.id)}
+                    distance={recentDistances.get(car.id)}
                   />
                 ))}
               </div>

@@ -1,3 +1,4 @@
+-- SUPERSEDED by supabase/i18n-v2.sql; do not run.
 -- AI 内容审核(手动在 Supabase SQL Editor 执行)
 -- 用户发布内容(车辆、社区帖子、评论)后,客户端调用 /api/moderate,
 -- 服务端用 DeepSeek(经 OpenRouter)按社区规范判定;违规内容自动屏蔽

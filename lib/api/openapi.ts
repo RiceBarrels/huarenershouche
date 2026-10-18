@@ -13,6 +13,7 @@ import {
   QUOTA_LIMITS,
   ANON_RATE_LIMIT_PER_MIN,
   DEFAULT_KEY_RATE_LIMIT_PER_MIN,
+  type ApiErrorCode,
 } from "./types";
 
 type Json = Record<string, unknown>;
@@ -32,12 +33,24 @@ const ERROR_CODES = [
   "account_banned",
   "not_found",
   "conflict",
+  "listing_blocked",
   "rate_limited",
   "quota_exceeded",
   "internal_error",
-];
+] satisfies readonly ApiErrorCode[];
 
 const LANGS = ["zh", "en", "ko", "ja", "es", "fr"];
+
+/**
+ * 内容时钟 cars.content_updated_at 覆盖的对外字段(supabase/i18n-v2.sql i18n.cars_before 第 (2) 步的列),
+ * updated_at / updated_since 的说明共用;SQL 增减列时同步改这里与 docs/public-api-v0.md §4.1
+ */
+const CONTENT_CLOCK_FIELDS =
+  "description, features, year, make, model, trim, price, original_price, mileage, photos, status and visibility, colors, " +
+  "fuel type, transmission, drivetrain, location and coordinates, carfax_url, carfax_summary, VIN, source_url, seller phone";
+
+/** 重复 PUT 时这些字段都没变就不重新审核(lib/api/listing.ts listingTextChanges) */
+const MODERATED_FIELDS = "description, features, year, make, model, trim";
 
 function errorResponse(description: string): Json {
   return { description, content: { "application/json": { schema: ref("Error") } } };
@@ -231,7 +244,10 @@ export function buildOpenApi(): Record<string, unknown> {
         is_syndicated: { type: "boolean", description: "`true` = republished from a dealer website by a system account; API-uploaded and manual listings are `false`." },
         seller: ref("Seller"),
         created_at: { type: "string", format: "date-time" },
-        updated_at: nullable("string", { format: "date-time" }),
+        updated_at: nullable("string", {
+          format: "date-time",
+          description: `Last change to the listing's visible content: ${CONTENT_CLOCK_FIELDS}. View counts, favorites, translation updates and seller profile edits don't move it.`,
+        }),
         expires_at: nullable("string", { format: "date-time" }),
       },
     },
@@ -240,14 +256,36 @@ export function buildOpenApi(): Record<string, unknown> {
         ref("CarSummary"),
         {
           type: "object",
-          required: ["description", "features", "images", "vin", "views_count", "favorites_count", "seller"],
+          required: [
+            "description", "description_original", "description_lang", "description_translated", "features",
+            "features_original", "images", "vin", "views_count", "favorites_count", "seller",
+          ],
           properties: {
-            description: { type: "string", description: "Localized by `lang` when a translation exists." },
-            features: { type: "array", items: { type: "string" } },
+            description: {
+              type: "string",
+              description:
+                "Description in the requested `lang`: the machine translation once it is ready (`description_translated: true`), otherwise the seller's original text. Empty string when the listing has no description.",
+            },
+            description_original: {
+              ...nullable("string"),
+              description: "The seller's own description, verbatim, in whatever language it was written. `null` when there is none.",
+            },
+            description_lang: {
+              ...nullable("string"),
+              description:
+                "ISO 639-1 code of the language `description_original` is written in (e.g. `en`, `zh`, `es`). `null` until language detection has run, and when the language can't be determined (e.g. only model names and numbers) or isn't one we recognize.",
+            },
+            description_translated: { type: "boolean", description: "`true` when `description` is a machine translation into `lang`." },
+            features: {
+              type: "array",
+              items: { type: "string" },
+              description: "Feature tags in the requested `lang`; the same feature written in several languages is listed once. Unrecognized tags are returned as written.",
+            },
+            features_original: { type: "array", items: { type: "string" }, description: "Feature tags exactly as the seller sent them." },
             images: { type: "array", items: { type: "string", format: "uri" } },
             vin: { ...nullable("string"), description: "Anonymous requests get a masked VIN (`1HGCV1F3****2345`); keyed requests get the full VIN." },
             carfax_url: nullable("string", { format: "uri" }),
-            carfax_summary: nullable("string"),
+            carfax_summary: nullable("string", { description: "Short Carfax summary (owners, accidents, service records) in the requested `lang`." }),
             views_count: { type: "integer" },
             favorites_count: { type: "integer" },
             source_url: { ...nullable("string"), format: "uri", description: "Original page when `is_syndicated`." },
@@ -306,9 +344,24 @@ export function buildOpenApi(): Record<string, unknown> {
         drivetrain: { ...nullable("string"), enum: [...slugs("drivetrain"), null], description: enumDesc("drivetrain") },
         exterior_color: nullable("string", { maxLength: 30, description: "Free text in English, e.g. `white`." }),
         interior_color: nullable("string", { maxLength: 30 }),
-        description: nullable("string", { maxLength: 5000, description: "Any language; the other site languages are machine-translated asynchronously." }),
-        description_lang: { ...nullable("string"), enum: ["zh", "en", null], description: "Source-language hint. Auto-detected when omitted." },
-        features: { type: "array", maxItems: 40, items: { type: "string", maxLength: 40 }, default: [] },
+        description: nullable("string", {
+          maxLength: 5000,
+          description:
+            "Your own text, in any language. Stored verbatim as the original and machine-translated into the other site languages in the background.",
+        }),
+        description_lang: {
+          ...nullable("string"),
+          enum: [...LANGS, null],
+          deprecated: true,
+          description: "Deprecated and ignored: the language of `description` is detected automatically. Still accepted so existing integrations keep working.",
+        },
+        features: {
+          type: "array",
+          maxItems: 40,
+          items: { type: "string", maxLength: 40 },
+          default: [],
+          description: "Feature tags in any language, stored as sent. Readers see recognized features in their own language.",
+        },
         images: {
           type: "array",
           maxItems: LISTING_MAX_IMAGES,
@@ -344,12 +397,17 @@ export function buildOpenApi(): Record<string, unknown> {
         drivetrain: ref("EnumValue"),
         location: { type: "string" },
         created_at: { type: "string", format: "date-time" },
-        updated_at: { type: "string", format: "date-time" },
+        updated_at: {
+          type: "string",
+          format: "date-time",
+          description: "Last change to the listing's visible content (same clock as `CarSummary.updated_at`).",
+        },
         expires_at: nullable("string", { format: "date-time" }),
         processing_state: {
           type: "array",
           items: { type: "string", enum: ["images_pending", "translation_pending"] },
-          description: "Background steps not finished yet. Empty = ready.",
+          description:
+            "Background steps not finished yet. `images_pending`: some photos are still being copied to our storage. `translation_pending`: the Chinese or English translation of the description is not ready yet (only reported for active listings). Empty = ready.",
         },
       },
     },
@@ -365,7 +423,7 @@ export function buildOpenApi(): Record<string, unknown> {
         processing: {
           type: "array",
           items: { type: "string" },
-          description: "Steps still running in the background (e.g. `vin`, `moderation`, `translation`, `images`).",
+          description: `Steps still running in the background: \`vin\` (new listing or changed VIN), \`moderation\` (new listing, or a change to any of ${MODERATED_FIELDS}), \`translation\` (a new or changed, non-empty description), \`images\` (photos still to be copied).`,
         },
         quota: ref("Quota"),
       },
@@ -535,7 +593,11 @@ export function buildOpenApi(): Record<string, unknown> {
           queryParam("drivetrain", { type: "string", enum: slugs("drivetrain") }, ""),
           queryParam("location", { type: "string" }, "Substring match on city/state, e.g. `Los Angeles` or `CA`."),
           queryParam("seller_id", { type: "string", format: "uuid" }, "Only this seller's listings (a `Seller.id` or `Dealer.owner_id`)."),
-          queryParam("updated_since", { type: "string", format: "date-time" }, "Only listings updated after this instant. Use for incremental sync."),
+          queryParam(
+            "updated_since",
+            { type: "string", format: "date-time" },
+            `Only listings whose visible content changed at or after this instant (${CONTENT_CLOCK_FIELDS}); view counts and translation updates don't count. Use for incremental sync, comparing against \`updated_at\`.`,
+          ),
           queryParam("sort", { type: "string", enum: ["newest", "price_asc", "price_desc", "mileage_asc", "year_desc"], default: "newest" }, ""),
           LIMIT_PARAM,
           CURSOR_PARAM,
@@ -548,6 +610,8 @@ export function buildOpenApi(): Record<string, unknown> {
       get: {
         tags: ["Cars"],
         summary: "Get one listing",
+        description:
+          "`description` and `features` are in the requested `lang` once their translation is ready; `description_original` / `features_original` always carry the seller's own text.",
         security: readSecurity,
         parameters: [pathParam("id", "Listing UUID", { type: "string", format: "uuid" }), LANG_PARAM],
         responses: {
@@ -634,7 +698,8 @@ export function buildOpenApi(): Record<string, unknown> {
       get: {
         tags: ["Inventory"],
         summary: "List my API-managed listings",
-        description: "Every listing of the key owner that carries an `external_id`, including `pending` / `sold` / `removed`. Requires `write:inventory`.",
+        description:
+          "Every listing of the key owner, including `pending` / `sold` / `removed` and manually posted ones (no `external_id`, adoptable via `?adopt=true`). Most recently changed first. Requires `write:inventory`.",
         security: keySecurity,
         parameters: [
           queryParam("status", { type: "string", enum: slugs("status") }, ""),
@@ -663,7 +728,7 @@ export function buildOpenApi(): Record<string, unknown> {
         tags: ["Inventory"],
         summary: "Create or update a listing (idempotent upsert)",
         description:
-          "The core write endpoint. First PUT for an external_id inserts (counts as an *insert*, HTTP 201); later PUTs update (count as an *update*, HTTP 200), refresh the 30-day expiry and re-activate a `sold`/`removed` listing. Returns as soon as the row is written; VIN check, AI moderation, translation and image mirroring run in the background (see `processing`). Requires `write:inventory`.",
+          `The core write endpoint. First PUT for an external_id inserts (counts as an *insert*, HTTP 201); later PUTs update (count as an *update*, HTTP 200), and re-activate a \`sold\`/\`removed\` listing — except one removed by moderation or an administrator (409 \`listing_blocked\`). Returns as soon as the row is written; VIN check, image mirroring, AI moderation and translation run in the background (see \`processing\`). Every new listing is moderated; a later PUT is moderated again only when any of ${MODERATED_FIELDS} changed, and translated again only when the description changed. Requires \`write:inventory\`.`,
         security: keySecurity,
         parameters: [
           queryParam(
@@ -676,7 +741,9 @@ export function buildOpenApi(): Record<string, unknown> {
         responses: {
           "200": jsonResponse("Updated", ref("UpsertResult"), QUOTA_HEADERS),
           "201": jsonResponse("Created", ref("UpsertResult"), QUOTA_HEADERS),
-          "409": errorResponse("`conflict`: same VIN already exists under this account (see `existing_id`)."),
+          "409": errorResponse(
+            "`conflict`: same VIN already exists under this account (see `existing_id`). `listing_blocked`: the listing was removed by moderation or an administrator and can't be relisted.",
+          ),
           ...COMMON_ERRORS,
         },
       },
@@ -806,13 +873,15 @@ export function buildOpenApi(): Record<string, unknown> {
       title: "CLCAuto Public API",
       version: "0.1.0",
       description: [
-        "Public API of 常來車網 (clcauto.com), a used-car marketplace for Chinese communities in North America.",
+        "Public API of 常來車網 (clcauto.com), a non-profit, multilingual used-car marketplace in North America.",
         "",
         "**Auth.** `Authorization: Bearer clc_live_...`. Create keys at https://www.clcauto.com/zh/developers/keys. Read endpoints also work without a key at stricter limits; write endpoints always need a key with the matching scope.",
         "",
         `**Quota.** Write quota is per account (all keys share it), reset daily at 00:00 UTC. Personal tier: ${p.inserts} new listings + ${p.updates} updates per day. Dealer tier (account with a verified store): ${d.inserts} writes per day, ${d.active} active listings. Every write response carries \`X-Quota-Inserts-Remaining\` / \`X-Quota-Updates-Remaining\`.`,
         "",
         `**Keys.** Up to ${MAX_KEYS_PER_OWNER} active keys per account. Scopes: ${API_SCOPES.map((s) => `\`${s}\``).join(", ")}. Key management itself is done in the web portal (session auth), not through this API.`,
+        "",
+        "**Languages.** Send listing text in any language; it is stored verbatim and machine-translated into the other site languages (zh, en, ko, ja, es, fr) in the background. Reads return text in `lang` once translated, plus the original (`description_original`, `features_original`).",
         "",
         "**Errors.** Always `{ \"error\": { \"code\", \"message\", \"details?\" } }`. CORS is open (`*`).",
       ].join("\n"),

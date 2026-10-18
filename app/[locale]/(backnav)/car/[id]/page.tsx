@@ -1,68 +1,70 @@
 // 车辆详情 — server component:每辆车独立 SEO metadata + Vehicle JSON-LD + 服务端预取。
-// 静态导出(Capacitor)构建时 build:static 会用客户端兜底版本替换本文件,
-// 客户端组件 car-detail 在无 initialCar 时仍会自行拉取数据。
+// 只渲染公开车源(getPublicCar:active 且未停用,不含电话等内部列),否则 notFound();
+// 车主 / 认领者 / 管理员看自己已下架的车由同目录 not-found.tsx 用登录会话在客户端补拉。
+// 正文、metadata、JSON-LD 共用同一份 resolveCarView(同一条 i18n_bundle 行):
+// 有译文出译文,没有就出原文 + canonical 指回原文语言页;本页只读,不触发任何翻译(无 LLM、无 after())。
+// 静态导出(Capacitor)构建时整个 [id] 目录被隐藏,原生端走 /car?id= + 客户端 car-detail 自行拉取。
 
 import type { Metadata } from "next";
-import { cache } from "react";
-import { supabase } from "@/lib/supabase";
-import { localeAlternates, SITE_URL, SITE_NAME, makeSlug } from "@/lib/seo-pages";
-import { MAKES } from "@/lib/mock-data";
-import type { DbCar } from "@/lib/types";
-import { carDescription, carLocation, type Locale } from "@/lib/i18n";
+import { notFound } from "next/navigation";
+import { SITE_URL, SITE_NAME, getSeoPage, makeSlug, seoPageHref } from "@/lib/seo-pages";
+import { carLocation, type Locale } from "@/lib/i18n";
 import { serverT } from "@/lib/i18n/translate";
+import { ogLocale } from "@/lib/i18n/content-langs";
+import {
+  getBundle,
+  getBundles,
+  getPublicCar,
+  getPublicCarComments,
+} from "@/lib/i18n/content/server";
+import { resolveCarView, type CarView } from "@/lib/i18n/content/resolve";
+import type { TFn } from "@/lib/i18n/content/types";
+import { contentAlternates, ogAlternates } from "@/lib/seo/alternates";
+import { JsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, vehicleJsonLd } from "@/lib/seo/structured-data";
+import { formatPrice } from "@/lib/format";
+import type { PublicCar } from "@/lib/types";
+import { ContentI18nProvider } from "@/components/content/content-i18n-provider";
 import CarDetail from "../car-detail";
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
+// 随页面 SSR 的首批评论条数(客户端挂载后补全其余并接实时更新)
+const SSR_COMMENT_LIMIT = 20;
+const DESCRIPTION_MAX = 160;
 
-const getCar = cache(async (id: string): Promise<DbCar | null> => {
-  try {
-    const { data } = await supabase
-      .from("cars")
-      .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by, languages)")
-      .eq("id", id)
-      .maybeSingle();
-    return (data as DbCar | null) ?? null;
-  } catch {
-    return null;
-  }
-});
-
-function usd(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
-function coverImage(car: DbCar): string | null {
+function coverImage(car: PublicCar): string | null {
   const pics = [car.image_url, ...(car.images || [])].filter(
     (u): u is string => !!u && !VIDEO_RE.test(u),
   );
   return pics[0] ?? null;
 }
 
-/** 面向搜索/分享的一句话描述:关键规格 + 本语言正文(zh 原样保留旧格式) */
-function buildDescription(car: DbCar, locale: string): string {
-  const t = serverT(locale);
-  const priceLabel = car.price > 0 ? usd(car.price) : t("电议");
+function priceLabel(car: PublicCar, t: TFn): string {
+  return car.price > 0 ? formatPrice(car.price) : t("电议");
+}
+
+/** 按字符(而非 UTF-16 码元)截断,emoji 等不会被切成半个 */
+function truncate(text: string, max: number): string {
+  return text.length <= max ? text : Array.from(text).slice(0, max).join("");
+}
+
+/** 面向搜索/分享的一句话描述:关键规格 + 本页显示的描述(译文或原文);无描述时用品牌标语 */
+function buildDescription(car: PublicCar, view: CarView, locale: Locale, t: TFn): string {
   const miles =
     car.mileage > 0 ? `${new Intl.NumberFormat("en-US").format(car.mileage)} ${t("英里")}` : "";
-  const parts = [
-    `${car.year} ${car.make} ${car.model}${car.trim ? " " + car.trim : ""}`,
-    priceLabel,
+  const specs = [
+    view.title,
+    priceLabel(car, t),
     miles,
-    carLocation(car, locale as Locale),
+    carLocation(car, locale),
     car.transmission && t(car.transmission),
     car.fuel_type && t(car.fuel_type),
-  ].filter(Boolean);
-  const base = parts.join(" · ");
-  if (locale === "zh") {
-    const zh = car.description_zh?.replace(/\s+/g, " ").trim();
-    return (zh ? `${base}。${zh}` : `${base}。常來車網 · 北美华人二手车`).slice(0, 160);
-  }
-  const body = carDescription(car, locale as Locale).replace(/\s+/g, " ").trim();
-  return (body ? `${base}. ${body}` : `${base}. ${t("常來車網")}`).slice(0, 160);
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const body = (view.description?.text.description ?? "").replace(/\s+/g, " ").trim();
+  const sep = locale === "zh" ? "。" : ". ";
+  return truncate(`${specs}${sep}${body || t("买车卖车 · 就上常來車網")}`, DESCRIPTION_MAX);
 }
 
 export async function generateMetadata({
@@ -70,20 +72,23 @@ export async function generateMetadata({
 }: {
   params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
-  const { locale, id } = await params;
+  const { locale: rawLocale, id } = await params;
+  const locale = rawLocale as Locale;
   const t = serverT(locale);
-  const car = await getCar(id);
+  const car = await getPublicCar(id);
 
-  if (!car || car.status === "removed" || car.owner_hidden) {
+  if (!car) {
     return { title: t("车源不存在或已下架"), robots: { index: false, follow: false } };
   }
 
-  const nameZh = `${car.year} ${car.make} ${car.model}${car.trim ? " " + car.trim : ""}`;
-  const priceLabel = car.price > 0 ? usd(car.price) : t("电议");
-  const title = `${nameZh} ${priceLabel} - ${carLocation(car, locale as Locale)}`;
-  const description = buildDescription(car, locale);
+  const view = resolveCarView(car, await getBundle("car", car.id, locale), locale, t);
+  const location = carLocation(car, locale);
+  // layout 的 title.template 会补上品牌后缀
+  const title = [`${view.title} ${priceLabel(car, t)}`, location].filter(Boolean).join(" - ");
+  const description = buildDescription(car, view, locale, t);
   const cover = coverImage(car);
-  const url = `${SITE_URL}/${locale}/car/${car.id}`;
+  // 本语言没有可用译文时 canonical 指向原文语言页,hreflang 只列可用语言
+  const alternates = contentAlternates(locale, `/car/${car.id}`, view.available, view.xDefault);
 
   return {
     title,
@@ -93,20 +98,21 @@ export async function generateMetadata({
       car.model,
       `${car.make} ${car.model}`,
       String(car.year),
-      carLocation(car, locale as Locale),
+      location,
       car.fuel_type && t(car.fuel_type),
-      ...(locale === "zh"
-        ? ["北美华人二手车", "华人卖车", "二手车"]
-        : [t("二手车"), t("常來車網")]),
+      t("二手车"),
+      t("常來車網"),
     ].filter(Boolean) as string[],
-    alternates: localeAlternates(locale, `/car/${car.id}`),
+    alternates,
     openGraph: {
       type: "website",
+      locale: ogLocale(locale),
+      alternateLocale: ogAlternates(locale, view.available),
       title,
       description,
-      url,
-      siteName: SITE_NAME,
-      ...(cover && { images: [{ url: cover, alt: nameZh }] }),
+      url: alternates.canonical,
+      siteName: t(SITE_NAME),
+      ...(cover && { images: [{ url: cover, alt: view.title }] }),
     },
     twitter: {
       card: cover ? "summary_large_image" : "summary",
@@ -120,121 +126,47 @@ export async function generateMetadata({
 export default async function Page({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  const { id } = await params;
-  const car = await getCar(id);
+  const { locale: rawLocale, id } = await params;
+  const locale = rawLocale as Locale;
+  const car = await getPublicCar(id);
+  if (!car) notFound();
 
-  // schema.org Car(继承 Vehicle/Product),带报价与关键规格,利于结构化检索
-  const jsonLd =
-    car && car.status !== "removed" && !car.owner_hidden
-      ? {
-          "@context": "https://schema.org",
-          "@type": "Car",
-          "@id": `${SITE_URL}/car/${car.id}`,
-          name: `${car.year} ${car.make} ${car.model}${car.trim ? " " + car.trim : ""}`,
-          brand: { "@type": "Brand", name: car.make },
-          model: car.model,
-          vehicleModelDate: String(car.year),
-          ...(car.vin && { vehicleIdentificationNumber: car.vin }),
-          ...(car.exterior_color && { color: car.exterior_color }),
-          ...(car.fuel_type && { fuelType: car.fuel_type }),
-          ...(car.drivetrain && { driveWheelConfiguration: car.drivetrain }),
-          ...(car.mileage > 0 && {
-            mileageFromOdometer: {
-              "@type": "QuantitativeValue",
-              value: car.mileage,
-              unitCode: "SMI",
-            },
-          }),
-          ...(car.transmission && { vehicleTransmission: car.transmission }),
-          ...(() => {
-            const imgs = [car.image_url, ...(car.images || [])].filter(
-              (u): u is string => !!u && !VIDEO_RE.test(u),
-            );
-            return imgs.length ? { image: imgs } : {};
-          })(),
-          ...(car.description_zh || car.description
-            ? { description: (car.description_zh || car.description || "").slice(0, 500) }
-            : {}),
-          ...(car.price > 0 && {
-            offers: {
-              "@type": "Offer",
-              price: car.price,
-              priceCurrency: "USD",
-              availability:
-                car.status === "active"
-                  ? "https://schema.org/InStock"
-                  : "https://schema.org/OutOfStock",
-              itemCondition: "https://schema.org/UsedCondition",
-              url: `${SITE_URL}/car/${car.id}`,
-              ...(car.seller_name && {
-                seller: {
-                  "@type":
-                    car.profiles?.account_type === "dealer" || car.profiles?.is_system
-                      ? "AutoDealer"
-                      : "Person",
-                  name: car.seller_name,
-                  url: `${SITE_URL}/user/${car.seller_id}`,
-                },
-              }),
-              ...(car.location && {
-                availableAtOrFrom: {
-                  "@type": "Place",
-                  name: car.location_zh || car.location,
-                  address: car.location,
-                },
-              }),
-            },
-          }),
-        }
-      : null;
+  const t = serverT(locale);
+  const [row, comments] = await Promise.all([
+    getBundle("car", car.id, locale),
+    getPublicCarComments(car.id, SSR_COMMENT_LIMIT),
+  ]);
+  const commentRows = await getBundles(
+    "car_comment",
+    comments.map((c) => c.id),
+    locale,
+  );
+  const view = resolveCarView(car, row, locale, t);
+  const url = `${SITE_URL}/${locale}/car/${car.id}`;
 
-  // 面包屑:首页 → 二手车 → 品牌落地页 → 本车,利于搜索结果展示层级
-  const hasMakePage =
-    !!car && car.make !== "Other" && (MAKES as readonly string[]).includes(car.make);
-  const breadcrumbLd = jsonLd
-    ? {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "首页", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: "二手车", item: `${SITE_URL}/cars` },
-          ...(hasMakePage
-            ? [
-                {
-                  "@type": "ListItem",
-                  position: 3,
-                  name: car!.make,
-                  item: `${SITE_URL}/cars/${makeSlug(car!.make)}`,
-                },
-              ]
-            : []),
-          {
-            "@type": "ListItem",
-            position: hasMakePage ? 4 : 3,
-            name: `${car!.year} ${car!.make} ${car!.model}`,
-            item: `${SITE_URL}/car/${car!.id}`,
-          },
-        ],
-      }
-    : null;
+  // 面包屑:首页 → 二手车 → 品牌落地页(/cars/* 只有中文版,仅 zh 树挂) → 本车
+  const makePage = locale === "zh" ? getSeoPage([makeSlug(car.make)]) : undefined;
+  const crumbs = [
+    { name: t("首页"), url: `${SITE_URL}/${locale}` },
+    { name: t("二手车"), url: `${SITE_URL}/${locale}/browse` },
+    ...(makePage?.kind === "make"
+      ? [{ name: makePage.label, url: `${SITE_URL}/zh${seoPageHref(makePage)}` }]
+      : []),
+    { name: view.title, url },
+  ];
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
-      )}
-      {breadcrumbLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
-        />
-      )}
-      <CarDetail initialCar={car} />
+      <JsonLd data={vehicleJsonLd({ car, view, locale, url, t })} />
+      <JsonLd data={breadcrumbJsonLd(crumbs)} />
+      <ContentI18nProvider
+        locale={locale}
+        rows={{ car: row ? { [car.id]: row } : {}, car_comment: commentRows }}
+      >
+        <CarDetail initialCar={car} initialComments={comments} />
+      </ContentI18nProvider>
     </>
   );
 }

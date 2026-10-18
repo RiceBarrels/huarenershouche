@@ -1,14 +1,15 @@
-// /api/translate-post — 社区帖子按需 AI 翻译(X 式「已翻译 · 显示原文」)。
-// 帖子只有原文(多为中文),非中文界面(en/ko)首次浏览时翻译并缓存进
-// community_posts.other_i18n;命中缓存直接返回,不重复花翻译费。
+// /api/translate-post — 旧版原生 App 的兼容接口(只读,绝不调用模型)。
+// 旧版本按需请求帖子(详情页单篇 postId,列表一批 postIds)在某个语种下的标题 / 正文。
+// 现在只读 i18n_bundle,只返回已有校验过译文(ok)的帖子;原文已是该语种、不需要翻译的字段用原文补齐。
+// 单篇没有译文时返回 translation_pending;批量里缺席的帖子由旧客户端标记为「显示原文」。
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/sources/service-client";
-import { translatePostInto, isTranslationConfigured } from "@/lib/translate";
-import { LOCALES } from "@/lib/i18n";
+import { supabase } from "@/lib/supabase";
+import type { Locale } from "@/lib/i18n";
+import { isSiteLocale } from "@/lib/i18n/content-langs";
+import type { BundleRow } from "@/lib/i18n/content/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 // Capacitor 原生壳与站点不同源,放开 CORS
 const CORS_HEADERS = {
@@ -17,11 +18,35 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+const MAX_BATCH = 12; // 旧版列表卡片一批最多 12 篇
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+type PostI18n = { title: string | null; content: string | null };
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
 
-const MAX_BATCH = 12; // 列表卡片批量翻译上限(每帖一次模型调用,防单请求过重)
+/** 已有译文的帖子 → { title, content };i18n_bundle 只返回公开帖子,RPC 失败(含 SQL 未执行)时为空 */
+async function translatedPosts(ids: string[], locale: Locale): Promise<Record<string, PostI18n>> {
+  const { data, error } = await supabase.rpc("i18n_bundle", { p_entity: "post", p_ids: ids, p_locale: locale });
+  const rows = error ? [] : ((data as BundleRow[] | null) ?? []).filter((r) => r.s === "ok" && r.f);
+  if (rows.length === 0) return {};
+
+  // 只翻了部分字段(如标题本来就是该语种)的帖子,另一个字段取原文
+  const partial = rows.filter((r) => !r.f?.title || !r.f?.content).map((r) => r.id);
+  const originals = new Map<string, { title: string | null; content: string | null }>();
+  if (partial.length > 0) {
+    const { data: posts } = await supabase.from("community_posts").select("id, title, content").in("id", partial);
+    for (const p of posts ?? []) originals.set(p.id, { title: p.title, content: p.content });
+  }
+  const out: Record<string, PostI18n> = {};
+  for (const r of rows) {
+    const original = originals.get(r.id);
+    out[r.id] = { title: r.f?.title || original?.title || null, content: r.f?.content || original?.content || null };
+  }
+  return out;
+}
 
 export async function POST(req: NextRequest) {
   let body: { postId?: string; postIds?: unknown; locale?: string } = {};
@@ -30,102 +55,23 @@ export async function POST(req: NextRequest) {
   } catch {
     // fallthrough
   }
-  const postId = typeof body.postId === "string" ? body.postId : null;
+  const postId = typeof body.postId === "string" && UUID_RE.test(body.postId) ? body.postId : null;
   const postIds = Array.isArray(body.postIds)
-    ? [...new Set(body.postIds.filter((v): v is string => typeof v === "string"))].slice(0, MAX_BATCH)
+    ? [...new Set(body.postIds.filter((v): v is string => typeof v === "string" && UUID_RE.test(v)))].slice(0, MAX_BATCH)
     : null;
-  const locale = typeof body.locale === "string" ? body.locale : null;
-  if ((!postId && !postIds?.length) || !locale || !(LOCALES as string[]).includes(locale)) {
-    return NextResponse.json(
-      { ok: false, error: "bad_request" },
-      { status: 400, headers: CORS_HEADERS }
-    );
+  const locale = isSiteLocale(body.locale) ? body.locale : null;
+  if ((!postId && !postIds?.length) || !locale) {
+    return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  // ---- 批量模式(社区列表卡片):返回 { i18n: { [postId]: { title, content } } } ----
+  // ---- 批量模式(社区列表卡片):{ i18n: { [postId]: { title, content } } },只含已有译文的帖子 ----
   if (postIds?.length) {
-    const supabase = createServiceClient();
-    const { data: rows, error } = await supabase
-      .from("community_posts")
-      .select("id, title, content, other_i18n")
-      .in("id", postIds)
-      .eq("status", "active");
-    if (error || !rows?.length) {
-      return NextResponse.json(
-        { ok: false, error: "not_found" },
-        { status: 404, headers: CORS_HEADERS }
-      );
-    }
-    const result: Record<string, { title?: string | null; content?: string | null }> = {};
-    const pending: typeof rows = [];
-    for (const row of rows) {
-      const cached = (row.other_i18n as Record<string, { title?: string | null; content?: string | null }> | null)?.[locale];
-      if (cached?.content || cached?.title) result[row.id] = cached;
-      else pending.push(row);
-    }
-    if (pending.length > 0 && isTranslationConfigured()) {
-      // 帖子正文可能很长,逐帖翻译;3 路并发平衡时延与限流
-      const CONCURRENCY = 3;
-      for (let i = 0; i < pending.length; i += CONCURRENCY) {
-        await Promise.all(
-          pending.slice(i, i + CONCURRENCY).map(async (row) => {
-            const translated = await translatePostInto(locale, {
-              title: row.title || null,
-              content: row.content || null,
-            });
-            if (!translated?.content && !translated?.title) return;
-            result[row.id] = translated;
-            await supabase
-              .from("community_posts")
-              .update({ other_i18n: { ...((row.other_i18n as object | null) ?? {}), [locale]: translated } })
-              .eq("id", row.id);
-          })
-        );
-      }
-    }
-    return NextResponse.json({ ok: true, i18n: result }, { headers: CORS_HEADERS });
+    return NextResponse.json({ ok: true, i18n: await translatedPosts(postIds, locale) }, { headers: CORS_HEADERS });
   }
 
-  const supabase = createServiceClient();
-  const { data: post, error } = await supabase
-    .from("community_posts")
-    .select("id, title, content, other_i18n")
-    .eq("id", postId)
-    .eq("status", "active")
-    .maybeSingle();
-  if (error || !post) {
-    return NextResponse.json(
-      { ok: false, error: "not_found" },
-      { status: 404, headers: CORS_HEADERS }
-    );
+  const single = postId ? (await translatedPosts([postId], locale))[postId] : undefined;
+  if (!single) {
+    return NextResponse.json({ ok: false, error: "translation_pending" }, { headers: CORS_HEADERS });
   }
-
-  const cached = (post.other_i18n as Record<string, { content?: string | null }> | null)?.[locale];
-  if (cached?.content) {
-    return NextResponse.json({ ok: true, i18n: cached, cached: true }, { headers: CORS_HEADERS });
-  }
-
-  if (!isTranslationConfigured()) {
-    return NextResponse.json(
-      { ok: false, error: "translation_not_configured" },
-      { status: 200, headers: CORS_HEADERS }
-    );
-  }
-
-  const translated = await translatePostInto(locale, {
-    title: post.title || null,
-    content: post.content || null,
-  });
-  if (!translated?.content && !translated?.title) {
-    return NextResponse.json(
-      { ok: false, error: "translation_failed" },
-      { status: 200, headers: CORS_HEADERS }
-    );
-  }
-
-  const merged = { ...((post.other_i18n as object | null) ?? {}), [locale]: translated };
-  // 写缓存失败不影响本次返回(下个用户会再翻一次)
-  await supabase.from("community_posts").update({ other_i18n: merged }).eq("id", postId);
-
-  return NextResponse.json({ ok: true, i18n: translated, cached: false }, { headers: CORS_HEADERS });
+  return NextResponse.json({ ok: true, i18n: single }, { headers: CORS_HEADERS });
 }

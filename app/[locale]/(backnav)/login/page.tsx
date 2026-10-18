@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { oauthRedirectTo } from "@/lib/oauth-redirect";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLogoSrc } from "@/lib/i18n";
 import { EASE } from "@/lib/motion";
@@ -92,7 +93,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `https://www.clcauto.com/`,
+        redirectTo: oauthRedirectTo(locale),
       },
     });
     if (error) {
@@ -118,7 +119,7 @@ export default function LoginPage() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "apple",
       options: {
-        redirectTo: `https://www.clcauto.com/`,
+        redirectTo: oauthRedirectTo(locale),
       },
     });
     if (error) {

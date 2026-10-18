@@ -1,6 +1,6 @@
 // /api/v1/inventory/{external_id} — 单条库存(需 write:inventory)。
 // PUT:幂等 upsert,201 新建 / 200 更新,?adopt=true 接管同 VIN 的手动帖;
-// DELETE:?reason=sold(默认)| removed;GET:单条详情。
+// DELETE:?reason=sold(默认)| removed;GET:单条详情(形状同 GET /inventory 的列表项)。
 
 import type { NextRequest } from "next/server";
 import { authenticateApi } from "@/lib/api/auth";
@@ -9,10 +9,12 @@ import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/re
 import type { ApiContext } from "@/lib/api/types";
 import {
   INVENTORY_COLS,
+  INVENTORY_COLS_V2,
   finalize,
   formatZodError,
   listingSchema,
   listingUrl,
+  loadTranslationPending,
   readJsonBody,
   removeListing,
   serializeInventoryItem,
@@ -20,6 +22,7 @@ import {
   validationResponse,
   type InventoryCar,
 } from "@/lib/api/listing";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -33,24 +36,34 @@ export async function GET(req: NextRequest, { params }: Params) {
     const auth = await authenticateApi(req, { scope: "write:inventory" });
     if (!auth.ok) return auth.response;
     ctx = auth.ctx;
+    const { supabase, lang } = ctx;
+    const ownerId = ctx.owner!.id;
     const { external_id } = await params;
 
-    const { data, error } = await ctx.supabase
-      .from("cars")
-      .select(INVENTORY_COLS)
-      .eq("seller_id", ctx.owner!.id)
-      .eq("external_id", external_id)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) return finalize(ctx, apiError(404, "not_found", `No listing with external_id "${external_id}"`));
+    // 内容时钟 content_updated_at(i18n-v2.sql);库里还没有该列时按旧列集重查(updated_at 即行时钟)
+    const run = (legacy: boolean) =>
+      supabase
+        .from("cars")
+        .select(legacy ? INVENTORY_COLS : INVENTORY_COLS_V2)
+        .eq("seller_id", ownerId)
+        .eq("external_id", external_id)
+        .maybeSingle();
+    let res = await run(false);
+    if (res.error && isMissingColumnError(res.error)) res = await run(true);
+    if (res.error) throw new Error(res.error.message);
+    if (!res.data) return finalize(ctx, apiError(404, "not_found", `No listing with external_id "${external_id}"`));
 
-    return apiJson({ data: serializeInventoryItem(data as unknown as InventoryCar, ctx.lang), lang: ctx.lang });
+    const car = res.data as unknown as InventoryCar;
+    const pending = await loadTranslationPending([car.id]);
+    return apiJson({ data: serializeInventoryItem(car, lang, pending.has(car.id)), lang });
   } catch (err) {
     return finalize(ctx, apiInternalError(err, "inventory.get"));
   }
 }
 
 export async function PUT(req: NextRequest, { params }: Params) {
+  // 后台审核 / 翻译截止 = 请求开始 + 55 s(maxDuration 60),鉴权与读 body 的耗时也算在内
+  const start = Date.now();
   let ctx: ApiContext | null = null;
   try {
     const auth = await authenticateApi(req, { scope: "write:inventory" });
@@ -67,7 +80,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     if (!parsed.success) return finalize(ctx, validationResponse(formatZodError(parsed.error)));
 
     const adopt = req.nextUrl.searchParams.get("adopt") === "true";
-    const result = await upsertListing(ctx, parsed.data, { adopt });
+    const result = await upsertListing(ctx, parsed.data, { adopt, startedAt: start });
     if (!result.ok) return finalize(ctx, result.response);
 
     return apiJson(

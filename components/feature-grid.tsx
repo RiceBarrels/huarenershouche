@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "@/components/localized-navigation";
 import { match } from "pinyin-pro";
-import { Search, X, LayoutGrid } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import { useI18n } from "@/components/i18n-provider";
@@ -92,10 +92,12 @@ function recordUse(id: string) {
   }
 }
 
-function FeatureIcon({ f, size = "lg" }: { f: Feature; size?: "lg" | "sm" }) {
+// 图标:public/icons/features/{id}.svg —— 品牌薄荷绿圆角底 + 深墨描边白色图形,
+// 每个图标各带一点点缀色(天蓝/琥珀/珊瑚/淡紫/粉/橙)以示区分。
+function FeatureIcon({ f, size = "lg" }: { f: Pick<Feature, "id">; size?: "lg" | "sm" }) {
   return (
     <img
-      src={`/icons/features/${f.id}.png`}
+      src={`/icons/features/${f.id}.svg`}
       alt=""
       loading="lazy"
       className={`object-contain ${size === "lg" ? "h-12 w-12" : "h-10 w-10"}`}
@@ -172,9 +174,7 @@ export function FeatureRow({ brandTiles = [] }: { brandTiles?: ReactNode[] }) {
             type="button"
             className="flex flex-col items-center gap-1.5 rounded-xl py-2 transition-colors active:bg-muted/50"
           >
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-              <LayoutGrid className="h-6 w-6" strokeWidth={1.8} />
-            </span>
+            <FeatureIcon f={{ id: "all" }} />
             <span className="font-mono text-[11px]">{t("全部功能")}</span>
           </button>
         </DrawerTrigger>

@@ -89,11 +89,13 @@ function enumFilter(sp: URLSearchParams, name: EnumKind, errors: ApiErrorDetail[
 /**
  * 把 query 参数套到 cars 查询上(不含 status/owner_hidden 公共可见性,路由自己加)。
  * anonymous=true 时 seller_id 直接报错(防匿名按卖家整站扒)。
+ * updated_since 比的是内容时钟 content_updated_at(i18n-v2.sql;只在可见内容变化时前进,
+ * 浏览数 / 收藏 / 翻译都不算);legacy=true(库里还没有该列,缺列重试时)退回 updated_at。
  */
 export function applyCarQueryFilters<Q extends CarFilterQuery>(
   query: Q,
   sp: URLSearchParams,
-  opts: { anonymous: boolean },
+  opts: { anonymous: boolean; legacy?: boolean },
 ): { query: Q; errors: ApiErrorDetail[] } {
   const errors: ApiErrorDetail[] = [];
   let q = query;
@@ -152,7 +154,7 @@ export function applyCarQueryFilters<Q extends CarFilterQuery>(
     if (Number.isNaN(ms)) {
       errors.push({ field: "updated_since", issue: "must be an ISO 8601 timestamp" });
     } else {
-      q = q.gte("updated_at", new Date(ms).toISOString());
+      q = q.gte(opts.legacy ? "updated_at" : "content_updated_at", new Date(ms).toISOString());
     }
   }
 

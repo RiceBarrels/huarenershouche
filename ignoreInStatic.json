@@ -1,0 +1,8 @@
+{
+  "ignore": [
+    "app/api",
+    "app/sitemap.xml",
+    "app/sitemaps",
+    "app/global-not-found.tsx"
+  ]
+}

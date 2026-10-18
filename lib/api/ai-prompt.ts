@@ -1,6 +1,6 @@
 // Public API 的「AI 格式」说明:一段纯文本,用户整段复制粘贴给 ChatGPT / Claude 等
 // 助手后,助手即可正确调用接口(单位、枚举、配额、先 dry run 再对账等规则都写在里面)。
-// 同一份文本也由 /api/v1/llms.txt 直接输出,供 AI 抓取(站点根 /llms.txt 是 public 静态文件,里面链到这里)。
+// 同一份文本也由 /api/v1/llms.txt 直接输出,供 AI 抓取(站点根 /llms.txt 由 lib/llms.ts 生成,里面链到这里)。
 // 数字与枚举全部从 lib/api/types.ts / enums.ts 取,避免文档与实现漂移。
 
 import { enumSlugs } from "./enums";
@@ -8,7 +8,6 @@ import {
   ANON_RATE_LIMIT_PER_MIN,
   BATCH_MAX_ITEMS,
   DEFAULT_PAGE_SIZE,
-  LISTING_EXPIRY_DAYS,
   LISTING_MAX_IMAGES,
   MAX_PAGE_SIZE,
   QUOTA_LIMITS,
@@ -26,7 +25,7 @@ export function buildAiPrompt(site: string = AI_PROMPT_SITE): string {
 
   return `# CLCAuto (常來車網) Public API — instructions for AI assistants
 
-You are helping a user work with the CLCAuto Public API. CLCAuto is a used-car marketplace for Chinese communities in North America. Follow these rules exactly.
+You are helping a user work with the CLCAuto Public API. CLCAuto is a non-profit, multilingual used-car marketplace in North America. Follow these rules exactly.
 
 ## Connection
 - Base URL: ${base}
@@ -43,8 +42,9 @@ You are helping a user work with the CLCAuto Public API. CLCAuto is a used-car m
   drivetrain: ${drive}
 - Lists are cursor-paginated: pass cursor = previous next_cursor; limit ≤ ${MAX_PAGE_SIZE} (default ${DEFAULT_PAGE_SIZE}).
 - Error body: { "error": { "code": string, "message": string, "details"?: [{ "field": string, "issue": string }] } }
-  400 bad_request / validation_failed · 401 unauthorized / key_revoked / key_expired · 403 insufficient_scope / ip_not_allowed / forbidden / account_banned · 404 not_found · 409 conflict · 429 rate_limited / quota_exceeded · 500 internal_error
+  400 bad_request / validation_failed · 401 unauthorized / key_revoked / key_expired · 403 insufficient_scope / ip_not_allowed / forbidden / account_banned · 404 not_found · 409 conflict / listing_blocked · 429 rate_limited / quota_exceeded · 500 internal_error
 - On 429 rate_limited: wait Retry-After seconds, then retry once. On 429 quota_exceeded: STOP; body.quota.resets_at (UTC midnight) says when to continue. Never retry in a tight loop.
+- On 409 listing_blocked: the listing was removed by moderation or an administrator and cannot be relisted. Do not retry; tell the user.
 
 ## Quotas (per account per UTC day, shared by all of the account's keys)
 - personal tier: ${p.inserts} new listings, ${p.updates} changes per day.
@@ -52,8 +52,8 @@ You are helping a user work with the CLCAuto Public API. CLCAuto is a used-car m
 - Every write response includes a "quota" object and headers X-Quota-Inserts-Remaining / X-Quota-Updates-Remaining. GET /me shows the current tier and quota.
 
 ## Endpoints
-GET    /cars                          filters: make, model, year_min, year_max, price_min, price_max, mileage_max, fuel_type, transmission, drivetrain, location, seller_id (key required), updated_since (ISO 8601), sort (newest|price_asc|price_desc|mileage_asc|year_desc), limit, cursor, lang
-GET    /cars/{id}
+GET    /cars                          filters: make, model, year_min, year_max, price_min, price_max, mileage_max, fuel_type, transmission, drivetrain, location, seller_id (key required), updated_since (ISO 8601; listings whose visible content changed since then — compare with updated_at), sort (newest|price_asc|price_desc|mileage_asc|year_desc), limit, cursor, lang
+GET    /cars/{id}                     description / features in lang once translated (description_translated tells you); description_original and features_original are the seller's own text, description_lang its ISO 639-1 language (null when not detected or undeterminable)
 GET    /dealers                       filters: location, limit, cursor
 GET    /dealers/{id}                  store + up to 50 active cars
 GET    /meta/makes                    make → models → counts, plus the full enum catalog
@@ -68,11 +68,13 @@ POST   /inventory/{external_id}/images  { "images": ["https://...", ...] } ≤ $
 
 ## ListingInput (body of PUT, and each item of /inventory/batch)
 Required: vin (17 chars, no I/O/Q), year, make, model, price, mileage, fuel_type, transmission.
-Optional: trim, original_price, drivetrain, exterior_color, interior_color, description, description_lang ("zh" | "en"), features (string[] ≤ 40), images (https URLs ≤ ${LISTING_MAX_IMAGES}), carfax_url, store_id (dealers with several stores), location.
+Optional: trim, original_price, drivetrain, exterior_color, interior_color, description, features (string[] ≤ 40), images (https URLs ≤ ${LISTING_MAX_IMAGES}), carfax_url, store_id (dealers with several stores), location.
 - external_id is the dealer's own stock number and goes in the URL path (in batch items it is a body field).
 - location: dealer-tier accounts may omit it (the verified store address is used). Personal accounts MUST send it as "City, ST" or a 5-digit US zip.
-- Write description in ONE language; the server translates the other language, decodes the VIN, runs content moderation and mirrors the images asynchronously. The response "processing" array lists what is still running (vin, moderation, translation, images) — do not poll for it; GET /inventory later shows processing_state.
-- Listings expire ${LISTING_EXPIRY_DAYS} days after the last PUT. Re-send (PUT or batch) at least weekly to keep them live.
+- description and features: send the user's own wording in any language — do NOT translate them yourself. They are stored verbatim and machine-translated into the other site languages. description_lang is deprecated and ignored (the language is detected automatically); omit it.
+- The server decodes the VIN, mirrors the images, runs content moderation and translates asynchronously. The response "processing" array lists what is still running (vin, moderation, translation, images) — do not poll for it; GET /inventory later shows processing_state (images_pending, translation_pending).
+- Re-sending a listing whose description, features, year, make, model and trim are unchanged triggers no new moderation, and translation only re-runs when the description changes, so periodic full syncs are cheap.
+- Listings never expire; they stay live until you DELETE them, mark them sold, or reconcile them away.
 
 Example
 PUT ${base}/inventory/STK12345

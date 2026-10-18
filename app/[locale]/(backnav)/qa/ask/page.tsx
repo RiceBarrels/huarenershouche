@@ -11,6 +11,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { requestModeration } from "@/lib/moderation-client";
 import { useI18n } from "@/components/i18n-provider";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
@@ -27,6 +28,9 @@ const CATEGORIES = [
   { key: "maintenance", label: "保养" },
   { key: "general", label: "其他" },
 ] as const;
+
+// 与数据库上限一致(i18n-v2.sql qa_questions_text_len:问题描述 ≤ 20000 字;标题 ≤ 300 字,输入框限 100 字更严)
+const MAX_CONTENT_CHARS = 20000;
 
 export default function AskQuestionPage() {
   const router = useRouter();
@@ -84,21 +88,26 @@ export default function AskQuestionPage() {
       .select("id")
       .single();
 
-    setLoading(false);
-
     if (insertError) {
-      if (
-        insertError.message.includes("does not exist") ||
-        insertError.message.includes("relation") ||
-        insertError.code === "42P01"
-      ) {
-        setError(t("问答功能即将上线，暂时无法提问"));
-      } else {
-        setError(t("提交失败: {msg}", { msg: insertError.message }));
-      }
-    } else if (data) {
-      router.push(`/qa/${data.id}`);
+      setLoading(false);
+      // 只有表不存在(42P01 / PostgREST 结构缓存里没有该表 PGRST205)才是问答未上线;不能按消息里有没有
+      // "relation" 判断 —— 长度等 CHECK 违规(23514)的消息同样含 "relation"。其余失败保留表单内容并提示重试
+      setError(
+        insertError.code === "42P01" || insertError.code === "PGRST205"
+          ? t("问答功能即将上线，暂时无法提问")
+          : t("提交失败，请稍后再试"),
+      );
+      return;
     }
+
+    // AI 审核(通过后服务端立即翻译成其他语言):违规问题被隐藏,不跳转到详情页
+    const mod = await requestModeration("qa_question", data.id);
+    setLoading(false);
+    if (mod.blocked) {
+      setError(t("内容涉嫌违反社区规范，已被系统拦截，将由管理员复核"));
+      return;
+    }
+    router.push(`/qa/${data.id}`);
   }
 
   return (
@@ -183,6 +192,7 @@ export default function AskQuestionPage() {
                 className="mt-1 w-full rounded-xl bg-muted px-3 py-2.5 font-mono text-xs leading-relaxed text-foreground transition-colors placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
                 rows={8}
                 placeholder={t("详细描述你的问题，包括相关背景信息...")}
+                maxLength={MAX_CONTENT_CHARS}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 required

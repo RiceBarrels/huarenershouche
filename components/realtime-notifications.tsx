@@ -1,10 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useEffectEvent } from "react";
 import { supabase } from "@/lib/supabase";
 import { useRealtimeNotifications } from "@/lib/use-realtime-notifications";
 import { useIdentity } from "@/components/identity-provider";
+import { useI18n } from "@/components/i18n-provider";
 import { getWatchList, updateWatchedPrice } from "@/lib/price-watch";
+import { carTitle, localizePath, type Locale } from "@/lib/i18n";
+import { buildCarTitles } from "@/lib/i18n/car-title";
+import type { TFn } from "@/lib/i18n/content/types";
+import { formatPrice } from "@/lib/format";
+import { carLink } from "@/lib/static-link";
 import {
   notifyPriceDrop,
   notifyNewListingMatches,
@@ -19,23 +25,37 @@ import {
 } from "@/lib/saved-searches";
 import type { DbCar } from "@/lib/types";
 
-async function checkPriceWatch() {
+// 降价检查用到的列:标题按显示语言取 title / title_zh;两列都空时由年份 / 品牌 / 车型 / 配置确定性生成
+type WatchedCar = Pick<DbCar, "id" | "price" | "title" | "title_zh" | "year" | "make" | "model" | "trim">;
+
+async function checkPriceWatch(t: TFn, locale: Locale, pathLocale: Locale) {
   const watchList = getWatchList();
   if (watchList.length === 0) return;
 
   const carIds = watchList.map((w) => w.carId);
   const { data } = await supabase
     .from("cars")
-    .select("id, price, title_zh")
+    .select("id, price, title, title_zh, year, make, model, trim")
     .in("id", carIds);
   if (!data) return;
-  for (const car of data) {
+  for (const car of data as WatchedCar[]) {
     const watched = watchList.find((w) => w.carId === car.id);
-    if (watched && car.price < watched.price) {
-      notifyPriceDrop(car.title_zh, watched.price, car.price, car.id);
-      // 更新价格快照，避免下次打开重复提醒同一次降价
-      updateWatchedPrice(car.id, car.price);
-    }
+    if (!watched || car.price >= watched.price) continue;
+    const drop = watched.price - car.price;
+    notifyPriceDrop(
+      {
+        carId: car.id,
+        title: carTitle(car, locale) || carTitle(buildCarTitles(car), locale),
+        drop: formatPrice(drop),
+        pct: Math.round((drop / watched.price) * 100),
+        price: formatPrice(car.price),
+        // 通知点开是整页跳转:网页端带语言前缀,原生端是静态导出那棵树的 /car?id=
+        url: localizePath(carLink(car.id), pathLocale),
+      },
+      t,
+    );
+    // 更新价格快照，避免下次打开重复提醒同一次降价
+    updateWatchedPrice(car.id, car.price);
   }
 }
 
@@ -79,28 +99,34 @@ async function checkSavedSearches() {
 export function RealtimeNotifications() {
   // 新私信提醒按当前操作身份(切换成车行时收车行的提醒)
   const { actingId } = useIdentity();
+  const { t, locale, pathLocale, localeReady } = useI18n();
 
   useRealtimeNotifications(actingId);
 
+  // 提醒文案与链接按显示语言生成;取最新的 t / 语言,但不让检查随语言切换重跑
+  const runChecks = useEffectEvent(async () => {
+    try {
+      await checkPriceWatch(t, locale, pathLocale);
+    } catch {
+      // 静默失败
+    }
+    try {
+      await checkSavedSearches();
+    } catch {
+      // 静默失败
+    }
+  });
+
   useEffect(() => {
+    // 原生端等系统语言生效(localeReady)后再查,每次启动只查一次
+    if (!localeReady) return;
     // 通知未开启/未授权时不做任何检查，避免静默消耗价格快照和
     // lastCheckedAt（用户开启通知后仍能收到此前积累的提醒）
     if (!getNotificationPrefs().enabled || getPermissionStatus() !== "granted") {
       return;
     }
-    (async () => {
-      try {
-        await checkPriceWatch();
-      } catch {
-        // 静默失败
-      }
-      try {
-        await checkSavedSearches();
-      } catch {
-        // 静默失败
-      }
-    })();
-  }, []);
+    runChecks();
+  }, [localeReady]);
 
   return null;
 }

@@ -1,16 +1,18 @@
 "use client";
 
 // 设置 · 个人资料(iOS 风格):居中大头像 + 分组卡内表单行
-// (label 左 / 无边框输入右,输入后 800ms 自动保存)
+// (label 左 / 无边框输入右,输入后 800ms 自动保存)。
+// 点头像或「更换头像」都打开与「我的」页相同的头像查看器,在「⋯」菜单里更换或恢复默认。
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "@/components/localized-navigation";
 import { Camera, Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { avatarUrl } from "@/lib/avatar";
+import { avatarUrl, defaultAvatarUrl, isDefaultAvatar } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AvatarViewer } from "@/components/avatar-viewer";
 import { SettingsGroup, GroupFooter } from "@/components/ios-settings";
 import { LanguagePicker } from "@/components/language-picker";
 import { useI18n } from "@/components/i18n-provider";
@@ -49,6 +51,7 @@ export default function ProfileSettingsPage() {
   const [profile, setProfile] = useState<DbProfile | null>(null);
   const [form, setForm] = useState({ username: "", phone: "", location: "", languages: [] as string[] });
   const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarViewOpen, setAvatarViewOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +121,15 @@ export default function ProfileSettingsPage() {
     if (avatarInputRef.current) avatarInputRef.current.value = "";
   }
 
+  async function handleUseDefaultAvatar() {
+    if (!user) return;
+    setAvatarUploading(true);
+    const url = defaultAvatarUrl(user);
+    const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user);
+    if (!error) setProfile((prev) => (prev ? { ...prev, avatar_url: url } : prev));
+    setAvatarUploading(false);
+  }
+
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
@@ -143,21 +155,30 @@ export default function ProfileSettingsPage() {
               <button
                 type="button"
                 className="group relative h-24 w-24 overflow-hidden rounded-full bg-muted"
-                onClick={() => avatarInputRef.current?.click()}
+                onClick={() => setAvatarViewOpen(true)}
                 disabled={avatarUploading}
-                aria-label={t("更换头像")}
+                aria-label={t("查看头像")}
               >
                 <img src={avatarUrl(profile?.avatar_url, user)} alt="" className="h-full w-full object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100 group-active:opacity-100">
+                <div className={`absolute inset-0 flex items-center justify-center bg-black/40 transition-opacity group-hover:opacity-100 group-active:opacity-100 ${avatarUploading ? "opacity-100" : "opacity-0"}`}>
                   {avatarUploading
                     ? <Loader2 className="h-5 w-5 animate-spin text-white" strokeWidth={1.5} />
                     : <Camera className="h-5 w-5 text-white" strokeWidth={1.5} />}
                 </div>
               </button>
               <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
+              <AvatarViewer
+                src={avatarUrl(profile?.avatar_url, user)}
+                alt={profile?.username || t("头像")}
+                open={avatarViewOpen}
+                onClose={() => setAvatarViewOpen(false)}
+                onEdit={() => avatarInputRef.current?.click()}
+                onUseDefault={!isDefaultAvatar(profile?.avatar_url) ? handleUseDefaultAvatar : undefined}
+              />
               <button
                 type="button"
-                onClick={() => avatarInputRef.current?.click()}
+                onClick={() => setAvatarViewOpen(true)}
+                disabled={avatarUploading}
                 className="mt-2 font-mono text-[13px] text-brand-ink transition-opacity active:opacity-60"
               >
                 {t("更换头像")}

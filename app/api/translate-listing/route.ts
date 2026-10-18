@@ -1,15 +1,15 @@
-// /api/translate-listing — 小语种车源内容按需翻译。
-// 首次有人用该语言(如 ko)打开车源详情时调用:命中 cars.other_i18n 缓存
-// 直接返回;未命中则经 OpenRouter 翻译并写回缓存(service role,绕过 RLS)。
-// 匿名可调:每辆车每语言最多真正翻译一次,之后都是读缓存,滥用面有限。
+// /api/translate-listing — 旧版原生 App 的兼容接口(只读,绝不调用模型)。
+// 旧版本在车源详情页按需请求某个语种的标题 / 描述。现在译文由翻译管线提前生成(supabase/i18n-v2.sql),
+// 这里只读 i18n_bundle:该语种已有校验过的译文(ok)或原文就是该语种(source)时返回 { title, description },
+// 否则返回 translation_pending,旧客户端随即回退显示原文。标题是确定性标题(carTitle),不需要翻译。
 
 import { NextRequest, NextResponse } from "next/server";
-import { createServiceClient } from "@/lib/sources/service-client";
-import { translateListingInto, isTranslationConfigured } from "@/lib/translate";
-import { LAZY_CONTENT_LOCALES } from "@/lib/i18n";
+import { supabase } from "@/lib/supabase";
+import { carTitle } from "@/lib/i18n";
+import { isSiteLocale } from "@/lib/i18n/content-langs";
+import type { BundleRow } from "@/lib/i18n/content/types";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
 
 // Capacitor 原生壳的 origin 与站点不同源,需要放开 CORS
 const CORS_HEADERS = {
@@ -18,9 +18,13 @@ const CORS_HEADERS = {
   "Access-Control-Allow-Headers": "Content-Type",
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }
+
+const pending = () => NextResponse.json({ ok: false, error: "translation_pending" }, { headers: CORS_HEADERS });
 
 export async function POST(req: NextRequest) {
   let body: { carId?: string; locale?: string } = {};
@@ -29,57 +33,26 @@ export async function POST(req: NextRequest) {
   } catch {
     // fallthrough
   }
-  const carId = typeof body.carId === "string" ? body.carId : null;
-  const locale = typeof body.locale === "string" ? body.locale : null;
-  if (!carId || !locale || !(LAZY_CONTENT_LOCALES as string[]).includes(locale)) {
-    return NextResponse.json(
-      { ok: false, error: "bad_request" },
-      { status: 400, headers: CORS_HEADERS }
-    );
+  const carId = typeof body.carId === "string" && UUID_RE.test(body.carId) ? body.carId : null;
+  const locale = isSiteLocale(body.locale) ? body.locale : null;
+  if (!carId || !locale) {
+    return NextResponse.json({ ok: false, error: "bad_request" }, { status: 400, headers: CORS_HEADERS });
   }
 
-  const supabase = createServiceClient();
-  const { data: car, error } = await supabase
+  // i18n_bundle 只返回公开车源;SQL 未执行(函数不存在)时同样按「还没有译文」处理
+  const { data: rows, error } = await supabase.rpc("i18n_bundle", { p_entity: "car", p_ids: [carId], p_locale: locale });
+  const row = error ? undefined : (rows as BundleRow[] | null)?.[0];
+  if (!row || (row.s !== "ok" && row.s !== "source")) return pending();
+
+  const { data: car } = await supabase
     .from("cars")
-    .select("id, title, title_zh, description, description_zh, other_i18n")
+    .select("title, title_zh, description_original")
     .eq("id", carId)
     .maybeSingle();
-  if (error || !car) {
-    return NextResponse.json(
-      { ok: false, error: "not_found" },
-      { status: 404, headers: CORS_HEADERS }
-    );
-  }
-
-  // 缓存命中:直接返回,不再花翻译费
-  const cached = (car.other_i18n as Record<string, { title?: string | null }> | null)?.[locale];
-  if (cached?.title) {
-    return NextResponse.json({ ok: true, i18n: cached, cached: true }, { headers: CORS_HEADERS });
-  }
-
-  if (!isTranslationConfigured()) {
-    return NextResponse.json(
-      { ok: false, error: "translation_not_configured" },
-      { status: 200, headers: CORS_HEADERS }
-    );
-  }
-
-  // 英文优先作源文(小语种译文通常从英文更稳),缺英文再用中文。
-  // locale=en 时这里的"英文列"实际是中文脏数据,同样直接翻
-  const translated = await translateListingInto(locale, {
-    title: car.title || car.title_zh || null,
-    description: car.description || car.description_zh || null,
-  });
-  if (!translated?.title) {
-    return NextResponse.json(
-      { ok: false, error: "translation_failed" },
-      { status: 200, headers: CORS_HEADERS }
-    );
-  }
-
-  const merged = { ...((car.other_i18n as object | null) ?? {}), [locale]: translated };
-  // 写缓存失败不影响本次返回(下个用户会再翻一次)
-  await supabase.from("cars").update({ other_i18n: merged }).eq("id", carId);
-
-  return NextResponse.json({ ok: true, i18n: translated, cached: false }, { headers: CORS_HEADERS });
+  if (!car) return pending();
+  const translated = row.s === "ok" ? row.f?.description : undefined;
+  return NextResponse.json(
+    { ok: true, i18n: { title: carTitle(car, locale), description: translated || car.description_original || null } },
+    { headers: CORS_HEADERS },
+  );
 }

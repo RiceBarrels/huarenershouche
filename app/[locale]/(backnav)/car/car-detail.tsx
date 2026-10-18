@@ -64,7 +64,6 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
-import { MAKES_ZH } from "@/lib/mock-data";
 import { addRecentlyViewed } from "@/lib/recently-viewed";
 import { recordPrice } from "@/lib/price-history";
 import { PriceHistoryChart } from "@/components/price-history-chart";
@@ -80,16 +79,29 @@ import { ModelReviews } from "@/components/model-reviews";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { useIdentity } from "@/components/identity-provider";
-import { apiOrigin } from "@/lib/capacitor";
 import { trackCarView } from "@/lib/analytics/client";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle, carDescription, carLocation, LAZY_CONTENT_LOCALES, needsContentTranslation } from "@/lib/i18n";
+import { carTitle, carLocation } from "@/lib/i18n";
+import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
+import { normTag } from "@/lib/i18n/hashtags";
+import { legacyOriginal } from "@/lib/i18n/content/resolve";
+import {
+  CAR_LIST_COLUMNS,
+  CAR_PROFILE_EMBED,
+  LEGACY_PUBLIC_CAR_COLUMNS,
+  PUBLIC_CAR_COLUMNS,
+} from "@/lib/i18n/content/columns";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import { useBundleRow, useLocalized } from "@/hooks/use-localized";
+import { useTermLabels } from "@/hooks/use-term-labels";
+import { LocalizedText } from "@/components/content/localized-text";
+import { TranslationNotice } from "@/components/content/translation-notice";
 import { sellerSpeaksLocale } from "@/lib/i18n/languages";
 import { languageList } from "@/components/language-picker";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { DbCar } from "@/lib/types";
+import type { DbCar, DbComment, PublicCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -114,25 +126,90 @@ const StoreMap = nextDynamic(
   { ssr: false },
 );
 
-export default function CarDetailPage({
-  initialCar,
-  embedded = false,
-  onClose,
-}: {
-  initialCar?: DbCar | null;
+interface CarDetailProps {
+  // 服务端预取的公开整行(不含电话)/ 浮层传入的列表精简行 / not-found 页车主补拉的行
+  initialCar?: PublicCar | null;
+  // 服务端预取的首批评论(随页面 SSR 直出)
+  initialComments?: DbComment[];
   // embedded:在移动端浮层里内嵌打开(隐藏 Header/Footer,不占满整屏高度)
   embedded?: boolean;
   onClose?: () => void;
-} = {}) {
+  // 重新上架成功(not-found 页据此收起「已下架」提示条)
+  onRelisted?: () => void;
+}
+
+// 详情整行:公开列 + 卖家资料(不含电话,登录后点开联系方式再单独取)
+const CAR_ROW_SELECT = `${PUBLIC_CAR_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+const LEGACY_CAR_ROW_SELECT = `${LEGACY_PUBLIC_CAR_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+// 相似车渲染成卡片:列表列集 + 卖家资料(车行 / 系统检索徽标)
+const CAR_CARD_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+// 市场比价池只用到这几列(最多 150 台,不拉卡片列)
+const PRICE_POOL_SELECT = "id, make, model, year, price, mileage, status, vin";
+const NO_FEATURES: readonly string[] = [];
+
+/**
+ * 拉一辆车的详情整行。可见性交给 RLS:公开车源人人可读,已下架的只有车主 / 认领者 / 管理员可读。
+ * i18n-v2.sql 未执行(新列不存在)时退回旧列集。failed = 请求本身出错(网络等),区别于「查无此车」。
+ */
+export async function fetchCarRow(id: string): Promise<{ row: PublicCar | null; failed: boolean }> {
+  const query = (columns: string) =>
+    supabase.from("cars").select(columns).eq("id", id).maybeSingle();
+  let { data, error } = await query(CAR_ROW_SELECT);
+  if (error && isMissingColumnError(error)) ({ data, error } = await query(LEGACY_CAR_ROW_SELECT));
+  return { row: error ? null : ((data as PublicCar | null) ?? null), failed: !!error };
+}
+
+/**
+ * 传入的行能否直接当详情整行用(SSR / not-found 取的都是):要有原文列,且带完整卖家资料
+ * (CAR_PROFILE_EMBED,以最后一列 languages 为准;embed 结果为 null = 查无卖家,补拉也一样)。
+ * 浮层传入的列表行 —— 列表列集 / browse_cars 不带原文,select("*") 带原文但 profiles 缺失或只有部分列 —— 都要补拉
+ */
+function isDetailRow(car: PublicCar): boolean {
+  return (
+    "description_original" in car &&
+    "profiles" in car &&
+    (car.profiles == null || "languages" in car.profiles)
+  );
+}
+
+interface FeatureChip {
+  key: string;
+  label: string;
+}
+
+/** 配置标签一个术语只留一条(同一配置的中英文双写合并),保持首次出现的顺序 */
+function uniqueByKey(items: readonly FeatureChip[]): FeatureChip[] {
+  const seen = new Set<string>();
+  const chips: FeatureChip[] = [];
+  for (const item of items) {
+    if (seen.has(item.key)) continue;
+    seen.add(item.key);
+    chips.push(item);
+  }
+  return chips;
+}
+
+export default function CarDetailPage(props: CarDetailProps = {}) {
   const params = useRouteParams<{ id: string }>();
   // initialCar(浮层传入 / 服务端预取)优先:useParams() 是整棵路由树共用的,布局里渲染的浮层
   // 会读到当前页面的 [id](/car/A 上点相似车 B、/user/U 上点车都会错成 A / U);
   // 只有静态导出的 /car?id= 整页没有 initialCar,才靠路由参数
-  const carId = initialCar?.id || (params.id as string) || "";
+  const carId = props.initialCar?.id || (params.id as string) || "";
+  // 按 carId 重新挂载:静态导出页内从 A 跳到 B 时,A 的收藏 / 门店 / 相似车等状态不会带到 B
+  return <CarDetailView key={carId} {...props} carId={carId} />;
+}
+
+function CarDetailView({
+  carId,
+  initialCar,
+  initialComments,
+  embedded = false,
+  onRelisted,
+}: CarDetailProps & { carId: string }) {
   const router = useRouter();
   const { t, locale } = useI18n();
   const showChrome = !embedded;
-  const [car, setCar] = useState<DbCar | null>(initialCar ?? null);
+  const [car, setCar] = useState<PublicCar | null>(initialCar ?? null);
   const [loading, setLoading] = useState(!initialCar);
   const [isFavorited, setIsFavorited] = useState(false);
   // user = 当前操作身份(actingId,用于归属/私信判断);authId = 真实用户(收藏等个人操作)
@@ -149,6 +226,8 @@ export default function CarDetailPage({
   const [watching, setWatching] = useState(false);
   const [watchedPrice, setWatchedPrice] = useState<number | null>(null);
   const [renewing, setRenewing] = useState(false);
+  // 重新上架被拒:系统审核 / 管理员下架的车,车主不能自行恢复(触发器抛 listing_blocked)
+  const [relistBlocked, setRelistBlocked] = useState(false);
   const [inCompare, setInCompare] = useState(false);
   // 移动端:发消息在 drawer 里直接聊(不跳 /messages,浮层下跳页看不见)
   const [chatOpen, setChatOpen] = useState(false);
@@ -165,186 +244,213 @@ export default function CarDetailPage({
     return () => window.removeEventListener("compare-change", onCompareChange);
   }, [carId]);
 
-  // 分享用规范公网地址(App 内 origin 是 capacitor://localhost、浮层内 href 是列表页,均不可分享)
-  const shareUrl = `${SITE_URL}/car/${carId}`;
+  // 分享用规范公网地址(App 内 origin 是 capacitor://localhost、浮层内 href 是列表页,均不可分享);
+  // 带显示语言前缀(原生端同样取显示语言),对方打开看到同一语言
+  const shareUrl = `${SITE_URL}/${locale}/car/${carId}`;
   const [storeAddress, setStoreAddress] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
   const mobileGalleryRef = useRef<HTMLDivElement>(null);
 
-  // 内容惰性翻译:ko 恒需;en 是兜底(英文双列实际是中文脏数据时)。
-  // 判定用 needsContentTranslation:显示内容已是目标语言就不翻。
-  // 失败时写入空对象标记"已尝试",配合 attemptedRef 防止无限重试;
-  // 翻译在途(other_i18n[locale] 尚为 undefined)期间描述区显示 skeleton。
-  // 判定源 = 该语言实际会显示的内容(zh 界面判 zh 列的回退结果,en 同理),
-  // 语言不匹配才翻(如 zh 列缺失回退成英文、en 列缺失回退成中文)
-  const carContentSource = car
-    ? locale === "zh"
-      ? `${car.title_zh || car.title || ""}\n${car.description_zh || car.description || ""}`
-      : `${car.title || car.title_zh || ""}\n${car.description || car.description_zh || ""}`
-    : "";
-  const carNeedsTranslation =
-    !!car &&
-    (LAZY_CONTENT_LOCALES as string[]).includes(locale) &&
-    needsContentTranslation(carContentSource, locale);
-  const carTranslationPending = carNeedsTranslation && car?.other_i18n?.[locale] === undefined;
-  const translateAttempted = useRef<Set<string>>(new Set());
+  // 以下副作用各按 carId 跑一次。只有 (a) 整行补拉是有条件的:
+  // SSR / not-found 已给整行时不再请求,其余副作用照常基于 initialCar 执行。
+
+  // (a) 整行:没有 initialCar(静态导出 /car?id=),或传入的是浮层 / 列表精简行(见 isDetailRow)
+  const needsRow = !initialCar || !isDetailRow(initialCar);
   useEffect(() => {
-    if (!car?.id || !carNeedsTranslation) return;
-    if (car.other_i18n?.[locale] !== undefined) return; // 已有译文或已尝试过
-    const key = `${car.id}:${locale}`;
-    if (translateAttempted.current.has(key)) return;
-    translateAttempted.current.add(key);
+    if (!needsRow || !carId) return;
     let cancelled = false;
-    const carId = car.id;
-    fetch(`${apiOrigin()}/api/translate-listing`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ carId, locale }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json: { ok?: boolean; i18n?: { title?: string | null; description?: string | null } } | null) => {
-        if (cancelled) return;
-        // 失败也写入 {} 标记,让 skeleton 收起、回退显示原文
-        const i18n = (json?.ok ? json.i18n : undefined) ?? {};
-        setCar((prev) =>
-          prev && prev.id === carId
-            ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: i18n } }
-            : prev
-        );
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setCar((prev) =>
-          prev && prev.id === carId
-            ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: {} } }
-            : prev
-        );
+    fetchCarRow(carId).then(({ row, failed }) => {
+      if (cancelled) return;
+      // 网络失败时保留浮层传入的精简行,别把已显示的车清空
+      if (row || !failed) setCar(row);
+      setLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, needsRow]);
+
+  const hasRow = car !== null;
+
+  // (b) 浏览量 +1(RPC 绕过 RLS),成功后本地计数同步
+  useEffect(() => {
+    if (!hasRow) return;
+    let cancelled = false;
+    supabase.rpc("increment_views", { car_id: carId }).then(({ error }) => {
+      if (cancelled || error) return;
+      setCar((prev) => (prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : prev));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, hasRow]);
+
+  // (c) 有行(SSR / 浮层传入 / 补拉)就记一次:访问统计、最近浏览、价格快照。
+  // 访问统计的车辆浏览(手机浮层打开车辆不改 URL,只能在这里打点);取最新界面语言,但不让 effect 随语言重跑
+  const reportCarView = useEffectEvent((id: string) => trackCarView(id, locale));
+  const recordPriceSnapshot = useEffectEvent((id: string) => {
+    if (car) recordPrice(id, car.title, car.price);
+  });
+  useEffect(() => {
+    if (!hasRow) return;
+    reportCarView(carId);
+    addRecentlyViewed(carId);
+    recordPriceSnapshot(carId);
+  }, [carId, hasRow]);
+
+  // (d) 车行卖家：取门店地址，卖家信息里展示并可点击打开地图(精简行没带卖家资料时,补拉到整行后再取)
+  const dealerSellerId = car?.profiles?.account_type === "dealer" ? car.seller_id : null;
+  useEffect(() => {
+    if (!dealerSellerId) return;
+    let cancelled = false;
+    supabase
+      .from("dealer_stores")
+      .select("address, lat, lng")
+      .eq("owner_id", dealerSellerId)
+      .limit(1)
+      .maybeSingle()
+      .then(({ data: store }) => {
+        if (!cancelled && store?.address) setStoreAddress(store);
       });
     return () => {
       cancelled = true;
     };
-  }, [car?.id, car?.other_i18n, carNeedsTranslation, locale]);
+  }, [dealerSellerId]);
 
-  // 访问统计的车辆浏览(手机浮层打开车辆不改 URL,只能在这里打点);取最新界面语言,但不让 load 随语言重跑
-  const reportCarView = useEffectEvent((id: string) => trackCarView(id, locale));
-
+  // (e) 同品牌比价池 + 相似车:只用到行里的品牌 / 车型 / 年份 / 价格(精简行也有)
+  const make = car?.make;
+  const model = car?.model;
+  const year = car?.year;
+  const price = car?.price;
   useEffect(() => {
-    async function load() {
-      const { data } = await supabase
+    if (!make || year === undefined || price === undefined) return;
+    let cancelled = false;
+    (async () => {
+      // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
+      const { data: pool } = await supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url, is_system, claimed_by, languages)")
-        .eq("id", carId)
-        .single();
-      setCar(data as DbCar);
-      setLoading(false);
+        .select(PRICE_POOL_SELECT)
+        .eq("status", "active")
+        .eq("owner_hidden", false)
+        .eq("make", make)
+        .limit(150);
+      if (cancelled) return;
+      setMakePool((pool as DbCar[] | null) || []);
 
-      // Increment view count via RPC (bypasses RLS)
-      if (data) {
-        supabase.rpc("increment_views", { car_id: carId }).then(() => {
-          setCar((prev) => prev ? { ...prev, views_count: (prev.views_count || 0) + 1 } : prev);
-        });
-        reportCarView(carId);
-        addRecentlyViewed(carId);
-        recordPrice(carId, data.title, data.price);
-
-        // 车行卖家：取门店地址，卖家信息里展示并可点击打开地图
-        if (data.profiles?.account_type === "dealer") {
-          supabase
-            .from("dealer_stores")
-            .select("address, lat, lng")
-            .eq("owner_id", data.seller_id)
-            .limit(1)
-            .maybeSingle()
-            .then(({ data: store }) => {
-              if (store?.address) setStoreAddress(store);
-            });
-        }
-
-        // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
-        const { data: pool } = await supabase
+      // 相似车：优先同 make+model（±2 年）按上架时间新到旧，
+      // 不足 4 台补同 make 按 |价差| 从小到大，再不足补 ±30% 价格区间
+      const { data: sameMake } = await supabase
+        .from("cars")
+        .select(CAR_CARD_SELECT)
+        .eq("status", "active")
+        .eq("owner_hidden", false)
+        .eq("make", make)
+        .neq("id", carId)
+        .order("created_at", { ascending: false })
+        .limit(24);
+      const sameMakeCars = (sameMake as DbCar[] | null) || [];
+      const modelKey = (model || "").toLowerCase().trim();
+      const tier1 = modelKey
+        ? sameMakeCars.filter(
+            (c) =>
+              (c.model || "").toLowerCase().trim() === modelKey &&
+              Math.abs(c.year - year) <= 2
+          )
+        : [];
+      // 电议车（price=0）按价差排序会把最便宜的车排最前，改按年份接近度
+      const tier2 = sameMakeCars
+        .filter((c) => !tier1.some((t) => t.id === c.id))
+        .sort((a, b) =>
+          price > 0
+            ? Math.abs(a.price - price) - Math.abs(b.price - price)
+            : Math.abs(a.year - year) - Math.abs(b.year - year)
+        );
+      let picked = [...tier1, ...tier2].slice(0, 4);
+      if (picked.length < 4 && price > 0) {
+        const { data: priceSimilar } = await supabase
           .from("cars")
-          .select("id, make, model, year, price, mileage, status, vin")
+          .select(CAR_CARD_SELECT)
           .eq("status", "active")
           .eq("owner_hidden", false)
-          .eq("make", data.make)
-          .limit(150);
-        setMakePool((pool as DbCar[]) || []);
-
-        // 相似车：优先同 make+model（±2 年）按上架时间新到旧，
-        // 不足 4 台补同 make 按 |价差| 从小到大，再不足补 ±30% 价格区间
-        const { data: sameMake } = await supabase
-          .from("cars")
-          .select("*")
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .eq("make", data.make)
           .neq("id", carId)
-          .order("created_at", { ascending: false })
-          .limit(24);
-        const sameMakeCars = (sameMake as DbCar[]) || [];
-        const modelKey = (data.model || "").toLowerCase().trim();
-        const tier1 = modelKey
-          ? sameMakeCars.filter(
-              (c) =>
-                (c.model || "").toLowerCase().trim() === modelKey &&
-                Math.abs(c.year - data.year) <= 2
-            )
-          : [];
-        // 电议车（price=0）按价差排序会把最便宜的车排最前，改按年份接近度
-        const tier2 = sameMakeCars
-          .filter((c) => !tier1.some((t) => t.id === c.id))
-          .sort((a, b) =>
-            data.price > 0
-              ? Math.abs(a.price - data.price) - Math.abs(b.price - data.price)
-              : Math.abs(a.year - data.year) - Math.abs(b.year - data.year)
-          );
-        let picked = [...tier1, ...tier2].slice(0, 4);
-        if (picked.length < 4 && data.price > 0) {
-          const { data: priceSimilar } = await supabase
-            .from("cars")
-            .select("*")
-            .eq("status", "active")
-            .eq("owner_hidden", false)
-            .neq("id", carId)
-            .gte("price", data.price * 0.7)
-            .lte("price", data.price * 1.3)
-            .limit(8);
-          const extra = ((priceSimilar as DbCar[]) || []).filter(
-            (c) => !picked.some((p) => p.id === c.id)
-          );
-          picked = [...picked, ...extra].slice(0, 4);
-        }
-        setSimilarCars(picked);
+          .gte("price", price * 0.7)
+          .lte("price", price * 1.3)
+          .limit(8);
+        const extra = ((priceSimilar as DbCar[] | null) || []).filter(
+          (c) => !picked.some((p) => p.id === c.id)
+        );
+        picked = [...picked, ...extra].slice(0, 4);
       }
+      if (!cancelled) setSimilarCars(picked);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, make, model, year, price]);
 
-      // Check price watch
-      setWatching(isWatching(carId));
-      setWatchedPrice(getWatchedPrice(carId));
-
-      // Check auth & favorite（收藏始终归属真实用户）
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser();
-      if (authUser) {
-        // user(操作身份)由下面的 actingId effect 统一设置,此处只处理个人收藏
-        const { data: fav } = await supabase
-          .from("favorites")
-          .select("id")
-          .eq("user_id", authUser.id)
-          .eq("car_id", carId)
-          .maybeSingle();
-        setIsFavorited(!!fav);
-      }
-    }
-    load();
+  // (f) 降价监控状态(localStorage)与收藏(收藏始终归属真实用户 authId)
+  useEffect(() => {
+    setWatching(isWatching(carId));
+    setWatchedPrice(getWatchedPrice(carId));
   }, [carId]);
+  useEffect(() => {
+    if (!authId) return;
+    let cancelled = false;
+    supabase
+      .from("favorites")
+      .select("id")
+      .eq("user_id", authId)
+      .eq("car_id", carId)
+      .maybeSingle()
+      .then(({ data: fav }) => {
+        if (!cancelled) setIsFavorited(!!fav);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, authId]);
 
-  // 市场比价：与同品牌车源池对比（里程修正后的同类均价）
+  // 描述:卖家原文(任何语言)+ 当前界面语言的译文(i18n_bundle);SSR 由 ContentI18nProvider 预置,首屏即最终文本
+  const desc = useLocalized("car", car?.id, { description: car ? legacyOriginal(car) : null });
+  // 配置(与 resolveCarView 同一口径):bundle 有配置标签就用(已按术语去重并本地化);
+  // 没有(浮层首帧 / 原生端 / SQL 未上线)时按卖家原始标签查术语表
+  const bundleFeatures = useBundleRow("car", car?.id)?.x?.features;
+  const bundled = bundleFeatures && bundleFeatures.length > 0 ? bundleFeatures : null;
+  const rawFeatures = car?.features_original ?? car?.features ?? NO_FEATURES;
+  const termLabels = useTermLabels("feature", bundled ? NO_FEATURES : rawFeatures);
+
+  // 电话不随 SSR / 详情行下发(不进 RSC payload):登录用户点开联系方式时再单独取
+  const phoneMissing = car !== null && car.phone === undefined;
+  useEffect(() => {
+    if (!contactVisible || !user || !phoneMissing) return;
+    let cancelled = false;
+    supabase
+      .from("cars")
+      .select("phone")
+      .eq("id", carId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        // 取失败就收起,用户可以再点一次
+        if (error) {
+          setContactVisible(false);
+          return;
+        }
+        const phone = (data as { phone: string | null } | null)?.phone ?? null;
+        setCar((prev) => (prev ? { ...prev, phone } : prev));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [carId, contactVisible, user, phoneMissing]);
+  const phoneLoading = contactVisible && phoneMissing;
+
+  // 市场比价：与同品牌车源池对比（里程修正后的同类均价）;比价只读价格 / 里程 / 年份等公开列
   const insight = useMemo(
-    () => (car ? getPriceInsight(car, makePool) : null),
+    () => (car ? getPriceInsight(car as DbCar, makePool) : null),
     [car, makePool]
   );
   const comparables = useMemo(
-    () => (car ? findComparables(car, makePool).cars : []),
+    () => (car ? findComparables(car as DbCar, makePool).cars : []),
     [car, makePool]
   );
 
@@ -376,7 +482,7 @@ export default function CarDetailPage({
     }
   }
 
-  if (loading) {
+  if (loading && carId) {
     return (
       <div className="flex min-h-screen flex-col bg-background font-mono">
         {showChrome && <Header />}
@@ -445,6 +551,19 @@ export default function CarDetailPage({
     );
   }
 
+  // 标题是确定性的(zh 用 title_zh,其余用 title),SSR 与客户端一致,不会闪
+  const title = carTitle(car, locale);
+  const carfaxText = localizeCarfaxSummary(car.carfax_summary, t);
+  // 「显示原文」时配置也切回卖家原始标签(逐字);否则一个术语一条,显示当前语言标签。
+  // 未归并的标签(r: 键)bundle 给的是原文,与 useTermLabels 的回退一致走 UI 词典(倒车影像 → Backup camera)
+  const featureChips: FeatureChip[] = desc.showOriginal
+    ? rawFeatures.filter((raw) => raw.trim()).map((raw, i) => ({ key: `${i}:${raw}`, label: raw }))
+    : uniqueByKey(
+        bundled
+          ? bundled.map((f) => (f.key.startsWith("r:") ? { key: f.key, label: t(f.label) } : f))
+          : rawFeatures.filter((raw) => normTag(raw) !== null).map((raw) => termLabels[raw]),
+      );
+
   const allImages = [
     car.image_url,
     ...(car.images || []),
@@ -511,7 +630,7 @@ export default function CarDetailPage({
                         ) : (
                           <img
                             src={url}
-                            alt=""
+                            alt={i === 0 ? title : ""}
                             loading={i === 0 ? "eager" : "lazy"}
                             className="h-full w-full cursor-zoom-in object-cover"
                             onClick={() => setLightboxOpen(true)}
@@ -568,7 +687,7 @@ export default function CarDetailPage({
                   ) : (
                     <img
                       src={allImages[currentImage]}
-                      alt={car.title}
+                      alt={title}
                       className="h-full w-full cursor-zoom-in object-cover"
                       onClick={() => setLightboxOpen(true)}
                     />
@@ -686,7 +805,7 @@ export default function CarDetailPage({
             >
               {/* 桌面标题略放大,与卡片小字拉开层级(手机保持 text-xl 不变) */}
               <h1 className="font-mono text-xl font-semibold tracking-tight md:text-2xl">
-                {carTitle(car, locale)}
+                {title}
               </h1>
 
               <div className="mt-4 flex flex-wrap items-baseline gap-2">
@@ -735,7 +854,11 @@ export default function CarDetailPage({
                   <Heart className="h-3 w-3" strokeWidth={1.5} />
                   {t("{n} 人喜欢", { n: car.favorites_count || 0 })}
                 </span>
-                <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
+                {/* 相对时间在服务端渲染与水合之间可能跨过分钟边界,忽略这一处文本差异 */}
+                <span
+                  className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground"
+                  suppressHydrationWarning
+                >
                   <Calendar className="h-3 w-3" strokeWidth={1.5} />
                   {t("{time}上架", { time: timeAgo(car.created_at, t) })}
                 </span>
@@ -745,12 +868,12 @@ export default function CarDetailPage({
             <PriceHistoryChart carId={carId} />
 
             {/* 市场价位:min—avg—max 价位条 + 当前车价 marker */}
-            <MarketPosition car={car} comparables={comparables} insight={insight} />
+            <MarketPosition car={car as DbCar} comparables={comparables} insight={insight} />
 
             <Separator className="my-6" />
 
-            {/* Specs data sheet */}
-            <Reveal>
+            {/* Specs data sheet — ssrVisible:SSR 首屏即可见,不靠滚动动画显现 */}
+            <Reveal ssrVisible>
               {/* 桌面参数卡间距略放宽,与上下楼层留白节奏一致(手机保持 gap-2) */}
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:gap-3">
                 <div className="rounded-xl bg-card p-3">
@@ -841,7 +964,7 @@ export default function CarDetailPage({
             </Reveal>
 
             {car.vin && (
-              <Reveal>
+              <Reveal ssrVisible>
                 <Separator className="my-6" />
                 <div>
                   <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
@@ -859,21 +982,21 @@ export default function CarDetailPage({
             )}
 
             {/* Features */}
-            {car.features && car.features.length > 0 && (
-              <Reveal>
+            {featureChips.length > 0 && (
+              <Reveal ssrVisible>
                 <Separator className="my-6" />
                 <div>
                   <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     {t("车辆配置")}
                   </h2>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {car.features.map((f) => (
+                    {featureChips.map((f) => (
                       <Badge
-                        key={f}
+                        key={f.key}
                         variant="outline"
                         className="font-mono text-[11px]"
                       >
-                        {t(f)}
+                        {f.label}
                       </Badge>
                     ))}
                   </div>
@@ -881,42 +1004,40 @@ export default function CarDetailPage({
               </Reveal>
             )}
 
-            {/* Description */}
-            {(car.description_zh || car.description) && (
-              <Reveal>
+            {/* Description — 原文或译文直出(无骨架);译文时附「已从 X 翻译 · 显示原文」,切换同时作用于上方配置 */}
+            {(desc.text.description || desc.original.description) && (
+              <Reveal ssrVisible>
                 <Separator className="my-6" />
                 <div>
                   <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     {t("车辆描述")}
                   </h2>
-                  {carTranslationPending ? (
-                    /* 翻译在途:骨架占位,避免先闪原文再跳变 */
-                    <div className="mt-2 space-y-2">
-                      <Skeleton className="h-4 w-full" />
-                      <Skeleton className="h-4 w-11/12" />
-                      <Skeleton className="h-4 w-4/5" />
-                      <Skeleton className="h-4 w-2/3" />
-                    </div>
-                  ) : (
-                    <p className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground">
-                      {carDescription(car, locale)}
-                    </p>
-                  )}
+                  <TranslationNotice
+                    view={desc}
+                    originalUncertain={car.original_uncertain}
+                    className="mt-2"
+                  />
+                  <LocalizedText
+                    view={desc}
+                    field="description"
+                    as="p"
+                    className="mt-2 whitespace-pre-wrap font-mono text-sm leading-relaxed text-muted-foreground"
+                  />
                 </div>
               </Reveal>
             )}
 
             {/* Carfax report */}
             {car.carfax_url && (
-              <Reveal>
+              <Reveal ssrVisible>
                 <Separator className="my-6" />
                 <div>
                   <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                     {t("Carfax 报告")}
                   </h2>
-                  {car.carfax_summary && (
+                  {carfaxText && (
                     <p className="mt-2 font-mono text-sm text-muted-foreground">
-                      {car.carfax_summary}
+                      {carfaxText}
                     </p>
                   )}
                   <a
@@ -1055,8 +1176,12 @@ export default function CarDetailPage({
                       }
                     }}
                   >
-                    <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
-                    {contactVisible
+                    {phoneLoading ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                    ) : (
+                      <Phone className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    )}
+                    {contactVisible && !phoneLoading
                       ? car.phone || t("未提供电话")
                       : t("查看联系方式")}
                   </Button>
@@ -1105,29 +1230,38 @@ export default function CarDetailPage({
                 )}
 
                 {user && user === car.seller_id && car.status === "removed" && (
-                  <Button
-                    className="w-full gap-1.5 font-mono text-xs"
-                    disabled={renewing}
-                    onClick={async () => {
-                      setRenewing(true);
-                      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-                      const { error } = await supabase
-                        .from("cars")
-                        .update({ status: "active", expires_at: expiresAt })
-                        .eq("id", carId);
-                      setRenewing(false);
-                      if (!error) {
-                        setCar((prev) => (prev ? { ...prev, status: "active", expires_at: expiresAt } : prev));
-                      }
-                    }}
-                  >
-                    {renewing ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
-                    ) : (
-                      <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                  <>
+                    <Button
+                      className="w-full gap-1.5 font-mono text-xs"
+                      disabled={renewing || relistBlocked}
+                      onClick={async () => {
+                        setRenewing(true);
+                        const { error } = await supabase
+                          .from("cars")
+                          .update({ status: "active" })
+                          .eq("id", carId);
+                        setRenewing(false);
+                        if (!error) {
+                          setCar((prev) => (prev ? { ...prev, status: "active" } : prev));
+                          onRelisted?.();
+                        } else if (error.message.includes("listing_blocked")) {
+                          setRelistBlocked(true);
+                        }
+                      }}
+                    >
+                      {renewing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" strokeWidth={1.5} />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      )}
+                      {t("重新上架")}
+                    </Button>
+                    {relistBlocked && (
+                      <p role="alert" className="font-mono text-[11px] leading-relaxed text-red-600 dark:text-red-400">
+                        {t("该车源已被系统或管理员下架，无法重新上架")}
+                      </p>
                     )}
-                    {car.expires_at && new Date(car.expires_at).getTime() < Date.now() ? t("续期并重新上架") : t("重新上架")}
-                  </Button>
+                  </>
                 )}
 
                 {(!car.profiles?.is_system || car.profiles?.claimed_by) &&
@@ -1196,7 +1330,7 @@ export default function CarDetailPage({
                     } else {
                       addPriceWatch({
                         carId,
-                        title: carTitle(car, locale),
+                        title,
                         price: car.price,
                         watchedAt: new Date().toISOString(),
                         imageUrl: car.image_url,
@@ -1239,8 +1373,8 @@ export default function CarDetailPage({
                     onClick={async () => {
                       const { nativeShare } = await import("@/lib/capacitor");
                       const shared = await nativeShare({
-                        title: carTitle(car, locale),
-                        text: `${carTitle(car, locale)} - ${formatPrice(car.price)}`,
+                        title,
+                        text: `${title} - ${formatPrice(car.price)}`,
                         url: shareUrl,
                       });
                       if (!shared) {
@@ -1259,7 +1393,7 @@ export default function CarDetailPage({
                 <div className="hidden md:block">
                   <QrShare
                     url={shareUrl}
-                    title={carTitle(car, locale)}
+                    title={title}
                   />
                 </div>
 
@@ -1334,7 +1468,8 @@ export default function CarDetailPage({
                 <div className="mt-3 rounded-xl bg-muted/50 p-4">
                   <div className="border-l-2 border-foreground pl-3">
                     <p className="font-mono text-xl font-bold">
-                      {t("${n}/月*", { n: estimateMonthlyPayment(car.price).toLocaleString() })}
+                      {/* 固定 en-US 千分位:不随浏览器区域变,SSR 与水合一致 */}
+                      {t("${n}/月*", { n: estimateMonthlyPayment(car.price).toLocaleString("en-US") })}
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                       {t("按 {apr}% APR 估算*", { apr: (LOAN_ASSUMPTION.apr * 100).toFixed(1) })}
@@ -1399,7 +1534,7 @@ export default function CarDetailPage({
 
         {/* Comments — no scroll reveal: interactive content must never start
             hidden (Safari IntersectionObserver can fail on tall sections) */}
-        <CommentSection carId={carId} />
+        <CommentSection carId={carId} initialComments={initialComments} />
 
         {/* Similar cars */}
         {similarCars.length > 0 && (
@@ -1481,8 +1616,8 @@ export default function CarDetailPage({
             onClick={async () => {
               const { nativeShare } = await import("@/lib/capacitor");
               const shared = await nativeShare({
-                title: carTitle(car, locale),
-                text: `${carTitle(car, locale)} - ${formatPrice(car.price)}`,
+                title,
+                text: `${title} - ${formatPrice(car.price)}`,
                 url: shareUrl,
               });
               if (!shared) {
@@ -1506,8 +1641,12 @@ export default function CarDetailPage({
               }
             }}
           >
-            <Phone className="h-4 w-4" strokeWidth={1.5} />
-            {contactVisible ? (car.phone || t("无电话")) : t("联系卖家")}
+            {phoneLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+            ) : (
+              <Phone className="h-4 w-4" strokeWidth={1.5} />
+            )}
+            {contactVisible && !phoneLoading ? (car.phone || t("无电话")) : t("联系卖家")}
           </Button>
         ) : (
           <Link href="/login">

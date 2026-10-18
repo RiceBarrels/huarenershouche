@@ -18,8 +18,10 @@ import {
   Play,
   CircleHelp,
   Trash2,
+  Languages,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 import { requestModeration } from "@/lib/moderation-client";
 import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
@@ -47,6 +49,10 @@ import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummar
 import { Header } from "@/components/header";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLabel } from "@/lib/i18n";
+import { buildCarTitles } from "@/lib/i18n/car-title";
+import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
+import { FEATURE_SUGGESTIONS } from "@/lib/i18n/tag-suggestions";
+import { useTermLabels } from "@/hooks/use-term-labels";
 import { useIdentity } from "@/components/identity-provider";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
@@ -192,17 +198,8 @@ const seatOptions: ComboboxOption[] = [
   { value: "other", label: "其他" },
 ];
 
-// 常见配置亮点(点选快速添加)
-const FEATURE_SUGGESTIONS = [
-  "倒车影像",
-  "全景天窗",
-  "CarPlay",
-  "座椅加热",
-  "无事故",
-  "一手车主",
-  "真皮座椅",
-  "自适应巡航",
-];
+// 常见配置亮点(点选快速添加):共享词表,标签文案按 i18n 词表显示当前语言
+const SUGGESTED_FEATURES: readonly string[] = FEATURE_SUGGESTIONS;
 
 // ===== 多草稿存储:数组按 updatedAt 倒序,发布/删除时移除对应条目 =====
 const DRAFTS_KEY = "huaren_post_drafts";
@@ -255,7 +252,7 @@ function loadDrafts(): PostDraft[] {
 function draftHasContent(form: Record<string, string>, imageUrls: string[], features: string[]) {
   return Boolean(
     form.vin || form.make || form.model || form.price || form.mileage ||
-    form.description_zh || imageUrls.length > 0 || features.length > 0
+    form.description || imageUrls.length > 0 || features.length > 0
   );
 }
 
@@ -384,11 +381,14 @@ export default function PostCarPage() {
     customMake: "",
     seller_name: "",
     phone: "",
-    description_zh: "",
+    // 卖家原文(任何语言),写入 cars.description_original
+    description: "",
     carfax_url: "",
   };
 
   const [form, setForm] = useState(defaultForm);
+  // 推荐配置标签的当前语言文案(未取到前走词典)
+  const suggestionLabels = useTermLabels("feature", SUGGESTED_FEATURES);
 
   // 下拉选项按当前语言本地化展示(value 保持中文原值写库)
   const localize = (opts: ComboboxOption[]) => opts.map((o) => ({ ...o, label: t(o.label) }));
@@ -411,7 +411,10 @@ export default function PostCarPage() {
   useEffect(() => setDrafts(loadDrafts()), []);
 
   function restoreDraft(d: PostDraft) {
-    const merged = { ...defaultForm, ...d.form };
+    // 旧版草稿的描述存在 description_zh(表单字段已改名为 description)
+    const { description_zh: legacyDescription, ...savedForm } = d.form;
+    const merged = { ...defaultForm, ...savedForm };
+    if (!merged.description && legacyDescription) merged.description = legacyDescription;
     setForm(merged);
     setImageUrls(d.imageUrls || []);
     setFeatures(d.features || []);
@@ -816,12 +819,10 @@ export default function PostCarPage() {
       const extColor = randomPick(EXTERIOR_COLORS);
       const intColor = randomPick(INTERIOR_COLORS);
       const drivetrain = randomPick(["FWD", "AWD", "RWD"]);
-      const makeZh = MAKES_ZH[make] || make;
 
       listings.push({
         seller_id: user,
-        title: `${year} ${make} ${model}`,
-        title_zh: `${year} ${makeZh} ${model}`,
+        ...buildCarTitles({ year, make, model, trim: null }),
         year,
         make,
         model,
@@ -841,13 +842,19 @@ export default function PostCarPage() {
         phone: `${randomInt(200, 999)}-${randomInt(200, 999)}-${randomInt(1000, 9999)}`,
         lat: null,
         lng: null,
-        description_zh: null,
-        features: [],
         status: "active" as const,
       });
     }
 
-    const { error: insertError } = await supabase.from("cars").insert(listings);
+    // 与正式发布同样写原文列;数据库还没有原文列(i18n-v2 迁移前)时按旧列再插一次
+    let { error: insertError } = await supabase
+      .from("cars")
+      .insert(listings.map((l) => ({ ...l, description_original: null, features_original: [] })));
+    if (insertError && isMissingColumnError(insertError)) {
+      ({ error: insertError } = await supabase
+        .from("cars")
+        .insert(listings.map((l) => ({ ...l, description_zh: null, features: [] }))));
+    }
 
     setFakeGenerating(false);
     if (insertError) {
@@ -886,9 +893,13 @@ export default function PostCarPage() {
     setLoading(true);
 
     const actualMake = form.make === "Other" ? form.customMake.trim() : form.make;
-    const titleEn = `${form.year} ${actualMake} ${form.model}${form.trim ? " " + form.trim : ""}`;
-    const makeZh = form.make === "Other" ? actualMake : (MAKES_ZH[form.make] || actualMake);
-    const titleZh = `${form.year} ${makeZh} ${form.model}${form.trim ? " " + form.trim : ""}`;
+    // 标题按规则拼(与数据库 i18n.car_title 同一套),不走 AI
+    const titles = buildCarTitles({
+      year: Number(form.year),
+      make: actualMake,
+      model: form.model,
+      trim: form.trim || null,
+    });
 
     // Build location from structured fields
     const fullAddress = [form.address, form.address2].filter(Boolean).join(", ");
@@ -915,69 +926,51 @@ export default function PostCarPage() {
       }
     }
 
-    // AI 双语翻译:经服务端 /api/translate 补全中英 title / description,
-    // 标签做成双语(任何失败都保持原样,发布流程不受影响)
-    const loc = {
-      title: titleEn as string | null,
-      title_zh: titleZh as string | null,
-      description: null as string | null,
-      description_zh: (form.description_zh || null) as string | null,
-      features: features as string[],
+    // 描述(任何语言,全空白视为没填)与配置标签按卖家原文保存;各语言译文、
+    // 中英投影列由数据库触发器排队、服务端翻译管线生成,前端不再翻译
+    const description = form.description.trim() ? form.description : null;
+    const listing = {
+      seller_id: user,
+      ...titles,
+      year: Number(form.year),
+      make: actualMake,
+      model: form.model,
+      trim: form.trim || null,
+      price: Number(form.price),
+      mileage: Number(form.mileage),
+      location: locationEn,
+      location_zh: locationZh,
+      image_url: imageUrls[0] || null,
+      // 视频追加在 images 末尾，详情页按扩展名识别视频
+      images: [...imageUrls.slice(1), ...(videoUrl ? [videoUrl] : [])],
+      fuel_type: form.fuel_type,
+      transmission: form.transmission,
+      drivetrain: form.drivetrain || null,
+      exterior_color: form.exterior_color || null,
+      interior_color: form.interior_color || null,
+      vin: form.vin,
+      seller_name: form.seller_name,
+      phone: form.phone || null,
+      lat: coords?.lat || null,
+      lng: coords?.lng || null,
+      carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
+      carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
+      status: "active",
     };
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData.session?.access_token;
-      if (accessToken) {
-        const res = await fetch("/api/translate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-          body: JSON.stringify({ title: titleEn, title_zh: titleZh, description_zh: form.description_zh || null, features }),
-        });
-        if (res.ok) {
-          const j = await res.json();
-          if (j?.localized) Object.assign(loc, j.localized);
-        }
-      }
-    } catch {
-      /* 翻译失败,保持原文 */
-    }
 
-    const { data, error: insertError } = await supabase
+    let { data, error: insertError } = await supabase
       .from("cars")
-      .insert({
-        seller_id: user,
-        title: loc.title || titleEn,
-        title_zh: loc.title_zh || titleZh,
-        year: Number(form.year),
-        make: actualMake,
-        model: form.model,
-        trim: form.trim || null,
-        price: Number(form.price),
-        mileage: Number(form.mileage),
-        location: locationEn,
-        location_zh: locationZh,
-        image_url: imageUrls[0] || null,
-        // 视频追加在 images 末尾，详情页按扩展名识别视频
-        images: [...imageUrls.slice(1), ...(videoUrl ? [videoUrl] : [])],
-        fuel_type: form.fuel_type,
-        transmission: form.transmission,
-        drivetrain: form.drivetrain || null,
-        exterior_color: form.exterior_color || null,
-        interior_color: form.interior_color || null,
-        vin: form.vin,
-        seller_name: form.seller_name,
-        phone: form.phone || null,
-        lat: coords?.lat || null,
-        lng: coords?.lng || null,
-        description: loc.description,
-        description_zh: loc.description_zh ?? (form.description_zh || null),
-        carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
-        carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
-        features: loc.features.length ? loc.features : features,
-        status: "active",
-      })
+      .insert({ ...listing, description_original: description, features_original: features })
       .select("id")
       .single();
+    // 数据库还没有原文列(i18n-v2 迁移前):按旧列再发一次
+    if (insertError && isMissingColumnError(insertError)) {
+      ({ data, error: insertError } = await supabase
+        .from("cars")
+        .insert({ ...listing, description_zh: description, features })
+        .select("id")
+        .single());
+    }
 
     if (insertError) {
       setLoading(false);
@@ -1771,8 +1764,9 @@ export default function PostCarPage() {
                       {carfaxSummary && (
                         <div className="mt-3 flex items-center gap-2 rounded-xl bg-muted/60 px-4 py-3">
                           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                          {/* 摘要按中文格式存库(筛选要解析),展示时按界面语言转写 */}
                           <span className="flex-1 text-sm">
-                            {formatCarfaxSummary(carfaxSummary)}
+                            {localizeCarfaxSummary(formatCarfaxSummary(carfaxSummary), t)}
                           </span>
                           <a
                             href={normalizeCarfaxUrl(form.carfax_url)}
@@ -1814,8 +1808,10 @@ export default function PostCarPage() {
                         </button>
                       </div>
                       <div className="mt-4 flex flex-wrap gap-2">
-                        {[...features.filter((f) => !FEATURE_SUGGESTIONS.includes(f)), ...FEATURE_SUGGESTIONS].map((f) => {
+                        {[...features.filter((f) => !SUGGESTED_FEATURES.includes(f)), ...SUGGESTED_FEATURES].map((f) => {
                           const selected = features.includes(f);
+                          // 推荐项显示当前语言文案(词表未取到时走词典);自己填的标签原样显示(即存库原文)
+                          const text = SUGGESTED_FEATURES.includes(f) ? suggestionLabels[f]?.label ?? t(f) : f;
                           return (
                             <button
                               key={f}
@@ -1832,7 +1828,7 @@ export default function PostCarPage() {
                               ) : (
                                 <Plus className="mr-1 inline h-3.5 w-3.5" strokeWidth={1.5} />
                               )}
-                              {t(f)}
+                              {text}
                             </button>
                           );
                         })}
@@ -1842,13 +1838,20 @@ export default function PostCarPage() {
 
                   {/* ==== 描述 + 发布 ==== */}
                   {current.id === "description" && (
-                    <textarea
-                      autoFocus
-                      className="min-h-[30vh] w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
-                      placeholder={t("描述车辆状况、保养历史、卖车原因等...")}
-                      value={form.description_zh}
-                      onChange={(e) => update("description_zh", e.target.value)}
-                    />
+                    <div>
+                      <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Languages className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                        {t("可用任何语言填写，会自动翻译成其他语言")}
+                      </p>
+                      <textarea
+                        autoFocus
+                        maxLength={20000}
+                        className="min-h-[30vh] w-full resize-none bg-transparent text-[15px] leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                        placeholder={t("描述车辆状况、保养历史、卖车原因等...")}
+                        value={form.description}
+                        onChange={(e) => update("description", e.target.value)}
+                      />
+                    </div>
                   )}
                 </div>
 

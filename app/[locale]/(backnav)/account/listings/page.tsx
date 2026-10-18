@@ -37,22 +37,17 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
-function isExpired(car: DbCar): boolean {
-  return car.status === "removed" && !!car.expires_at && new Date(car.expires_at).getTime() < Date.now();
-}
-
-function daysLeft(car: DbCar): number | null {
-  if (!car.expires_at) return null;
-  const ms = new Date(car.expires_at).getTime() - Date.now();
-  return Math.ceil(ms / (1000 * 60 * 60 * 24));
-}
-
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
   active: { label: "在售", variant: "default" },
   sold: { label: "已售", variant: "secondary" },
   pending: { label: "审核中", variant: "outline" },
   removed: { label: "已下架", variant: "destructive" },
 };
+
+// 被 AI 审核或管理员下架的车源卖家不能自行重新上架(数据库触发器拒绝,报 listing_blocked)
+function relistLocked(car: DbCar): boolean {
+  return car.status === "removed" && (car.removal_reason === "moderation" || car.removal_reason === "admin");
+}
 
 export default function ListingsPage() {
   const router = useRouter();
@@ -61,12 +56,20 @@ export default function ListingsPage() {
   // 以「正在操作的账号」为准(默认本人;切换到已认领的系统车行时为该车行账号)。
   const acct = actingId;
   const [draft, setDraft] = useState<PostDraft | null>(null);
+  // 底部轻提示(如重新上架被拒),几秒后自动消失
+  const [notice, setNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 3500);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (!identityLoading && !authId) { router.push("/login"); return; }
   }, [identityLoading, authId, router]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage,仅首帧一次
     try { const raw = localStorage.getItem(DRAFT_KEY); if (raw) setDraft(JSON.parse(raw)); } catch {}
   }, []);
 
@@ -82,13 +85,22 @@ export default function ListingsPage() {
 
   async function toggleStatus(carId: string, currentStatus: string) {
     const newStatus = currentStatus === "active" ? "removed" : "active";
-    // 重新上架时续期 30 天
     const patch: Partial<DbCar> = { status: newStatus as DbCar["status"] };
-    if (newStatus === "active") {
-      // eslint-disable-next-line react-hooks/purity -- 事件回调里取当前时间,并非渲染期
-      patch.expires_at = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { error } = await supabase.from("cars").update(patch).eq("id", carId);
+    if (error) {
+      if (!error.message.includes("listing_blocked")) {
+        setNotice(t("失败: {msg}", { msg: error.message }));
+        return;
+      }
+      setNotice(t("该车源已被系统或管理员下架，无法重新上架"));
+      // 本地缓存可能还没有下架原因:拉回真实状态,隐藏「上架」按钮
+      const { data } = await supabase.from("cars").select("status, removal_reason").eq("id", carId).maybeSingle();
+      if (data) {
+        const fresh = data as Pick<DbCar, "status" | "removal_reason">;
+        mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, ...fresh } : c)));
+      }
+      return;
     }
-    await supabase.from("cars").update(patch).eq("id", carId);
     mutate((prev) => (prev || []).map((c) => (c.id === carId ? { ...c, ...patch } : c)));
   }
 
@@ -193,8 +205,8 @@ export default function ListingsPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <Link href={carLink(car.id)}><h3 className="font-mono text-sm font-semibold hover:underline">{carTitle(car, locale)}</h3></Link>
-                      <Badge variant={isExpired(car) ? "destructive" : (STATUS_MAP[car.status]?.variant || "outline")} className="font-mono text-[10px]">
-                        {isExpired(car) ? t("已过期") : (STATUS_MAP[car.status]?.label ? t(STATUS_MAP[car.status].label) : car.status)}
+                      <Badge variant={STATUS_MAP[car.status]?.variant || "outline"} className="font-mono text-[10px]">
+                        {STATUS_MAP[car.status]?.label ? t(STATUS_MAP[car.status].label) : car.status}
                       </Badge>
                       {car.source_id && (
                         <Badge variant="outline" className="gap-1 font-mono text-[10px]">
@@ -207,10 +219,12 @@ export default function ListingsPage() {
                     </div>
                     <p className="mt-0.5 font-mono text-xs text-muted-foreground">
                       {formatPrice(car.price)} · {carLocation(car, locale)} · {t("{n} 次浏览", { n: car.views_count || 0 })}
-                      {car.status === "active" && daysLeft(car) !== null && (
-                        <span className={daysLeft(car)! <= 7 ? "text-amber-600" : ""}> · {daysLeft(car)! <= 0 ? t("即将过期") : t("{n} 天后过期", { n: daysLeft(car)! })}</span>
-                      )}
                     </p>
+                    {relistLocked(car) && (
+                      <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                        {t("该车源已被系统或管理员下架，无法重新上架")}
+                      </p>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {car.source_id ? (
@@ -232,9 +246,11 @@ export default function ListingsPage() {
                             <CheckCircle className="h-3 w-3" strokeWidth={1.5} />{t("已售")}
                           </Button>
                         )}
-                        <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
-                          {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />{t("下架")}</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{isExpired(car) ? t("续期上架") : t("上架")}</> : null}
-                        </Button>
+                        {!relistLocked(car) && (
+                          <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px]" onClick={() => toggleStatus(car.id, car.status)}>
+                            {car.status === "active" ? <><XCircle className="h-3 w-3" strokeWidth={1.5} />{t("下架")}</> : car.status === "removed" ? <><Eye className="h-3 w-3" strokeWidth={1.5} />{t("上架")}</> : null}
+                          </Button>
+                        )}
                         <Button variant="secondary" size="sm" className="h-8 gap-1 px-3 font-mono text-[11px] text-destructive" onClick={() => deleteCar(car.id)}>
                           <Trash2 className="h-3 w-3" strokeWidth={1.5} />{t("删除")}
                         </Button>
@@ -250,6 +266,16 @@ export default function ListingsPage() {
         )}
       </main>
       <Footer />
+      {notice && (
+        <div
+          role="status"
+          className="pointer-events-none fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] z-50 flex justify-center px-4"
+        >
+          <p className="max-w-md rounded-xl border border-border bg-card px-4 py-2.5 text-center font-mono text-xs text-foreground shadow-sm">
+            {notice}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

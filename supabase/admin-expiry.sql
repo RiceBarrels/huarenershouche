@@ -1,23 +1,9 @@
 -- ============================================================================
--- 常來車網 — 管理员权限 + Listing 过期 + 删除用户
+-- 常來車網 — 管理员权限 + 删除用户
+-- （原 Listing 30 天自动过期已取消，见 remove-listing-expiry.sql）
 -- 一次性运行（幂等，可重复执行）。在 Supabase 控制台 → SQL Editor 里跑一遍即可。
 --   Dashboard: https://supabase.com/dashboard/project/nkboeyveppapmxgfjqqb/sql
 -- ============================================================================
-
--- ────────────────────────────────────────────────────────────────────────────
--- 1) Listing 过期：新增 expires_at，默认发布后 30 天
--- ────────────────────────────────────────────────────────────────────────────
-alter table public.cars add column if not exists expires_at timestamptz;
-
--- 已有车源：按各自发布时间 +30 天回填
-update public.cars
-set expires_at = created_at + interval '30 days'
-where expires_at is null;
-
--- 之后新发布的车源自动 = 现在 +30 天
-alter table public.cars alter column expires_at set default (now() + interval '30 days');
-
-create index if not exists cars_expires_at_idx on public.cars (expires_at);
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2) 管理员判定辅助函数（SECURITY DEFINER 避免 RLS 递归）
@@ -161,30 +147,3 @@ $$;
 
 revoke execute on function public.admin_get_auth_user(uuid) from public;
 grant execute on function public.admin_get_auth_user(uuid) to authenticated;
-
--- ────────────────────────────────────────────────────────────────────────────
--- 5) 自动过期：立即处理已超期的在售车源，并每 30 分钟自动执行一次
---    过期后 status 置为 'removed'，公开列表（筛选 status='active'）自动不再展示。
---    车主可在「我的发布」里一键「重新上架」续期。
--- ────────────────────────────────────────────────────────────────────────────
-
--- 立即处理存量（不依赖 pg_cron，一定会执行）
-update public.cars
-set status = 'removed'
-where status = 'active' and expires_at < now();
-
--- 定时任务（若该项目未启用 pg_cron，会跳过并给出提示，不影响以上其它改动）
-do $$
-begin
-  execute 'create extension if not exists pg_cron';
-  if exists (select 1 from cron.job where jobname = 'expire-old-listings') then
-    perform cron.unschedule('expire-old-listings');
-  end if;
-  perform cron.schedule(
-    'expire-old-listings',
-    '*/30 * * * *',
-    $q$update public.cars set status = 'removed' where status = 'active' and expires_at < now()$q$
-  );
-exception when others then
-  raise notice 'pg_cron 未启用，已跳过定时任务（存量过期已处理）。原因: %', sqlerrm;
-end $$;

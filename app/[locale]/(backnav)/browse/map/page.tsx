@@ -33,7 +33,11 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import { CAR_LIST_COLUMNS, CAR_PROFILE_EMBED } from "@/lib/i18n/content/columns";
 import { useI18n } from "@/components/i18n-provider";
+import { useTermLabels } from "@/hooks/use-term-labels";
+import { localizePath } from "@/lib/i18n";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import type { DbCar } from "@/lib/types";
 import {
@@ -52,6 +56,7 @@ import { Header } from "@/components/header";
 import { CarCard } from "@/components/car-card";
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import { MobileFilterDrawer } from "@/components/mobile-filters";
+import type { CountOption } from "@/components/search-filters";
 import {
   Drawer,
   DrawerClose,
@@ -79,6 +84,13 @@ const REGION_DEBOUNCE_MS = 1000;
 const REGION_MIN_MOVE_FRAC = 0.1;
 const VIEWPORT_CAR_LIMIT = 300;
 const VIEWPORT_STORE_LIMIT = 100;
+
+// 视口车源列:卡片列 + 关键词检索要搜的描述(原文 + 中英投影)+ 原始配置标签(统计配置选项)
+const MAP_CAR_SELECT = `${CAR_LIST_COLUMNS}, description_original, description, description_zh, features_original, ${CAR_PROFILE_EMBED}`;
+// 数据库还没有原文列(i18n-v2 迁移前)时退回的列
+const MAP_CAR_SELECT_LEGACY = `${CAR_LIST_COLUMNS}, description, description_zh, ${CAR_PROFILE_EMBED}`;
+// 配置选项:取出现最多的这么多个原始标签查词表,按词条归并后再取前 12
+const FEATURE_LABEL_POOL = 48;
 
 // 没有定位权限时的兜底初始视野:北美大陆
 const FALLBACK_CAMERA = { lat: 39.8, lng: -98.6, zoom: 4 };
@@ -137,8 +149,13 @@ function groupKey(car: DbCar): string {
   return `${car.lat!.toFixed(4)},${car.lng!.toFixed(4)}`;
 }
 
+// 车源的原始配置标签:优先 features_original,空(或迁移前没有该列)则退回 features,同 browse_facets
+function carFeatureTags(car: DbCar): string[] {
+  return car.features_original?.length ? car.features_original : car.features || [];
+}
+
 function BrowseMapContent() {
-  const { t, locale } = useI18n();
+  const { t, locale, pathLocale } = useI18n();
   const searchParams = useSearchParams();
   const { enabled: overlayEnabled, openUser } = useCarOverlay();
 
@@ -182,7 +199,8 @@ function BrowseMapContent() {
     ]
       .filter(Boolean)
       .join("&");
-    return parts ? `/browse/map?${parts}` : "/browse/map";
+    // 带上语言前缀:裸 /browse/map 刷新后会被 vercel.json 重定向到 /zh
+    return localizePath(parts ? `/browse/map?${parts}` : "/browse/map", pathLocale);
   }
 
   function setFilters(next: Filters) {
@@ -232,10 +250,10 @@ function BrowseMapContent() {
   async function fetchViewport(r: AppMapRegion) {
     const seq = ++fetchSeq.current;
     setFetching(true);
-    const [carsRes, storesRes] = await Promise.all([
+    const carsInRegion = (columns: string) =>
       supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url, languages)")
+        .select(columns)
         .eq("status", "active")
         .eq("owner_hidden", false)
         .gte("lat", r.south)
@@ -243,7 +261,9 @@ function BrowseMapContent() {
         .gte("lng", r.west)
         .lte("lng", r.east)
         .order("created_at", { ascending: false })
-        .limit(VIEWPORT_CAR_LIMIT),
+        .limit(VIEWPORT_CAR_LIMIT);
+    const [firstCarsRes, storesRes] = await Promise.all([
+      carsInRegion(MAP_CAR_SELECT),
       supabase
         .from("dealer_stores")
         .select("id, owner_id, name, address, lat, lng, store_photos")
@@ -254,6 +274,11 @@ function BrowseMapContent() {
         .lte("lng", r.east)
         .limit(VIEWPORT_STORE_LIMIT),
     ]);
+    // 迁移前数据库没有原文列:按旧列再查一次
+    const carsRes =
+      firstCarsRes.error && isMissingColumnError(firstCarsRes.error)
+        ? await carsInRegion(MAP_CAR_SELECT_LEGACY)
+        : firstCarsRes;
     if (seq !== fetchSeq.current) return;
     let nextStores = (storesRes.data as MapStore[]) || [];
     // 只显示有在售车的店铺,并收集每店最新 3 张车图 + 在售数(标注预览条用)
@@ -307,7 +332,7 @@ function BrowseMapContent() {
           : { ...s, avatar_url: avatars.get(s.owner_id) ?? null }
       );
     }
-    const nextCars = (carsRes.data as DbCar[]) || [];
+    const nextCars = (carsRes.data as unknown as DbCar[]) || [];
     setCars(nextCars);
     setStores(nextStores);
     setLoading(false);
@@ -486,20 +511,57 @@ function BrowseMapContent() {
     return [...counts.values()].sort((a, b) => b.count - a.count);
   }, [cars, filters.make]);
 
-  const featureOptions = useMemo(() => {
-    const counts = new Map<string, number>();
+  // 配置选项与 /browse 的 browse_facets 同口径:统计原始配置标签出现在几辆车上,取最常见的
+  // 一批查 i18n 词表,按词条归并语言孪生词(倒车影像 / Backup Camera 算一项)。
+  // name = 组内最常见的原始标签(筛选值,与 cars.features 去空格、忽略大小写比对),label = 当前语言文案
+  const featureLabelPool = useMemo(() => {
+    const stats = new Map<string, { raw: string; count: number }>();
     for (const car of cars) {
-      for (const f of car.features || []) {
-        const tag = f.trim();
-        if (!tag) continue;
-        counts.set(tag, (counts.get(tag) || 0) + 1);
+      const seen = new Set<string>();
+      for (const f of carFeatureTags(car)) {
+        const raw = f.trim();
+        const key = raw.toLowerCase();
+        if (!raw || seen.has(key)) continue;
+        seen.add(key);
+        const entry = stats.get(key);
+        if (entry) entry.count += 1;
+        else stats.set(key, { raw, count: 1 });
       }
     }
-    return [...counts.entries()]
-      .map(([name, count]) => ({ name, count }))
+    return [...stats.values()]
+      .sort((a, b) => b.count - a.count)
+      .slice(0, FEATURE_LABEL_POOL)
+      .map((e) => e.raw);
+  }, [cars]);
+  const featureTerms = useTermLabels("feature", featureLabelPool);
+
+  const featureOptions = useMemo<CountOption[]>(() => {
+    // 原始标签 → 词条:已归并的用词表 key,未归并/未查到的按标签本身;
+    // 池子已按出现次数降序,每组第一个就是组内最常见的原始标签
+    const groupOf = new Map<string, string>();
+    const nameOf = new Map<string, string>();
+    for (const raw of featureLabelPool) {
+      const lower = raw.toLowerCase();
+      const group = featureTerms[raw]?.key ?? `r:${lower}`;
+      groupOf.set(lower, group);
+      if (!nameOf.has(group)) nameOf.set(group, raw);
+    }
+    // 按车数计:同一辆车带多个孪生词只算一次
+    const carCounts = new Map<string, number>();
+    for (const car of cars) {
+      const counted = new Set<string>();
+      for (const f of carFeatureTags(car)) {
+        const group = groupOf.get(f.trim().toLowerCase());
+        if (!group || counted.has(group)) continue;
+        counted.add(group);
+        carCounts.set(group, (carCounts.get(group) || 0) + 1);
+      }
+    }
+    return [...nameOf.entries()]
+      .map(([group, name]) => ({ name, label: featureTerms[name]?.label, count: carCounts.get(group) || 0 }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 12);
-  }, [cars]);
+  }, [cars, featureLabelPool, featureTerms]);
 
   // ---------- 底部结果面板(拖拽 + 三档吸附) ----------
 
@@ -741,13 +803,13 @@ function BrowseMapContent() {
       setCamera(cameraFor(store.lat, store.lng));
       supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url, languages)")
+        .select(`${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`)
         .eq("status", "active")
         .eq("owner_hidden", false)
         .eq("seller_id", store.owner_id)
         .order("created_at", { ascending: false })
         .limit(60)
-        .then(({ data }) => setStoreCars((data as DbCar[]) || []));
+        .then(({ data }) => setStoreCars((data as unknown as DbCar[]) || []));
       return;
     }
     setSelectedStore(null);

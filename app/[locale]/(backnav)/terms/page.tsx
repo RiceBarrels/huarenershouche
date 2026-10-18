@@ -6,7 +6,8 @@ export default function TermsPage() {
   return (
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
-      <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 md:py-8">
+      {/* 条款正文只有中文:各语言树都标 zh-CN(<html lang> 是界面语言) */}
+      <main lang="zh-CN" className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 md:py-8">
         <LargeTitle title="用户协议" subtitle="Terms of Service · 最后更新 2026年10月" />
 
         {/* 条款正文放进 iOS 白色大圆角卡 */}

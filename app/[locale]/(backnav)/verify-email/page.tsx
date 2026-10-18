@@ -4,14 +4,12 @@ import { Suspense, useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "@/components/localized-navigation";
 import Link from "@/components/localized-navigation";
 import { Loader2, Mail, CheckCircle } from "lucide-react";
-import type { User as SupaUser } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { useI18n } from "@/components/i18n-provider";
 import { Header } from "@/components/header";
 
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
-import { ProfileSetupDialog } from "@/components/profile-setup-dialog";
 
 const CODE_LENGTH = 6;
 
@@ -43,8 +41,6 @@ function VerifyEmailContent() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [user, setUser] = useState<SupaUser | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Countdown timer for resend
@@ -115,7 +111,7 @@ function VerifyEmailContent() {
     setLoading(true);
     setError("");
 
-    const { data, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       email,
       token,
       type: "signup",
@@ -127,15 +123,11 @@ function VerifyEmailContent() {
     } else {
       setSuccess(true);
       setLoading(false);
-      if (data.user) {
-        setUser(data.user);
-        setShowProfileSetup(true);
-      } else {
-        setTimeout(() => {
-          router.push("/");
-          router.refresh();
-        }, 1500);
-      }
+      // 用户名已在注册页取好;个别没取上的由全站 UsernameGate 补问
+      setTimeout(() => {
+        router.push("/");
+        router.refresh();
+      }, 1500);
     }
   }
 
@@ -164,23 +156,10 @@ function VerifyEmailContent() {
           <CheckCircle className="h-12 w-12 text-green-500" strokeWidth={1.5} />
           <h1 className="mt-4 font-logo text-2xl font-bold tracking-tight">{t("验证成功")}</h1>
           <p className="mt-2 font-mono text-sm text-muted-foreground">
-            {showProfileSetup ? t("请完成账户设置") : t("正在跳转...")}
+            {t("正在跳转...")}
           </p>
         </main>
         <Footer />
-
-        {showProfileSetup && user && (
-          <ProfileSetupDialog
-            open={showProfileSetup}
-            userId={user.id}
-            user={user}
-            onComplete={() => {
-              setShowProfileSetup(false);
-              router.push("/");
-              router.refresh();
-            }}
-          />
-        )}
       </div>
     );
   }

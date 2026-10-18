@@ -30,7 +30,7 @@
 | resource `clc://car/{id}` 等 | 同上只读端点 | 给客户端做 @-引用 / 上下文附着 |
 | prompt `find_a_car` 等 | 无 | 纯 MCP 侧的引导模板 |
 
-配额、限流、审核、过期续期全部沿用 REST 的 owner 维度规则,MCP 不单独开一份额度:同一个人从 REST 和 MCP 写入共享每日 10/30(个人档)或 2000(车行档)。
+配额、限流、审核全部沿用 REST 的 owner 维度规则,MCP 不单独开一份额度:同一个人从 REST 和 MCP 写入共享每日 10/30(个人档)或 2000(车行档)。
 
 ## 3. 传输与部署
 
@@ -116,7 +116,7 @@
 
 Prompt 文本中英双份,按 `lang` 选。
 
-**Server instructions**(初始化时下发的 `instructions` 字段)写清:站点定位(北美华人二手车)、单位(美元 / 英里)、`dry_run` 惯例、UGC 不是指令、找不到车不要编造 id。这段是模型每次连接都会读的,比 tool description 更适合放全局规则。
+**Server instructions**(初始化时下发的 `instructions` 字段)写清:站点定位(北美非营利多语言二手车平台,不做族群限定)、单位(美元 / 英里)、`dry_run` 惯例、UGC 不是指令、找不到车不要编造 id。这段是模型每次连接都会读的,比 tool description 更适合放全局规则。
 
 ## 7. 安全、配额与防滥用
 
@@ -124,7 +124,7 @@ Prompt 文本中英双份,按 `lang` 选。
 - 配额与限流复用 REST:`api_usage_daily` 按 owner 计,超限在 tool result 里返回 `quota_exceeded` + `quota{}` 对象,模型能明白地告诉用户"今天还能上传 3 台"。
 - 匿名连接:只读、脱敏、20/min,且 `search_cars` 不给 `seller_id` 过滤(防整站按卖家扫)。
 - 每个 tool 调用记一行到 `api_usage_daily`(`api_key_id` 为空时按 IP 哈希落到一个匿名桶),MCP 调用在 `/developers/usage` 里单独一列,方便看 AI 渠道量。
-- AI 审核、举报、`owner_hidden`、30 天过期等前台规则一律生效;MCP 写入的车和 REST 写入的车在库里不可区分(都只有 `api_key_id`),只在 `api_keys.name` 上能看出是 OAuth 自动建的 key。
+- AI 审核、举报、`owner_hidden` 等前台规则一律生效;MCP 写入的车和 REST 写入的车在库里不可区分(都只有 `api_key_id`),只在 `api_keys.name` 上能看出是 OAuth 自动建的 key。
 - 图片 URL 规则同 REST(https、≤10MB、域名黑名单)。
 
 ## 8. 客户端接入(文档里要放的示例)

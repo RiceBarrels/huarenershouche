@@ -1,14 +1,14 @@
 "use client";
 
 // 新用户必须先取名:profiles.username_set_at 为空(Google/Apple 首次登录,
-// 触发器只拿到了真实姓名)时弹出不可关闭的取名对话框,默认填好随机用户名。
+// 触发器只拿到了真实姓名)时弹出关不掉的取名 drawer,默认填好随机用户名。
 // 邮箱注册在注册页已取名,触发器直接写入 username_set_at,不会弹。
 // 列不存在(未执行 supabase/username-onboarding.sql)或查询失败时不拦。
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { useIdentity } from "@/components/identity-provider";
-import { ProfileSetupDialog } from "@/components/profile-setup-dialog";
+import { UsernameDrawer } from "@/components/username-drawer";
 
 export function UsernameGate() {
   const { authUser } = useIdentity();
@@ -33,8 +33,7 @@ export function UsernameGate() {
 
   if (!authUser || pendingId !== authUser.id) return null;
   return (
-    <ProfileSetupDialog
-      open
+    <UsernameDrawer
       userId={authUser.id}
       user={authUser}
       onComplete={() => setPendingId(null)}

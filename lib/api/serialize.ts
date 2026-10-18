@@ -1,9 +1,14 @@
 // Public API 对外 JSON 形状:英文 key、枚举 slug + label、绝不泄露库内中文枚举值。
 // 匿名请求(redact=true)脱敏联系方式与 VIN;带 key 的请求给全量。
 // 路由只负责查数据,字段整形统一走这里,保证列表/详情/门店在售车形状一致。
+// 描述 / 配置标签按 lang 取 i18n_bundle(译文未就绪时给原文,不拿原文冒充译文),原文另给 *_original。
 
 import type { DbCar, DbDealerStore } from "@/lib/types";
-import { carTitle, carDescription, carLocation } from "@/lib/i18n";
+import { carTitle, carLocation } from "@/lib/i18n";
+import { serverT } from "@/lib/i18n/translate";
+import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
+import { legacyOriginal } from "@/lib/i18n/content/resolve";
+import type { BundleRow } from "@/lib/i18n/content/types";
 import { enumField, enumToSlug, labelFor } from "./enums";
 import type { ApiLang } from "./types";
 
@@ -11,13 +16,12 @@ import type { ApiLang } from "./types";
 export const CAR_PROFILE_JOIN =
   "profiles!seller_id(id, username, account_type, avatar_url, is_system, claimed_by, languages)";
 
-/** 列表端点只取摘要需要的列,避免把 description/features/图片数组全拉下来 */
-export const CAR_SUMMARY_COLUMNS = [
+/** 列表端点只取摘要需要的列,避免把 description/features/图片数组全拉下来(都是迁移前就有的列) */
+const CAR_SUMMARY_FIELDS = [
   "id",
   "seller_id",
   "title",
   "title_zh",
-  "other_i18n",
   "year",
   "make",
   "model",
@@ -42,9 +46,14 @@ export const CAR_SUMMARY_COLUMNS = [
   "created_at",
   "updated_at",
   "expires_at",
-].join(", ");
+] as const satisfies readonly (keyof DbCar)[];
+
+/** 摘要列 + 内容时钟 content_updated_at(i18n-v2.sql) */
+export const CAR_SUMMARY_COLUMNS = [...CAR_SUMMARY_FIELDS, "content_updated_at" satisfies keyof DbCar].join(", ");
 
 export const CAR_SUMMARY_SELECT = `${CAR_SUMMARY_COLUMNS}, ${CAR_PROFILE_JOIN}`;
+/** 去掉 i18n-v2 新增列:CAR_SUMMARY_SELECT 查询遇到缺列错误(isMissingColumnError)时用它重试一次 */
+export const LEGACY_CAR_SUMMARY_SELECT = `${CAR_SUMMARY_FIELDS.join(", ")}, ${CAR_PROFILE_JOIN}`;
 export const CAR_DETAIL_SELECT = `*, ${CAR_PROFILE_JOIN}`;
 
 /** join 出来的卖家摘要(比 DbCar.profiles 多 id/username) */
@@ -104,6 +113,10 @@ export interface CarSummary {
   is_syndicated: boolean;
   seller: CarSeller;
   created_at: string;
+  /**
+   * 可见内容最后一次变化(content_updated_at:文本 / 标题字段 / 价格与原价 / 里程 / 图片 / 状态 / 颜色与
+   * 动力参数 / 位置与坐标 / Carfax / VIN / 源站链接 / 电话,字段清单见 openapi.ts;浏览数与翻译不算)
+   */
   updated_at: string | null;
   expires_at: string | null;
 }
@@ -119,12 +132,23 @@ export interface CarStore {
 }
 
 export interface CarDetail extends CarSummary {
+  /** 按 lang 显示的描述:该语言译文已就绪为译文(description_translated),否则为原文;无描述为 "" */
   description: string;
+  /** 卖家原文(任意语言,逐字);无描述为 null */
+  description_original: string | null;
+  /** 原文语言(ISO 639-1 两字母代码);检测完成前、或检测结果是 und(判断不出)/ other(不认识的语言)时为 null */
+  description_lang: string | null;
+  /** description 是否为机器翻译 */
+  description_translated: boolean;
+  /** 配置标签按 lang 显示(同一配置的不同语言写法合并为一个) */
   features: string[];
+  /** 卖家原样提交的配置标签 */
+  features_original: string[];
   images: string[];
   /** 匿名:前 8 + **** + 后 4;带 key:完整 */
   vin: string | null;
   carfax_url: string | null;
+  /** Carfax 摘要,按 lang 显示 */
   carfax_summary: string | null;
   views_count: number;
   favorites_count: number;
@@ -218,7 +242,7 @@ export function serializeCarSummary(car: ApiCarRow, opts: SerializeOpts): CarSum
     is_syndicated: car.source_id != null,
     seller: sellerOf(car),
     created_at: car.created_at,
-    updated_at: car.updated_at ?? null,
+    updated_at: car.content_updated_at ?? car.updated_at ?? null,
     expires_at: car.expires_at ?? null,
   };
 }
@@ -236,20 +260,51 @@ function storeOf(store: DbDealerStore | null | undefined, redact: boolean): CarS
   };
 }
 
+/**
+ * 配置标签按 lang:bundle.x.features(已按术语合并、取好该语言标签);没有时退回原文标签。
+ * 大小写不敏感去重。
+ */
+function featureLabels(bundle: BundleRow | undefined, original: readonly string[]): string[] {
+  const resolved = bundle?.x?.features;
+  const labels = resolved && resolved.length > 0 ? resolved.map((f) => f.label) : original;
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of labels) {
+    const label = raw.trim();
+    const key = label.toLowerCase();
+    if (!label || seen.has(key)) continue;
+    seen.add(key);
+    out.push(label);
+  }
+  return out;
+}
+
+/** 检测结果里的 ISO 639-1 代码;und / other 不是语言代码,不对外 */
+const ISO_639_1 = /^[a-z]{2}$/;
+
+/** bundle = 该车在 lang 下的 i18n_bundle 行(路由用 getBundle 取;RPC 不可用时为 undefined → 全给原文) */
 export function serializeCarDetail(
   car: ApiCarRow,
-  opts: SerializeOpts & { store?: DbDealerStore | null },
+  opts: SerializeOpts & { store?: DbDealerStore | null; bundle?: BundleRow },
 ): CarDetail {
   const summary = serializeCarSummary(car, opts);
   const isDealer = summary.seller.account_type === "dealer";
+  const { bundle } = opts;
+  const original = legacyOriginal(car);
+  const translated = (bundle?.s === "ok" && bundle.f?.description) || null;
+  const featuresOriginal = car.features_original ?? car.features ?? [];
   return {
     ...summary,
-    description: carDescription(car, opts.lang),
-    features: car.features ?? [],
+    description: translated ?? original ?? "",
+    description_original: original,
+    description_lang: [bundle?.sl, bundle?.pl].find((l): l is string => !!l && ISO_639_1.test(l)) ?? null,
+    description_translated: translated != null,
+    features: featureLabels(bundle, featuresOriginal),
+    features_original: featuresOriginal,
     images: car.images ?? [],
     vin: opts.redact ? maskVin(car.vin) : (car.vin ?? null),
     carfax_url: car.carfax_url ?? null,
-    carfax_summary: car.carfax_summary ?? null,
+    carfax_summary: localizeCarfaxSummary(car.carfax_summary, serverT(opts.lang)),
     views_count: car.views_count ?? 0,
     favorites_count: car.favorites_count ?? 0,
     seller: {

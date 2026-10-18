@@ -70,7 +70,7 @@ const FIELDS: { name: string; type: string; required: string; desc: string }[] =
   { name: "drivetrain", type: "enum", required: "可选", desc: "见下方枚举表" },
   { name: "exterior_color / interior_color", type: "string", required: "可选", desc: "英文" },
   { name: "description", type: "string", required: "可选", desc: "任一语言,其他语言自动翻译" },
-  { name: "description_lang", type: "string", required: "可选", desc: "源语言提示,省略则自动检测" },
+  { name: "description_lang", type: "string", required: "可选", desc: "已弃用:可传但会被忽略(语言自动检测)" },
   { name: "features", type: "string[]", required: "可选", desc: "" },
   { name: "images", type: "string[]", required: "可选", desc: "https 链接,最多 30 张,单张 ≤ 10MB" },
   { name: "carfax_url", type: "string", required: "可选", desc: "" },
@@ -432,6 +432,7 @@ export default function DevelopersPage() {
                 ["insufficient_scope / ip_not_allowed / forbidden", "403", t("scope 不足、IP 不在白名单或账号被封")],
                 ["not_found", "404", t("资源不存在或不可见")],
                 ["conflict", "409", t("同账号 VIN 重复(附 existing_id,可加 ?adopt=true 接管)")],
+                ["listing_blocked", "409", t("该车源已被系统或管理员下架，无法重新上架")],
                 ["rate_limited / quota_exceeded", "429", t("限速或配额用尽")],
                 ["internal_error", "500", t("服务端异常")],
               ]}

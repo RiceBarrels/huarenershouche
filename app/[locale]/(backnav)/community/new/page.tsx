@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { requestModeration } from "@/lib/moderation-client";
+import { TAG_SUGGESTIONS } from "@/lib/i18n/tag-suggestions";
 import { useI18n } from "@/components/i18n-provider";
+import { useTermLabels } from "@/hooks/use-term-labels";
 import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { KeyboardToolbar } from "@/components/keyboard-toolbar";
@@ -28,15 +30,10 @@ const POST_TYPES = [
   { key: "discussion", label: "讨论" },
 ] as const;
 
-// 快捷标签建议(类似小红书发布页的地点建议)
-const TAG_SUGGESTIONS = [
-  "新手购车",
-  "提车作业",
-  "二手车",
-  "保养维修",
-  "自驾游",
-  "改装",
-];
+// 与数据库上限一致(i18n-v2.sql:标签 ≤ 10 个、每个 ≤ 40 字,正文 ≤ 20000 字)
+const MAX_TAGS = 10;
+const MAX_TAG_CHARS = 40;
+const MAX_CONTENT_CHARS = 20000;
 
 // ===== 多草稿存储(与 /post 同款交互:列表选择 + 可删除) =====
 const DRAFTS_KEY = "community_post_drafts";
@@ -141,6 +138,11 @@ export default function NewPostPage() {
 
   const contentRef = useRef<HTMLTextAreaElement>(null);
 
+  // 标签胶囊:已选的自定义标签在前,快捷建议在后;显示当前语言的话题名,存库的仍是原始标签
+  const chipTags = [...tags.filter((tag) => !TAG_SUGGESTIONS.includes(tag)), ...TAG_SUGGESTIONS];
+  const tagLabels = useTermLabels("topic", chipTags);
+  const tagsFull = tags.length >= MAX_TAGS;
+
   useEffect(() => {
     supabase.auth
       .getUser()
@@ -160,7 +162,7 @@ export default function NewPostPage() {
     setMake(d.make || "");
     setModel(d.model || "");
     setYear(d.year || "");
-    setTags(d.tags || []);
+    setTags((d.tags || []).slice(0, MAX_TAGS));
     setDraftId(d.id);
   }
 
@@ -290,13 +292,17 @@ export default function NewPostPage() {
 
   function toggleTag(tag: string) {
     setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+      prev.includes(tag)
+        ? prev.filter((t) => t !== tag)
+        : prev.length < MAX_TAGS
+          ? [...prev, tag]
+          : prev
     );
   }
 
   function addCustomTag() {
-    const trimmed = tagInput.trim().replace(/^#/, "");
-    if (trimmed && !tags.includes(trimmed)) {
+    const trimmed = tagInput.trim().replace(/^[#＃]+/, "").trim();
+    if (trimmed && !tags.includes(trimmed) && tags.length < MAX_TAGS) {
       setTags((prev) => [...prev, trimmed]);
     }
     setTagInput("");
@@ -553,6 +559,7 @@ export default function NewPostPage() {
               placeholder={t("分享你的想法...")}
               value={content}
               onChange={(e) => setContent(e.target.value)}
+              maxLength={MAX_CONTENT_CHARS}
               rows={1}
             />
 
@@ -591,9 +598,11 @@ export default function NewPostPage() {
                   />
                   <span className="text-[15px]">{t("添加标签")}</span>
                   <input
-                    className="min-w-0 flex-1 bg-transparent text-right text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent text-right text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none disabled:opacity-40"
                     placeholder={t("自定义标签")}
                     value={tagInput}
+                    maxLength={MAX_TAG_CHARS}
+                    disabled={tagsFull}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
@@ -607,29 +616,29 @@ export default function NewPostPage() {
                 {/* 建议标签 + 已选标签(横向滚动胶囊) */}
                 {/* 桌面标签换行平铺:鼠标环境横向滚动不可发现(无滚动条提示),
                     换行能一眼看全所有建议标签 */}
+                {/* 标签上限 10 个:选满后未选的胶囊与自定义输入置灰 */}
                 <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-none md:flex-wrap md:overflow-visible">
-                  {[...tags.filter((t) => !TAG_SUGGESTIONS.includes(t)), ...TAG_SUGGESTIONS].map(
-                    (tag) => {
-                      const selected = tags.includes(tag);
-                      return (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => toggleTag(tag)}
-                          className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors ${
-                            selected
-                              ? "bg-primary/30 text-brand-ink"
-                              : "bg-muted text-muted-foreground active:bg-muted/70"
-                          }`}
-                        >
-                          {selected && (
-                            <X className="mr-1 inline h-3 w-3" strokeWidth={2} />
-                          )}
-                          #{t(tag)}
-                        </button>
-                      );
-                    }
-                  )}
+                  {chipTags.map((tag) => {
+                    const selected = tags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        disabled={!selected && tagsFull}
+                        className={`shrink-0 rounded-full px-3.5 py-1.5 text-[13px] transition-colors disabled:opacity-40 ${
+                          selected
+                            ? "bg-primary/30 text-brand-ink"
+                            : "bg-muted text-muted-foreground active:bg-muted/70"
+                        }`}
+                      >
+                        {selected && (
+                          <X className="mr-1 inline h-3 w-3" strokeWidth={2} />
+                        )}
+                        #{tagLabels[tag].label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 

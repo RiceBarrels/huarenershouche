@@ -11,7 +11,13 @@ import {
   paginateCarRows,
   parseCarPageParams,
 } from "@/lib/api/filters";
-import { CAR_SUMMARY_SELECT, serializeCarSummary, type ApiCarRow } from "@/lib/api/serialize";
+import {
+  CAR_SUMMARY_SELECT,
+  LEGACY_CAR_SUMMARY_SELECT,
+  serializeCarSummary,
+  type ApiCarRow,
+} from "@/lib/api/serialize";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const OPTIONS = handleOptions;
@@ -25,19 +31,27 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
 
     const { params, errors: pageErrors } = parseCarPageParams(sp);
-    const base = ctx.supabase
-      .from("cars")
-      .select(CAR_SUMMARY_SELECT)
-      .eq("status", "active")
-      .eq("owner_hidden", false);
-    const { query: filtered, errors: filterErrors } = applyCarQueryFilters(base, sp, { anonymous });
-    const errors = [...pageErrors, ...filterErrors];
+    // 内容时钟 content_updated_at(i18n-v2.sql)还没建时整条查询报缺列:legacy 用旧列集重查,
+    // updated_since 退回 updated_at。参数校验与 legacy 无关,只看第一次构建的结果
+    const build = (legacy: boolean) =>
+      applyCarQueryFilters(
+        ctx.supabase
+          .from("cars")
+          .select(legacy ? LEGACY_CAR_SUMMARY_SELECT : CAR_SUMMARY_SELECT)
+          .eq("status", "active")
+          .eq("owner_hidden", false),
+        sp,
+        { anonymous, legacy },
+      );
+    const first = build(false);
+    const errors = [...pageErrors, ...first.errors];
     if (errors.length) return apiError(400, "validation_failed", "Invalid query parameters", errors);
 
-    const { data, error } = await applyCarSortAndPage(filtered, params);
-    if (error) throw new Error(error.message);
+    let res = await applyCarSortAndPage(first.query, params);
+    if (res.error && isMissingColumnError(res.error)) res = await applyCarSortAndPage(build(true).query, params);
+    if (res.error) throw new Error(res.error.message);
 
-    const rows = (data ?? []) as unknown as ApiCarRow[];
+    const rows = (res.data ?? []) as unknown as ApiCarRow[];
     const { page, next_cursor } = paginateCarRows(rows, params);
     return apiJson({
       data: page.map((car) => serializeCarSummary(car, { lang: ctx.lang, redact: anonymous })),

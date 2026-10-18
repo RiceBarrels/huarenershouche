@@ -19,11 +19,6 @@ export const LOCALE_STORAGE_KEY = "clc_locale";
 export const BUILD_LOCALES: Locale[] =
   process.env.NEXT_PUBLIC_OUTPUT === "static" ? ["zh"] : LOCALES;
 
-// 内容惰性翻译语言:首次有人用该语言浏览时经 /api/translate-listing
-// 翻译并缓存进 cars.other_i18n。zh/en 是兜底——正常车源有双列,
-// 只有对应列缺失或语言不对(历史翻译管线故障的脏数据)才会触发。
-export const LAZY_CONTENT_LOCALES: Locale[] = ["zh", "en", "ko", "ja", "es", "fr"];
-
 /** 界面语言 → Intl/toLocaleDateString 用的 BCP 47 区域标签 */
 export function dateLocale(locale: Locale): string {
   return (
@@ -80,25 +75,7 @@ export function localizePath(path: string, locale: Locale): string {
   return path === "/" ? `/${locale}` : `/${locale}${path}`;
 }
 
-// ---- 数据层双语字段(cars.title / cars.title_zh 等)按语言取值 ----
-
-/**
- * 用户生成内容(帖子/评论)是否需要为当前语言做 AI 翻译:
- * zh 界面不翻;en 界面只翻含中日韩汉字的;其他语言(ko)只要原文不是该语言就翻。
- */
-export function needsContentTranslation(text: string, locale: Locale): boolean {
-  const trimmed = text.trim();
-  if (!trimmed) return false;
-  // 先检测源语言,再决定是否翻到界面语言:
-  // zh 界面看英文/韩文帖也要翻(原文无汉字且确有字母/谚文才翻,纯数字表情不翻)
-  if (locale === "zh") return !/[一-鿿]/.test(trimmed) && /[A-Za-z가-힣]/.test(trimmed);
-  if (locale === "en") return /[一-鿿]/.test(trimmed);
-  if (locale === "ko") return !/[가-힣]/.test(trimmed);
-  // 日文:原文含假名视为已是日文(汉字与中文重叠,无法只靠汉字判断)
-  if (locale === "ja") return !/[ぁ-ゖァ-ヺ]/.test(trimmed);
-  // es/fr 等拉丁语种无法与英文可靠区分:默认都翻(结果有缓存,宁可多翻)
-  return true;
-}
+// ---- 数据层字段(品牌名、cars.title / cars.title_zh 等)按语言取值 ----
 
 type TranslateLikeFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -140,35 +117,10 @@ export function brandLogoSrc(locale: Locale): string {
   return "/logo-en.png";
 }
 
-/** cars.other_i18n 列的形状:{ ko: { title, description }, ... } 按需翻译缓存 */
-export type CarOtherI18n = Record<
-  string,
-  { title?: string | null; description?: string | null } | undefined
-> | null;
-
-interface BilingualCarText {
-  title?: string | null;
-  title_zh?: string | null;
-  description?: string | null;
-  description_zh?: string | null;
-  other_i18n?: CarOtherI18n;
-}
-
-/** 车辆标题:zh 用 title_zh,en 用 title,小语种查 other_i18n 缓存;缺失时逐级回退。
- *  en 也先查 other_i18n.en——只有英文双列实际是中文(脏数据)时才会有这份兜底翻译 */
-export function carTitle(car: BilingualCarText, locale: Locale): string {
-  if (locale === "zh") return car.other_i18n?.zh?.title || car.title_zh || car.title || "";
-  if (locale === "en") return car.other_i18n?.en?.title || car.title || car.title_zh || "";
-  return car.other_i18n?.[locale]?.title || car.title || car.title_zh || "";
-}
-
-/** 车辆描述:同 carTitle 的回退规则 */
-export function carDescription(car: BilingualCarText, locale: Locale): string {
-  if (locale === "zh")
-    return car.other_i18n?.zh?.description || car.description_zh || car.description || "";
-  if (locale === "en")
-    return car.other_i18n?.en?.description || car.description || car.description_zh || "";
-  return car.other_i18n?.[locale]?.description || car.description || car.description_zh || "";
+/** 车辆标题:zh 用 title_zh,其他语言用 title(都是确定性标题,见 lib/i18n/car-title.ts buildCarTitles);
+ *  缺失时互相回退。描述等用户原文的译文走 lib/i18n/content(i18n_bundle),不在这里 */
+export function carTitle(car: { title?: string | null; title_zh?: string | null }, locale: Locale): string {
+  return locale === "zh" ? car.title_zh || car.title || "" : car.title || car.title_zh || "";
 }
 
 /** 车辆位置:zh 用 location_zh(法拉盛, NY),其他语言用英文 location(Flushing, NY) */

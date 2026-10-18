@@ -2,10 +2,11 @@
 
 // 帖子详情 — 小红书式布局:媒体轮播 → 标题/正文/话题 → 楼中楼评论 → 相关推荐,
 // 底部固定操作栏(评论输入 + 点赞 + 评论数)。
-// server 模式下由 [id]/page.tsx 传入 initialPost/initialRelated(SSR + SEO);
-// 静态导出(Capacitor)模式下无 props,依旧客户端自行拉取。
+// server 模式下由 [id]/page.tsx 传入 initialPost/initialRelated/initialComments,译文 bundle 由
+// ContentI18nProvider 预置,SSR 直接输出界面语言的标题/正文/评论(无译文时原文 + lang,无骨架);
+// 静态导出(Capacitor)/浮层模式下缺的数据客户端自行拉取,译文由 useLocalized 按显示语言读取。
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "@/components/localized-navigation";
 import Link from "@/components/localized-navigation";
 import {
@@ -22,12 +23,25 @@ import {
 import { useRouteParams } from "@/lib/use-route-params";
 import { useI18n } from "@/components/i18n-provider";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import {
+  LEGACY_POST_COLUMNS,
+  LEGACY_POST_COMMENT_COLUMNS,
+  POST_AUTHOR_EMBED,
+  POST_COLUMNS,
+  POST_COMMENT_COLUMNS,
+} from "@/lib/i18n/content/columns";
+import { normTag } from "@/lib/i18n/hashtags";
+import { useBundleRow, useLocalized, useLocalizedPrefetch } from "@/hooks/use-localized";
+import { LocalizedText } from "@/components/content/localized-text";
+import { TranslationNotice } from "@/components/content/translation-notice";
 import { requestModeration } from "@/lib/moderation-client";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { RelatedPosts } from "@/components/related-posts";
-import { HashtagText } from "@/components/hashtag-text";
+import { TopicChip } from "@/components/topic-chip";
+import { Reveal } from "@/components/reveal";
 import { FollowButton } from "@/components/follow-button";
 import { ReportDialog } from "@/components/report-dialog";
 import { useBlockedIds } from "@/lib/blocks";
@@ -37,9 +51,9 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { timeAgo } from "@/lib/format";
 import { SITE_URL } from "@/lib/seo-pages";
-import { apiOrigin } from "@/lib/capacitor";
-import { needsContentTranslation, dateLocale } from "@/lib/i18n";
+import { dateLocale } from "@/lib/i18n";
 import { userLink } from "@/lib/static-link";
+import type { TopicLabel } from "@/lib/i18n/content/types";
 import type { DbCommunityPost, DbPostComment } from "@/lib/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -56,22 +70,40 @@ const TYPE_COLORS: Record<string, string> = {
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 
+// useSyncExternalStore 的挂载标记:服务端与水合首帧为 false,之后为 true
+const subscribeNever = () => () => {};
+const getMounted = () => true;
+const getNotMounted = () => false;
+
+// 帖子/评论列集;迁移 SQL 未执行时新列(含 reply_to 外键)不存在 → 旧列集重查
+const POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+const LEGACY_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+const COMMENT_SELECT = `${POST_COMMENT_COLUMNS}, ${POST_AUTHOR_EMBED}, reply_to:profiles!reply_to_user_id(username)`;
+const LEGACY_COMMENT_SELECT = `${LEGACY_POST_COMMENT_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+
+// 与数据库上限一致(i18n-v2.sql post_comments_text_len:评论正文 ≤ 5000 字)
+const MAX_COMMENT_CHARS = 5000;
+
 interface ReplyTarget {
   /** 楼中楼统一挂在顶层评论下(两级结构) */
   parentId: string;
   name: string;
-  /** 回复的是楼中楼里的某条回复时,正文加"回复 @xxx："前缀 */
+  /** 被回复者;回复的是楼中楼里的某条回复时写入 reply_to_user_id,界面渲染「回复 @xxx」 */
+  userId: string;
   isNested: boolean;
 }
 
 export default function CommunityDetailPage({
   initialPost = null,
   initialRelated,
+  initialComments,
   embedded = false,
   onClose,
 }: {
   initialPost?: DbCommunityPost | null;
   initialRelated?: DbCommunityPost[];
+  // SSR 预取的前若干条可见评论(server 模式);浮层/静态导出模式不传,客户端自行拉取
+  initialComments?: DbPostComment[];
   // embedded:在移动端浮层里内嵌打开(隐藏 Header/Footer,不占满整屏高度)
   embedded?: boolean;
   onClose?: () => void;
@@ -91,9 +123,9 @@ export default function CommunityDetailPage({
   };
 
   const [post, setPost] = useState<DbCommunityPost | null>(initialPost);
-  const [comments, setComments] = useState<DbPostComment[]>([]);
+  const [comments, setComments] = useState<DbPostComment[]>(initialComments ?? []);
   const [loading, setLoading] = useState(!initialPost);
-  const [commentsLoading, setCommentsLoading] = useState(true);
+  const [commentsLoading, setCommentsLoading] = useState(!initialComments);
   const [liked, setLiked] = useState(false);
   const [likeCount, setLikeCount] = useState(initialPost?.likes_count ?? 0);
   const [likedComments, setLikedComments] = useState<Set<string>>(new Set());
@@ -102,107 +134,22 @@ export default function CommunityDetailPage({
   const [userId, setUserId] = useState<string | null>(null);
   const [content, setContent] = useState("");
   const [sending, setSending] = useState(false);
-  // AI 审核拦截提示(评论已被屏蔽时展示在输入框上方)
+  // AI 审核拦截 / 发送失败提示(展示在输入框上方)
   const [modNotice, setModNotice] = useState("");
   const [tableError, setTableError] = useState(false);
   const [activeImg, setActiveImg] = useState(0);
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
-  // 非中文界面:帖子经 AI 翻译展示,可切回原文(X 式)
-  const [showOriginal, setShowOriginal] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const commentsRef = useRef<HTMLElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
 
-  // ---- 帖子 AI 翻译(en/ko):原文已是目标语言则不翻;结果缓存在 other_i18n ----
-  const postText = post ? `${post.title}\n${post.content}` : "";
-  const sourceIsCJK = /[一-鿿]/.test(postText);
-  // 先检测源语言再决定翻译(helper 支持 zh:中文界面看英文帖同样翻)
-  const needsTranslation = !!post && needsContentTranslation(postText, locale);
-  const translation = needsTranslation ? post?.other_i18n?.[locale] : undefined;
-  const showTranslated = needsTranslation && !!translation?.content && !showOriginal;
-  // 翻译在途(尚无任何尝试结果):正文区显示 skeleton
-  const postTranslationPending = needsTranslation && post?.other_i18n?.[locale] === undefined;
-  const postTranslateAttempted = useRef<Set<string>>(new Set());
-
-  useEffect(() => {
-    if (!post?.id || !needsTranslation) return;
-    if (post.other_i18n?.[locale] !== undefined) return; // 已有译文或已尝试(失败标记 {})
-    const key = `${post.id}:${locale}`;
-    if (postTranslateAttempted.current.has(key)) return;
-    postTranslateAttempted.current.add(key);
-    let cancelled = false;
-    const pid = post.id;
-    // 失败也写入 {} 标记:skeleton 收起、回退原文、不再重试
-    const markFailed = () =>
-      setPost((prev) =>
-        prev && prev.id === pid
-          ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: {} } }
-          : prev
-      );
-    // 网页端走同源相对路径;仅原生壳用线上绝对地址(静态导出没有 /api)
-    fetch(`${apiOrigin()}/api/translate-post`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ postId: pid, locale }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json: { ok?: boolean; i18n?: { title?: string | null; content?: string | null } } | null) => {
-        if (cancelled) return;
-        const i18n = json?.ok ? json.i18n : undefined;
-        if (!i18n) return markFailed();
-        setPost((prev) =>
-          prev && prev.id === pid
-            ? { ...prev, other_i18n: { ...(prev.other_i18n ?? {}), [locale]: i18n } }
-            : prev
-        );
-      })
-      .catch(() => {
-        if (!cancelled) markFailed();
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [post?.id, post?.other_i18n, needsTranslation, locale]);
-
-  // ---- 评论按需批量翻译(40/批,一次模型调用),结果合并回 comments ----
-  const commentTranslating = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    if (comments.length === 0) return;
-    // undefined = 从未尝试;失败写入 {} 标记(skeleton 收起、回退原文、不再重试)
-    const need = comments.filter(
-      (c) =>
-        needsContentTranslation(c.content, locale) &&
-        c.other_i18n?.[locale] === undefined &&
-        !commentTranslating.current.has(c.id)
-    );
-    if (need.length === 0) return;
-    const ids = need.slice(0, 40).map((c) => c.id);
-    ids.forEach((id) => commentTranslating.current.add(id));
-    const applyMap = (map: Record<string, { content?: string | null }>) =>
-      setComments((prev) =>
-        prev.map((c) =>
-          map[c.id] ? { ...c, other_i18n: { ...(c.other_i18n ?? {}), [locale]: map[c.id] } } : c
-        )
-      );
-    fetch(`${apiOrigin()}/api/translate-comments`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ kind: "post", ids, locale }),
-    })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((json: { ok?: boolean; i18n?: Record<string, { content?: string | null }> } | null) => {
-        const map = { ...(json?.ok ? json.i18n : undefined) };
-        for (const id of ids) if (!(id in map)) map[id] = {};
-        applyMap(map);
-      })
-      .catch(() => {
-        applyMap(Object.fromEntries(ids.map((id) => [id, {}])));
-      })
-      .finally(() => {
-        ids.forEach((id) => commentTranslating.current.delete(id));
-      });
-  }, [comments, locale]);
+  // 标题/正文按界面语言显示(SSR 由 ContentI18nProvider 预置译文;无译文显示原文并标 lang),
+  // 「显示原文」切换在 view 里;正文 #话题 与标签 chip 用 bundle 里的话题名
+  const view = useLocalized("post", post?.id, { title: post?.title, content: post?.content });
+  const topics = useBundleRow("post", post?.id)?.x?.topics;
+  // 绝对发帖时间按访客时区格式化,服务端(UTC)的结果必与水合不一致:只在挂载后输出
+  const mounted = useSyncExternalStore(subscribeNever, getMounted, getNotMounted);
 
   // Auth
   useEffect(() => {
@@ -222,11 +169,10 @@ export default function CommunityDetailPage({
     if (!postId || initialPost) return;
 
     async function loadPost() {
-      const { data, error } = await supabase
-        .from("community_posts")
-        .select("*, profiles!user_id(username, avatar_url)")
-        .eq("id", postId)
-        .single();
+      const byId = (cols: string) =>
+        supabase.from("community_posts").select(cols).eq("id", postId).single();
+      let { data, error } = await byId(POST_SELECT);
+      if (error && isMissingColumnError(error)) ({ data, error } = await byId(LEGACY_POST_SELECT));
 
       if (error) {
         if (
@@ -238,8 +184,9 @@ export default function CommunityDetailPage({
         }
         setPost(null);
       } else {
-        setPost(data as DbCommunityPost);
-        setLikeCount((data as DbCommunityPost).likes_count || 0);
+        const row = data as unknown as DbCommunityPost;
+        setPost(row);
+        setLikeCount(row.likes_count || 0);
       }
     }
 
@@ -248,29 +195,43 @@ export default function CommunityDetailPage({
       .finally(() => setLoading(false));
   }, [postId, initialPost]);
 
-  // Load comments
+  // Load comments:SSR 已带全部可见评论则不重复拉;评论数多于 SSR 条数(长楼)时后台补全
   useEffect(() => {
     if (!postId) return;
+    if (initialComments && initialComments.length >= (initialPost?.comments_count ?? 0)) return;
+    let cancelled = false;
 
     async function loadComments() {
-      const { data, error } = await supabase
-        .from("post_comments")
-        .select("*, profiles!user_id(username, avatar_url)")
-        .eq("post_id", postId)
-        .order("created_at", { ascending: true });
+      const run = (cols: string, activeOnly: boolean) => {
+        const query = supabase
+          .from("post_comments")
+          .select(cols)
+          .eq("post_id", postId)
+          .order("created_at", { ascending: true });
+        return activeOnly ? query.eq("status", "active") : query;
+      };
+      let { data, error } = await run(COMMENT_SELECT, true);
+      // 迁移 SQL 未执行:status / reply_to 列与外键都不存在 → 旧列集、不按状态过滤
+      if (error && isMissingColumnError(error)) ({ data, error } = await run(LEGACY_COMMENT_SELECT, false));
+      if (cancelled) return;
 
-      if (error) {
+      if (!error) {
+        setComments((data as unknown as DbPostComment[]) || []);
+      } else if (!initialComments) {
         // Table may not exist
         setComments([]);
-      } else {
-        setComments((data as DbPostComment[]) || []);
       }
     }
 
     loadComments()
       .catch((err) => console.error("Failed to load comments:", err))
-      .finally(() => setCommentsLoading(false));
-  }, [postId]);
+      .finally(() => {
+        if (!cancelled) setCommentsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, initialComments, initialPost?.comments_count]);
 
   // Check if user already liked the post
   useEffect(() => {
@@ -306,15 +267,19 @@ export default function CommunityDetailPage({
         }
       })
       .then(undefined, () => {}); // 表可能还没建
+    // 只在评论条数变化时重查(点赞改计数不触发);SSR 评论 + 长楼补全后也能拿到全部点赞状态
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, commentsLoading]);
+  }, [userId, commentsLoading, comments.length]);
 
-  // 被屏蔽用户的评论、AI 审核屏蔽的评论不展示(blocks 表 / ai-moderation.sql)
+  // 被屏蔽用户的评论、AI 审核屏蔽的评论不展示(blocks 表 / status 列)
   const { blockedIds } = useBlockedIds();
   const visibleComments = useMemo(
     () => comments.filter((c) => !blockedIds.has(c.user_id) && c.status !== "blocked"),
     [comments, blockedIds],
   );
+  // 可见评论的译文合并成批量 bundle 请求(被屏蔽的不请求)
+  const visibleCommentIds = useMemo(() => visibleComments.map((c) => c.id), [visibleComments]);
+  useLocalizedPrefetch("post_comment", visibleCommentIds);
 
   // 楼中楼结构:顶层 + 按 parent_id 分组的回复
   const topLevel = useMemo(
@@ -426,6 +391,7 @@ export default function CommunityDetailPage({
     setReplyTo({
       parentId: target.parent_id ?? target.id,
       name,
+      userId: target.user_id,
       isNested: !!target.parent_id,
     });
     inputRef.current?.focus();
@@ -440,36 +406,43 @@ export default function CommunityDetailPage({
     setSending(true);
     setModNotice("");
 
-    const body =
-      replyTo?.isNested && !content.trim().startsWith("回复 @")
-        ? `回复 @${replyTo.name}：${content.trim()}`
-        : content.trim();
-
-    const { data, error } = await supabase
+    const text = content.trim();
+    const base = { post_id: postId, user_id: userId, parent_id: replyTo?.parentId ?? null };
+    // 楼中楼回复:被回复者存 reply_to_user_id,「回复 @xx」由界面按语言渲染,不写进正文
+    let { data, error } = await supabase
       .from("post_comments")
-      .insert({
-        post_id: postId,
-        user_id: userId,
-        content: body,
-        parent_id: replyTo?.parentId ?? null,
-      })
-      .select("*, profiles!user_id(username, avatar_url)")
+      .insert({ ...base, content: text, reply_to_user_id: replyTo?.isNested ? replyTo.userId : null })
+      .select(COMMENT_SELECT)
       .single();
+    // 迁移 SQL 未执行时没有 reply_to_* 列:按旧版格式把「回复 @xx：」前缀写进正文
+    if (error && isMissingColumnError(error)) {
+      const legacyContent =
+        replyTo?.isNested && !text.startsWith("回复 @") ? `回复 @${replyTo.name}：${text}` : text;
+      ({ data, error } = await supabase
+        .from("post_comments")
+        .insert({ ...base, content: legacyContent })
+        .select(LEGACY_COMMENT_SELECT)
+        .single());
+    }
 
     if (!error && data) {
-      setComments((prev) => [...prev, data as DbPostComment]);
+      const row = data as unknown as DbPostComment;
+      setComments((prev) => [...prev, row]);
       if (replyTo) {
         setExpanded((prev) => new Set(prev).add(replyTo.parentId));
       }
       setContent("");
       setReplyTo(null);
       // AI 审核(不阻塞发送):违规评论就地屏蔽并从列表移除
-      requestModeration("post_comment", data.id).then((mod) => {
+      requestModeration("post_comment", row.id).then((mod) => {
         if (mod.blocked) {
-          setComments((prev) => prev.filter((c) => c.id !== data.id));
+          setComments((prev) => prev.filter((c) => c.id !== row.id));
           setModNotice(t("评论涉嫌违规，已被系统拦截"));
         }
       });
+    } else {
+      // 写入失败(网络、权限等):保留输入内容并提示,用户可直接重试
+      setModNotice(t("提交失败，请稍后再试"));
     }
 
     setSending(false);
@@ -484,10 +457,11 @@ export default function CommunityDetailPage({
 
   async function handleShare() {
     if (!post) return;
-    const url = window.location.href;
+    // 分享线上带语言前缀的地址(原生端为显示语言);原生壳/浮层里 window.location 不是帖子页
+    const url = `${SITE_URL}/${locale}/community/${post.id}`;
     if (navigator.share) {
       try {
-        await navigator.share({ title: post.title, url });
+        await navigator.share({ title: view.shown.title, url });
         return;
       } catch {
         // 用户取消分享:忽略
@@ -559,6 +533,18 @@ export default function CommunityDetailPage({
         {showChrome && <Footer />}
       </div>
     );
+  }
+
+  // 帖子自带的标签按归一化 key 对上 bundle 话题(正文里的 #话题 由 LocalizedText 渲染,不重复成 chip)。
+  // 按话题去重:只差大小写/空格的写法(Model 3 / model3)对应同一条 bundle 话题,
+  // 不同写法解析到同一话题(特斯拉 / Tesla)时指向同一话题页,都只出一个 chip
+  const topicByNorm = new Map((topics ?? []).map((topic) => [topic.norm, topic]));
+  const tagChips = new Map<string, TopicLabel | { raw: string }>();
+  for (const raw of post.tags ?? []) {
+    const norm = normTag(raw);
+    const topic = norm ? topicByNorm.get(norm) : undefined;
+    const key = topic?.slug ? `t:${topic.slug}` : `r:${norm ?? raw}`;
+    if (!tagChips.has(key)) tagChips.set(key, topic ?? { raw });
   }
 
   return (
@@ -635,44 +621,33 @@ export default function CommunityDetailPage({
 
         {/* X 式:标题/正文在媒体之前,大字号全色。
             桌面:标题升半档、正文行高放宽到 1.8——中文长文在 42em 行宽下
-            需要更松的行距才不显拥挤(行宽由 max-w-2xl 保证,刻意不拉宽) */}
-        {/* AI 翻译标注 + 显示原文切换(仅非中文界面且确实翻译了才出现) */}
-        {needsTranslation && !!translation?.content && (
-          <div className="mt-3 flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
-            <span>{sourceIsCJK ? t("已从中文翻译") : t("已从英文翻译")}</span>
-            <button
-              type="button"
-              onClick={() => setShowOriginal((v) => !v)}
-              className="text-brand-ink underline-offset-2 hover:underline"
-            >
-              {showOriginal ? t("显示翻译") : t("显示原文")}
-            </button>
-          </div>
-        )}
-        {postTranslationPending ? (
-          /* 翻译在途:标题 + 正文骨架,避免先闪原文再跳变 */
-          <div className="mt-3 space-y-2.5">
-            <Skeleton className="h-6 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-11/12" />
-            <Skeleton className="h-4 w-2/3" />
-          </div>
-        ) : (
-          <>
-            <h1 className="mt-3 font-mono text-lg font-bold leading-snug md:text-xl">
-              {showTranslated && translation?.title ? translation.title : post.title}
-            </h1>
-            <div className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground md:mt-2 md:leading-[1.8]">
-              <HashtagText text={showTranslated && translation?.content ? translation.content : post.content} />
-            </div>
-          </>
-        )}
+            需要更松的行距才不显拥挤(行宽由 max-w-2xl 保证,刻意不拉宽)。
+            SSR 即输出可见正文(译文或带 lang 的原文),ssrVisible 不从隐藏态开始 */}
+        <Reveal ssrVisible>
+          {/* 翻译标注 + 显示原文切换(仅确实显示了译文时出现;翻译中仅挂载后提示) */}
+          <TranslationNotice view={view} className="mt-3" />
+          <LocalizedText
+            view={view}
+            field="title"
+            as="h1"
+            className="mt-3 font-mono text-lg font-bold leading-snug md:text-xl"
+          />
+          <LocalizedText
+            view={view}
+            field="content"
+            as="div"
+            hashtags
+            topics={topics}
+            className="mt-1.5 whitespace-pre-wrap font-mono text-[15px] leading-relaxed text-foreground md:mt-2 md:leading-[1.8]"
+          />
+        </Reveal>
 
-        {/* Hashtags:可点击,跳社区搜索该话题(HashtagText 会先清浮层栈) */}
-        {post.tags && post.tags.length > 0 && (
+        {/* 标签:按 bundle 话题显示当前语言的话题名(未解析的显示原始标签),
+            点击进话题页 / 社区搜索(TopicChip 会先清浮层栈) */}
+        {tagChips.size > 0 && (
           <div className="mt-2 flex flex-wrap gap-x-2 gap-y-1 font-mono text-sm">
-            {post.tags.map((tag) => (
-              <HashtagText key={tag} text={`#${tag}`} />
+            {[...tagChips].map(([key, topic]) => (
+              <TopicChip key={key} topic={topic} />
             ))}
           </div>
         )}
@@ -714,7 +689,7 @@ export default function CommunityDetailPage({
                   ) : (
                     <img
                       src={src}
-                      alt={post.title}
+                      alt={view.shown.title}
                       className={`w-full cursor-zoom-in object-contain ${
                         media.length > 1 ? "h-full" : "max-h-[70vh]"
                       }`}
@@ -743,16 +718,21 @@ export default function CommunityDetailPage({
           </div>
         )}
 
-        {/* X 式绝对时间行 */}
-        <p className="mt-3 font-mono text-[13px] text-muted-foreground">
-          {new Date(post.created_at).toLocaleString(dateLocale(locale), {
-            year: "numeric",
-            month: "long",
-            day: "numeric",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-          <span className="mx-1.5">·</span>
+        {/* X 式绝对时间行:绝对时间挂载后才出现(见 mounted);
+            相对时间在服务端渲染与水合之间可能跨过分钟边界,忽略这一处文本差异 */}
+        <p className="mt-3 font-mono text-[13px] text-muted-foreground" suppressHydrationWarning>
+          {mounted && (
+            <>
+              {new Date(post.created_at).toLocaleString(dateLocale(locale), {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+              <span className="mx-1.5">·</span>
+            </>
+          )}
           {timeAgo(post.created_at, t)}
         </p>
 
@@ -766,9 +746,9 @@ export default function CommunityDetailPage({
           </div>
         )}
 
-        {/* Comments — no scroll reveal: interactive content must never
-            start hidden (Safari IntersectionObserver can fail to fire on tall
-            sections / after the iOS page-transition remount) */}
+        {/* Comments — interactive content must never start hidden (Safari
+            IntersectionObserver can fail to fire on tall sections / after the
+            iOS page-transition remount): ssrVisible starts visible, SSR included */}
         <section
           ref={commentsRef}
           className="mt-5 scroll-mt-16 border-t border-border pt-4"
@@ -778,7 +758,7 @@ export default function CommunityDetailPage({
           </h2>
 
           {/* 桌面楼层间距略放大,楼与楼的层级分隔更清晰 */}
-          <div className="mt-4 space-y-4 md:mt-5 md:space-y-5">
+          <Reveal ssrVisible className="mt-4 space-y-4 md:mt-5 md:space-y-5">
             {commentsLoading ? (
               <p className="font-mono text-xs text-muted-foreground">
                 {t("加载中...")}
@@ -859,7 +839,7 @@ export default function CommunityDetailPage({
                 );
               })
             )}
-          </div>
+          </Reveal>
         </section>
 
         {/* 相关推荐(内链)*/}
@@ -911,6 +891,7 @@ export default function CommunityDetailPage({
                     : t("说点什么...")
                 }
                 rows={1}
+                maxLength={MAX_COMMENT_CHARS}
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 onKeyDown={(e) => {
@@ -1007,16 +988,11 @@ function CommentRow({
   onDelete: () => void;
 }) {
   const avatarSize = isReply ? "h-6 w-6" : "h-8 w-8";
-  const { t, locale } = useI18n();
-  // 非中文界面显示 AI 译文(父组件批量拉取写入 other_i18n),可切回原文
-  const [showOriginal, setShowOriginal] = useState(false);
-  const commentNeedsTranslation = needsContentTranslation(comment.content, locale);
-  const translatedContent = commentNeedsTranslation
-    ? comment.other_i18n?.[locale]?.content
-    : undefined;
-  // 翻译在途:内容行显示 skeleton
-  const commentPending = commentNeedsTranslation && comment.other_i18n?.[locale] === undefined;
-  const commentIsCJK = /[一-鿿]/.test(comment.content);
+  const { t } = useI18n();
+  // 评论正文按界面语言显示(父组件批量预取 bundle;无译文显示原文并标 lang),可切回原文
+  const view = useLocalized("post_comment", comment.id, { content: comment.content });
+  // 楼中楼回复对象:优先关联出的当前用户名(改名后仍正确),其次写入时记录的名字
+  const replyName = comment.reply_to?.username ?? comment.reply_to_name;
   const { enabled: overlayEnabled, openUser } = useOverlay();
   const onUser = (e: React.MouseEvent) => {
     if (overlayEnabled) {
@@ -1045,30 +1021,18 @@ function CommentRow({
         >
           {comment.profiles?.username || t("匿名")}
         </Link>
-        {commentPending ? (
-          <div className="mt-1 space-y-1.5">
-            <Skeleton className="h-3.5 w-full" />
-            <Skeleton className="h-3.5 w-2/3" />
-          </div>
-        ) : (
-          <p className="mt-0.5 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/90">
-            {translatedContent && !showOriginal ? translatedContent : comment.content}
-          </p>
-        )}
-        {translatedContent && (
-          <div className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] text-muted-foreground">
-            <span>{commentIsCJK ? t("已从中文翻译") : t("已从英文翻译")}</span>
-            <button
-              type="button"
-              onClick={() => setShowOriginal((v) => !v)}
-              className="text-brand-ink underline-offset-2 hover:underline"
-            >
-              {showOriginal ? t("显示翻译") : t("显示原文")}
-            </button>
-          </div>
-        )}
+        <p className="mt-0.5 whitespace-pre-wrap font-mono text-sm leading-relaxed text-foreground/90">
+          {replyName && (
+            <span className="mr-1.5 text-muted-foreground">
+              {t("回复 @{name}", { name: replyName })}
+            </span>
+          )}
+          <LocalizedText view={view} field="content" as="span" />
+        </p>
+        <TranslationNotice view={view} className="mt-0.5" />
         <div className="mt-1 flex items-center gap-3">
-          <span className="font-mono text-[10px] text-muted-foreground">
+          {/* 相对时间在服务端渲染与水合之间可能跨过分钟边界,忽略这一处文本差异 */}
+          <span className="font-mono text-[10px] text-muted-foreground" suppressHydrationWarning>
             {timeAgo(comment.created_at, t)}
           </span>
           <button

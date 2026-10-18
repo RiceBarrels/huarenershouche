@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { oauthRedirectTo } from "@/lib/oauth-redirect";
 import { useI18n } from "@/components/i18n-provider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,10 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { ProfileSetupDialog } from "@/components/profile-setup-dialog";
 import { UsernameInput } from "@/components/username-input";
 import { useRandomUsername } from "@/hooks/use-random-username";
-import type { User as SupaUser } from "@supabase/supabase-js";
 
 function GoogleIcon({ className }: { className?: string }) {
   return (
@@ -37,7 +36,7 @@ export function AuthDialog({
   children: React.ReactNode;
   onSuccess?: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,8 +44,6 @@ export function AuthDialog({
   const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState("");
   const [open, setOpen] = useState(false);
-  const [showProfileSetup, setShowProfileSetup] = useState(false);
-  const [newUser, setNewUser] = useState<SupaUser | null>(null);
   // 注册模式默认填入随机用户名,骰子按钮换一个
   const { username, setUsername, reroll } = useRandomUsername(null, mode === "register");
 
@@ -69,7 +66,7 @@ export function AuthDialog({
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `https://www.clcauto.com/`,
+        redirectTo: oauthRedirectTo(locale),
       },
     });
     if (error) {
@@ -111,8 +108,7 @@ export function AuthDialog({
           username: username,
         });
         setOpen(false);
-        setNewUser(data.user);
-        setShowProfileSetup(true);
+        onSuccess?.();
       }
     }
     setLoading(false);
@@ -229,18 +225,6 @@ export function AuthDialog({
           </form>
         </DialogContent>
       </Dialog>
-
-      {showProfileSetup && newUser && (
-        <ProfileSetupDialog
-          open={showProfileSetup}
-          userId={newUser.id}
-          user={newUser}
-          onComplete={() => {
-            setShowProfileSetup(false);
-            onSuccess?.();
-          }}
-        />
-      )}
     </>
   );
 }

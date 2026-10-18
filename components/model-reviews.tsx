@@ -1,11 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import {
+  LEGACY_POST_COLUMNS,
+  POST_AUTHOR_EMBED,
+  POST_COLUMNS,
+} from "@/lib/i18n/content/columns";
 import { useI18n } from "@/components/i18n-provider";
+import { useLocalizedPrefetch } from "@/hooks/use-localized";
 import { PostCard } from "@/components/post-card";
-import { usePostTranslations, type PostI18nMap } from "@/hooks/use-post-translations";
 import type { DbCommunityPost } from "@/lib/types";
 
 interface ModelReviewsProps {
@@ -13,16 +19,23 @@ interface ModelReviewsProps {
   model: string;
 }
 
+const POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+const LEGACY_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+
 /**
  * 车主口碑：来自社区的车评（type='review'），直接复用社区帖子卡片
- * （含非中文界面的 AI 翻译 + 显示原文切换）。
+ * （卡片自带界面语言译文 + 显示原文切换）。
  * 优先同 make+model，没有则退回同 make（标注"同品牌车主评价"）。
  * 一条都没有时不渲染。
  */
 export function ModelReviews({ make, model }: ModelReviewsProps) {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [posts, setPosts] = useState<DbCommunityPost[]>([]);
   const [makeLevelOnly, setMakeLevelOnly] = useState(false);
+
+  // 卡片各自 useLocalized;这里把整组 id 合并成一次 bundle 请求
+  const ids = useMemo(() => posts.map((p) => p.id), [posts]);
+  useLocalizedPrefetch("post", ids);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,27 +43,34 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
     async function load() {
       if (!make) return;
 
-      // PostCard 需要完整字段(作者/图片/计数/翻译缓存)
-      const baseQuery = () =>
+      // PostCard 需要完整字段(作者/图片/计数)
+      const baseQuery = (cols: string) =>
         supabase
           .from("community_posts")
-          .select("*, profiles!user_id(username, avatar_url)")
+          .select(cols)
           .eq("type", "review")
           .eq("status", "active")
           .ilike("make", make)
           .order("created_at", { ascending: false })
           .limit(3);
+      // 迁移 SQL 未执行时新列缺失:改用旧列集,之后的查询沿用
+      let cols = POST_SELECT;
+      const fetchRows = async (byModel: boolean): Promise<DbCommunityPost[]> => {
+        const run = () => (byModel ? baseQuery(cols).ilike("model", model.trim()) : baseQuery(cols));
+        let res = await run();
+        if (res.error && isMissingColumnError(res.error) && cols !== LEGACY_POST_SELECT) {
+          cols = LEGACY_POST_SELECT;
+          res = await run();
+        }
+        return (res.data as unknown as DbCommunityPost[] | null) ?? [];
+      };
 
       let rows: DbCommunityPost[] = [];
       let fellBack = false;
 
-      if (model) {
-        const { data } = await baseQuery().ilike("model", model.trim());
-        rows = (data as DbCommunityPost[]) || [];
-      }
+      if (model) rows = await fetchRows(true);
       if (rows.length === 0) {
-        const { data } = await baseQuery();
-        rows = (data as DbCommunityPost[]) || [];
+        rows = await fetchRows(false);
         fellBack = true;
       }
 
@@ -65,19 +85,6 @@ export function ModelReviews({ make, model }: ModelReviewsProps) {
       cancelled = true;
     };
   }, [make, model]);
-
-  // 非中文界面:批量翻译并合并回状态(缓存全站共享)
-  const mergeI18n = useCallback(
-    (map: PostI18nMap) => {
-      setPosts((prev) =>
-        prev.map((p) =>
-          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
-        )
-      );
-    },
-    [locale]
-  );
-  usePostTranslations(posts, locale, mergeI18n);
 
   if (posts.length === 0) return null;
 

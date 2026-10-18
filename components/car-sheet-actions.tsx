@@ -74,8 +74,9 @@ export function CarSheetActions({ car }: { car: DbCar }) {
   }
 
   async function share() {
-    // 规范公网地址:App 内 origin 是 capacitor://localhost,浮层内 href 是列表页,都不能用
-    const url = `${SITE_URL}/car/${car.id}`;
+    // 规范公网地址:App 内 origin 是 capacitor://localhost,浮层内 href 是列表页,都不能用;
+    // 带显示语言前缀(原生端同样取显示语言),对方打开看到同一语言
+    const url = `${SITE_URL}/${locale}/car/${car.id}`;
     const { nativeShare } = await import("@/lib/capacitor");
     const shared = await nativeShare({
       title: carTitle(car, locale),

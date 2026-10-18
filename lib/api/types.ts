@@ -95,6 +95,7 @@ export type ApiErrorCode =
   | "account_banned"
   | "not_found"
   | "conflict"
+  | "listing_blocked"
   | "rate_limited"
   | "quota_exceeded"
   | "internal_error";
@@ -110,5 +111,3 @@ export const MAX_PAGE_SIZE = 100;
 export const BATCH_MAX_ITEMS = 100;
 /** 每条 listing 最多图片数(与 lib/sources/images.ts MAX_IMAGES_PER_CAR 对齐的上限之上再收紧) */
 export const LISTING_MAX_IMAGES = 30;
-/** API 写入的车与转载一致:30 天过期,每次 PUT 刷新 */
-export const LISTING_EXPIRY_DAYS = 30;

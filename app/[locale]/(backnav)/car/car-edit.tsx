@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "@/components/localized-navigation";
 import { useRouteParams } from "@/lib/use-route-params";
-import { Loader2, Upload, X, Plus, FileText, ExternalLink } from "lucide-react";
+import { Loader2, Upload, X, Plus, FileText, ExternalLink, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import { requestModeration } from "@/lib/moderation-client";
+import { legacyOriginal } from "@/lib/i18n/content/resolve";
+import { invalidateEntries } from "@/lib/i18n/content/store";
+import { buildCarTitles } from "@/lib/i18n/car-title";
+import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -102,10 +108,11 @@ export default function EditCarPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [car, setCar] = useState<DbCar | null>(null);
 
+  // description = 卖家原文(任何语言),对应 cars.description_original
   const [form, setForm] = useState({
     price: "", mileage: "", zipcode: "", phone: "", seller_name: "",
     fuel_type: "", transmission: "", exterior_color: "", interior_color: "",
-    drivetrain: "", description_zh: "", make: "", model: "", year: "",
+    drivetrain: "", description: "", make: "", model: "", year: "",
     trim: "", customMake: "", carfax_url: "",
   });
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -157,7 +164,8 @@ export default function EditCarPage() {
         exterior_color: c.exterior_color || "",
         interior_color: c.interior_color || "",
         drivetrain: c.drivetrain || "",
-        description_zh: c.description_zh || "",
+        // 编辑的是原文:迁移前没有原文列时按旧规则从中英列推断
+        description: c.description_original ?? legacyOriginal(c) ?? "",
         make: isOther ? "Other" : c.make,
         model: c.model,
         year: String(c.year),
@@ -165,11 +173,10 @@ export default function EditCarPage() {
         customMake: isOther ? c.make : "",
         carfax_url: c.carfax_url || "",
       });
-      if (c.carfax_summary) {
-        setCarfaxSummary({ title: "Carfax Report", owners: null, accidents: null, serviceRecords: null });
-      }
+      // 已存的 Carfax 摘要直接展示(car.carfax_summary);重新「获取」后才替换
       setImageUrls([c.image_url, ...(c.images || [])].filter(Boolean) as string[]);
-      setFeatures(c.features || []);
+      // 卖家原样填写的标签(cars.features 是含中英词表标签的投影,不在这里编辑)
+      setFeatures(c.features_original ?? c.features ?? []);
       setLoading(false);
     }
     load();
@@ -253,9 +260,13 @@ export default function EditCarPage() {
     const newPrice = Number(form.price);
     const oldPrice = car.price;
     const actualMake = form.make === "Other" ? form.customMake.trim() : form.make;
-    const makeZh = form.make === "Other" ? actualMake : (MAKES_ZH[form.make] || actualMake);
-    const titleEn = `${form.year} ${actualMake} ${form.model}${form.trim ? " " + form.trim : ""}`;
-    const titleZh = `${form.year} ${makeZh} ${form.model}${form.trim ? " " + form.trim : ""}`;
+    // 标题按规则拼(与数据库 i18n.car_title 同一套),不走 AI
+    const titles = buildCarTitles({
+      year: Number(form.year),
+      make: actualMake,
+      model: form.model,
+      trim: form.trim || null,
+    });
 
     // Price change logic: track original price if changed after 24h (admin bypasses)
     const createdAt = new Date(car.created_at).getTime();
@@ -286,45 +297,68 @@ export default function EditCarPage() {
     const locationEn = zipEn ? `${zipEn.city}, ${zipEn.stateCode} ${form.zipcode}` : car.location;
     const locationZh = zipZh?.city || car.location_zh;
 
-    const { error: updateError } = await supabase
-      .from("cars")
-      .update({
-        title: titleEn,
-        title_zh: titleZh,
-        make: actualMake,
-        model: form.model,
-        year: Number(form.year),
-        trim: form.trim || null,
-        price: newPrice,
-        original_price: originalPrice,
-        price_updated_at: priceUpdatedAt,
-        mileage: Number(form.mileage),
-        location: locationEn,
-        location_zh: locationZh,
-        lat: coords?.lat || car.lat,
-        lng: coords?.lng || car.lng,
-        image_url: imageUrls[0] || null,
-        images: imageUrls.slice(1),
-        fuel_type: form.fuel_type,
-        transmission: form.transmission,
-        exterior_color: form.exterior_color || null,
-        interior_color: form.interior_color || null,
-        drivetrain: form.drivetrain || null,
-        description_zh: form.description_zh || null,
-        seller_name: form.seller_name,
-        phone: form.phone || null,
-        carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
-        carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : (car.carfax_summary || null),
-        features,
-      })
-      .eq("id", carId);
+    // 描述原样保存(任何语言,全空白视为没填);各语言译文由数据库触发器排队、服务端翻译
+    const description = form.description.trim() ? form.description : null;
+    const base = {
+      ...titles,
+      make: actualMake,
+      model: form.model,
+      year: Number(form.year),
+      trim: form.trim || null,
+      price: newPrice,
+      original_price: originalPrice,
+      price_updated_at: priceUpdatedAt,
+      mileage: Number(form.mileage),
+      location: locationEn,
+      location_zh: locationZh,
+      lat: coords?.lat || car.lat,
+      lng: coords?.lng || car.lng,
+      image_url: imageUrls[0] || null,
+      images: imageUrls.slice(1),
+      fuel_type: form.fuel_type,
+      transmission: form.transmission,
+      exterior_color: form.exterior_color || null,
+      interior_color: form.interior_color || null,
+      drivetrain: form.drivetrain || null,
+      seller_name: form.seller_name,
+      phone: form.phone || null,
+      carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
+      carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : (car.carfax_summary || null),
+    };
 
-    setSaving(false);
-    if (updateError) {
-      setError(t("保存失败: {msg}", { msg: updateError.message }));
-    } else {
-      router.push(`/car/${carId}`);
+    // 写原文列;卖家保存即确认原文是自己写的(original_uncertain 只能由非管线写入方清除)
+    let { error: updateError } = await supabase
+      .from("cars")
+      .update({ ...base, description_original: description, features_original: features, original_uncertain: false })
+      .eq("id", carId);
+    // 数据库还没有原文列(i18n-v2 迁移前):按旧列写一次
+    if (updateError && isMissingColumnError(updateError)) {
+      ({ error: updateError } = await supabase
+        .from("cars")
+        .update({ ...base, description_zh: description, features })
+        .eq("id", carId));
     }
+    if (updateError) {
+      setSaving(false);
+      setError(
+        updateError.message.includes("listing_blocked")
+          ? t("该车源已被系统或管理员下架，无法重新上架")
+          : t("保存失败: {msg}", { msg: updateError.message })
+      );
+      return;
+    }
+
+    // 已保存即已确认原文;留在本页(被拦截)时不再提示确认
+    setCar((prev) => (prev ? { ...prev, original_uncertain: false } : prev));
+    // 内容可能变了:重新 AI 审核(通过后服务端接着翻译),并丢掉本地缓存的旧译文
+    const mod = await requestModeration("car", carId);
+    invalidateEntries("car", [carId]);
+    setSaving(false);
+    if (mod.blocked) {
+      setError(t("内容涉嫌违反社区规范，已被系统拦截，将由管理员复核"));
+      return;
+    }
+    router.push(`/car/${carId}`);
   }
 
   if (loading) {
@@ -468,16 +502,29 @@ export default function EditCarPage() {
             </div>
           </div>
 
-          {/* Description */}
+          {/* Description(原文,任何语言) */}
           <div>
             <Label className="font-mono text-[11px] text-muted-foreground">{t("描述")}</Label>
+            {/* 旧版系统存的原文可能被机器处理过:请卖家确认,保存即视为确认 */}
+            {car.original_uncertain && (
+              <p className="mt-1 flex items-start gap-1.5 rounded-xl border border-border bg-muted/30 px-3 py-2 font-mono text-[11px] text-muted-foreground">
+                <Info className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                {t("请确认这是你写的原文，保存后会自动翻译成其他语言")}
+              </p>
+            )}
             <textarea
               className="mt-1 w-full resize-none rounded-xl bg-muted px-3 py-2.5 font-mono text-xs transition-colors focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
               rows={4}
-              value={form.description_zh}
-              onChange={(e) => update("description_zh", e.target.value)}
+              maxLength={20000}
+              value={form.description}
+              onChange={(e) => update("description", e.target.value)}
               placeholder={t("车况描述、改装信息等...")}
             />
+            {!car.original_uncertain && (
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                {t("可用任何语言填写，会自动翻译成其他语言")}
+              </p>
+            )}
           </div>
 
           {/* Carfax */}
@@ -527,8 +574,9 @@ export default function EditCarPage() {
             {(carfaxSummary || car.carfax_summary) && (
               <div className="mt-2 flex items-center gap-2 rounded-xl bg-muted/30 px-3 py-2">
                 <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                {/* 摘要按中文格式存库(筛选要解析),展示时按界面语言转写 */}
                 <span className="flex-1 font-mono text-[11px]">
-                  {carfaxSummary ? formatCarfaxSummary(carfaxSummary) : car.carfax_summary}
+                  {localizeCarfaxSummary(carfaxSummary ? formatCarfaxSummary(carfaxSummary) : car.carfax_summary, t)}
                 </span>
                 {form.carfax_url && (
                   <a

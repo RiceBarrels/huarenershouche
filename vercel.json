@@ -3,6 +3,10 @@
     {
       "path": "/api/sync",
       "schedule": "0 * * * *"
+    },
+    {
+      "path": "/api/i18n/drain",
+      "schedule": "*/2 * * * *"
     }
   ],
   "redirects": [

@@ -1,7 +1,7 @@
 "use client";
 
 // 头像查看器:点击头像全屏放大(黑底居中),右上角「⋯」打开底部操作单
-// (保存图片;是自己的头像时还可「更换头像」)。
+// (保存图片;是自己的头像时还可「更换头像」「使用默认头像」)。
 // · 注册进浮层栈:系统返回键/手势逐层关闭,层级随栈分配;
 // · 整体 portal 到 body:宿主可能在 vaul drawer 内(内容节点带 transform,
 //   会把内联 fixed 元素钳在 drawer 盒子里);
@@ -17,7 +17,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { createPortal } from "react-dom";
-import { MoreHorizontal, Download, Camera, Check, Loader2 } from "lucide-react";
+import { MoreHorizontal, Download, Camera, Check, Loader2, UserRound } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { useI18n } from "@/components/i18n-provider";
@@ -35,6 +35,7 @@ export function AvatarViewer({
   open,
   onClose,
   onEdit,
+  onUseDefault,
 }: {
   src: string;
   alt?: string;
@@ -42,6 +43,8 @@ export function AvatarViewer({
   onClose: () => void;
   /** 自己的头像:提供后菜单里出现「更换头像」 */
   onEdit?: () => void;
+  /** 自己的头像且当前不是默认头像:提供后菜单里出现「使用默认头像」 */
+  onUseDefault?: () => void;
 }) {
   const { t } = useI18n();
   const registry = useContext(OverlayLayerRegistryCtx);
@@ -224,6 +227,20 @@ export function AvatarViewer({
             >
               <Camera className="h-4 w-4" strokeWidth={1.5} />
               {t("更换头像")}
+            </button>
+          )}
+          {onUseDefault && (
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                onClose();
+                onUseDefault();
+              }}
+              className="flex w-full items-center justify-center gap-2 py-3.5 font-mono text-sm transition-colors active:bg-muted/50"
+            >
+              <UserRound className="h-4 w-4" strokeWidth={1.5} />
+              {t("使用默认头像")}
             </button>
           )}
           <button

@@ -1,5 +1,6 @@
 // GET /api/v1/inventory — key owner 名下全部车(含 sold/pending/removed),
-// 筛选 status / external_id,offset 游标分页。需 write:inventory。
+// 筛选 status / external_id,按内容时钟倒序(最近改过的在前),offset 游标分页。需 write:inventory。
+// processing_state 的 translation_pending 按页查一次 zh / en 的 i18n_bundle。
 
 import type { NextRequest } from "next/server";
 import { authenticateApi } from "@/lib/api/auth";
@@ -14,7 +15,15 @@ import {
   intParam,
 } from "@/lib/api/response";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type ApiContext } from "@/lib/api/types";
-import { INVENTORY_COLS, finalize, serializeInventoryItem, type InventoryCar } from "@/lib/api/listing";
+import {
+  INVENTORY_COLS,
+  INVENTORY_COLS_V2,
+  finalize,
+  loadTranslationPending,
+  serializeInventoryItem,
+  type InventoryCar,
+} from "@/lib/api/listing";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -26,46 +35,51 @@ export async function GET(req: NextRequest) {
     const auth = await authenticateApi(req, { scope: "write:inventory" });
     if (!auth.ok) return auth.response;
     ctx = auth.ctx;
+    const { supabase, lang } = ctx;
+    const ownerId = ctx.owner!.id;
 
     const sp = req.nextUrl.searchParams;
     const limit = intParam(sp, "limit", DEFAULT_PAGE_SIZE, { min: 1, max: MAX_PAGE_SIZE })!;
     const cursor = decodeCursor<{ o: number }>(sp.get("cursor"));
     const offset = Math.max(0, Math.trunc(Number(cursor?.o ?? 0)) || 0);
 
-    let query = ctx.supabase
-      .from("cars")
-      .select(INVENTORY_COLS)
-      .eq("seller_id", ctx.owner!.id) // 含手动发帖(external_id 为空),便于发现可 adopt 的车
-      .order("updated_at", { ascending: false })
-      .order("id", { ascending: true })
-      .range(offset, offset + limit); // 多取一条判断是否还有下一页
-
     const status = sp.get("status");
-    if (status) {
-      const dbStatus = enumToDb("status", status);
-      if (!dbStatus) {
-        return finalize(
-          ctx,
-          apiError(400, "validation_failed", "Invalid status", [
-            { field: "status", issue: `must be one of: ${enumSlugs("status").join(", ")}` },
-          ]),
-        );
-      }
-      query = query.eq("status", dbStatus);
+    const dbStatus = status ? enumToDb("status", status) : null;
+    if (status && !dbStatus) {
+      return finalize(
+        ctx,
+        apiError(400, "validation_failed", "Invalid status", [
+          { field: "status", issue: `must be one of: ${enumSlugs("status").join(", ")}` },
+        ]),
+      );
     }
     const externalId = sp.get("external_id");
-    if (externalId) query = query.eq("external_id", externalId);
 
-    const { data, error } = await query;
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as unknown as InventoryCar[];
+    // 内容时钟 content_updated_at(i18n-v2.sql);库里还没有该列时按 updated_at 重查
+    const run = (legacy: boolean) => {
+      let query = supabase
+        .from("cars")
+        .select(legacy ? INVENTORY_COLS : INVENTORY_COLS_V2)
+        .eq("seller_id", ownerId) // 含手动发帖(external_id 为空),便于发现可 adopt 的车
+        .order(legacy ? "updated_at" : "content_updated_at", { ascending: false })
+        .order("id", { ascending: true })
+        .range(offset, offset + limit); // 多取一条判断是否还有下一页
+      if (dbStatus) query = query.eq("status", dbStatus);
+      if (externalId) query = query.eq("external_id", externalId);
+      return query;
+    };
+    let res = await run(false);
+    if (res.error && isMissingColumnError(res.error)) res = await run(true);
+    if (res.error) throw new Error(res.error.message);
+    const rows = (res.data ?? []) as unknown as InventoryCar[];
     const hasMore = rows.length > limit;
     const page = hasMore ? rows.slice(0, limit) : rows;
+    const pending = await loadTranslationPending(page.map((c) => c.id));
 
     return apiJson({
-      data: page.map((c) => serializeInventoryItem(c, ctx!.lang)),
+      data: page.map((c) => serializeInventoryItem(c, lang, pending.has(c.id))),
       next_cursor: hasMore ? encodeCursor({ o: offset + limit }) : null,
-      lang: ctx.lang,
+      lang,
     });
   } catch (err) {
     return finalize(ctx, apiInternalError(err, "inventory.list"));

@@ -16,7 +16,11 @@ export interface CrawlResult {
   failed: boolean;
 }
 
-/** Maps 1:1 onto `cars` insert columns (minus seller_id/status/timestamps). */
+/**
+ * Maps onto `cars` insert columns (minus seller_id/status/timestamps), except the text the i18n
+ * pipeline owns: `description` → cars.description_original and `features` → cars.features_original
+ * (verbatim originals); title/title_zh are rebuilt by buildCarTitles (lib/i18n/car-title.ts).
+ */
 export interface ParsedListing {
   title: string;
   title_zh: string;
@@ -39,8 +43,14 @@ export interface ParsedListing {
   interior_color: string | null;
   drivetrain: string | null;
   vin: string | null;
+  /** Dealer's own text, any language — stored verbatim as cars.description_original. */
   description: string | null;
+  /**
+   * Ignored: never written to cars.description_zh (a pipeline projection). Adapters set null; sync
+   * only falls back to it as the original when `description` is empty.
+   */
   description_zh: string | null;
+  /** Dealer's own tags as scraped — stored verbatim as cars.features_original. */
   features: string[];
   seller_name: string;
   phone: string | null;

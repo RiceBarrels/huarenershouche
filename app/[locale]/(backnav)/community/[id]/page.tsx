@@ -1,13 +1,33 @@
-// 社区帖子详情 — server component:SEO metadata + JSON-LD + 服务端预取。
-// 静态导出(Capacitor)构建时本文件会被 build:static 替换为 query-param 版本,
-// 客户端组件 community-detail 在无 initialPost 时仍会自行拉取数据。
+// 社区帖子详情 — server component:SEO metadata + JSON-LD + 服务端预取
+// (帖子 + 8 篇相关 + 前 50 条可见评论,连同当前语言的译文 bundle)。
+// 正文/metadata/JSON-LD 共用同一份 bundle 行(resolvePostView),译文没好时一律原文 + lang,
+// canonical 指向原文语言版本;页面渲染不触发任何翻译。
+// 静态导出(Capacitor)构建时 [id] 目录整体隐藏,原生端经浮层/客户端拉取渲染 community-detail。
 
 import type { Metadata } from "next";
-import { cache } from "react";
+import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
 import { serverT } from "@/lib/i18n/translate";
-import { dateLocale, type Locale } from "@/lib/i18n";
+import type { Locale } from "@/lib/i18n";
+import { isSiteLocale, ogLocale } from "@/lib/i18n/content-langs";
+import {
+  LEGACY_POST_COLUMNS,
+  POST_AUTHOR_EMBED,
+  POST_COLUMNS,
+} from "@/lib/i18n/content/columns";
+import {
+  getBundle,
+  getBundles,
+  getPublicPost,
+  getPublicPostComments,
+} from "@/lib/i18n/content/server";
+import { localize, resolvePostView } from "@/lib/i18n/content/resolve";
+import { contentAlternates, ogAlternates } from "@/lib/seo/alternates";
+import { JsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, postJsonLd } from "@/lib/seo/structured-data";
+import { ContentI18nProvider } from "@/components/content/content-i18n-provider";
 import type { DbCommunityPost } from "@/lib/types";
 import CommunityDetail from "../community-detail";
 
@@ -19,59 +39,61 @@ const TYPE_LABELS: Record<string, string> = {
   discussion: "讨论",
 };
 
-const getPost = cache(async (id: string): Promise<DbCommunityPost | null> => {
-  try {
-    const { data } = await supabase
-      .from("community_posts")
-      .select("*, profiles!user_id(username, avatar_url)")
-      .eq("id", id)
-      .eq("status", "active")
-      .maybeSingle();
-    return (data as DbCommunityPost | null) ?? null;
-  } catch {
-    return null;
-  }
-});
+const RELATED_LIMIT = 8;
+// SSR 的评论条数(更多的由客户端补全);JSON-LD 只放前 10 条
+const COMMENT_LIMIT = 50;
+const LD_COMMENT_LIMIT = 10;
+
+const POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+const LEGACY_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+
+// 非法语言段由根 layout notFound();这里兜底为 zh
+const toLocale = (value: string): Locale => (isSiteLocale(value) ? value : "zh");
 
 async function getRelated(post: DbCommunityPost): Promise<DbCommunityPost[]> {
-  const LIMIT = 8;
   const related: DbCommunityPost[] = [];
   const seen = new Set<string>([post.id]);
-  try {
-    // 优先同品牌
-    if (post.make) {
-      const { data } = await supabase
-        .from("community_posts")
-        .select("*, profiles!user_id(username, avatar_url)")
-        .eq("status", "active")
-        .eq("make", post.make)
-        .neq("id", post.id)
-        .order("likes_count", { ascending: false })
-        .limit(LIMIT);
-      for (const p of (data as DbCommunityPost[]) ?? []) {
-        if (!seen.has(p.id)) {
-          seen.add(p.id);
-          related.push(p);
-        }
+  const take = (rows: DbCommunityPost[]) => {
+    for (const p of rows) {
+      if (related.length >= RELATED_LIMIT) break;
+      if (!seen.has(p.id)) {
+        seen.add(p.id);
+        related.push(p);
       }
     }
+  };
+  try {
+    // 优先同品牌
+    const make = post.make;
+    if (make) {
+      const byMake = (cols: string) =>
+        supabase
+          .from("community_posts")
+          .select(cols)
+          .eq("status", "active")
+          .eq("make", make)
+          .neq("id", post.id)
+          .order("likes_count", { ascending: false })
+          .limit(RELATED_LIMIT);
+      let res = await byMake(POST_SELECT);
+      // 迁移 SQL 未执行时新列缺失:按旧列集重查
+      if (res.error && isMissingColumnError(res.error)) res = await byMake(LEGACY_POST_SELECT);
+      take((res.data as unknown as DbCommunityPost[] | null) ?? []);
+    }
     // 同类型补足
-    if (related.length < LIMIT) {
-      const { data } = await supabase
-        .from("community_posts")
-        .select("*, profiles!user_id(username, avatar_url)")
-        .eq("status", "active")
-        .eq("type", post.type)
-        .neq("id", post.id)
-        .order("created_at", { ascending: false })
-        .limit(LIMIT + related.length);
-      for (const p of (data as DbCommunityPost[]) ?? []) {
-        if (related.length >= LIMIT) break;
-        if (!seen.has(p.id)) {
-          seen.add(p.id);
-          related.push(p);
-        }
-      }
+    if (related.length < RELATED_LIMIT) {
+      const byType = (cols: string) =>
+        supabase
+          .from("community_posts")
+          .select(cols)
+          .eq("status", "active")
+          .eq("type", post.type)
+          .neq("id", post.id)
+          .order("created_at", { ascending: false })
+          .limit(RELATED_LIMIT + related.length);
+      let res = await byType(POST_SELECT);
+      if (res.error && isMissingColumnError(res.error)) res = await byType(LEGACY_POST_SELECT);
+      take((res.data as unknown as DbCommunityPost[] | null) ?? []);
     }
   } catch {
     // 表不存在等场景:静默降级
@@ -89,34 +111,38 @@ export async function generateMetadata({
   params: Promise<{ locale: string; id: string }>;
 }): Promise<Metadata> {
   const { locale, id } = await params;
-  const t = serverT(locale);
-  const post = await getPost(id);
+  const L = toLocale(locale);
+  const t = serverT(L);
+  const post = await getPublicPost(id);
 
   if (!post) {
     return { title: t("帖子不存在"), robots: { index: false, follow: false } };
   }
 
-  // 非中文界面用 AI 翻译缓存(没有就用原文,首次有人浏览后会翻译写入)
-  const tr = locale === "zh" ? undefined : post.other_i18n?.[locale];
-  const postTitle = tr?.title || post.title;
-  const description = excerpt(tr?.content || post.content);
+  // 与正文同一规则:有校验通过的译文显示译文,否则原文(zh 同样适用);
+  // bundle 查询与页面主体在同一请求内去重(getBundles 内部 React cache)
+  const view = resolvePostView(post, await getBundle("post", post.id, L), L);
+  const postTitle = view.body.text.title;
+  const description = excerpt(view.body.text.content);
   const section = t(TYPE_LABELS[post.type] || "社区");
   const cover = post.images?.find((u) => !VIDEO_RE.test(u));
-  const url = `${SITE_URL}/${locale}/community/${post.id}`;
-
+  const path = `/community/${post.id}`;
+  // 本语言没有可用版本(译文未就绪)时 canonical 指向原文语言页,hreflang 只列可用语言
+  const alternates = contentAlternates(L, path, view.available, view.xDefault);
+  const authorUrl = `${SITE_URL}/${L}/user/${post.user_id}`;
   const author = post.profiles?.username || t("匿名用户");
 
   return {
     title: `${postTitle} - ${section}`,
     description,
     keywords: [
-      ...(post.tags || []),
+      ...view.topics.map((topic) => topic.label),
       post.make,
       post.model,
-      ...(locale === "zh" ? ["北美华人", "二手车", "汽车社区"] : [t("二手车"), t("社区")]),
+      ...(L === "zh" ? ["二手车", "汽车社区"] : [t("二手车"), t("社区")]),
     ].filter(Boolean) as string[],
-    authors: [{ name: author, url: `${SITE_URL}/${locale}/user/${post.user_id}` }],
-    alternates: localeAlternates(locale, `/community/${post.id}`),
+    authors: [{ name: author, url: authorUrl }],
+    alternates,
     robots: {
       index: true,
       follow: true,
@@ -127,15 +153,17 @@ export async function generateMetadata({
       type: "article",
       title: postTitle,
       description,
-      url,
-      siteName: SITE_NAME,
-      locale: dateLocale(locale as Locale).replace("-", "_"),
+      url: alternates.canonical,
+      siteName: t(SITE_NAME),
+      locale: ogLocale(L),
+      alternateLocale: ogAlternates(L, view.available),
       publishedTime: post.created_at,
-      modifiedTime: post.updated_at,
-      authors: [`${SITE_URL}/${locale}/user/${post.user_id}`],
+      // 内容时钟:只随标题/正文/图片等可见内容变化(点赞、评论计数不动它)
+      modifiedTime: post.content_updated_at ?? post.updated_at,
+      authors: [authorUrl],
       section,
-      tags: post.tags || [],
-      ...(cover && { images: [{ url: cover }] }),
+      tags: view.topics.map((topic) => topic.label),
+      ...(cover && { images: [{ url: cover, alt: postTitle }] }),
     },
     twitter: {
       card: cover ? "summary_large_image" : "summary",
@@ -149,74 +177,70 @@ export async function generateMetadata({
 export default async function Page({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ locale: string; id: string }>;
 }) {
-  const { id } = await params;
-  const post = await getPost(id);
-  const related = post ? await getRelated(post) : [];
+  const { locale, id } = await params;
+  const L = toLocale(locale);
+  const post = await getPublicPost(id);
+  if (!post) notFound();
 
-  const jsonLd = post
-    ? {
-        "@context": "https://schema.org",
-        "@type": "DiscussionForumPosting",
-        "@id": `${SITE_URL}/community/${post.id}`,
-        mainEntityOfPage: `${SITE_URL}/community/${post.id}`,
-        headline: post.title,
-        articleBody: excerpt(post.content, 500),
-        ...(post.images?.filter((u) => !VIDEO_RE.test(u)).length && {
-          image: post.images.filter((u) => !VIDEO_RE.test(u)),
-        }),
-        datePublished: post.created_at,
-        dateModified: post.updated_at,
-        author: {
-          "@type": "Person",
-          name: post.profiles?.username || "匿名用户",
-          url: `${SITE_URL}/user/${post.user_id}`,
-        },
-        publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
-        interactionStatistic: [
-          {
-            "@type": "InteractionCounter",
-            interactionType: "https://schema.org/LikeAction",
-            userInteractionCount: post.likes_count || 0,
-          },
-          {
-            "@type": "InteractionCounter",
-            interactionType: "https://schema.org/CommentAction",
-            userInteractionCount: post.comments_count || 0,
-          },
-        ],
-      }
-    : null;
+  const [related, comments, postRow] = await Promise.all([
+    getRelated(post),
+    getPublicPostComments(post.id, COMMENT_LIMIT),
+    getBundle("post", post.id, L),
+  ]);
+  const [relatedRows, commentRows] = await Promise.all([
+    getBundles("post", related.map((p) => p.id), L),
+    getBundles("post_comment", comments.map((c) => c.id), L),
+  ]);
+  const postRows = postRow ? { ...relatedRows, [post.id]: postRow } : relatedRows;
 
-  // 面包屑结构化数据:首页 → 社区 → 帖子(与车源页同款,利于搜索结果层级展示)
-  const breadcrumbLd = post
-    ? {
-        "@context": "https://schema.org",
-        "@type": "BreadcrumbList",
-        itemListElement: [
-          { "@type": "ListItem", position: 1, name: "首页", item: SITE_URL },
-          { "@type": "ListItem", position: 2, name: "社区", item: `${SITE_URL}/community` },
-          { "@type": "ListItem", position: 3, name: post.title, item: `${SITE_URL}/community/${post.id}` },
-        ],
-      }
-    : null;
+  const t = serverT(L);
+  const view = resolvePostView(post, postRow, L);
+  const path = `/community/${post.id}`;
+  const url = `${SITE_URL}/${L}${path}`;
+
+  // DiscussionForumPosting:标题/正文/评论都用页面上显示的文本(译文或原文)及其 lang
+  const ldComments = comments.slice(0, LD_COMMENT_LIMIT).map((c) => {
+    const shown = localize({ content: c.content }, commentRows[c.id], L);
+    return {
+      text: shown.text.content,
+      lang: shown.textLang.content,
+      author: c.profiles?.username || t("匿名用户"),
+      userId: c.user_id,
+      createdAt: c.created_at,
+    };
+  });
 
   return (
     <>
-      {jsonLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      <JsonLd
+        data={postJsonLd({
+          post,
+          view,
+          author: post.profiles?.username || t("匿名用户"),
+          comments: ldComments,
+          locale: L,
+          url,
+          // 原文所在语言版本(x-default);显示译文时作为 translationOfWork
+          sourceUrl: `${SITE_URL}/${view.xDefault}${path}`,
+        })}
+      />
+      {/* 面包屑结构化数据:首页 → 社区 → 帖子(与车源页同款,利于搜索结果层级展示) */}
+      <JsonLd
+        data={breadcrumbJsonLd([
+          { name: t("首页"), url: `${SITE_URL}/${L}` },
+          { name: t("社区"), url: `${SITE_URL}/${L}/community` },
+          { name: view.body.text.title, url },
+        ])}
+      />
+      <ContentI18nProvider locale={L} rows={{ post: postRows, post_comment: commentRows }}>
+        <CommunityDetail
+          initialPost={post}
+          initialRelated={related}
+          initialComments={comments}
         />
-      )}
-      {breadcrumbLd && (
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }}
-        />
-      )}
-      <CommunityDetail initialPost={post} initialRelated={related} />
+      </ContentI18nProvider>
     </>
   );
 }

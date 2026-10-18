@@ -10,7 +10,9 @@ import { getCompareIds, removeFromCompare } from "@/lib/compare";
 import { Badge } from "@/components/ui/badge";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { useI18n } from "@/components/i18n-provider";
+import { useTermLabels } from "@/hooks/use-term-labels";
 import { carLocation, carTitle, brandLabel, type Locale } from "@/lib/i18n";
+import { normTag } from "@/lib/i18n/hashtags";
 import type { DbCar } from "@/lib/types";
 
 function formatPrice(price: number): string {
@@ -73,6 +75,26 @@ function getCellValue(
   }
 }
 
+// 卖家原始配置标签(features_original;SQL 未上线时只有 features),规范化后为空的不算
+function featureRaws(car: DbCar): string[] {
+  return (car.features_original ?? car.features ?? []).filter((raw) => normTag(raw) !== null);
+}
+
+type FeatureChip = { key: string; label: string };
+
+/** 一辆车的配置:按术语 key 去重(同一配置的中英文双写只留一条),标签为当前界面语言 */
+function featureChips(car: DbCar, labels: Record<string, FeatureChip>): FeatureChip[] {
+  const seen = new Set<string>();
+  const chips: FeatureChip[] = [];
+  for (const raw of featureRaws(car)) {
+    const chip = labels[raw];
+    if (seen.has(chip.key)) continue;
+    seen.add(chip.key);
+    chips.push(chip);
+  }
+  return chips;
+}
+
 export function CompareContent() {
   const { t, locale } = useI18n();
   const [ids, setIds] = useState<string[]>([]);
@@ -107,6 +129,8 @@ export function CompareContent() {
   }, [ids]);
 
   const selected = ids.map((id) => cars.get(id)).filter(Boolean) as DbCar[];
+  // 所有对比车的原始标签一次查术语表(未归并的回退 UI 词典)
+  const featureLabels = useTermLabels("feature", [...new Set(selected.flatMap(featureRaws))]);
 
   function getBestValue(key: string): string | null {
     if (selected.length < 2) return null;
@@ -206,25 +230,28 @@ export function CompareContent() {
                 <td className="whitespace-nowrap bg-muted/30 px-3 py-2.5 font-mono text-[11px] font-medium text-muted-foreground">
                   {t("配置")}
                 </td>
-                {selected.map((car) => (
-                  <td key={car.id} className="px-3 py-2.5">
-                    {car.features?.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {car.features.map((f) => (
-                          <Badge
-                            key={f}
-                            variant="outline"
-                            className="font-mono text-[10px]"
-                          >
-                            {t(f)}
-                          </Badge>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="font-mono text-xs">—</span>
-                    )}
-                  </td>
-                ))}
+                {selected.map((car) => {
+                  const chips = featureChips(car, featureLabels);
+                  return (
+                    <td key={car.id} className="px-3 py-2.5">
+                      {chips.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {chips.map((f) => (
+                            <Badge
+                              key={f.key}
+                              variant="outline"
+                              className="font-mono text-[10px]"
+                            >
+                              {f.label}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="font-mono text-xs">—</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
           </table>

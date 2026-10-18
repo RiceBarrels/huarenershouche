@@ -1,8 +1,6 @@
 // 第一方访问统计的共享类型:埋点上报载荷(/api/vt)与管理后台 RPC 返回形状。
 // SQL 侧见 supabase/analytics.sql —— 改字段两边必须同步。
 
-import type { CarOtherI18n } from "@/lib/i18n";
-
 export type AnalyticsEventType = "pageview" | "car_view";
 export type AnalyticsPlatform = "web" | "ios" | "android";
 export type AnalyticsDevice = "desktop" | "mobile" | "tablet";
@@ -135,12 +133,17 @@ export type AnalyticsDimension =
   | "locale"
   | "car";
 
-/** 车辆摘要(join cars;车被删时为 null) */
+/**
+ * 车辆摘要(join cars;车被删时为 null)。线上库的 analytics_car_info 还是旧版(多返回 other_i18n、没有 trim),
+ * supabase/analytics.sql 的新版返回 trim、不再返回 other_i18n,重新执行该文件前两种形状都会出现:
+ * 界面只读两版共有的字段(标题一律走 carTitle(title / title_zh)),不读 other_i18n(冻结的旧翻译缓存)
+ */
 export interface AnalyticsCarInfo {
   id: string;
   title: string | null;
   title_zh: string | null;
-  other_i18n: CarOtherI18n;
+  /** 只有新版函数返回 */
+  trim?: string | null;
   image_url: string | null;
   price: number | null;
   year: number | null;

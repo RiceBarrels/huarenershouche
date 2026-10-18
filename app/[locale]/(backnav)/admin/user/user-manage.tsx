@@ -50,7 +50,6 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function carStatusLabel(c: DbCar): string {
-  if (c.status === "removed" && c.expires_at && new Date(c.expires_at).getTime() < Date.now()) return "已过期";
   return STATUS_LABEL[c.status] || c.status;
 }
 
@@ -312,9 +311,8 @@ export default function AdminUserManagePage() {
 
   async function restoreCar(carId: string) {
     setActionId(carId);
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    await supabase.from("cars").update({ status: "active", expires_at: expiresAt }).eq("id", carId);
-    setCars((prev) => prev.map((c) => (c.id === carId ? { ...c, status: "active" as const, expires_at: expiresAt } : c)));
+    await supabase.from("cars").update({ status: "active" }).eq("id", carId);
+    setCars((prev) => prev.map((c) => (c.id === carId ? { ...c, status: "active" as const } : c)));
     setActionId(null);
   }
 

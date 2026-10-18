@@ -7,10 +7,13 @@ import { notFound } from "next/navigation";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { SeoCarList } from "@/components/seo-car-list";
+import { JsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
+import { ogLocale } from "@/lib/i18n/content-langs";
+import type { Locale } from "@/lib/i18n";
 import {
   localeAlternates,
   SEO_PAGES,
-  SITE_URL,
   SITE_NAME,
   getSeoPage,
   seoPageHref,
@@ -37,7 +40,7 @@ export async function generateMetadata({
     title: { absolute: def.title },
     description: def.description,
     alternates: localeAlternates(locale, `/cars/${def.slug}`, { zhOnly: true }),
-    openGraph: { title: def.title, description: def.description },
+    openGraph: { title: def.title, description: def.description, locale: ogLocale(locale as Locale) },
   };
 }
 
@@ -53,35 +56,17 @@ export default async function SeoLandingPage({
   const relatedGroups = getRelatedPages(def);
   const browseUrl = browseHref(def);
 
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: SITE_NAME,
-        item: SITE_URL,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: "二手车",
-        item: `${SITE_URL}/cars`,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: def.label,
-        item: `${SITE_URL}/cars/${def.slug}`,
-      },
-    ],
-  };
+  // 正文只有中文,各语言树的 canonical 都回 /zh:结构化数据里的 URL 同样用 zh 树地址
+  const breadcrumb = breadcrumbJsonLd([
+    { name: SITE_NAME, url: "/zh" },
+    { name: "二手车", url: "/zh/cars" },
+    { name: def.label, url: `/zh/cars/${def.slug}` },
+  ]);
 
   return (
     <>
       <Header />
-      <main className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
+      <main lang="zh-CN" className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
         <nav
           aria-label="Breadcrumb"
           className="font-mono text-[11px] text-muted-foreground"
@@ -138,10 +123,7 @@ export default async function SeoLandingPage({
           </section>
         ))}
 
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
-        />
+        <JsonLd data={breadcrumb} />
       </main>
       <Footer />
     </>

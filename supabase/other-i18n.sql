@@ -1,3 +1,4 @@
+-- SUPERSEDED by supabase/i18n-v2.sql; do not run.
 -- ============================================================
 -- 小语种内容惰性翻译缓存:cars.other_i18n
 -- 形如 { "ko": { "title": "...", "description": "..." } }

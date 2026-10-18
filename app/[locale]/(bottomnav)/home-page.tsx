@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "@/components/localized-navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "@/components/localized-navigation";
 import Image from "next/image";
 import { motion, AnimatePresence, useReducedMotion, useScroll, useTransform } from "framer-motion";
@@ -55,6 +55,14 @@ import { MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
 import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import {
+  CAR_LIST_COLUMNS,
+  CAR_PROFILE_EMBED,
+  LEGACY_POST_COLUMNS,
+  POST_AUTHOR_EMBED,
+  POST_COLUMNS,
+} from "@/lib/i18n/content/columns";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
 import { getCurrentPosition, reverseGeocode } from "@/lib/geocode";
 
@@ -62,6 +70,8 @@ import type { DbCar, DbCommunityPost } from "@/lib/types";
 import { Heart } from "lucide-react";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
+import { useLocalized, useLocalizedPrefetch } from "@/hooks/use-localized";
+import { LocalizedText } from "@/components/content/localized-text";
 import { carTitle, brandLogoSrc } from "@/lib/i18n";
 
 // Map city names to Chinese region names, with NYC borough detection
@@ -287,6 +297,12 @@ function formatPrice(price: number): string {
   }).format(price);
 }
 
+// 列表列集:车源卡片只取卡片用列(不含描述/内部 id);社区帖带作者。
+// 迁移 SQL 未执行时帖子新列缺失 → 按旧列集重查
+const HOME_CAR_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+const HOME_POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+const LEGACY_HOME_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
+
 // 首页数据双层缓存(社区同款):session 命中直接复用不重拉,
 // localStorage 冷启动兜底,先展示后台刷新
 const HOME_CACHE_KEY = "clc_home_v1";
@@ -299,7 +315,7 @@ interface HomeCache {
 
 export default function Home() {
   const router = useRouter();
-  const { t, locale } = useI18n();
+  const { t, locale, localeReady } = useI18n();
   // hero 搜索：与 /browse 同构的筛选对象，搜索时整体带入 URL
   const [searchFilters, setSearchFilters] = useState<Filters>(INITIAL_FILTERS);
   const [featured, setFeatured] = useState<DbCar[]>([]);
@@ -310,6 +326,9 @@ export default function Home() {
   const [monthlyBudget, setMonthlyBudget] = useState("400");
   const [carCount, setCarCount] = useState<number | null>(null);
   const [communityPosts, setCommunityPosts] = useState<DbCommunityPost[]>([]);
+  // 社区卡片标题按界面语言显示:4 张卡的译文合并成一次 bundle 请求
+  const communityPostIds = useMemo(() => communityPosts.map((p) => p.id), [communityPosts]);
+  useLocalizedPrefetch("post", communityPostIds);
 
   // 手机端:hero 搜索框滑出视口后,顶部浮出缩小版搜索条
   const heroSearchRef = useRef<HTMLDivElement>(null);
@@ -335,15 +354,25 @@ export default function Home() {
   const budgetPrice = monthlyBudgetNum > 0 ? paymentToPrice(monthlyBudgetNum) : 0;
 
   useEffect(() => {
+    // 原生端界面语言要等系统语言检测完(localeReady)才确定:排序与缓存 key 都按语言,就绪前不拉
+    if (!localeReady) return;
     const hasHistory = hasUserHistory();
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage 信号,仅首帧一次
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage 信号,语言就绪后一次
     setShowRecommended(hasHistory);
 
     async function load(withHistory: boolean) {
-      const [carsRes, countRes, postsRes] = await Promise.all([
+      // 社区热帖入口:优先带图的最新帖
+      const latestPosts = (cols: string) =>
+        supabase
+          .from("community_posts")
+          .select(cols)
+          .eq("status", "active")
+          .order("created_at", { ascending: false })
+          .limit(12);
+      const [carsRes, countRes, firstPostsRes] = await Promise.all([
         supabase
           .from("cars")
-          .select("*, profiles!seller_id(account_type, avatar_url, languages)")
+          .select(HOME_CAR_SELECT)
           .eq("status", "active")
           .eq("owner_hidden", false)
           .order("created_at", { ascending: false })
@@ -354,16 +383,14 @@ export default function Home() {
           .select("id", { count: "exact", head: true })
           .eq("status", "active")
           .eq("owner_hidden", false),
-        // 社区热帖入口:优先带图的最新帖
-        supabase
-          .from("community_posts")
-          .select("*, profiles!user_id(username, avatar_url)")
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(12),
+        latestPosts(HOME_POST_SELECT),
       ]);
+      const postsRes =
+        firstPostsRes.error && isMissingColumnError(firstPostsRes.error)
+          ? await latestPosts(LEGACY_HOME_POST_SELECT)
+          : firstPostsRes;
 
-      const cars = (carsRes.data as DbCar[]) || [];
+      const cars = (carsRes.data as unknown as DbCar[]) || [];
       // 卖家会说当前界面语言的优先,其次个人/车行直发优先于系统检索转载
       // (稳定排序保持组内最新在前)
       const prioritized = sortCars(cars, "newest", new Map(), locale);
@@ -380,8 +407,8 @@ export default function Home() {
         let favoriteCars: DbCar[] = [];
         let viewedCars: DbCar[] = [];
         if (signalIds.length > 0) {
-          const { data: sig } = await supabase.from("cars").select("*").in("id", signalIds);
-          const byId = new Map(((sig as DbCar[]) || []).map((c) => [c.id, c]));
+          const { data: sig } = await supabase.from("cars").select(CAR_LIST_COLUMNS).in("id", signalIds);
+          const byId = new Map(((sig as unknown as DbCar[]) || []).map((c) => [c.id, c]));
           // 保持收藏/浏览的原有顺序(浏览按新近度)
           favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
           viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
@@ -396,7 +423,7 @@ export default function Home() {
       const countNext = countRes.count ?? 0;
       setCarCount(countNext);
 
-      const rows = (postsRes.data as DbCommunityPost[]) || [];
+      const rows = (postsRes.data as unknown as DbCommunityPost[]) || [];
       const withImg = rows.filter((p) => p.images && p.images.length > 0);
       const withoutImg = rows.filter((p) => !p.images || p.images.length === 0);
       const postsNext = [...withImg, ...withoutImg].slice(0, 4);
@@ -424,16 +451,16 @@ export default function Home() {
     } else {
       load(hasHistory).catch(() => {});
     }
+    // 就绪后 locale 不再变化(原生端语言跟随系统、应用内不可改),本 effect 实际只跑一次
+  }, [localeReady, locale]);
 
-    // Auto-detect user location with detailed region info
+  // Auto-detect user location with detailed region info(与界面语言无关,挂载即检测)
+  useEffect(() => {
     detectDetailedLocation()
       .then((loc) => {
         if (loc) setUserLocation(loc);
       })
       .finally(() => setLocationLoading(false));
-
-    // locale 只在原生端应用内切语言时变化;首页缓存按语言分 key,下次进入首页即按新语言排序
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // 定位权限刚被授予(权限弹窗/设置页开启)时重新检测——mount 时那次可能因无权限失败
@@ -1217,40 +1244,7 @@ export default function Home() {
             <RevealGroup className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
               {communityPosts.map((post) => (
                 <RevealItem key={post.id}>
-                  <Link
-                    href={`/community/${post.id}`}
-                    className="block h-full overflow-hidden rounded-xl bg-card outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
-                  >
-                    {post.images?.[0] && (
-                      <img
-                        src={post.images[0]}
-                        alt=""
-                        className="aspect-[4/3] w-full object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <div className="p-2.5">
-                      <p className="line-clamp-2 font-mono text-xs font-medium leading-snug">
-                        {post.title}
-                      </p>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
-                          <img
-                            src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        </span>
-                        <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
-                          {post.profiles?.username || t("匿名")}
-                        </span>
-                        <span className="ml-auto flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-muted-foreground">
-                          <Heart className="h-3 w-3" strokeWidth={1.5} />
-                          {post.likes_count || 0}
-                        </span>
-                      </div>
-                    </div>
-                  </Link>
+                  <HomePostCard post={post} />
                 </RevealItem>
               ))}
             </RevealGroup>
@@ -1394,5 +1388,50 @@ export default function Home() {
 
       <Footer />
     </div>
+  );
+}
+
+// 首页社区入口卡片:标题按界面语言显示(无译文时显示原文并标 lang)
+function HomePostCard({ post }: { post: DbCommunityPost }) {
+  const { t } = useI18n();
+  const view = useLocalized("post", post.id, { title: post.title });
+  return (
+    <Link
+      href={`/community/${post.id}`}
+      className="block h-full overflow-hidden rounded-xl bg-card outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-brand-ink/50"
+    >
+      {post.images?.[0] && (
+        <img
+          src={post.images[0]}
+          alt=""
+          className="aspect-[4/3] w-full object-cover"
+          loading="lazy"
+        />
+      )}
+      <div className="p-2.5">
+        <LocalizedText
+          view={view}
+          field="title"
+          as="p"
+          className="line-clamp-2 font-mono text-xs font-medium leading-snug"
+        />
+        <div className="mt-2 flex items-center gap-1.5">
+          <span className="flex h-4 w-4 shrink-0 items-center justify-center overflow-hidden rounded-full bg-muted">
+            <img
+              src={avatarUrl(post.profiles?.avatar_url, post.profiles?.username)}
+              alt=""
+              className="h-full w-full object-cover"
+            />
+          </span>
+          <span className="min-w-0 truncate font-mono text-[10px] text-muted-foreground">
+            {post.profiles?.username || t("匿名")}
+          </span>
+          <span className="ml-auto flex shrink-0 items-center gap-0.5 font-mono text-[10px] text-muted-foreground">
+            <Heart className="h-3 w-3" strokeWidth={1.5} />
+            {post.likes_count || 0}
+          </span>
+        </div>
+      </div>
+    </Link>
   );
 }

@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { CAR_LIST_COLUMNS } from "@/lib/i18n/content/columns";
 import { CarCard } from "@/components/car-card";
 import { classifyBodyStyle } from "@/lib/body-style";
 import { useI18n } from "@/components/i18n-provider";
@@ -42,10 +43,12 @@ export function SeoCarList({
   useEffect(() => {
     let cancelled = false;
     async function load() {
+      // 车主停用的转载车源不展示(与列表/详情口径一致)
       let query = supabase
         .from("cars")
-        .select("*, profiles!seller_id(account_type, avatar_url)")
+        .select(`${CAR_LIST_COLUMNS}, profiles!seller_id(account_type, avatar_url)`)
         .eq("status", "active")
+        .eq("owner_hidden", false)
         .order("created_at", { ascending: false })
         .limit(200);
       if (filter.make) query = query.eq("make", filter.make);
@@ -58,7 +61,7 @@ export function SeoCarList({
       if (filter.maxYear) query = query.lte("year", filter.maxYear);
       const { data } = await query;
       if (cancelled) return;
-      let result = (data as DbCar[]) || [];
+      let result = (data as unknown as DbCar[]) || [];
       if (filter.stateAbbr || filter.cityKeywords) {
         result = result.filter((c) => matchesLocation(c, filter));
       }

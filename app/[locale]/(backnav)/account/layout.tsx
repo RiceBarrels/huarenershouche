@@ -1,10 +1,19 @@
 import type { Metadata } from "next";
+import { serverT } from "@/lib/i18n/translate";
 
-export const metadata: Metadata = {
-  title: "我的账户",
-  description: "管理你的常來車網账户、发布的车源与收藏。",
-  robots: { index: false },
-};
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = serverT(locale);
+  return {
+    title: t("我的账户"),
+    description: t("管理你的{site}账户、发布的车源与收藏。", { site: t("常來車網") }),
+    robots: { index: false },
+  };
+}
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   return children;

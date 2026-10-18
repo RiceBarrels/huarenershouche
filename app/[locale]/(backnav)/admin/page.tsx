@@ -9,6 +9,7 @@ import {
   Headset, Handshake, Pencil, Settings2, DatabaseZap, RefreshCw, ExternalLink, Bot, BarChart3,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isMissingFunctionError } from "@/lib/supabase-compat";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle } from "@/lib/i18n";
 import { carEditLink, adminUserLink } from "@/lib/static-link";
@@ -27,16 +28,45 @@ import { cityFromAddress } from "@/components/admin/analytics/user-region";
 
 type Tab = "analytics" | "verifications" | "claims" | "users" | "cars" | "reports" | "aimod" | "tickets" | "sources";
 
-// AI 审核拦截目标 → 展示标签 + 恢复时写回的表/状态(supabase/ai-moderation.sql)
-const AIMOD_TARGETS: Record<
-  DbAiModeration["target_type"],
-  { label: string; table: string; restore: Record<string, string>; link?: (id: string) => string }
-> = {
-  car: { label: "车辆", table: "cars", restore: { status: "active" }, link: (id) => `/car/${id}` },
-  post: { label: "帖子", table: "community_posts", restore: { status: "active" }, link: (id) => `/community/${id}` },
-  car_comment: { label: "评论", table: "comments", restore: { status: "active" } },
-  post_comment: { label: "评论", table: "post_comments", restore: { status: "active" } },
+// AI 审核目标 → 展示标签 + 内容所在表(supabase/i18n-v2.sql):恢复(误杀)写回 restore;
+// 影子模式的标记确认违规时写入 hide(与执行模式下数据库的屏蔽方式一致)。
+// translation = 被输出审核拦下的机器译文(table 为空,context 记录原内容类型与语种):恢复 = 这些语种重新排队翻译
+type AimodTarget =
+  | {
+      label: string;
+      table: string;
+      restore: Record<string, string>;
+      hide: Record<string, string>;
+      link?: (id: string) => string;
+    }
+  | { label: string; table: null };
+
+const AIMOD_TARGETS: Record<DbAiModeration["target_type"], AimodTarget> = {
+  car: { label: "车辆", table: "cars", restore: { status: "active" }, hide: { status: "removed" }, link: (id) => `/car/${id}` },
+  post: { label: "帖子", table: "community_posts", restore: { status: "active" }, hide: { status: "hidden" }, link: (id) => `/community/${id}` },
+  car_comment: { label: "评论", table: "comments", restore: { status: "active" }, hide: { status: "blocked" } },
+  post_comment: { label: "评论", table: "post_comments", restore: { status: "active" }, hide: { status: "blocked" } },
+  qa_question: { label: "问答", table: "qa_questions", restore: { status: "active" }, hide: { status: "hidden" }, link: (id) => `/qa/${id}` },
+  qa_answer: { label: "问答", table: "qa_answers", restore: { status: "active" }, hide: { status: "blocked" } },
+  dealer_review: { label: "评价", table: "dealer_reviews", restore: { status: "active" }, hide: { status: "blocked" } },
+  translation: { label: "翻译", table: null },
 };
+
+/** 库里出现前端还不认识的类型(新版 SQL 先上线)时返回 undefined:只展示,不提供操作 */
+function aimodTarget(type: string | null | undefined): AimodTarget | undefined {
+  return type && Object.prototype.hasOwnProperty.call(AIMOD_TARGETS, type)
+    ? AIMOD_TARGETS[type as DbAiModeration["target_type"]]
+    : undefined;
+}
+
+/** 「查看」链接:内容类直接看原内容;被拦的译文看它所属的原内容 */
+function aimodLink(flag: DbAiModeration): string | null {
+  const target = aimodTarget(flag.target_type === "translation" ? flag.context?.entity : flag.target_type);
+  return target?.table && target.link ? target.link(flag.target_id) : null;
+}
+
+// AI 审核 tab 的筛选:pending = 执行模式下已屏蔽、待复核;shadow = 影子模式只做了标记(内容照常展示)
+type AimodFilter = "pending" | "shadow";
 
 // 用户群体筛选:与搜索独立,可单独按群体过滤用户列表
 type UserSegment = "all" | "personal" | "dealer" | "system" | "admin" | "banned";
@@ -145,6 +175,7 @@ export default function AdminPage() {
   const [viewersCar, setViewersCar] = useState<{ id: string; title: string } | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [aiFlags, setAiFlags] = useState<DbAiModeration[]>([]);
+  const [aimodFilter, setAimodFilter] = useState<AimodFilter>("pending");
   const [claims, setClaims] = useState<ClaimRequestRow[]>([]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [sources, setSources] = useState<DbListingSource[]>([]);
@@ -193,7 +224,7 @@ export default function AdminPage() {
   }, [router]);
 
   const loadAll = useCallback(async () => {
-    const [storesRes, reportsRes, ticketsRes, aiRes, claimsRes] = await Promise.all([
+    const [storesRes, reportsRes, ticketsRes, aiPendingRes, aiShadowRes, claimsRes] = await Promise.all([
       supabase
         .from("dealer_stores")
         .select("*")
@@ -210,11 +241,17 @@ export default function AdminPage() {
         .eq("status", "open")
         .order("created_at", { ascending: false })
         .limit(50),
-      // AI 拦截待复核(表可能还没建,error 时静默为空)
+      // AI 审核待复核:pending = 已屏蔽,shadow = 影子模式只标记(表可能还没建,error 时静默为空)
       supabase
         .from("ai_moderation")
         .select("*")
         .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("ai_moderation")
+        .select("*")
+        .eq("status", "shadow")
         .order("created_at", { ascending: false })
         .limit(50),
       // 认领申请待审(表可能还没建,error 时静默为空)
@@ -265,12 +302,22 @@ export default function AdminPage() {
     setPendingStores(stores);
     setReports((reportsRes.data as Report[]) || []);
     setTickets((ticketsRes.data as Ticket[]) || []);
-    setAiFlags((aiRes.data as DbAiModeration[]) || []);
+    // 停放的标记(context.parked:快速回滚时按 i18n-v2-rollback.sql 头部临时改成 shadow 的新类型待审记录)内容仍是
+    // 屏蔽的:运维恢复前照待审核处理(恢复 / 确认,不给「忽略」),复核结果由 settleAiFlag 照常写进库
+    const aiShadowRows = (aiShadowRes.data as DbAiModeration[]) || [];
+    const aiPending = [
+      ...((aiPendingRes.data as DbAiModeration[]) || []),
+      ...aiShadowRows.filter((f) => f.context?.parked).map((f) => ({ ...f, status: "pending" as const })),
+    ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
+    const aiShadow = aiShadowRows.filter((f) => !f.context?.parked);
+    setAiFlags([...aiPending, ...aiShadow]);
+    // 影子模式期间只有 shadow 标记:直接打开那一栏
+    setAimodFilter(aiPending.length === 0 && aiShadow.length > 0 ? "shadow" : "pending");
     setCounts({
       verifications: storesRes.data?.length || 0,
       claims: claimRows.length,
       reports: reportsRes.data?.length || 0,
-      aimod: aiRes.data?.length || 0,
+      aimod: aiPending.length + aiShadow.length,
       tickets: ticketsRes.data?.length || 0,
     });
   }, []);
@@ -503,10 +550,8 @@ export default function AdminPage() {
 
   async function restoreCar(carId: string) {
     setActionLoading(carId);
-    // 重新上架同时续期 30 天
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-    await supabase.from("cars").update({ status: "active", expires_at: expiresAt }).eq("id", carId);
-    setCars((prev) => prev.map((c) => c.id === carId ? { ...c, status: "active" as const, expires_at: expiresAt } : c));
+    await supabase.from("cars").update({ status: "active" }).eq("id", carId);
+    setCars((prev) => prev.map((c) => c.id === carId ? { ...c, status: "active" as const } : c));
     setActionLoading(null);
   }
 
@@ -566,53 +611,105 @@ export default function AdminPage() {
     setActionLoading(null);
   }
 
-  // AI 拦截复核:恢复(误杀)—— 内容状态写回 active,记录标记 restored
-  async function restoreAiFlag(flag: DbAiModeration) {
-    setActionLoading(flag.id);
+  // 改写被审核内容的状态(恢复 / 确认屏蔽)。管理员 JWT 的写入受 RLS 约束:被策略挡下或内容已删除时
+  // PostgREST 不报错、只是 0 行,不能当成功把标记关掉。返回失败原因,成功为 null
+  async function updateAiTarget(table: string, values: Record<string, string>, id: string): Promise<string | null> {
+    const { error, count } = await supabase.from(table).update(values, { count: "exact" }).eq("id", id);
+    if (error) return error.message;
+    return count === 0 ? `${table}: 0 rows updated` : null;
+  }
+
+  // AI 审核复核收尾:写复核结果(管理员只能改 status / reviewed_*;reviewed = RPC 已经写好,不再写一次)+ 操作日志,
+  // 从列表移除。复核结果已落库时操作日志写不进去(约束不认识这个类型等)也要让管理员知道,但不当成复核失败
+  async function settleAiFlag(
+    flag: DbAiModeration,
+    status: "restored" | "confirmed",
+    action: string,
+    reviewed = false,
+  ) {
     const { data: { user } } = await supabase.auth.getUser();
-    const target = AIMOD_TARGETS[flag.target_type];
-    // 车辆恢复上架同时续期 30 天(与 restoreCar 一致)
-    const restore = flag.target_type === "car"
-      ? { ...target.restore, expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }
-      : target.restore;
-    await supabase.from(target.table).update(restore).eq("id", flag.target_id);
-    await supabase
-      .from("ai_moderation")
-      .update({ status: "restored", reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
-      .eq("id", flag.id);
+    if (!reviewed) {
+      const { error } = await supabase
+        .from("ai_moderation")
+        .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
+        .eq("id", flag.id);
+      if (error) {
+        alert(t("保存失败: {msg}", { msg: error.message }));
+        return;
+      }
+    }
+    setAiFlags((prev) => prev.filter((f) => f.id !== flag.id));
+    setCounts((c) => ({ ...c, aimod: c.aimod - 1 }));
     if (user) {
-      await supabase.from("admin_actions").insert({
+      const { error: auditError } = await supabase.from("admin_actions").insert({
         admin_id: user.id,
-        action: "restore_ai_flag",
+        action,
         target_type: flag.target_type,
         target_id: flag.target_id,
         detail: flag.reason,
       });
+      if (auditError) {
+        console.warn(`[admin] admin_actions ${action} ${flag.target_type} ${flag.target_id}: ${auditError.message}`);
+        alert(t("复核结果已保存,但操作日志写入失败: {msg}", { msg: auditError.message }));
+      }
     }
-    setAiFlags((prev) => prev.filter((f) => f.id !== flag.id));
-    setCounts((c) => ({ ...c, aimod: c.aimod - 1 }));
+  }
+
+  // 被拦译文的恢复:i18n_admin_restore_translation 记下管理员放行的原文版本(同一版本不再做输出审核),把该内容所有
+  // 被拒的语种重新排队,并把标记记为 restored(连同复核人、时间:reviewed)。SQL 还没升级(函数不存在)时照旧只让
+  // 标记里记录的语种重新排队,复核结果由 settleAiFlag 写
+  async function restoreTranslation(flag: DbAiModeration): Promise<{ failure: string | null; reviewed: boolean }> {
+    const { error } = await supabase.rpc("i18n_admin_restore_translation", { p_flag_id: flag.id });
+    if (!error) return { failure: null, reviewed: true };
+    if (!isMissingFunctionError(error)) return { failure: error.message, reviewed: false };
+    const { error: requeueError } = await supabase.rpc("i18n_admin_requeue", {
+      p_entity: flag.context?.entity,
+      p_ids: [flag.target_id],
+      p_locales: flag.context?.locales,
+    });
+    return { failure: requeueError?.message ?? null, reviewed: false };
+  }
+
+  // AI 拦截复核:恢复(误杀)—— 内容状态写回 active;被拦的译文则重新排队翻译(restoreTranslation)。记录标记 restored
+  async function restoreAiFlag(flag: DbAiModeration) {
+    const target = aimodTarget(flag.target_type);
+    if (!target || (!target.table && !flag.context?.entity)) return;
+    setActionLoading(flag.id);
+    const { failure, reviewed } = target.table
+      ? { failure: await updateAiTarget(target.table, target.restore, flag.target_id), reviewed: false }
+      : await restoreTranslation(flag);
+    if (failure) {
+      setActionLoading(null);
+      alert(t("保存失败: {msg}", { msg: failure }));
+      return;
+    }
+    await settleAiFlag(flag, "restored", "restore_ai_flag", reviewed);
     setActionLoading(null);
   }
 
-  // AI 拦截复核:确认违规 —— 内容保持屏蔽,记录标记 confirmed
+  // AI 拦截复核:确认违规 —— 已屏蔽的保持屏蔽;影子模式只标记过的内容此时才屏蔽(被拦的译文本来就没上线)。
+  // 记录标记 confirmed
   async function confirmAiFlag(flag: DbAiModeration) {
+    const target = aimodTarget(flag.target_type);
+    if (!target) return;
     setActionLoading(flag.id);
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase
-      .from("ai_moderation")
-      .update({ status: "confirmed", reviewed_at: new Date().toISOString(), reviewed_by: user?.id ?? null })
-      .eq("id", flag.id);
-    if (user) {
-      await supabase.from("admin_actions").insert({
-        admin_id: user.id,
-        action: "confirm_ai_flag",
-        target_type: flag.target_type,
-        target_id: flag.target_id,
-        detail: flag.reason,
-      });
+    if (flag.status === "shadow" && target.table) {
+      const failure = await updateAiTarget(target.table, target.hide, flag.target_id);
+      if (failure) {
+        setActionLoading(null);
+        alert(t("保存失败: {msg}", { msg: failure }));
+        return;
+      }
     }
-    setAiFlags((prev) => prev.filter((f) => f.id !== flag.id));
-    setCounts((c) => ({ ...c, aimod: c.aimod - 1 }));
+    await settleAiFlag(flag, "confirmed", "confirm_ai_flag");
+    setActionLoading(null);
+  }
+
+  // 影子模式的标记判为误报:内容从未被屏蔽,无需恢复,记录标记 restored
+  async function dismissAiFlag(flag: DbAiModeration) {
+    if (!aimodTarget(flag.target_type)) return;
+    setActionLoading(flag.id);
+    await settleAiFlag(flag, "restored", "dismiss_ai_flag");
     setActionLoading(null);
   }
 
@@ -716,9 +813,6 @@ export default function AdminPage() {
         u.id.includes(userSearch)
       )
     : segmentUsers;
-
-  const carExpired = (car: DbCar) =>
-    car.status === "removed" && !!car.expires_at && new Date(car.expires_at).getTime() < Date.now();
 
   const filteredCars = carSearch
     ? cars.filter((c) =>
@@ -1191,11 +1285,10 @@ export default function AdminPage() {
                         <span className={`shrink-0 rounded-full px-1 py-0.5 text-[10px] ${
                           car.status === "active" ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                             : car.status === "sold" ? "bg-blue-500/10 text-blue-600"
-                            : carExpired(car) ? "bg-orange-500/10 text-orange-600"
                             : car.status === "removed" ? "bg-red-500/10 text-red-600 dark:text-red-400"
                             : "bg-amber-500/10 text-amber-600"
                         }`}>
-                          {car.status === "active" ? t("在售") : car.status === "sold" ? t("已售") : carExpired(car) ? t("已过期") : car.status === "removed" ? t("已下架") : t("待审")}
+                          {car.status === "active" ? t("在售") : car.status === "sold" ? t("已售") : car.status === "removed" ? t("已下架") : t("待审")}
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
@@ -1366,18 +1459,46 @@ export default function AdminPage() {
         {/* === AI Moderation Tab === */}
         {tab === "aimod" && (
           <div className="mt-4 space-y-3">
-            {aiFlags.length === 0 ? (
+            {/* 筛选:pending = 已屏蔽待复核;shadow = 影子模式只做了标记(内容照常展示,确认后才屏蔽) */}
+            <div className="flex flex-wrap gap-1.5">
+              {(["pending", "shadow"] as const).map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setAimodFilter(s)}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] transition-colors ${
+                    aimodFilter === s
+                      ? "bg-primary/30 font-medium text-brand-ink"
+                      : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                  }`}
+                >
+                  {t(s === "pending" ? "待审核" : "仅标记(未屏蔽)")}
+                  <span className="tabular-nums opacity-70">{aiFlags.filter((f) => f.status === s).length}</span>
+                </button>
+              ))}
+            </div>
+            {aiFlags.every((f) => f.status !== aimodFilter) ? (
               <p className="py-12 text-center text-xs text-muted-foreground">{t("暂无 AI 拦截内容")}</p>
             ) : (
-              aiFlags.map((f) => {
-                const target = AIMOD_TARGETS[f.target_type];
+              aiFlags.filter((f) => f.status === aimodFilter).map((f) => {
+                const target = aimodTarget(f.target_type);
+                const source = f.target_type === "translation" ? aimodTarget(f.context?.entity) : undefined;
+                const link = aimodLink(f);
+                // 影子模式标记的内容从未被屏蔽:操作是「确认屏蔽」或「忽略」;其余(已屏蔽的内容、被拦的译文)是「恢复」或「确认」
+                const shadowContent = f.status === "shadow" && !!target?.table;
+                const canRestore = !!target && (!!target.table || !!f.context?.entity);
                 return (
                   <div key={f.id} className="rounded-xl bg-card p-3">
                     <div className="flex items-center gap-1.5">
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
                         <Bot className="h-2.5 w-2.5" strokeWidth={1.5} />
-                        {t(target.label)}
+                        {target ? t(target.label) : f.target_type}
                       </span>
+                      {/* 被拦的译文:原内容类型 + 语种 */}
+                      {f.target_type === "translation" && f.context && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {source ? t(source.label) : f.context.entity} · {f.context.locales.join(", ")}
+                        </span>
+                      )}
                       {f.categories.map((c) => (
                         <span key={c} className="rounded-full bg-red-500/10 px-1.5 py-0.5 text-[10px] text-red-600 dark:text-red-400">
                           {c}
@@ -1398,32 +1519,47 @@ export default function AdminPage() {
                       {f.content}
                     </p>
                     <div className="mt-2 flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        className="h-7 gap-1 px-2 text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
-                        onClick={() => restoreAiFlag(f)}
-                        disabled={actionLoading === f.id}
-                      >
-                        {actionLoading === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={2} />}
-                        {t("恢复")}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
-                        onClick={() => confirmAiFlag(f)}
-                        disabled={actionLoading === f.id}
-                      >
-                        <Ban className="h-3 w-3" strokeWidth={1.5} />
-                        {t("确认屏蔽")}
-                      </Button>
-                      {target.link && (
+                      {shadowContent ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 gap-1 px-2 text-[11px]"
+                          onClick={() => dismissAiFlag(f)}
+                          disabled={actionLoading === f.id}
+                        >
+                          {actionLoading === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <X className="h-3 w-3" strokeWidth={1.5} />}
+                          {t("忽略")}
+                        </Button>
+                      ) : canRestore ? (
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 gap-1 px-2 text-[11px] text-emerald-600 dark:text-emerald-400 hover:text-emerald-700"
+                          onClick={() => restoreAiFlag(f)}
+                          disabled={actionLoading === f.id}
+                        >
+                          {actionLoading === f.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" strokeWidth={2} />}
+                          {t("恢复")}
+                        </Button>
+                      ) : null}
+                      {target && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 gap-1 px-2 text-[11px] text-red-600 dark:text-red-400 hover:text-red-700"
+                          onClick={() => confirmAiFlag(f)}
+                          disabled={actionLoading === f.id}
+                        >
+                          <Ban className="h-3 w-3" strokeWidth={1.5} />
+                          {t("确认屏蔽")}
+                        </Button>
+                      )}
+                      {link && (
                         <Button
                           size="sm"
                           variant="ghost"
                           className="h-7 gap-1 px-2 text-[11px]"
-                          onClick={() => window.open(target.link!(f.target_id), "_blank")}
+                          onClick={() => window.open(link, "_blank")}
                         >
                           <Eye className="h-3 w-3" strokeWidth={1.5} />
                           {t("查看")}

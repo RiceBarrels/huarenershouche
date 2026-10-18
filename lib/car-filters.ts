@@ -1,5 +1,6 @@
-// 车源筛选/排序共享逻辑:从 /browse 页面抽取,供列表页与地图页(/browse/map)复用。
-// 全部为纯函数,不依赖组件状态;数据仍是「全量拉取 + 客户端过滤」模式。
+// 车源筛选/排序共享逻辑(纯函数):地图找车(/browse/map)对视野内车源做客户端过滤。
+// /browse 列表已改为服务端分页,同一套规则在 supabase/browse-cars.sql 的
+// browse_filtered / browse_cars 里有一份 SQL 版,改规则时两边一起改。
 
 import { match } from "pinyin-pro";
 import { MAKES_ZH } from "@/lib/mock-data";
@@ -96,8 +97,8 @@ export function filtersToQuery(f: Filters, sort: SortKey): string {
   return params.toString();
 }
 
-// 关键词全字段检索:把该车所有可读信息(中英标题、双语描述、标签、配置、
-// 颜色、地区、卖家、VIN、年份等)拼成一个字符串,按空格拆词做「与」匹配
+// 关键词全字段检索:把该车所有可读信息(中英标题、原文描述(任何语言)与中英投影、
+// 标签、配置、颜色、地区、卖家、VIN、年份等)拼成一个字符串,按空格拆词做「与」匹配
 // (输入越多词结果越精确,且与词序无关)。英文/中文直接子串命中,
 // 另对较短的中文字段做拼音匹配(支持 kaimeirui / byd 这类拼音/首字母输入)。
 export function carMatchesKeyword(car: DbCar, rawKeyword: string): boolean {
@@ -107,7 +108,7 @@ export function carMatchesKeyword(car: DbCar, rawKeyword: string): boolean {
   const haystack = [
     car.title, car.title_zh,
     car.make, MAKES_ZH[car.make], car.model, car.trim, String(car.year ?? ""),
-    car.description, car.description_zh,
+    car.description_original, car.description, car.description_zh,
     (car.features || []).join(" "),
     car.fuel_type, car.transmission, car.drivetrain,
     car.exterior_color, car.interior_color,
@@ -241,10 +242,15 @@ export function applyCarFilters(
       if (new Date(car.created_at).getTime() < listedCutoff) return false;
     }
     if (filters.features) {
-      // AND 语义:车辆需包含全部所选配置
-      const wanted = filters.features.split(",").filter(Boolean);
-      const has = car.features || [];
-      if (!wanted.every((f) => has.includes(f))) return false;
+      // AND 语义:车辆需包含全部所选配置;去首尾空格、忽略大小写比对(同 browse_filtered)
+      const wanted = filters.features
+        .split(",")
+        .map((f) => f.trim().toLowerCase())
+        .filter(Boolean);
+      if (wanted.length > 0) {
+        const has = new Set((car.features || []).map((f) => f.trim().toLowerCase()));
+        if (!wanted.every((f) => has.has(f))) return false;
+      }
     }
     if (filters.noAccident === "true" && !car.carfax_summary?.includes("无事故")) return false;
     if (filters.oneOwner === "true") {

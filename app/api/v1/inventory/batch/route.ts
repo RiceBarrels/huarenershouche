@@ -1,13 +1,15 @@
 // POST /api/v1/inventory/batch — 一次 ≤ BATCH_MAX_ITEMS 条 upsert,顺序处理、逐条返回结果。
 // 配额逐条扣:超限的条目单独 429,前面已成功的不回滚。整体总是 200。需 write:inventory。
+// 后台处理整批只排一个 after():逐车 VIN / 转存 → 有界审核 → 一次 drain(截止 start + 55 s)。
 
-import type { NextRequest } from "next/server";
+import { after, type NextRequest } from "next/server";
 import { z } from "zod";
 import { authenticateApi } from "@/lib/api/auth";
 import { getQuota, quotaHeaders } from "@/lib/api/quota";
 import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/response";
 import { BATCH_MAX_ITEMS, type ApiContext, type ApiErrorDetail, type QuotaInfo } from "@/lib/api/types";
 import { finalize, formatZodError, listingSchema, listingUrl, readJsonBody, upsertListing } from "@/lib/api/listing";
+import { processListingBatch, type ListingTask } from "@/lib/api/process";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,6 +31,7 @@ interface BatchItemResult {
 }
 
 export async function POST(req: NextRequest) {
+  const start = Date.now();
   let ctx: ApiContext | null = null;
   try {
     const auth = await authenticateApi(req, { scope: "write:inventory" });
@@ -49,6 +52,7 @@ export async function POST(req: NextRequest) {
 
     const results: BatchItemResult[] = [];
     const summary = { created: 0, updated: 0, failed: 0 };
+    const tasks: ListingTask[] = [];
     let quota: QuotaInfo | null = null;
 
     for (const raw of outer.data.items) {
@@ -68,9 +72,10 @@ export async function POST(req: NextRequest) {
         continue;
       }
       try {
-        const r = await upsertListing(ctx, parsed.data, { adopt: false });
+        const r = await upsertListing(ctx, parsed.data, { adopt: false, deferProcessing: true });
         if (r.ok) {
           quota = r.quota;
+          if (r.deferred) tasks.push(r.deferred);
           if (r.created) summary.created++;
           else summary.updated++;
           results.push({
@@ -108,6 +113,9 @@ export async function POST(req: NextRequest) {
         });
       }
     }
+
+    // 已写入条目的后台处理(先排上,后面的配额查询失败也不影响)
+    if (tasks.length > 0) after(() => processListingBatch(tasks, start));
 
     quota = quota ?? (await getQuota(ctx));
     // 整批全失败也记一次 errors,便于门户用量图看出问题

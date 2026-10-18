@@ -6,7 +6,7 @@
 -- 背景:同步引擎(lib/sources/sync.ts)现在会把源站照片下载、sharp 压缩成
 -- WebP(最长边 1280px)后上传到已有的 car-images bucket 的 syndicated/<carId>/
 -- 目录,cars.images 存我方公网 URL,不再外链车行 CDN。
--- 下架(源站删除/30 天过期)后自动删除转存文件并把 images 回退为源站外链。
+-- 下架(源站删除)后自动删除转存文件并把 images 回退为源站外链。
 -- ============================================================================
 
 -- cars.source_images:源站原始图片 URL 列表。

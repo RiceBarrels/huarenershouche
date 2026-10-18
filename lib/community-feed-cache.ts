@@ -1,8 +1,13 @@
 // 社区 feed 双层缓存:sessionStorage(本次会话状态,优先)+ localStorage(冷启动兜底)。
 // 站点任意入口挂载 <CommunityPrefetch /> 即预取社区首屏与关注流,
 // 进社区页时先展示缓存、后台刷新(顶部小 spinner),体感秒开。
+// v2:只缓存原文行 —— 帖子(POST_COLUMNS + 作者)与附近车源(CAR_LIST_COLUMNS)都按显式列集合查询,
+// 不含旧版翻译缓存列,缓存里从来没有译文;译文由 lib/i18n/content/store 按显示语言现取、不落盘。
+// v1 键里混着旧版翻译缓存(含失败标记),首次读取时从两层存储里删掉(B29)。
 
 import { supabase } from "./supabase";
+import { LEGACY_POST_COLUMNS, POST_AUTHOR_EMBED, POST_COLUMNS } from "./i18n/content/columns";
+import { isMissingColumnError } from "./supabase-compat";
 import type { DbCar, DbCommunityPost } from "./types";
 
 export interface FeedCache {
@@ -16,9 +21,42 @@ interface FollowingCache {
   posts: DbCommunityPost[];
 }
 
-export const FEED_CACHE_KEY = "clc_community_feed_v1";
-const FOLLOWING_CACHE_KEY = "clc_community_following_v1";
+export const FEED_CACHE_KEY = "clc_community_feed_v2";
+const FOLLOWING_CACHE_KEY = "clc_community_following_v2";
+const LEGACY_CACHE_KEYS = ["clc_community_feed_v1", "clc_community_following_v1"];
 export const FEED_PAGE_SIZE = 20;
+
+// 每个页面加载只清一次旧键
+let legacyPurged = false;
+
+function purgeLegacyCache() {
+  if (legacyPurged) return;
+  legacyPurged = true;
+  for (const key of LEGACY_CACHE_KEYS) {
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      /* 存储不可用就算了 */
+    }
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+/** 帖子查询:先用新列集;库里还没有新列(i18n-v2.sql 未执行)时用旧列集重查一次。失败返回 null */
+async function selectPosts(
+  query: (columns: string) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<DbCommunityPost[] | null> {
+  let { data, error } = await query(`${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`);
+  if (error && isMissingColumnError(error)) {
+    ({ data, error } = await query(`${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`));
+  }
+  if (error) return null;
+  return (data as DbCommunityPost[] | null) ?? [];
+}
 
 function readJson<T>(storage: Storage, key: string): T | null {
   try {
@@ -40,6 +78,7 @@ function writeJson(storage: Storage, key: string, value: unknown) {
 /** stale=true 表示来自 localStorage 的旧数据:先展示,调用方应后台刷新 */
 export function readFeedCache(): { cache: FeedCache; stale: boolean } | null {
   if (typeof window === "undefined") return null;
+  purgeLegacyCache();
   const fresh = readJson<FeedCache>(sessionStorage, FEED_CACHE_KEY);
   if (fresh && fresh.posts?.length > 0) return { cache: fresh, stale: false };
   const local = readJson<FeedCache>(localStorage, FEED_CACHE_KEY);
@@ -66,6 +105,7 @@ export function readFollowingCache(
   userId: string,
 ): { posts: DbCommunityPost[]; stale: boolean } | null {
   if (typeof window === "undefined") return null;
+  purgeLegacyCache();
   const fresh = readJson<FollowingCache>(sessionStorage, FOLLOWING_CACHE_KEY);
   if (fresh?.userId === userId) return { posts: fresh.posts, stale: false };
   const local = readJson<FollowingCache>(localStorage, FOLLOWING_CACHE_KEY);
@@ -102,14 +142,16 @@ export async function fetchFollowingPosts(
     return [];
   }
   const ids = fRows.map((r) => r.followee_id as string);
-  const { data } = await supabase
-    .from("community_posts")
-    .select("*, profiles!user_id(username, avatar_url)")
-    .in("user_id", ids)
-    .eq("status", "active")
-    .order("created_at", { ascending: false })
-    .limit(60);
-  const posts = (data as DbCommunityPost[]) || [];
+  const posts =
+    (await selectPosts((columns) =>
+      supabase
+        .from("community_posts")
+        .select(columns)
+        .in("user_id", ids)
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(60),
+    )) ?? [];
   writeFollowingCache(userId, posts);
   return posts;
 }
@@ -121,6 +163,7 @@ let prefetched = false;
 export async function prefetchCommunityFeed() {
   if (prefetched || typeof window === "undefined") return;
   prefetched = true;
+  purgeLegacyCache();
 
   // 本会话已有新鲜缓存(比如刚逛过社区)就不重复拉
   const hasSession = (() => {
@@ -142,12 +185,11 @@ export async function prefetchCommunityFeed() {
       if (!error && data && data.length > 0) {
         const ids = shuffleArray(data.map((r) => r.id as string));
         const firstIds = ids.slice(0, FEED_PAGE_SIZE);
-        const { data: rows } = await supabase
-          .from("community_posts")
-          .select("*, profiles!user_id(username, avatar_url)")
-          .in("id", firstIds);
+        const rows = await selectPosts((columns) =>
+          supabase.from("community_posts").select(columns).in("id", firstIds),
+        );
         if (rows && rows.length > 0) {
-          const byId = new Map((rows as DbCommunityPost[]).map((p) => [p.id, p]));
+          const byId = new Map(rows.map((p) => [p.id, p]));
           const posts = firstIds
             .map((id) => byId.get(id))
             .filter(Boolean) as DbCommunityPost[];

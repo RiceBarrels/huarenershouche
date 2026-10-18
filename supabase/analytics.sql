@@ -413,7 +413,7 @@ as $$
     'id', c.id,
     'title', c.title,
     'title_zh', c.title_zh,
-    'other_i18n', c.other_i18n,
+    'trim', c.trim,
     'image_url', c.image_url,
     'price', c.price,
     'year', c.year,
@@ -589,12 +589,7 @@ begin
            when p_dimension = 'car' then exists (
              select 1 from public.cars c
              where c.id = g.k_car
-               and (c.title ilike v_pat or c.title_zh ilike v_pat or c.make ilike v_pat or c.model ilike v_pat
-                    -- 各语言的机翻标题(ko / ja 界面显示的就是它):{"ko": {"title": …}, …},没有译文时为 null / {}
-                    or exists (
-                      select 1 from jsonb_each(case when jsonb_typeof(c.other_i18n) = 'object' then c.other_i18n end) x
-                      where jsonb_typeof(x.value) = 'object' and x.value ->> 'title' ilike v_pat
-                    ))
+               and (c.title ilike v_pat or c.title_zh ilike v_pat or c.make ilike v_pat or c.model ilike v_pat or c.trim ilike v_pat)
            )
            else g.k ilike v_pat
          end

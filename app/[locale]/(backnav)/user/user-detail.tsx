@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { flushSync } from "react-dom";
 import { useRouter } from "@/components/localized-navigation";
 import { skipNextTransition } from "@/components/page-transition";
@@ -10,15 +10,23 @@ import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation, Flag, Ban, L
 import { languageList } from "@/components/language-picker";
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 import { dateLocale } from "@/lib/i18n";
+import {
+  CAR_LIST_COLUMNS,
+  CAR_PROFILE_EMBED,
+  LEGACY_POST_COLUMNS,
+  POST_AUTHOR_EMBED,
+  POST_COLUMNS,
+} from "@/lib/i18n/content/columns";
 import { avatarUrl } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { useI18n } from "@/components/i18n-provider";
+import { useLocalizedPrefetch } from "@/hooks/use-localized";
 
 import { CarCard } from "@/components/car-card";
 import { PostCard } from "@/components/post-card";
-import { usePostTranslations, type PostI18nMap } from "@/hooks/use-post-translations";
 import { DealerReviews } from "@/components/dealer-reviews";
 import { ChatThread } from "@/components/chat-thread";
 import { AvatarViewer } from "@/components/avatar-viewer";
@@ -31,7 +39,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { OpenInMaps } from "@/components/open-in-maps";
-import type { DbCar, DbClaimRequest, DbCommunityPost } from "@/lib/types";
+import type { DbCar, DbClaimRequest, DbCommunityPost, DbDealerReview } from "@/lib/types";
 import { MessageSquare } from "lucide-react";
 
 // leaflet 不能 SSR,按需加载
@@ -40,7 +48,8 @@ const StoreMap = dynamic(
   { ssr: false },
 );
 
-interface SellerProfile {
+// 主页资料列(/user/[id] 系列 server page 用同一组列预取后注入 initialProfile)
+export interface SellerProfile {
   id: string;
   username: string;
   avatar_url: string | null;
@@ -49,7 +58,66 @@ interface SellerProfile {
   is_system: boolean;
   claimed_by?: string | null;
   languages?: string[] | null;
+  banned?: boolean;
   created_at: string;
+}
+
+type Rating = { avg: number; count: number };
+
+// 首屏车源条数,须与 /user/[id] server page 的 limit 一致:注入满一页说明可能还有,挂载后补齐其余
+const SSR_CAR_PAGE = 48;
+
+/** 卖家在售车源(列表列含电话 + 卖家资料 embed,新→旧,从第 offset 辆起) */
+async function fetchSellerCars(userId: string, offset: number): Promise<DbCar[]> {
+  const { data } = await supabase
+    .from("cars")
+    .select(`${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`)
+    .eq("seller_id", userId)
+    .eq("status", "active")
+    .eq("owner_hidden", false)
+    .order("created_at", { ascending: false })
+    .range(offset, offset + 999);
+  return (data as DbCar[] | null) ?? [];
+}
+
+/** 指定车源的电话(id → phone,无号码的不收);查询失败时为空,卡片照旧不显示拨号按钮 */
+async function fetchCarPhones(ids: string[]): Promise<Map<string, string>> {
+  const { data } = await supabase.from("cars").select("id, phone").in("id", ids);
+  const phones = new Map<string, string>();
+  for (const row of (data as Pick<DbCar, "id" | "phone">[] | null) ?? []) {
+    if (row.phone) phones.set(row.id, row.phone);
+  }
+  return phones;
+}
+
+/** 最新 12 篇帖子(PostCard 需要作者信息);新列未建(迁移前)时退回旧列集 */
+async function fetchUserPosts(userId: string): Promise<DbCommunityPost[]> {
+  const run = (columns: string) =>
+    supabase
+      .from("community_posts")
+      .select(`${columns}, ${POST_AUTHOR_EMBED}`)
+      .eq("user_id", userId)
+      .eq("status", "active")
+      .order("created_at", { ascending: false })
+      .limit(12);
+  let res = await run(POST_COLUMNS);
+  if (res.error && isMissingColumnError(res.error)) res = await run(LEGACY_POST_COLUMNS);
+  return (res.data as DbCommunityPost[] | null) ?? [];
+}
+
+/** 车行评分汇总(只算公开评价);status 列未建(迁移前)时退回全部评价 */
+async function fetchRating(userId: string): Promise<Rating | null> {
+  const run = (activeOnly: boolean) => {
+    let query = supabase.from("dealer_reviews").select("rating").eq("dealer_id", userId);
+    if (activeOnly) query = query.eq("status", "active");
+    return query;
+  };
+  let res = await run(true);
+  if (res.error && isMissingColumnError(res.error)) res = await run(false);
+  const rows = (res.data as { rating: number }[] | null) ?? [];
+  return rows.length > 0
+    ? { avg: rows.reduce((s, r) => s + r.rating, 0) / rows.length, count: rows.length }
+    : null;
 }
 
 export default function UserProfilePage({
@@ -58,16 +126,21 @@ export default function UserProfilePage({
   onClose,
   initialProfile = null,
   initialCars,
-  initialRating = null,
+  initialRating,
+  initialPosts,
+  initialReviews,
   initialTab = "cars",
 }: {
   userId?: string;
   embedded?: boolean;
   onClose?: () => void;
-  // 服务端预取(/user/[id] server component 注入),SSR 首屏直出内容利于 SEO
+  // 服务端预取(/user/[id] 系列 server page 注入),SSR 首屏直出内容利于 SEO;
+  // 注入了的数据客户端不再重复拉取(B19),未注入的(undefined)照常在客户端拉取
   initialProfile?: SellerProfile | null;
   initialCars?: DbCar[];
-  initialRating?: { avg: number; count: number } | null;
+  initialRating?: Rating | null;
+  initialPosts?: DbCommunityPost[];
+  initialReviews?: DbDealerReview[];
   // 直达 tab(/user/[id]/posts 等动态路由注入)
   initialTab?: "cars" | "posts" | "reviews";
 } = {}) {
@@ -77,9 +150,9 @@ export default function UserProfilePage({
   const showChrome = !embedded;
   const [profile, setProfile] = useState<SellerProfile | null>(initialProfile);
   const [cars, setCars] = useState<DbCar[]>(initialCars ?? []);
-  const [posts, setPosts] = useState<DbCommunityPost[]>([]);
+  const [posts, setPosts] = useState<DbCommunityPost[]>(initialPosts ?? []);
   const [loading, setLoading] = useState(!initialProfile);
-  const [avgRating, setAvgRating] = useState<{ avg: number; count: number } | null>(initialRating);
+  const [avgRating, setAvgRating] = useState<Rating | null>(initialRating ?? null);
   const [store, setStore] = useState<{ address: string; lat: number | null; lng: number | null } | null>(null);
   // 私信:真实登录用户;移动端在 drawer 里直接聊
   const [authId, setAuthId] = useState<string | null>(null);
@@ -126,18 +199,9 @@ export default function UserProfilePage({
   }
   const router = useRouter();
 
-  // 非中文界面:帖子批量 AI 翻译并合并回状态(缓存全站共享,见 use-post-translations)
-  const mergeI18n = useCallback(
-    (map: PostI18nMap) => {
-      setPosts((prev) =>
-        prev.map((p) =>
-          map[p.id] ? { ...p, other_i18n: { ...(p.other_i18n ?? {}), [locale]: map[p.id] } } : p
-        )
-      );
-    },
-    [locale]
-  );
-  usePostTranslations(posts, locale, mergeI18n);
+  // 帖子译文:PostCard 各自 useLocalized 读取;这里只在帖子 tab 可见时批量预取一次(B47)
+  const postIds = useMemo(() => posts.map((p) => p.id), [posts]);
+  useLocalizedPrefetch("post", postIds, { enabled: tab === "posts" });
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setAuthId(data.user?.id ?? null));
@@ -254,32 +318,27 @@ export default function UserProfilePage({
   }
 
   useEffect(() => {
+    let cancelled = false;
+    // SSR 注入的数据只对它所属的用户有效;浮层与静态导出(原生)没有注入,全部在客户端拉取
+    const seeded = !!initialProfile && initialProfile.id === userId;
+    const seededCars = seeded ? initialCars : undefined;
+    // 车源:未注入从头拉;注入满一页时只补齐其余,注入不足一页说明已是全部(客户端拉取一律用含电话的列表列)
+    const carOffset = !seededCars ? 0 : seededCars.length >= SSR_CAR_PAGE ? seededCars.length : null;
+    // 注入的车卡不含电话(电话不进 SSR HTML / RSC 负载,B26):挂载后按 id 补拉,卡片恢复拨号按钮
+    const phoneIds = seededCars?.map((c) => c.id) ?? [];
     async function fetchData() {
-      const [profileRes, carsRes, reviewsRes, postsRes, storeRes] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id, username, avatar_url, location, account_type, is_system, claimed_by, languages, created_at")
-          .eq("id", userId)
-          .maybeSingle(),
-        supabase
-          .from("cars")
-          .select("*")
-          .eq("seller_id", userId)
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("dealer_reviews")
-          .select("rating")
-          .eq("dealer_id", userId),
-        supabase
-          .from("community_posts")
-          // PostCard 需要作者信息(profiles)与翻译缓存(other_i18n,含在 * 中)
-          .select("*, profiles!user_id(username, avatar_url)")
-          .eq("user_id", userId)
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(12),
+      const [profileRes, carRows, phones, rating, postRows, storeRes] = await Promise.all([
+        seeded
+          ? null
+          : supabase
+              .from("profiles")
+              .select("id, username, avatar_url, location, account_type, is_system, claimed_by, languages, banned, created_at")
+              .eq("id", userId)
+              .maybeSingle(),
+        carOffset === null ? null : fetchSellerCars(userId, carOffset),
+        phoneIds.length > 0 ? fetchCarPhones(phoneIds) : null,
+        seeded && initialRating !== undefined ? undefined : fetchRating(userId),
+        seeded && initialPosts ? null : fetchUserPosts(userId),
         supabase
           .from("dealer_stores")
           .select("address, lat, lng")
@@ -287,25 +346,42 @@ export default function UserProfilePage({
           .limit(1)
           .maybeSingle(),
       ]);
-      setProfile(profileRes.data as SellerProfile | null);
-      setCars((carsRes.data as DbCar[]) || []);
-      setPosts((postsRes.data as DbCommunityPost[]) || []);
+      if (cancelled) return;
+      if (profileRes) {
+        const p = profileRes.data as SellerProfile | null;
+        // 已封禁与不存在同等对待(与 server page 的 404 一致)
+        setProfile(p && !p.banned ? p : null);
+      }
+      if (carRows) {
+        setCars((prev) => {
+          if (!carOffset) return carRows;
+          const seen = new Set(prev.map((c) => c.id));
+          return [...prev, ...carRows.filter((c) => !seen.has(c.id))];
+        });
+      }
+      if (phones && phones.size > 0) {
+        setCars((prev) =>
+          prev.map((c) => {
+            const phone = phones.get(c.id);
+            return phone ? { ...c, phone } : c;
+          }),
+        );
+      }
+      if (rating !== undefined) setAvgRating(rating);
+      if (postRows) setPosts(postRows);
       setStore(
         (storeRes.data as { address: string; lat: number | null; lng: number | null } | null)?.address
           ? (storeRes.data as { address: string; lat: number | null; lng: number | null })
           : null,
       );
 
-      const reviewData = (reviewsRes.data as { rating: number }[]) || [];
-      if (reviewData.length > 0) {
-        const sum = reviewData.reduce((s, r) => s + r.rating, 0);
-        setAvgRating({ avg: sum / reviewData.length, count: reviewData.length });
-      }
-
       setLoading(false);
     }
     fetchData();
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, initialProfile, initialCars, initialRating, initialPosts]);
 
   // 已被真实用户认领的系统账号 → 视为认证车行
   const isClaimedSystem = !!profile?.is_system && !!profile?.claimed_by;
@@ -324,10 +400,12 @@ export default function UserProfilePage({
     }
   })();
 
+  // 加入年月按 UTC 取:服务端(UTC)与访客浏览器时区不同也输出同一文本,水合不会不一致
   const memberSince = profile
     ? new Date(profile.created_at).toLocaleDateString(dateLocale(locale), {
         year: "numeric",
         month: "long",
+        timeZone: "UTC",
       })
     : "";
 
@@ -742,7 +820,7 @@ export default function UserProfilePage({
               )
             )}
 
-            {/* 帖子 tab:直接复用社区帖子卡片(含非中文界面 AI 翻译 + 显示原文切换);
+            {/* 帖子 tab:直接复用社区帖子卡片(卡片自带按界面语言显示译文 + 显示原文切换);
                 点赞在此为只读展示(不传 onLike) */}
             {tab === "posts" && (
               posts.length > 0 ? (
@@ -760,7 +838,10 @@ export default function UserProfilePage({
 
             {/* 评价 tab(车行) */}
             {tab === "reviews" && profile.account_type === "dealer" && (
-              <DealerReviews dealerId={userId} />
+              <DealerReviews
+                dealerId={userId}
+                initialReviews={initialProfile && initialProfile.id === userId ? initialReviews : undefined}
+              />
             )}
           </>
         )}

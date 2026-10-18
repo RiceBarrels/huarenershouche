@@ -23,11 +23,20 @@ export interface DbCar {
   interior_color: string | null;
   drivetrain: string | null;
   vin: string | null;
+  // 兼容投影(supabase/i18n-v2.sql):由翻译管线写入 zh / en 译文,未翻译前等于原文;应用代码只写 *_original。
+  // 旧版按需翻译缓存列 other_i18n 已冻结,代码不再读写(Phase D 删列)
   description: string | null;
   description_zh: string | null;
-  // 小语种内容缓存:{ ko: { title, description } },首次被该语言用户浏览时
-  // 由 /api/translate-listing 按需翻译写入(zh/en 仍走 title/title_zh 双列)
-  other_i18n?: Record<string, { title?: string | null; description?: string | null }> | null;
+  // 卖家 / 源站写的原文(任意语言,逐字保存);以下 5 列在 SQL 执行前不存在,故可选
+  description_original?: string | null;
+  // 原样标签(去重不截断);features 列是按术语表投影的 zh / en 标签
+  features_original?: string[];
+  // 内容时钟(触发器维护,只在可见内容变化时前移):sitemap lastmod、API updated_since
+  content_updated_at?: string | null;
+  // 下架原因(触发器维护):moderation / admin 下架的车源卖家不能自行重新上架(listing_blocked)
+  removal_reason?: "moderation" | "admin" | "other" | null;
+  // 旧版保存的原文可能经过机器处理(迁移标记),卖家确认保存后清除
+  original_uncertain?: boolean;
   seller_name: string;
   phone: string | null;
   carfax_url: string | null;
@@ -62,6 +71,15 @@ export interface DbCar {
     languages?: string[] | null;
   };
 }
+
+// 公开读取的车源(SSR / RSC 载荷 = lib/i18n/content/columns.ts 的 PUBLIC_CAR_COLUMNS):不带源站内部字段
+// (原图外链、源站车源编号、最后抓取时间)、API key 与车行库存编号;phone 不进公开载荷,登录后按需单独取
+export type PublicCar = Omit<
+  DbCar,
+  "phone" | "source_images" | "source_listing_id" | "last_seen_at" | "api_key_id" | "external_id"
+> & {
+  phone?: string | null;
+};
 
 export interface DbProfile {
   id: string;
@@ -185,9 +203,7 @@ export interface DbComment {
   car_id: string;
   user_id: string;
   content: string;
-  // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
-  other_i18n?: Record<string, { content?: string | null }> | null;
-  // AI 审核屏蔽(supabase/ai-moderation.sql);列可能尚未创建,故可选
+  // AI 审核屏蔽(supabase/i18n-v2.sql);列可能尚未创建,故可选
   status?: "active" | "blocked";
   created_at: string;
   // Joined
@@ -200,6 +216,8 @@ export interface DbDealerReview {
   user_id: string;
   rating: number;
   content: string;
+  // AI 审核屏蔽(supabase/i18n-v2.sql);列可能尚未创建,故可选
+  status?: "active" | "blocked";
   created_at: string;
   // Joined
   profiles?: { username: string; avatar_url: string | null };
@@ -219,11 +237,11 @@ export interface DbCommunityPost {
   tags: string[];
   likes_count: number;
   comments_count: number;
-  // 非中文界面的 AI 翻译缓存:{ en: { title, content }, ko: ... },按需写入
-  other_i18n?: Record<string, { title?: string | null; content?: string | null }> | null;
   status: "active" | "hidden" | "removed";
   created_at: string;
   updated_at: string;
+  // 内容时钟(触发器维护,只在标题/正文/标签等可见内容变化时前移;点赞、评论数不动它);列可能尚未创建
+  content_updated_at?: string | null;
   profiles?: { username: string; avatar_url: string | null };
 }
 
@@ -234,28 +252,43 @@ export interface DbPostComment {
   parent_id: string | null;
   content: string;
   likes_count: number;
-  // 评论翻译缓存:{ en: { content }, ko: ... },/api/translate-comments 批量写入
-  other_i18n?: Record<string, { content?: string | null }> | null;
-  // AI 审核屏蔽(supabase/ai-moderation.sql);列可能尚未创建,故可选
+  // AI 审核屏蔽(supabase/i18n-v2.sql);列可能尚未创建,故可选
   status?: "active" | "blocked";
+  // 回复对象(结构化,不再把「回复 @name:」写进 content);显示用 t("回复 @{name}")
+  reply_to_user_id?: string | null;
+  reply_to_name?: string | null;
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
+  // Joined: reply_to:profiles!reply_to_user_id(username)
+  reply_to?: { username: string } | null;
 }
 
-// AI 审核拦截记录(supabase/ai-moderation.sql):只记违规,admin「AI 审核」tab 复核
+// AI 审核记录(supabase/i18n-v2.sql):只由翻译管线创建,admin「AI 审核」tab 复核。
+// shadow = 影子模式下的违规判定(未屏蔽);translation = 被拦下的机器译文(恢复即重新排队翻译)
 export interface DbAiModeration {
   id: string;
-  target_type: "car" | "post" | "car_comment" | "post_comment";
+  target_type:
+    | "car"
+    | "post"
+    | "car_comment"
+    | "post_comment"
+    | "qa_question"
+    | "qa_answer"
+    | "dealer_review"
+    | "translation";
   target_id: string;
   user_id: string | null;
   content: string;
   categories: string[];
   reason: string | null;
   model: string | null;
-  status: "pending" | "restored" | "confirmed";
+  status: "pending" | "restored" | "confirmed" | "shadow";
   created_at: string;
   reviewed_at: string | null;
   reviewed_by: string | null;
+  // translation 记录:原内容的实体类型、被拦下的语言与对应原文版本(src_hash);其他类型没有这些键(停放时只有 parked)。
+  // parked = 回滚前暂存的新类型待审记录:status 临时改为 shadow,内容仍是屏蔽的(见 supabase/i18n-v2-rollback.sql)
+  context?: { entity: string; locales: string[]; src_hash?: string; parked?: boolean } | null;
 }
 
 export interface DbQaQuestion {
@@ -282,6 +315,8 @@ export interface DbQaAnswer {
   content: string;
   likes_count: number;
   is_accepted: boolean;
+  // AI 审核屏蔽(supabase/i18n-v2.sql);列可能尚未创建,故可选
+  status?: "active" | "blocked";
   created_at: string;
   profiles?: { username: string; avatar_url: string | null };
 }

@@ -1,3 +1,5 @@
+import type { TFn } from "@/lib/i18n/content/types";
+
 const PREFS_KEY = "clcauto_notification_prefs";
 
 export interface NotificationPrefs {
@@ -68,17 +70,33 @@ export function sendNotification(
   }
 }
 
-export function notifyPriceDrop(carTitle: string, oldPrice: number, newPrice: number, carId: string): void {
+/** 降价提醒的内容:标题、金额、链接都由调用方按当前显示语言准备好 */
+export interface PriceDropNotice {
+  carId: string;
+  /** carTitle(car, locale) */
+  title: string;
+  /** 已格式化的降价金额,如 "$1,500" */
+  drop: string;
+  /** 降幅百分比(整数) */
+  pct: number;
+  /** 已格式化的现价 */
+  price: string;
+  /** 带语言前缀的站内路径 */
+  url: string;
+}
+
+export function notifyPriceDrop(notice: PriceDropNotice, t: TFn): void {
   const prefs = getNotificationPrefs();
   if (!prefs.priceDrops) return;
 
-  const drop = oldPrice - newPrice;
-  const pct = Math.round((drop / oldPrice) * 100);
-
-  sendNotification(`降价提醒: ${carTitle}`, {
-    body: `降价 $${drop.toLocaleString()} (${pct}%)，现价 $${newPrice.toLocaleString()}`,
-    tag: `price-drop-${carId}`,
-    url: `/car/${carId}`,
+  sendNotification(t("降价提醒: {title}", { title: notice.title }), {
+    body: t("降价 {drop} ({pct}%)，现价 {price}", {
+      drop: notice.drop,
+      pct: notice.pct,
+      price: notice.price,
+    }),
+    tag: `price-drop-${notice.carId}`,
+    url: notice.url,
   });
 }
 

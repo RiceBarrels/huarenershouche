@@ -3,6 +3,15 @@
 // 最外层兜底:根 layout 自身崩溃时渲染,必须自带 <html>/<body>,
 // 没有任何 Provider,文案用中英双语静态写死,不引入组件依赖。
 
+import { useSyncExternalStore } from "react";
+import { localeFromPath } from "@/lib/i18n";
+import { htmlLang } from "@/lib/i18n/content-langs";
+
+// <html lang> 跟随 URL 语言前缀:服务端与水合首帧固定 zh-CN,客户端按 location.pathname 取值
+const subscribeNoop = () => () => {};
+const pathHtmlLang = () => htmlLang(localeFromPath(window.location.pathname) ?? "zh");
+const serverHtmlLang = () => "zh-CN";
+
 export default function GlobalError({
   error,
   reset,
@@ -10,8 +19,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const lang = useSyncExternalStore(subscribeNoop, pathHtmlLang, serverHtmlLang);
+
   return (
-    <html lang="zh-CN">
+    <html lang={lang}>
       <body
         style={{
           margin: 0,

@@ -5,7 +5,14 @@ import type { NextRequest } from "next/server";
 import { authenticateApi } from "@/lib/api/auth";
 import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/response";
 import { isUuid } from "@/lib/api/filters";
-import { CAR_SUMMARY_SELECT, serializeCarSummary, serializeDealer, type ApiCarRow } from "@/lib/api/serialize";
+import {
+  CAR_SUMMARY_SELECT,
+  LEGACY_CAR_SUMMARY_SELECT,
+  serializeCarSummary,
+  serializeDealer,
+  type ApiCarRow,
+} from "@/lib/api/serialize";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 import type { DbDealerStore } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -35,26 +42,30 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const visibleCars = () =>
       ctx.supabase.from("cars").select("id", { count: "exact", head: true });
+    // 内容时钟 content_updated_at(i18n-v2.sql)还没建时 CAR_SUMMARY_SELECT 报缺列,用旧列集重查一次
+    const dealerCars = (select: string) =>
+      ctx.supabase
+        .from("cars")
+        .select(select)
+        .eq("seller_id", store.owner_id)
+        .eq("status", "active")
+        .eq("owner_hidden", false)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(DEALER_CARS_LIMIT);
 
-    const [{ data: profile, error: profErr }, { data: cars, error: carsErr }, { count, error: countErr }] =
-      await Promise.all([
-        ctx.supabase.from("profiles").select("languages").eq("id", store.owner_id).maybeSingle(),
-        ctx.supabase
-          .from("cars")
-          .select(CAR_SUMMARY_SELECT)
-          .eq("seller_id", store.owner_id)
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(DEALER_CARS_LIMIT),
-        visibleCars().eq("seller_id", store.owner_id).eq("status", "active").eq("owner_hidden", false),
-      ]);
+    const [{ data: profile, error: profErr }, firstCars, { count, error: countErr }] = await Promise.all([
+      ctx.supabase.from("profiles").select("languages").eq("id", store.owner_id).maybeSingle(),
+      dealerCars(CAR_SUMMARY_SELECT),
+      visibleCars().eq("seller_id", store.owner_id).eq("status", "active").eq("owner_hidden", false),
+    ]);
     if (profErr) throw new Error(profErr.message);
-    if (carsErr) throw new Error(carsErr.message);
+    let carsRes = firstCars;
+    if (carsRes.error && isMissingColumnError(carsRes.error)) carsRes = await dealerCars(LEGACY_CAR_SUMMARY_SELECT);
+    if (carsRes.error) throw new Error(carsRes.error.message);
     if (countErr) throw new Error(countErr.message);
 
-    const rows = (cars ?? []) as unknown as ApiCarRow[];
+    const rows = (carsRes.data ?? []) as unknown as ApiCarRow[];
     const active_count = count ?? rows.length;
     const opts = { lang: ctx.lang, redact: anonymous };
     return apiJson({

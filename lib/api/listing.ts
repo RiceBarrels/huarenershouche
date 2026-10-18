@@ -1,24 +1,30 @@
 // Public API 库存写入核心(docs/public-api-v0.md §4.2/§4.3、待定 2/3):
 // 请求体 schema、定位解析、cars 行组装、幂等 upsert / 下架 / 对账、库存序列化。
 // 路由层只做 HTTP 进出;这里的每个写操作自己扣配额(consumeQuota),超限不写库。
-// Server-only(ctx.supabase 为 service role)。
+// 文本只写原文列(description_original / features_original,任意语言原样保存)和确定性标题,
+// 翻译与兼容投影归 i18n 管线。Server-only(ctx.supabase 为 service role)。
 
 import { z } from "zod";
-import { after, type NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import type { PostgrestError } from "@supabase/supabase-js";
 import type { DbCar, DbDealerStore } from "@/lib/types";
 import { SITE_URL } from "@/lib/seo-pages";
-import { MAKES, MAKES_ZH } from "@/lib/mock-data";
+import { MAKES } from "@/lib/mock-data";
 import { isValidVinFormat } from "@/lib/vin";
 import { geocodeCity, geocodeZipToCoords, lookupZip } from "@/lib/geocode";
-import { CITY_ZH } from "@/lib/sources/sync";
+import { buildCarTitles } from "@/lib/i18n/car-title";
+import { legacyOriginal } from "@/lib/i18n/content/resolve";
+import { getBundles } from "@/lib/i18n/content/server";
+import { isMissingColumnError } from "@/lib/supabase-compat";
+import { CITY_ZH, isRelistBlocked, originalColumns, sameOriginal, sameTagSet } from "@/lib/sources/sync";
 import { deleteMirroredImages, isMirroredUrl } from "@/lib/sources/images";
 import type { ApiContext, ApiErrorDetail, ApiLang, QuotaInfo } from "./types";
-import { LISTING_EXPIRY_DAYS, LISTING_MAX_IMAGES } from "./types";
+import { LISTING_MAX_IMAGES } from "./types";
 import { enumField, enumSlugs, enumToDb, enumToSlug } from "./enums";
 import { apiError } from "./response";
 import { recordUsage } from "./auth";
 import { consumeQuota, getQuota, quotaExceededResponse } from "./quota";
-import { processListingAsync, processingSteps, type ProcessOptions } from "./process";
+import { processListingAsync, processingSteps, type ListingTask, type ProcessOptions } from "./process";
 
 // ─── Schema ─────────────────────────────────────────────────────────
 
@@ -74,8 +80,10 @@ export const listingSchema = z.object({
   drivetrain: enumSlug("drivetrain").nullish(),
   exterior_color: optionalText(30),
   interior_color: optionalText(30),
+  /** 任一语言,原样保存为原文;其他语言由 i18n 管线自动翻译 */
   description: optionalText(5000),
-  description_lang: z.enum(["zh", "en"]).nullish(),
+  /** 已弃用:接受但忽略(原文语言由管线自动检测) */
+  description_lang: z.enum(["zh", "en", "ko", "ja", "es", "fr"]).nullish(),
   features: z.array(z.string().trim().min(1).max(40)).max(40).default([]),
   images: z.array(httpsUrl).max(LISTING_MAX_IMAGES).default([]),
   carfax_url: httpsUrl.nullish(),
@@ -185,37 +193,22 @@ export async function resolveLocation(
 
 // ─── Row assembly ───────────────────────────────────────────────────
 
-function expiresAt(): string {
-  return new Date(Date.now() + LISTING_EXPIRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-}
-
-/** 与发帖页相同的标题规则 */
-export function buildTitles(input: Pick<ListingInput, "year" | "make" | "model" | "trim">): {
-  title: string;
-  title_zh: string;
-} {
-  const tail = `${input.model}${input.trim ? " " + input.trim : ""}`;
-  return {
-    title: `${input.year} ${input.make} ${tail}`,
-    title_zh: `${input.year} ${MAKES_ZH[input.make] ?? input.make} ${tail}`,
-  };
-}
-
-/** 描述按 description_lang 落列(未声明 → 有中文字符算 zh),另一列留空由翻译补 */
-function descriptionColumns(input: ListingInput): { description: string | null; description_zh: string | null } {
-  if (!input.description) return { description: null, description_zh: null };
-  const lang = input.description_lang ?? (/[一-鿿]/.test(input.description) ? "zh" : "en");
-  return lang === "zh"
-    ? { description: null, description_zh: input.description }
-    : { description: input.description, description_zh: null };
-}
-
-export function buildCarRow(ctx: ApiContext, input: ListingInput, loc: ResolvedLocation): Record<string, unknown> {
+/**
+ * cars 行:标题确定性生成(buildCarTitles,与 SQL i18n.car_title 一致);描述 / 标签原样写原文列,
+ * 从不写 description / description_zh / features(管线维护的兼容投影)。
+ * legacy = 库里还没有原文列(i18n-v2.sql 未执行),原文退回旧列(见 originalColumns)。
+ */
+export function buildCarRow(
+  ctx: ApiContext,
+  input: ListingInput,
+  loc: ResolvedLocation,
+  legacy: boolean,
+): Record<string, unknown> {
   const owner = ctx.owner!;
   const now = new Date().toISOString();
   return {
     seller_id: owner.id,
-    ...buildTitles(input),
+    ...buildCarTitles(input),
     year: input.year,
     make: input.make,
     model: input.model,
@@ -233,15 +226,13 @@ export function buildCarRow(ctx: ApiContext, input: ListingInput, loc: ResolvedL
     exterior_color: input.exterior_color ?? null,
     interior_color: input.interior_color ?? null,
     vin: input.vin,
-    ...descriptionColumns(input),
-    features: input.features,
+    ...originalColumns(input.description ?? null, input.features, legacy),
     images: input.images,
     image_url: input.images[0] ?? null,
     carfax_url: input.carfax_url ?? null,
     seller_name: owner.username,
     phone: owner.phone,
     status: "active",
-    expires_at: expiresAt(),
     external_id: input.external_id,
     api_key_id: ctx.key?.id ?? null,
     last_seen_at: now,
@@ -250,75 +241,215 @@ export function buildCarRow(ctx: ApiContext, input: ListingInput, loc: ResolvedL
 
 // ─── Upsert ─────────────────────────────────────────────────────────
 
+/** 已有记录;原文 / 标签已按库结构归一(见 findExisting) */
 interface ExistingCar {
   id: string;
   external_id: string | null;
   status: string;
   price: number;
   vin: string | null;
-  description: string | null;
-  description_zh: string | null;
-  features: string[] | null;
+  year: number;
+  make: string;
+  model: string;
+  trim: string | null;
   images: string[] | null;
   source_images: string[] | null;
+  /** 当前原文(旧库按 legacyOriginal 从 description / description_zh 推出) */
+  original: string | null;
+  /** 当前标签原文(旧库为 features) */
+  features: string[];
+  removal_reason: DbCar["removal_reason"];
 }
 
-const EXISTING_COLS = "id, external_id, status, price, vin, description, description_zh, features, images, source_images";
+/** 两套列集查回来的原始行(各只有其中一部分可选列) */
+interface ExistingRow {
+  id: string;
+  external_id: string | null;
+  status: string;
+  price: number;
+  vin: string | null;
+  year: number;
+  make: string;
+  model: string;
+  trim: string | null;
+  images: string[] | null;
+  source_images: string[] | null;
+  description_original?: string | null;
+  features_original?: string[] | null;
+  removal_reason?: DbCar["removal_reason"];
+  source_id?: string | null;
+  api_key_id?: string | null;
+  description?: string | null;
+  description_zh?: string | null;
+  features?: string[] | null;
+}
+
+const BASE_EXISTING_COLS = "id, external_id, status, price, vin, year, make, model, trim, images, source_images";
+const EXISTING_COLS = `${BASE_EXISTING_COLS}, description_original, features_original, removal_reason`;
+/** supabase/i18n-v2.sql 执行前的列集(没有原文列与 removal_reason) */
+const LEGACY_EXISTING_COLS = `${BASE_EXISTING_COLS}, source_id, api_key_id, description, description_zh, features`;
+
+function toExistingCar(row: ExistingRow, legacy: boolean): ExistingCar {
+  return {
+    id: row.id,
+    external_id: row.external_id,
+    status: row.status,
+    price: row.price,
+    vin: row.vin,
+    year: row.year,
+    make: row.make,
+    model: row.model,
+    trim: row.trim,
+    images: row.images,
+    source_images: row.source_images,
+    original: legacy ? legacyOriginal(row) : (row.description_original ?? null),
+    features: (legacy ? row.features : row.features_original) ?? [],
+    removal_reason: row.removal_reason ?? null,
+  };
+}
+
+/**
+ * 查一条已有记录:先按 v2 列查,库里还没有原文列(i18n-v2.sql 未执行)时用旧列集重查并返回
+ * legacy=true(本次写入也走旧列)。build 每次都要返回新的 builder(builder 不可复用)。
+ */
+async function findExisting(
+  build: (cols: string) => PromiseLike<{ data: unknown; error: PostgrestError | null }>,
+  legacy: boolean,
+  what: string,
+): Promise<{ car: ExistingCar | null; legacy: boolean }> {
+  const first = (data: unknown) => ((data as ExistingRow[] | null) ?? [])[0];
+  if (!legacy) {
+    const { data, error } = await build(EXISTING_COLS);
+    if (!error) {
+      const row = first(data);
+      return { car: row ? toExistingCar(row, false) : null, legacy: false };
+    }
+    if (!isMissingColumnError(error)) throw new Error(`${what}: ${error.message}`);
+  }
+  const { data, error } = await build(LEGACY_EXISTING_COLS);
+  if (error) throw new Error(`${what}: ${error.message}`);
+  const row = first(data);
+  return { car: row ? toExistingCar(row, true) : null, legacy: true };
+}
 
 function sameArray(a: string[], b: string[]): boolean {
   return a.length === b.length && a.every((v, i) => v === b[i]);
 }
 
-/** 输入标签是否都已在库里(库里是双语超集,只能单向比) */
-function featuresCovered(input: string[], stored: string[]): boolean {
-  const have = new Set(stored.map((s) => s.trim().toLowerCase()));
-  return input.every((f) => have.has(f.trim().toLowerCase()));
+/** 重复 PUT 相对库里已有记录,哪些文本变了 */
+export interface ListingTextChanges {
+  /** 描述原文(首尾空白不算) */
+  description: boolean;
+  /** 标签集合(顺序无关、大小写敏感) */
+  features: boolean;
+  /** 年份 / 品牌 / 车型 / 配置:确定性标题由它们生成,品牌 / 车型 / 配置是自由文本 */
+  title: boolean;
+  /** 以上任一变了 → 重新审核(送审文本 = 品牌 / 车型 / 配置 + 描述 + 标签;年份随标题一并算) */
+  moderate: boolean;
+}
+
+export function listingTextChanges(
+  existing: Pick<ExistingCar, "original" | "features" | "year" | "make" | "model" | "trim">,
+  input: Pick<ListingInput, "description" | "features" | "year" | "make" | "model" | "trim">,
+): ListingTextChanges {
+  const description = !sameOriginal(input.description, existing.original);
+  const features = !sameTagSet(input.features, existing.features);
+  const title =
+    input.year !== existing.year ||
+    input.make !== existing.make ||
+    input.model !== existing.model ||
+    (input.trim ?? null) !== (existing.trim ?? null);
+  return { description, features, title, moderate: description || features || title };
+}
+
+export interface UpsertOptions {
+  /** 同 VIN 手动帖存在时接管(?adopt=true) */
+  adopt?: boolean;
+  /** 请求开始时间:后台处理截止 startedAt + 55 s(缺省为调用时刻) */
+  startedAt?: number;
+  /** true:不在这里排 after(),把后台任务放进结果的 deferred,由调用方整批执行(batch) */
+  deferProcessing?: boolean;
 }
 
 export type UpsertResult =
-  | { ok: true; id: string; created: boolean; status: string; processing: string[]; quota: QuotaInfo }
+  | {
+      ok: true;
+      id: string;
+      created: boolean;
+      status: string;
+      processing: string[];
+      quota: QuotaInfo;
+      /** deferProcessing 时留给调用方的后台任务;没有后台步骤(或已在这里排好)为 null */
+      deferred: ListingTask | null;
+    }
   | { ok: false; response: NextResponse };
+
+/** 有后台步骤才排:deferProcessing 时交给调用方,否则这里直接排 after()(单车处理链) */
+function scheduleTask(task: ListingTask, opts: UpsertOptions, startedAt: number): ListingTask | null {
+  if (processingSteps(task.opts).length === 0 && !task.clearMirrors) return null;
+  if (opts.deferProcessing) return task;
+  after(() => processListingAsync(task.carId, task.opts, { startedAt, clearMirrors: task.clearMirrors }));
+  return null;
+}
 
 /**
  * 幂等 upsert(PUT /inventory/{external_id}):
  * 1. 按 (seller_id, external_id) 找;没有 → 查同 seller 同 VIN 未 removed 的车:
  *    手动帖(无 external_id)且 ?adopt=true → 接管;否则 409 附 existing_id。
+ *    审核 / 管理员下架的车(removal_reason moderation / admin)→ 409 listing_blocked。
  * 2. 校验通过后才扣配额(新建 insert / 其余 update),超限 429 不写库。
- * 3. 更新:每次 PUT 刷新 expires_at;removed / sold 的车被显式 PUT 视为重新上架
- *    (pending 保持);价格变动记 price_updated_at;图片列表与 source_images 不同
- *    才重置为原始外链并重新转存,否则不动已转存的图。
- * 4. after():VIN 核对 / AI 审核 / 翻译 / 转存(见 lib/api/process.ts)。
+ * 3. 更新:removed(removal_reason 为空或 other)/ sold 的车被显式 PUT 视为重新上架
+ *    (pending 保持);价格变动记 price_updated_at;原文 / 标签没变就不写原文列
+ *    (同一哈希,不会重新翻译,B12),再加上年份 / 品牌 / 车型 / 配置也没变就不重新审核
+ *    (listingTextChanges);图片列表与 source_images 不同才重置为原始外链并重新转存。
+ * 4. after():VIN 核对 / 转存 / 审核 / 翻译(见 lib/api/process.ts);batch 用 deferProcessing 整批排一次。
  */
 export async function upsertListing(
   ctx: ApiContext,
   input: ListingInput,
-  opts: { adopt?: boolean } = {},
+  opts: UpsertOptions = {},
 ): Promise<UpsertResult> {
+  const startedAt = opts.startedAt ?? Date.now();
   const { supabase } = ctx;
   const ownerId = ctx.owner!.id;
 
-  // 1. 已有记录
-  const { data: byExt, error: findErr } = await supabase
-    .from("cars")
-    .select(EXISTING_COLS)
-    .eq("seller_id", ownerId)
-    .eq("external_id", input.external_id)
-    .maybeSingle();
-  if (findErr) throw new Error(`find by external_id: ${findErr.message}`);
-  let existing = (byExt as ExistingCar | null) ?? null;
+  // 1. 已有记录(同时确定库结构:legacy = 还没有原文列)
+  const byExt = await findExisting(
+    (cols) => supabase.from("cars").select(cols).eq("seller_id", ownerId).eq("external_id", input.external_id).limit(1),
+    false,
+    "find by external_id",
+  );
+  const legacy = byExt.legacy;
+  let existing = byExt.car;
+
+  // PUT 会把 removed 的车改回在售:审核 / 管理员下架的不允许(B10)。cars_before 触发器对
+  // service 写入是静默保持下架,这里提前拦下给出明确错误
+  if (existing?.status === "removed" && isRelistBlocked(existing.removal_reason)) {
+    return {
+      ok: false,
+      response: apiError(
+        409,
+        "listing_blocked",
+        "This listing was removed by moderation or an administrator and can't be relisted.",
+      ),
+    };
+  }
 
   // 2. 同 seller 同 VIN 去重(待定 2)
   if (!existing) {
-    const { data: dups, error: dupErr } = await supabase
-      .from("cars")
-      .select(EXISTING_COLS)
-      .eq("seller_id", ownerId)
-      .eq("vin", input.vin)
-      .neq("status", "removed")
-      .order("created_at", { ascending: false })
-      .limit(1);
-    if (dupErr) throw new Error(`vin lookup: ${dupErr.message}`);
-    const dup = (dups?.[0] as ExistingCar | undefined) ?? null;
+    const { car: dup } = await findExisting(
+      (cols) =>
+        supabase
+          .from("cars")
+          .select(cols)
+          .eq("seller_id", ownerId)
+          .eq("vin", input.vin)
+          .neq("status", "removed")
+          .order("created_at", { ascending: false })
+          .limit(1),
+      legacy,
+      "vin lookup",
+    );
     if (dup) {
       if (dup.external_id && dup.external_id !== input.external_id) {
         return {
@@ -358,7 +489,7 @@ export async function upsertListing(
   const q = await consumeQuota(ctx, created ? "insert" : "update");
   if (!q.ok) return { ok: false, response: quotaExceededResponse(q.quota) };
 
-  const row = buildCarRow(ctx, input, loc);
+  const row = buildCarRow(ctx, input, loc, legacy);
   const now = new Date().toISOString();
 
   // 4a. 新建
@@ -379,14 +510,23 @@ export async function upsertListing(
       throw new Error(`insert: ${error.message}`);
     }
     const id = inserted.id as string;
+    // 审核看标题 + 标签 + 描述;只有描述需要翻译(标签走术语表)
     const proc: ProcessOptions = {
       verifyVin: true,
       moderate: true,
-      translate: true,
+      translate: !!input.description,
       mirrorImages: input.images.length > 0,
     };
-    after(() => processListingAsync(id, proc));
-    return { ok: true, id, created: true, status: "active", processing: processingSteps(proc), quota: q.quota };
+    const deferred = scheduleTask({ carId: id, opts: proc, clearMirrors: false }, opts, startedAt);
+    return {
+      ok: true,
+      id,
+      created: true,
+      status: "active",
+      processing: processingSteps(proc),
+      quota: q.quota,
+      deferred,
+    };
   }
 
   // 4b. 更新
@@ -395,19 +535,11 @@ export async function upsertListing(
   update.status = status;
   if (input.price !== existing.price) update.price_updated_at = now;
 
-  // 描述 / 标签是否变了:变了就重写(另一语言列清空待译),没变则保留库里已翻译好的
-  const incoming = descriptionColumns(input);
-  const storedSource = incoming.description_zh != null ? existing.description_zh : existing.description;
-  const incomingSource = incoming.description_zh ?? incoming.description;
-  const descChanged = (incomingSource ?? null) !== (storedSource ?? null);
-  const featuresChanged = !featuresCovered(input.features, existing.features ?? []);
-  const contentChanged = descChanged || featuresChanged;
-  const counterpartMissing =
-    !!incomingSource && (incoming.description_zh != null ? !existing.description : !existing.description_zh);
-  if (!contentChanged) {
-    delete update.description;
-    delete update.description_zh;
-    delete update.features;
+  // 原文 / 标签(顺序无关、大小写敏感)都没变 → 不写原文列(buildCarRow 经 originalColumns 加进来的那几列):
+  // 同一哈希,不会重新翻译(B12)
+  const changed = listingTextChanges(existing, input);
+  if (!changed.description && !changed.features) {
+    for (const col of Object.keys(originalColumns(null, [], legacy))) delete update[col];
   }
 
   // 图片:原始列表没变且已转存 → 不动;否则重置为外链并排队转存
@@ -425,27 +557,18 @@ export async function upsertListing(
   if (upErr) throw new Error(`update: ${upErr.message}`);
 
   const id = existing.id;
+  // 描述、标签或年份 / 品牌 / 车型 / 配置任一变了才重新审核(结论按送审文本的哈希缓存,没变的直接复用);
+  // 只有描述要翻译(标签走术语表)
   const proc: ProcessOptions = {
     verifyVin: existing.vin !== input.vin,
-    moderate: contentChanged,
-    translate: contentChanged || counterpartMissing,
+    moderate: changed.moderate,
+    translate: changed.description && !!input.description,
     mirrorImages: needMirror,
   };
-  const clearOld = alreadyMirrored && sourceChanged;
-  if (processingSteps(proc).length > 0 || clearOld) {
-    after(async () => {
-      // 换图:先清旧转存文件(新列表可能更短,避免孤儿文件)
-      if (clearOld) {
-        try {
-          await deleteMirroredImages(supabase, id);
-        } catch (err) {
-          console.error(`[api/v1:process] ${id} clear old mirrors: ${err instanceof Error ? err.message : String(err)}`);
-        }
-      }
-      await processListingAsync(id, proc);
-    });
-  }
-  return { ok: true, id, created: false, status, processing: processingSteps(proc), quota: q.quota };
+  // 换图:先清旧转存文件(新列表可能更短,避免孤儿文件)
+  const clearMirrors = alreadyMirrored && sourceChanged;
+  const deferred = scheduleTask({ carId: id, opts: proc, clearMirrors }, opts, startedAt);
+  return { ok: true, id, created: false, status, processing: processingSteps(proc), quota: q.quota, deferred };
 }
 
 // ─── Remove ─────────────────────────────────────────────────────────
@@ -571,37 +694,38 @@ export async function reconcileInventory(
 
 // ─── Serialize ──────────────────────────────────────────────────────
 
-export const INVENTORY_COLS =
-  "id, external_id, status, title, title_zh, year, make, model, trim, price, mileage, vin, images, image_url, " +
-  "fuel_type, transmission, drivetrain, location, location_zh, description, description_zh, created_at, updated_at, expires_at";
+/** 库存列(都是 i18n-v2.sql 之前就有的列:不做缺列重试的单条查询也安全) */
+const INVENTORY_FIELDS = [
+  "id",
+  "external_id",
+  "status",
+  "title",
+  "title_zh",
+  "year",
+  "make",
+  "model",
+  "trim",
+  "price",
+  "mileage",
+  "vin",
+  "images",
+  "image_url",
+  "fuel_type",
+  "transmission",
+  "drivetrain",
+  "location",
+  "location_zh",
+  "created_at",
+  "updated_at",
+  "expires_at",
+] as const satisfies readonly (keyof DbCar)[];
 
-export type InventoryCar = Pick<
-  DbCar,
-  | "id"
-  | "external_id"
-  | "status"
-  | "title"
-  | "title_zh"
-  | "year"
-  | "make"
-  | "model"
-  | "trim"
-  | "price"
-  | "mileage"
-  | "vin"
-  | "images"
-  | "image_url"
-  | "fuel_type"
-  | "transmission"
-  | "drivetrain"
-  | "location"
-  | "location_zh"
-  | "description"
-  | "description_zh"
-  | "created_at"
-  | "updated_at"
-  | "expires_at"
->;
+export const INVENTORY_COLS = INVENTORY_FIELDS.join(", ");
+/** 再加内容时钟 content_updated_at(i18n-v2.sql);查询遇到缺列错误时退回 INVENTORY_COLS 重试 */
+export const INVENTORY_COLS_V2 = [...INVENTORY_FIELDS, "content_updated_at" satisfies keyof DbCar].join(", ");
+
+/** content_updated_at 只有按 INVENTORY_COLS_V2 查才有 */
+export type InventoryCar = Pick<DbCar, (typeof INVENTORY_FIELDS)[number] | "content_updated_at">;
 
 export interface InventoryItem {
   id: string;
@@ -623,9 +747,13 @@ export interface InventoryItem {
   drivetrain: { value: string | null; label: string | null };
   location: string;
   created_at: string;
+  /** 可见内容最后一次变化(content_updated_at;没查到该列时为 updated_at) */
   updated_at: string;
   expires_at: string | null;
-  /** 仍在后台处理的步骤:images_pending / translation_pending;空数组 = 就绪 */
+  /**
+   * 仍在后台处理的步骤:images_pending(还有未转存的外链图)/ translation_pending
+   * (描述的中文或英文译文还没生成);空数组 = 就绪
+   */
   processing_state: string[];
 }
 
@@ -633,12 +761,12 @@ export function listingUrl(id: string): string {
   return `${SITE_URL}/zh/car/${id}`;
 }
 
-export function serializeInventoryItem(car: InventoryCar, lang: ApiLang): InventoryItem {
+/** translationPending:见 loadTranslationPending;调用方没查 bundle 时缺省 false */
+export function serializeInventoryItem(car: InventoryCar, lang: ApiLang, translationPending = false): InventoryItem {
   const images = car.images ?? [];
   const processing: string[] = [];
   if (images.some((u) => !isMirroredUrl(u))) processing.push("images_pending");
-  const hasDesc = !!(car.description || car.description_zh);
-  if (hasDesc && (!car.description || !car.description_zh)) processing.push("translation_pending");
+  if (translationPending) processing.push("translation_pending");
   return {
     id: car.id,
     external_id: car.external_id ?? null,
@@ -659,8 +787,19 @@ export function serializeInventoryItem(car: InventoryCar, lang: ApiLang): Invent
     drivetrain: enumField("drivetrain", car.drivetrain, lang),
     location: lang === "zh" ? car.location_zh || car.location : car.location,
     created_at: car.created_at,
-    updated_at: car.updated_at,
+    updated_at: car.content_updated_at ?? car.updated_at,
     expires_at: car.expires_at ?? null,
     processing_state: processing,
   };
+}
+
+/**
+ * translation_pending 判定:按页各查一次 zh / en 的 i18n_bundle(只含公开车源;RPC 不可用时为空),
+ * 任一语言为 pending 的车返回在集合里。
+ */
+export async function loadTranslationPending(ids: readonly string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const [zh, en] = await Promise.all([getBundles("car", ids, "zh"), getBundles("car", ids, "en")]);
+  const pending = (id: string) => zh[id.toLowerCase()]?.s === "pending" || en[id.toLowerCase()]?.s === "pending";
+  return new Set(ids.filter(pending));
 }

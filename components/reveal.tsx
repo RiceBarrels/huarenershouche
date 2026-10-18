@@ -15,6 +15,9 @@ interface RevealProps {
   // them stuck at opacity 0), so only pass a number for small elements.
   amount?: number | "some";
   as?: RevealTag;
+  // SSR'd content (descriptions, specs, comments, post bodies): skip the hidden
+  // initial state so the server HTML is never opacity:0 for crawlers (I13).
+  ssrVisible?: boolean;
 }
 
 // Single-element scroll reveal. Long lists: wrap each item in its own <Reveal>
@@ -26,6 +29,7 @@ export function Reveal({
   delay = 0,
   amount = "some",
   as = "div",
+  ssrVisible = false,
 }: RevealProps) {
   const reduced = useReducedMotion();
   const Tag = as;
@@ -35,7 +39,7 @@ export function Reveal({
     <M
       className={className}
       variants={variants}
-      initial="hidden"
+      initial={ssrVisible ? false : "hidden"}
       whileInView="visible"
       viewport={{ ...viewportOnce, amount }}
       transition={delay ? { delay } : undefined}

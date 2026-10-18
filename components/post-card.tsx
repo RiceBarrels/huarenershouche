@@ -1,20 +1,20 @@
 "use client";
 
-// 社区帖子卡片(X 式):社区信息流与车详情「车主口碑」等处共用。
-// 非中文界面自动显示 AI 译文(other_i18n 缓存,由使用方负责批量拉取,
-// 见 hooks/use-post-translations),卡片带「已从中文翻译 · 显示原文」切换。
+// 社区帖子卡片(X 式):社区信息流、话题页、用户主页与车详情「车主口碑」等处共用。
+// 标题/正文按界面语言显示译文(useLocalized 读 i18n_bundle,无译文时显示原文并标 lang),
+// 带「已从X翻译 · 显示原文」切换;使用方用 useLocalizedPrefetch 批量预取可见卡片。
 
-import { useState } from "react";
 import { Play, MessageCircle, Heart, Share } from "lucide-react";
 import Link from "@/components/localized-navigation";
 import { useRouter } from "@/components/localized-navigation";
 import { useI18n } from "@/components/i18n-provider";
-import { needsContentTranslation } from "@/lib/i18n";
 import { useOverlay } from "@/components/car-overlay-provider";
-import { HashtagText } from "@/components/hashtag-text";
+import { useBundleRow, useLocalized } from "@/hooks/use-localized";
+import { LocalizedText } from "@/components/content/localized-text";
+import { TranslationNotice } from "@/components/content/translation-notice";
 import { avatarUrl } from "@/lib/avatar";
 import { timeAgo } from "@/lib/format";
-import { Skeleton } from "@/components/ui/skeleton";
+import { SITE_URL } from "@/lib/seo-pages";
 import { communityPostLink, userLink } from "@/lib/static-link";
 import type { DbCommunityPost } from "@/lib/types";
 
@@ -38,17 +38,9 @@ export function PostCard({
   const { enabled: overlayEnabled, openPost, openUser } = useOverlay();
   const media = post.images || [];
   const shown = media.slice(0, 4);
-  // 非中文界面显示 AI 译文(使用方 effect 负责拉取,这里只消费缓存),可切回原文
-  const [showOriginal, setShowOriginal] = useState(false);
-  const needsTranslation = needsContentTranslation(`${post.title}\n${post.content}`, locale);
-  const cardI18n = needsTranslation ? post.other_i18n?.[locale] : undefined;
-  const hasTranslation = !!(cardI18n?.content || cardI18n?.title);
-  // 翻译在途(尚无任何尝试结果):正文区显示 skeleton,避免先闪原文再跳变
-  const translationPending = needsTranslation && post.other_i18n?.[locale] === undefined;
-  const sourceIsCJK = /[一-鿿]/.test(`${post.title}${post.content}`);
-  const displayTitle = hasTranslation && !showOriginal ? cardI18n?.title || post.title : post.title;
-  const displayContent =
-    hasTranslation && !showOriginal ? cardI18n?.content || post.content : post.content;
+  // 译文/原文与「显示原文」切换都由 useLocalized 管理;#话题 按 bundle 里的话题名显示
+  const view = useLocalized("post", post.id, { title: post.title, content: post.content });
+  const topics = useBundleRow("post", post.id)?.x?.topics;
 
   // 点头像/名字进作者主页(浮层可用时用浮层)
   function goProfile(e: React.MouseEvent) {
@@ -97,49 +89,32 @@ export function PostCard({
             >
               {post.profiles?.username || t("匿名")}
             </button>
-            <span className="shrink-0 text-muted-foreground">
+            {/* 相对时间在服务端渲染(话题页、用户主页)与水合之间可能跨过分钟边界,忽略这一处文本差异 */}
+            <span className="shrink-0 text-muted-foreground" suppressHydrationWarning>
               · {timeAgo(post.created_at, t)}
             </span>
           </div>
 
           {/* 正文:X 式全色文字,标题加粗、内容常规 */}
-          {/* AI 翻译标注 + 显示原文切换(卡片在 Link 里,按钮要阻止跳转) */}
-          {hasTranslation && (
-            <div className="mt-1 flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-              <span>{sourceIsCJK ? t("已从中文翻译") : t("已从英文翻译")}</span>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setShowOriginal((v) => !v);
-                }}
-                className="text-brand-ink underline-offset-2 hover:underline"
-              >
-                {showOriginal ? t("显示翻译") : t("显示原文")}
-              </button>
-            </div>
+          {/* 翻译标注 + 显示原文切换(卡片在 Link 里,按钮要阻止跳转) */}
+          <TranslationNotice view={view} stopPropagation className="mt-1" />
+          {post.title && (
+            <LocalizedText
+              view={view}
+              field="title"
+              as="h3"
+              className="font-mono text-[15px] font-semibold leading-snug text-foreground py-2"
+            />
           )}
-          {translationPending ? (
-            /* 翻译在途:标题 + 正文骨架 */
-            <div className="space-y-2 py-2">
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-3.5 w-full" />
-              <Skeleton className="h-3.5 w-5/6" />
-            </div>
-          ) : (
-            <>
-              {post.title && (
-                <h3 className="font-mono text-[15px] font-semibold leading-snug text-foreground py-2">
-                  {displayTitle}
-                </h3>
-              )}
-              {post.content && (
-                <p className="mt-0.5 line-clamp-4 whitespace-pre-line font-mono text-[15px] leading-relaxed text-foreground">
-                  <HashtagText text={displayContent} />
-                </p>
-              )}
-            </>
+          {post.content && (
+            <LocalizedText
+              view={view}
+              field="content"
+              as="p"
+              hashtags
+              topics={topics}
+              className="mt-0.5 line-clamp-4 whitespace-pre-line font-mono text-[15px] leading-relaxed text-foreground"
+            />
           )}
 
           {/* 媒体:单图原比例,多图 2 列网格,超过 4 张盖 +N;X 式细描边圆角 */}
@@ -222,9 +197,10 @@ export function PostCard({
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const url = `${window.location.origin}/community/${post.id}`;
+                // 分享线上带语言前缀的地址(原生端为显示语言),不用 window.location(原生壳是本地页)
+                const url = `${SITE_URL}/${locale}/community/${post.id}`;
                 if (navigator.share) {
-                  navigator.share({ title: post.title, url }).catch(() => {});
+                  navigator.share({ title: view.shown.title, url }).catch(() => {});
                 } else {
                   navigator.clipboard?.writeText(url).catch(() => {});
                 }

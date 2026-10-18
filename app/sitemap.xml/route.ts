@@ -1,29 +1,20 @@
-// /sitemap.xml — sitemap index,指向按语言拆分的六个子 sitemap。
-// 全量单文件(6 语言 × 全部 URL × hreflang)接近 20MB 会撞
-// Vercel ISR 响应上限(FALLBACK_BODY_TOO_LARGE),必须分片。
+// /sitemap.xml — sitemap index:各语言静态页分片 + zh 落地页分片 + 按 sitemap_counts 算出的内容分片
+// (分片命名与数据来源见 lib/sitemap.ts)。ISR 每小时重新生成;静态导出经 ignoreInStatic.json 隐藏本路由。
 
-import { SITE_URL } from "@/lib/seo-pages";
-import { LOCALES } from "@/lib/i18n";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
+import { contentShardFiles, renderIndex, staticShardFiles, xmlResponse } from "@/lib/sitemap";
 
-// 静态导出（Capacitor / output: "export"）下必须是纯静态
-export const dynamic = "force-static";
+export const revalidate = 3600;
 
 export async function GET(): Promise<Response> {
-  const lastmod = new Date().toISOString();
-  const xml =
-    `<?xml version="1.0" encoding="UTF-8"?>\n` +
-    `<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
-    LOCALES.map((loc) =>
-      [
-        "  <sitemap>",
-        `    <loc>${SITE_URL}/sitemaps/${loc}.xml</loc>`,
-        `    <lastmod>${lastmod}</lastmod>`,
-        "  </sitemap>",
-      ].join("\n")
-    ).join("\n") +
-    `\n</sitemapindex>\n`;
-
-  return new Response(xml, {
-    headers: { "Content-Type": "application/xml; charset=utf-8" },
-  });
+  const files = staticShardFiles();
+  try {
+    files.push(...(await contentShardFiles()));
+  } catch (err) {
+    // 构建期预渲染拿不到数据(RPC / env / 网络):先只发静态页 + 落地页,ISR 一小时内补齐;
+    // 运行期重新生成失败则抛出,Next 继续返回上一份完整的 index
+    if (process.env.NEXT_PHASE !== PHASE_PRODUCTION_BUILD) throw err;
+    console.warn(`[sitemap] index built without content shards: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return xmlResponse(renderIndex(files));
 }

@@ -16,7 +16,7 @@ import {
 import { isNative } from "@/lib/capacitor";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
-import { avatarUrl } from "@/lib/avatar";
+import { avatarUrl, defaultAvatarUrl, isDefaultAvatar } from "@/lib/avatar";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +160,15 @@ function AccountContent() {
     if (avatarInputRef.current) avatarInputRef.current.value = "";
   }
 
+  async function handleUseDefaultAvatar() {
+    if (!user || isActingAsClaimed) return;
+    setAvatarUploading(true);
+    const url = defaultAvatarUrl(user);
+    const { error } = await supabase.from("profiles").update({ avatar_url: url }).eq("id", user);
+    if (!error) mutateProfile((prev) => prev ? { ...prev, avatar_url: url } : prev);
+    setAvatarUploading(false);
+  }
+
   async function handleLogout() {
     if (loggingOut) return;
     setLoggingOut(true);
@@ -253,6 +262,9 @@ function AccountContent() {
                 open={avatarViewOpen}
                 onClose={() => setAvatarViewOpen(false)}
                 onEdit={!isActingAsClaimed ? () => avatarInputRef.current?.click() : undefined}
+                onUseDefault={
+                  !isActingAsClaimed && !isDefaultAvatar(profile?.avatar_url) ? handleUseDefaultAvatar : undefined
+                }
               />
               <Link href="/account/settings/profile" className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="min-w-0 flex-1">

@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
+import { oauthRedirectTo } from "@/lib/oauth-redirect";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLogoSrc } from "@/lib/i18n";
 import { EASE } from "@/lib/motion";
@@ -139,7 +140,7 @@ export default function RegisterPage() {
                     onClick={async () => {
                       const { isNative, signInWithGoogleNative } = await import("@/lib/capacitor");
                       if (isNative()) { await signInWithGoogleNative(); return; }
-                      await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: "https://www.clcauto.com/" } });
+                      await supabase.auth.signInWithOAuth({ provider: "google", options: { redirectTo: oauthRedirectTo(locale) } });
                     }}
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -156,7 +157,7 @@ export default function RegisterPage() {
                     onClick={async () => {
                       const { isNative, signInWithAppleNative } = await import("@/lib/capacitor");
                       if (isNative()) { await signInWithAppleNative(); return; }
-                      await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: "https://www.clcauto.com/" } });
+                      await supabase.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: oauthRedirectTo(locale) } });
                     }}
                   >
                     <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">

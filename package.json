@@ -11,7 +11,11 @@
     "cap:sync": "bunx cap sync",
     "cap:dev": "CAPACITOR_SERVER_URL=http://192.168.1.108:3000 bunx cap sync",
     "cap:ios": "bunx cap sync ios && bunx cap open ios",
-    "cap:android": "bunx cap sync android && bunx cap open android"
+    "cap:android": "bunx cap sync android && bunx cap open android",
+    "i18n:db-test": "bun scripts/i18n-db-test.ts",
+    "i18n:selftest": "bun scripts/i18n-selftest.ts",
+    "i18n:backfill": "bun scripts/i18n-backfill.ts",
+    "i18n:verify": "bun scripts/i18n-verify.ts"
   },
   "dependencies": {
     "@capacitor/app": "^8.0.1",
@@ -59,6 +63,7 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/ios": "^8.2.0",
+    "@electric-sql/pglite": "0.3.7",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

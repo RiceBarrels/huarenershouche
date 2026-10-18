@@ -26,6 +26,28 @@ function median(nums: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+// 评级 → 徽标文案/样式(前端展示用;存库的评级只存 level 和数值,见 StoredDeal)
+const LEVEL_STYLE: Record<DealLevel, { label: string; className: string }> = {
+  great: { label: "超值好价", className: "bg-green-600 text-white" },
+  good: { label: "好价", className: "bg-green-500/10 text-green-600 dark:text-green-400" },
+  fair: { label: "价格合理", className: "bg-foreground/10 text-foreground" },
+  high: { label: "偏高", className: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
+};
+
+/** 预算好存进 car_browse_meta.deal 的评级(/browse 服务端分页用,见 lib/browse-meta) */
+export type StoredDeal = Omit<PriceInsight, "label" | "className">;
+
+export function toStoredDeal(insight: PriceInsight | null): StoredDeal | null {
+  if (!insight) return null;
+  const { level, delta, marketAvg, sampleSize, sameModel } = insight;
+  return { level, delta, marketAvg, sampleSize, sameModel };
+}
+
+export function fromStoredDeal(deal: StoredDeal | null | undefined): PriceInsight | null {
+  if (!deal || !LEVEL_STYLE[deal.level]) return null;
+  return { ...deal, ...LEVEL_STYLE[deal.level] };
+}
+
 /** 明显是乱标/占位的挂牌不进比价池 */
 function isSanePrice(c: DbCar): boolean {
   return c.price >= 500 && c.price <= 500_000 && c.mileage >= 0 && c.mileage <= 400_000;
@@ -131,14 +153,7 @@ export function getPriceInsight(
   const delta = Math.round(marketAvg - car.price);
   const shared = { delta, marketAvg: Math.round(marketAvg), sampleSize: pool.length, sameModel };
 
-  if (ratio < 0.87) {
-    return { level: "great", label: "超值好价", className: "bg-green-600 text-white", ...shared };
-  }
-  if (ratio < 0.95) {
-    return { level: "good", label: "好价", className: "bg-green-500/10 text-green-600 dark:text-green-400", ...shared };
-  }
-  if (ratio <= 1.15) {
-    return { level: "fair", label: "价格合理", className: "bg-foreground/10 text-foreground", ...shared };
-  }
-  return { level: "high", label: "偏高", className: "bg-orange-500/10 text-orange-600 dark:text-orange-400", ...shared };
+  const level: DealLevel =
+    ratio < 0.87 ? "great" : ratio < 0.95 ? "good" : ratio <= 1.15 ? "fair" : "high";
+  return { level, ...LEVEL_STYLE[level], ...shared };
 }

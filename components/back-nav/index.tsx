@@ -25,7 +25,7 @@ export function BackNav({ title, fallback = "/" }: BackNavProps) {
   }, [router, fallback]);
 
   return (
-    <div className=""
+    <div className="md:hidden"
       style={{
         paddingTop: "calc(42px + env(safe-area-inset-top, 0px))",
       }}

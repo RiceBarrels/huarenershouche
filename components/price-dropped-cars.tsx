@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { ChevronRight, MapPin, TrendingDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { CAR_LIST_COLUMNS } from "@/lib/i18n/content/columns";
 import { carLink } from "@/lib/static-link";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,17 +28,18 @@ export function PriceDroppedCars() {
   useEffect(() => {
     async function load() {
       try {
-        // 多取一些再过滤,避免"先 limit 后过滤"漏掉真正降价的车
+        // 多取一些再过滤,避免"先 limit 后过滤"漏掉真正降价的车;车主停用的转载车源不展示
         const { data } = await supabase
           .from("cars")
-          .select("*")
+          .select(CAR_LIST_COLUMNS)
           .eq("status", "active")
+          .eq("owner_hidden", false)
           .not("original_price", "is", null)
           .order("price_updated_at", { ascending: false })
           .limit(24);
         if (data) {
           // Filter client-side: price < original_price
-          const dropped = (data as DbCar[]).filter(
+          const dropped = (data as unknown as DbCar[]).filter(
             (c) => c.original_price !== null && c.price < c.original_price
           );
           setCars(dropped.slice(0, 6));
