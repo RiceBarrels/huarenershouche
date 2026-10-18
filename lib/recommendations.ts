@@ -15,6 +15,7 @@ import { classifyBodyStyle } from "./body-style";
 import { sellerSpeaksLocale } from "./i18n/languages";
 import type { Locale } from "./i18n";
 import type { DbCar } from "./types";
+import { carMileageMi, carPriceUsd } from "./currency";
 
 const FAVORITES_KEY = "huaren_favorites";
 
@@ -127,9 +128,10 @@ export function buildProfile(favorites: DbCar[], viewed: DbCar[]): TasteProfile 
     if (car.transmission) profile.transmissions[car.transmission] = (profile.transmissions[car.transmission] || 0) + weight;
     if (car.drivetrain) profile.drivetrains[car.drivetrain] = (profile.drivetrains[car.drivetrain] || 0) + weight;
 
-    if (car.price > 0) prices.push({ v: car.price, w: weight });
+    // 价格 / 里程偏好按折合美元 / 英里统计(加元 / 公里车源与美国车源同一口径)
+    if (car.price > 0) prices.push({ v: carPriceUsd(car), w: weight });
     if (car.year > 0) years.push({ v: car.year, w: weight });
-    if (car.mileage >= 0) mileages.push({ v: car.mileage, w: weight });
+    if (car.mileage >= 0) mileages.push({ v: carMileageMi(car), w: weight });
   }
 
   profile.totalWeight = totalW;
@@ -197,9 +199,9 @@ export function scoreCar(car: DbCar, profile: TasteProfile, opts?: RankOpts): nu
     if (car.drivetrain) score += ((profile.drivetrains[car.drivetrain] || 0) / W) * W_DRIVETRAIN;
 
     // 数值特征:与偏好中心的高斯接近度
-    if (profile.priceCenter > 0 && car.price > 0) score += gaussian(car.price, profile.priceCenter, profile.priceSpread) * W_PRICE;
+    if (profile.priceCenter > 0 && car.price > 0) score += gaussian(carPriceUsd(car), profile.priceCenter, profile.priceSpread) * W_PRICE;
     if (profile.yearCenter > 0 && car.year > 0) score += gaussian(car.year, profile.yearCenter, profile.yearSpread) * W_YEAR;
-    if (profile.mileageCenter > 0 && car.mileage >= 0) score += gaussian(car.mileage, profile.mileageCenter, profile.mileageSpread) * W_MILEAGE;
+    if (profile.mileageCenter > 0 && car.mileage >= 0) score += gaussian(carMileageMi(car), profile.mileageCenter, profile.mileageSpread) * W_MILEAGE;
   }
 
   // 搜索历史关键词命中

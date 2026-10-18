@@ -10,10 +10,10 @@ import { Calendar, ExternalLink, MapPin, Star, Loader2, Navigation, Flag, Ban, L
 import { languageList } from "@/components/language-picker";
 import Link from "@/components/localized-navigation";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import { dateLocale } from "@/lib/i18n";
 import {
-  CAR_LIST_COLUMNS,
+  CAR_LIST_COLUMN_SETS,
   CAR_PROFILE_EMBED,
   LEGACY_POST_COLUMNS,
   POST_AUTHOR_EMBED,
@@ -69,15 +69,20 @@ const SSR_CAR_PAGE = 48;
 
 /** 卖家在售车源(列表列含电话 + 卖家资料 embed,新→旧,从第 offset 辆起) */
 async function fetchSellerCars(userId: string, offset: number): Promise<DbCar[]> {
-  const { data } = await supabase
-    .from("cars")
-    .select(`${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`)
-    .eq("seller_id", userId)
-    .eq("status", "active")
-    .eq("owner_hidden", false)
-    .order("created_at", { ascending: false })
-    .range(offset, offset + 999);
-  return (data as DbCar[] | null) ?? [];
+  // car-currency.sql 未执行时退回不带币种 / 里程单位的列集(按 USD / mi 显示)
+  const { data } = await queryWithColumnFallback(
+    (cols) =>
+      supabase
+        .from("cars")
+        .select(`${cols}, ${CAR_PROFILE_EMBED}`)
+        .eq("seller_id", userId)
+        .eq("status", "active")
+        .eq("owner_hidden", false)
+        .order("created_at", { ascending: false })
+        .range(offset, offset + 999),
+    CAR_LIST_COLUMN_SETS
+  );
+  return (data as unknown as DbCar[] | null) ?? [];
 }
 
 /** 指定车源的电话(id → phone,无号码的不收);查询失败时为空,卡片照旧不显示拨号按钮 */

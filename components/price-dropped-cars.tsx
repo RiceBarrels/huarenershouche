@@ -4,21 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { ChevronRight, MapPin, TrendingDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { CAR_LIST_COLUMNS } from "@/lib/i18n/content/columns";
+import { CAR_LIST_COLUMN_SETS } from "@/lib/i18n/content/columns";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
+import { formatCarPrice } from "@/lib/format";
 import { carLink } from "@/lib/static-link";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18n } from "@/components/i18n-provider";
 import { carLocation, carTitle } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 export function PriceDroppedCars() {
   const { t, locale } = useI18n();
@@ -29,14 +23,19 @@ export function PriceDroppedCars() {
     async function load() {
       try {
         // 多取一些再过滤,避免"先 limit 后过滤"漏掉真正降价的车;车主停用的转载车源不展示
-        const { data } = await supabase
-          .from("cars")
-          .select(CAR_LIST_COLUMNS)
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .not("original_price", "is", null)
-          .order("price_updated_at", { ascending: false })
-          .limit(24);
+        // car-currency.sql 未执行时退回不带币种 / 里程单位的列集(按 USD 显示)
+        const { data } = await queryWithColumnFallback(
+          (cols) =>
+            supabase
+              .from("cars")
+              .select(cols)
+              .eq("status", "active")
+              .eq("owner_hidden", false)
+              .not("original_price", "is", null)
+              .order("price_updated_at", { ascending: false })
+              .limit(24),
+          CAR_LIST_COLUMN_SETS
+        );
         if (data) {
           // Filter client-side: price < original_price
           const dropped = (data as unknown as DbCar[]).filter(
@@ -141,7 +140,7 @@ export function PriceDroppedCars() {
                           </span>
                         )}
                         <span className="rounded-full bg-background/90 px-1.5 py-0.5 font-mono text-[10px] font-semibold text-green-600 dark:text-green-400">
-                          -{formatPrice(dropAmount)}
+                          -{formatCarPrice(car, dropAmount)}
                         </span>
                       </div>
                     )}
@@ -154,11 +153,11 @@ export function PriceDroppedCars() {
                     </p>
                     <div className="mt-1.5 flex items-baseline gap-2">
                       <span className="font-mono text-sm font-bold">
-                        {formatPrice(car.price)}
+                        {formatCarPrice(car, car.price)}
                       </span>
                       {car.original_price && (
                         <span className="font-mono text-[10px] text-muted-foreground line-through">
-                          {formatPrice(car.original_price)}
+                          {formatCarPrice(car, car.original_price)}
                         </span>
                       )}
                     </div>

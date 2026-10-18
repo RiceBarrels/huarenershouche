@@ -1,3 +1,5 @@
+import { isCanadianPostalCode, normalizeCanadianPostalCode } from "@/lib/currency";
+
 export interface GeoResult {
   city: string;
   state: string;
@@ -235,16 +237,31 @@ export async function reverseGeocode(
   }
 }
 
+// 加拿大省 / 地区缩写(Nominatim 回退只给全称)
+const CA_PROVINCE_ABBR: Record<string, string> = {
+  Alberta: "AB", "British Columbia": "BC", Manitoba: "MB", "New Brunswick": "NB",
+  "Newfoundland and Labrador": "NL", "Nova Scotia": "NS", Ontario: "ON", "Prince Edward Island": "PE",
+  Quebec: "QC", Québec: "QC", Saskatchewan: "SK", "Northwest Territories": "NT", Nunavut: "NU", Yukon: "YT",
+};
+
+/** 邮编 → 地理编码参数:美国 5 位 zip 或加拿大邮编(统一成「A1A 1A1」) */
+function postalQuery(zip: string): { code: string; country: "US" | "CA" } {
+  return isCanadianPostalCode(zip)
+    ? { code: normalizeCanadianPostalCode(zip), country: "CA" }
+    : { code: zip, country: "US" };
+}
+
 /**
- * Lookup by US zip code
+ * Lookup by US zip code or Canadian postal code
  */
 export async function lookupZip(
-  zip: string,
+  rawZip: string,
   lang: "en" | "zh" = "en"
 ): Promise<GeoResult | null> {
+  const { code: zip, country } = postalQuery(rawZip);
   if (useGoogle()) {
     const result = await googleGeocode(
-      { address: zip, components: "country:US" },
+      { address: zip, components: `country:${country}` },
       lang
     );
     if (result) {
@@ -264,7 +281,7 @@ export async function lookupZip(
   // Fallback: Nominatim
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&addressdetails=1&limit=1&accept-language=${lang}`,
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&country=${country.toLowerCase()}&format=json&addressdetails=1&limit=1&accept-language=${lang}`,
       { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
@@ -280,7 +297,7 @@ export async function lookupZip(
       "";
     const state = addr?.state || "";
     const stateCode =
-      lang === "en" ? STATE_ABBR[state] || state : state;
+      lang === "en" ? (country === "CA" ? CA_PROVINCE_ABBR[state] : STATE_ABBR[state]) || state : state;
     return {
       city,
       state,
@@ -400,17 +417,18 @@ export async function detectUserZip(): Promise<string | null> {
 }
 
 /**
- * Geocode a US zipcode to coordinates
+ * Geocode a US zipcode / Canadian postal code to coordinates
  */
 export async function geocodeZipToCoords(
-  zip: string
+  rawZip: string
 ): Promise<{ lat: number; lng: number } | null> {
-  if (!/^\d{5}$/.test(zip)) return null;
+  if (!/^\d{5}$/.test(rawZip) && !isCanadianPostalCode(rawZip)) return null;
+  const { code: zip, country } = postalQuery(rawZip);
 
   if (useGoogle()) {
     const result = await googleGeocode({
       address: zip,
-      components: "country:US",
+      components: `country:${country}`,
     });
     if (result?.geometry?.location) {
       return {
@@ -423,7 +441,7 @@ export async function geocodeZipToCoords(
   // Fallback: Nominatim
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=us&format=json&limit=1`,
+      `https://nominatim.openstreetmap.org/search?postalcode=${encodeURIComponent(zip)}&country=${country.toLowerCase()}&format=json&limit=1`,
       { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;

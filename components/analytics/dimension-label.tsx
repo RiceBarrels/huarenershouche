@@ -303,7 +303,7 @@ function CarLabel({ row }: { row: AnalyticsBreakdownRow }) {
       (row.key ?? "").slice(0, 8)
     : t("已删除车辆");
   const meta = car
-    ? [car.year ? String(car.year) : "", car.price != null ? formatPrice(car.price) : ""]
+    ? [car.year ? String(car.year) : "", car.price != null ? formatPrice(car.price, car.currency) : ""]
         .filter(Boolean)
         .join(" · ")
     : "";

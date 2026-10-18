@@ -38,8 +38,28 @@ export function isMissingColumnNamed(err: unknown, column: string): boolean {
 }
 
 /**
+ * 缺列错误里的列名:42703「column cars.currency does not exist」/「column "currency" does not exist」、
+ * PGRST204「Could not find the 'currency' column of 'cars' in the schema cache」。认不出来返回 null。
+ */
+export function missingColumnName(err: unknown): string | null {
+  if (!isMissingColumnError(err)) return null;
+  const { message } = errorParts(err);
+  const m =
+    /column\s+"?(?:[\w]+\.)?"?([\w]+)"?\s+does not exist/i.exec(message) ||
+    /could not find the '([\w]+)' column/i.exec(message);
+  return m ? m[1] : null;
+}
+
+/** "a, b, c" 列集合 → 列名集合 */
+function columnSetNames(columns: string): Set<string> {
+  return new Set(columns.split(",").map((c) => c.trim()).filter(Boolean));
+}
+
+/**
  * 按列集合从新到旧依次查询:遇到缺列错误就换下一组,其他结果(成功 / 别的错误)直接返回。
- * 代码先于多份互不依赖的迁移上线时用(如 i18n-v2.sql 与 title-status.sql 各自可能没执行)。
+ * 代码先于多份互不依赖的迁移上线时用(如 i18n-v2.sql、title-status.sql、car-currency.sql 各自可能没执行)。
+ * 错误里认得出缺的列名时,直接跳到第一组不含「已知缺失的全部列」的集合(多份迁移的组合不必逐组试);
+ * 认不出列名(如 join 的列)就按顺序试下一组。
  * run 每次都要返回新的 builder(PostgREST builder 不可复用)。
  */
 export async function queryWithColumnFallback<R extends { error: unknown }>(
@@ -47,7 +67,21 @@ export async function queryWithColumnFallback<R extends { error: unknown }>(
   columnSets: readonly string[],
 ): Promise<R> {
   let res = await run(columnSets[0]);
-  for (let i = 1; i < columnSets.length && res.error && isMissingColumnError(res.error); i++) {
+  const missing = new Set<string>();
+  let i = 0;
+  while (res.error && isMissingColumnError(res.error)) {
+    const name = missingColumnName(res.error);
+    if (name && columnSetNames(columnSets[i]).has(name)) missing.add(name);
+    let next = i + 1;
+    while (
+      next < columnSets.length &&
+      missing.size > 0 &&
+      [...columnSetNames(columnSets[next])].some((c) => missing.has(c))
+    ) {
+      next++;
+    }
+    if (next >= columnSets.length) break;
+    i = next;
     res = await run(columnSets[i]);
   }
   return res;

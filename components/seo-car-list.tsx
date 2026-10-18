@@ -7,7 +7,9 @@ import { useEffect, useState } from "react";
 import Link from "@/components/localized-navigation";
 import { Loader2, ArrowRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { CAR_LIST_COLUMNS } from "@/lib/i18n/content/columns";
+import { CAR_LIST_COLUMN_SETS } from "@/lib/i18n/content/columns";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
+import { CAD_PER_USD, KM_PER_MI, carMileageMi, carPriceUsd } from "@/lib/currency";
 import { CarCard } from "@/components/car-card";
 import { classifyBodyStyle } from "@/lib/body-style";
 import { useI18n } from "@/components/i18n-provider";
@@ -43,25 +45,36 @@ export function SeoCarList({
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      // 车主停用的转载车源不展示(与列表/详情口径一致)
-      let query = supabase
-        .from("cars")
-        .select(`${CAR_LIST_COLUMNS}, profiles!seller_id(account_type, avatar_url)`)
-        .eq("status", "active")
-        .eq("owner_hidden", false)
-        .order("created_at", { ascending: false })
-        .limit(200);
-      if (filter.make) query = query.eq("make", filter.make);
-      if (filter.model) query = query.ilike("model", filter.model);
-      if (filter.fuelType) query = query.eq("fuel_type", filter.fuelType);
-      if (filter.maxMileage) query = query.lte("mileage", filter.maxMileage);
-      if (filter.minPrice) query = query.gte("price", filter.minPrice);
-      if (filter.maxPrice) query = query.lte("price", filter.maxPrice).gt("price", 0);
-      if (filter.minYear) query = query.gte("year", filter.minYear);
-      if (filter.maxYear) query = query.lte("year", filter.maxYear);
-      const { data } = await query;
+      // 车主停用的转载车源不展示(与列表/详情口径一致)。
+      // 价格条件是美元、里程是英里,库里是各车自己的币种 / 单位:服务端只按放宽到能覆盖加元 / 公里车源的
+      // 原值区间粗筛,拉回来再按折合美元 / 英里精筛(同 lib/car-filters.ts)
+      const run = (cols: string) => {
+        let query = supabase
+          .from("cars")
+          .select(`${cols}, profiles!seller_id(account_type, avatar_url)`)
+          .eq("status", "active")
+          .eq("owner_hidden", false)
+          .order("created_at", { ascending: false })
+          .limit(200);
+        if (filter.make) query = query.eq("make", filter.make);
+        if (filter.model) query = query.ilike("model", filter.model);
+        if (filter.fuelType) query = query.eq("fuel_type", filter.fuelType);
+        if (filter.maxMileage) query = query.lte("mileage", Math.ceil(filter.maxMileage * KM_PER_MI));
+        if (filter.minPrice) query = query.gte("price", filter.minPrice);
+        if (filter.maxPrice) query = query.lte("price", Math.ceil(filter.maxPrice * CAD_PER_USD)).gt("price", 0);
+        if (filter.minYear) query = query.gte("year", filter.minYear);
+        if (filter.maxYear) query = query.lte("year", filter.maxYear);
+        return query;
+      };
+      // car-currency.sql 未执行时退回不带币种 / 里程单位的列集(全部按 USD / mi)
+      const { data } = await queryWithColumnFallback(run, CAR_LIST_COLUMN_SETS);
       if (cancelled) return;
-      let result = (data as unknown as DbCar[]) || [];
+      let result = ((data as unknown as DbCar[]) || []).filter(
+        (c) =>
+          (!filter.maxMileage || carMileageMi(c) <= filter.maxMileage) &&
+          (!filter.minPrice || carPriceUsd(c) >= filter.minPrice) &&
+          (!filter.maxPrice || carPriceUsd(c) <= filter.maxPrice)
+      );
       if (filter.stateAbbr || filter.cityKeywords) {
         result = result.filter((c) => matchesLocation(c, filter));
       }

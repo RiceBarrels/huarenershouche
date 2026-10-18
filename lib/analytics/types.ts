@@ -39,15 +39,27 @@ export interface TrackPayload {
 }
 
 /**
- * 详情页联系按钮点击(同走 POST /api/vt,写 contact_clicks 表,见 supabase/analytics-contact-click.sql)。
- * 不进 analytics_events:那张表的 type 只收 pageview / car_view,后台各项口径都按这两种事件算
+ * 点击统计的种类(同走 POST /api/vt,写 click_events 表,见 supabase/click-events.sql):
+ * contact 详情页联系按钮;financing_tag 卖家卡片的车行贷款标签;filter_chip 列表筛选开关被打开。
+ * 不进 analytics_events:那张表的 type 只收 pageview / car_view,后台各项口径都按全部行 / 会话算
  */
-export interface ContactClickPayload {
-  type: "contact_click";
+export type ClickKind = "contact" | "financing_tag" | "filter_chip";
+
+/** 统计「被打开次数」的筛选开关(filter_chip 的 target;服务端按此白名单校验) */
+export const TRACKED_FILTER_CHIPS = ["financing"] as const;
+export type TrackedFilterChip = (typeof TRACKED_FILTER_CHIPS)[number];
+
+export interface ClickEventPayload {
+  type: "click";
+  kind: ClickKind;
   visitor_id: string;
   session_id: string;
-  car_id: string;
-  app: ContactChannel;
+  /** contact / financing_tag 必填;filter_chip 为 null */
+  car_id: string | null;
+  /** 仅 contact:点的是哪种联系方式 */
+  app: ContactChannel | null;
+  /** financing_tag:标签中文值(lib/dealer-financing.ts);filter_chip:筛选键;contact 为 null */
+  target: string | null;
   locale: string | null;
   platform: AnalyticsPlatform;
   token: string | null;
@@ -163,6 +175,8 @@ export interface AnalyticsCarInfo {
   trim?: string | null;
   image_url: string | null;
   price: number | null;
+  /** 价格币种(USD / CAD);analytics.sql 重新执行且 car-currency.sql 已建列后才有,缺失按 USD */
+  currency?: string | null;
   year: number | null;
   make: string | null;
   model: string | null;

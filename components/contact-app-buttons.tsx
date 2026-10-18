@@ -6,7 +6,7 @@
 // 手机底栏空间紧(价格 + 收藏 + 分享 + 电话):只放排第一的即时通讯应用,纯图标;短信不进底栏(电话按钮旁已有,
 // 卖家卡片里的整组按钮在手机上也看得到)。
 // WhatsApp → wa.me 带预填消息;短信 → sms: 带同一条预填;LINE → 加好友链接;微信 / KakaoTalk → 复制 ID + 提示。
-// 外链在原生壳里经 openExternal(AppLauncher)唤起对应 App。每次点击上报一次 contact_click(lib/analytics/client.ts)。
+// 外链在原生壳里经 openExternal(AppLauncher)唤起对应 App。每次点击上报一次点击统计(kind = contact,lib/analytics/client.ts → click_events)。
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";

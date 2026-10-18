@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-常來車網 (CLCAuto) — a bilingual (Chinese/English) used car marketplace for Chinese communities in North America. Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend. use bun as cli.
+常來車網 (CLCAuto) — a multilingual used car marketplace (North America first, expanding to Australia/New Zealand). Built with Next.js App Router, TypeScript, Tailwind CSS v4, and Supabase as the backend. use bun as cli.
 
 ## Commands
 

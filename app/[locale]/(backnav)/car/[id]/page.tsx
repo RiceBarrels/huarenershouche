@@ -22,7 +22,8 @@ import type { TFn } from "@/lib/i18n/content/types";
 import { contentAlternates, ogAlternates } from "@/lib/seo/alternates";
 import { JsonLd } from "@/lib/seo/jsonld";
 import { breadcrumbJsonLd, vehicleJsonLd } from "@/lib/seo/structured-data";
-import { formatPrice } from "@/lib/format";
+import { formatCarPrice } from "@/lib/format";
+import { carMileageUnit } from "@/lib/currency";
 import type { PublicCar } from "@/lib/types";
 import { ContentI18nProvider } from "@/components/content/content-i18n-provider";
 import CarDetail from "../car-detail";
@@ -40,7 +41,8 @@ function coverImage(car: PublicCar): string | null {
 }
 
 function priceLabel(car: PublicCar, t: TFn): string {
-  return car.price > 0 ? formatPrice(car.price) : t("电议");
+  // 车源自己的币种(加元车源「CA$」)
+  return car.price > 0 ? formatCarPrice(car, car.price) : t("电议");
 }
 
 /** 按字符(而非 UTF-16 码元)截断,emoji 等不会被切成半个 */
@@ -50,8 +52,11 @@ function truncate(text: string, max: number): string {
 
 /** 面向搜索/分享的一句话描述:关键规格 + 本页显示的描述(译文或原文);无描述时用品牌标语 */
 function buildDescription(car: PublicCar, view: CarView, locale: Locale, t: TFn): string {
+  // 里程按车源自己的单位(英里 / 公里)
   const miles =
-    car.mileage > 0 ? `${new Intl.NumberFormat("en-US").format(car.mileage)} ${t("英里")}` : "";
+    car.mileage > 0
+      ? `${new Intl.NumberFormat("en-US").format(car.mileage)} ${t(carMileageUnit(car) === "km" ? "公里" : "英里")}`
+      : "";
   const specs = [
     view.title,
     priceLabel(car, t),

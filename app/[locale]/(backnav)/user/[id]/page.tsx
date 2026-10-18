@@ -7,14 +7,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
 import { serverT } from "@/lib/i18n/translate";
 import { carTitle, LOCALES, type Locale } from "@/lib/i18n";
 import { isSiteLocale, ogLocale } from "@/lib/i18n/content-langs";
 import {
   CAR_PROFILE_EMBED,
-  CAR_SSR_CARD_COLUMNS,
+  CAR_SSR_CARD_COLUMN_SETS,
   LEGACY_POST_COLUMNS,
   POST_AUTHOR_EMBED,
   POST_COLUMNS,
@@ -84,21 +84,26 @@ const getSeller = cache(async (id: string, locale: Locale): Promise<SellerData> 
   }
   const [profileRes, carsRes, rating, posts] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle(),
-    // 卡片列(不含 phone,电话不进 SSR HTML / RSC 负载)+ 卖家资料 embed;count 给出在售总数
-    supabase
-      .from("cars")
-      .select(`${CAR_SSR_CARD_COLUMNS}, ${CAR_PROFILE_EMBED}`, { count: "exact" })
-      .eq("seller_id", id)
-      .eq("status", "active")
-      .eq("owner_hidden", false)
-      .order("created_at", { ascending: false })
-      .limit(CAR_LIMIT),
+    // 卡片列(不含 phone,电话不进 SSR HTML / RSC 负载)+ 卖家资料 embed;count 给出在售总数。
+    // car-currency.sql 未执行时退回不带币种 / 里程单位的列集
+    queryWithColumnFallback(
+      (cols) =>
+        supabase
+          .from("cars")
+          .select(`${cols}, ${CAR_PROFILE_EMBED}`, { count: "exact" })
+          .eq("seller_id", id)
+          .eq("status", "active")
+          .eq("owner_hidden", false)
+          .order("created_at", { ascending: false })
+          .limit(CAR_LIMIT),
+      CAR_SSR_CARD_COLUMN_SETS
+    ),
     fetchRating(id),
     fetchPosts(id),
   ]);
   // 主体查询出错直接抛出(错误边界 500),不把暂时故障渲染成 404
   if (profileRes.error) throw new Error(`profiles(${id}): ${profileRes.error.message}`);
-  const cars = (carsRes.data as DbCar[] | null) ?? [];
+  const cars = (carsRes.data as unknown as DbCar[] | null) ?? [];
   return {
     profile: (profileRes.data as SellerProfile | null) ?? null,
     cars,

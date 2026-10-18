@@ -1,4 +1,6 @@
 import type { TitleStatus } from "@/lib/title-status";
+import type { Currency, MileageUnit } from "@/lib/currency";
+import type { CarCondition } from "@/lib/car-condition";
 
 export interface DbCar {
   id: string;
@@ -41,6 +43,11 @@ export interface DbCar {
   original_uncertain?: boolean;
   // 产权状态(lib/title-status.ts,存中文,t() 渲染);null = 未填。supabase/title-status.sql 执行前没有这一列
   title_status?: TitleStatus | null;
+  // 价格币种 / 里程单位(lib/currency.ts;supabase/car-currency.sql 执行前没有这两列,缺失按 USD / mi)
+  currency?: Currency | null;
+  mileage_unit?: MileageUnit | null;
+  // 结构化车况清单(lib/car-condition.ts,枚举存中文);{} = 没填。supabase/car-condition.sql 执行前没有这一列
+  condition?: CarCondition | null;
   seller_name: string;
   phone: string | null;
   carfax_url: string | null;
@@ -144,6 +151,8 @@ export interface DbDealerStore {
   verification_submitted_at: string | null;
   verification_reviewed_at: string | null;
   verification_note: string | null;
+  /** 贷款 / 付款方式标签(lib/dealer-financing.ts;supabase/dealer-financing.sql 未执行时没有该字段) */
+  financing?: string[];
   created_at: string;
 }
 
@@ -188,7 +197,8 @@ export interface DbConversation {
   last_message_at: string;
   created_at: string;
   // Joined
-  cars?: { id: string; title: string | null; title_zh: string | null; image_url: string | null; price: number };
+  // currency:car-currency.sql 执行前 join 不到,缺失按 USD
+  cars?: { id: string; title: string | null; title_zh: string | null; image_url: string | null; price: number; currency?: string | null };
   buyer_profile?: { username: string; avatar_url: string | null };
   seller_profile?: { username: string; avatar_url: string | null };
 }

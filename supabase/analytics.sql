@@ -416,6 +416,8 @@ as $$
     'trim', c.trim,
     'image_url', c.image_url,
     'price', c.price,
+    -- 币种(supabase/car-currency.sql);经 to_jsonb 取,列还没建时为 null(界面按 USD),本函数不依赖执行顺序
+    'currency', to_jsonb(c) -> 'currency',
     'year', c.year,
     'make', c.make,
     'model', c.model,

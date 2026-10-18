@@ -16,11 +16,29 @@ import { buildCarTitles } from "@/lib/i18n/car-title";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import { getBundles } from "@/lib/i18n/content/server";
 import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
+import {
+  CURRENCIES,
+  DEFAULT_CURRENCY,
+  DEFAULT_MILEAGE_UNIT,
+  MILEAGE_UNITS,
+  carCurrency,
+  carMileageUnit,
+  isCanadianPostalCode,
+  type Currency,
+  type MileageUnit,
+} from "@/lib/currency";
+import {
+  CONDITION_KEYS,
+  KEYS_COUNT_MAX,
+  KNOWN_ISSUES,
+  normalizeCarCondition,
+  type CarCondition,
+} from "@/lib/car-condition";
 import { CITY_ZH, isRelistBlocked, originalColumns, sameOriginal, sameTagSet } from "@/lib/sources/sync";
 import { deleteMirroredImages, isMirroredUrl } from "@/lib/sources/images";
 import type { ApiContext, ApiErrorDetail, ApiLang, QuotaInfo } from "./types";
 import { LISTING_MAX_IMAGES } from "./types";
-import { enumField, enumSlugs, enumToDb, enumToSlug } from "./enums";
+import { enumField, enumSlugs, enumToDb, enumToSlug, type EnumKind } from "./enums";
 import { apiError } from "./response";
 import { recordUsage } from "./auth";
 import { consumeQuota, getQuota, quotaExceededResponse } from "./quota";
@@ -43,13 +61,29 @@ const httpsUrl = z
   .url({ message: "must be a valid URL" })
   .refine((u) => u.startsWith("https://"), { message: "must be an https URL" });
 
-const enumSlug = (kind: "fuel_type" | "transmission" | "drivetrain" | "title_status") =>
+const enumSlug = (kind: Exclude<EnumKind, "status">) =>
   z
     .string()
     .trim()
     .refine((s) => enumToDb(kind, s) != null, {
       message: `must be one of: ${enumSlugs(kind).join(", ")}`,
     });
+
+/**
+ * 车况清单(cars.condition,lib/car-condition.ts):只有固定的是否 / 数字 / 枚举 slug,没有自由文本;
+ * 未知键直接 400(防止把备注之类的自由文本塞进来 —— 那会绕开翻译与审核,细节写在 description 里)。
+ * 每项可省略或 null = 没填;known_issues: [] = 明确无已知问题(和省略不同),重复项去重。
+ */
+const conditionSchema = z
+  .object({
+    service_records: z.boolean().nullish(),
+    one_owner: z.boolean().nullish(),
+    smoker: z.boolean().nullish(),
+    keys_count: z.number().int().min(0).max(KEYS_COUNT_MAX).nullish(),
+    tires_condition: enumSlug("tires_condition").nullish(),
+    known_issues: z.array(enumSlug("known_issue")).max(KNOWN_ISSUES.length).nullish(),
+  })
+  .strict({ message: `unknown key; allowed: ${CONDITION_KEYS.join(", ")}` });
 
 /** 可选字符串:空串/空白视为 null */
 const optionalText = (max: number) =>
@@ -71,15 +105,21 @@ export const listingSchema = z.object({
   make: z.string().trim().min(1).max(40).transform(canonicalMake),
   model: z.string().trim().min(1).max(60),
   trim: optionalText(60),
-  /** 整数美元;0 = 电议 */
+  /** 整数,币种见 currency;0 = 电议 */
   price: z.number().int().min(0),
   original_price: z.number().int().min(0).nullish(),
   mileage: z.number().int().min(0),
+  /** price / original_price 的币种 USD / CAD;省略 = 新建为 USD、更新保留原值,null = 恢复默认 USD */
+  currency: z.enum(CURRENCIES, { message: `must be one of: ${CURRENCIES.join(", ")}` }).nullish(),
+  /** mileage 的单位 mi / km;省略 = 新建为 mi、更新保留原值,null = 恢复默认 mi */
+  mileage_unit: z.enum(MILEAGE_UNITS, { message: `must be one of: ${MILEAGE_UNITS.join(", ")}` }).nullish(),
   fuel_type: enumSlug("fuel_type"),
   transmission: enumSlug("transmission"),
   drivetrain: enumSlug("drivetrain").nullish(),
   /** 产权状态 clean / rebuilt / salvage / lemon_buyback;省略 = 不改(新建为空),null = 清空 */
   title_status: enumSlug("title_status").nullish(),
+  /** 车况清单;省略 = 不改(新建为空),null = 清空,对象 = 整张替换(没给的项视为没填) */
+  condition: conditionSchema.nullish(),
   exterior_color: optionalText(30),
   interior_color: optionalText(30),
   /** 任一语言,原样保存为原文;其他语言由 i18n 管线自动翻译 */
@@ -90,7 +130,7 @@ export const listingSchema = z.object({
   images: z.array(httpsUrl).max(LISTING_MAX_IMAGES).default([]),
   carfax_url: httpsUrl.nullish(),
   store_id: z.string().uuid().nullish(),
-  /** 个人档必填:"City, ST" 或 5 位 zip;车行省略则跟随门店 */
+  /** 个人档必填:"City, ST"、5 位 zip 或加拿大邮编(A1A 1A1);车行省略则跟随门店 */
   location: optionalText(80),
 });
 
@@ -150,7 +190,7 @@ function storeLocation(store: DbDealerStore): ResolvedLocation {
 
 /**
  * 车行:门店地址(store_id 指定或第一家已认证门店);个人 / 车行显式传 location:
- * 5 位 zip → 反查城市 + 坐标;否则按 "City, ST" 文本 geocode。地理编码失败只丢坐标,不报错。
+ * 5 位 zip / 加拿大邮编 → 反查城市 + 坐标;否则按 "City, ST" 文本 geocode。地理编码失败只丢坐标,不报错。
  */
 export async function resolveLocation(
   ctx: ApiContext,
@@ -170,16 +210,16 @@ export async function resolveLocation(
     return {
       error: {
         field: "location",
-        issue: ctx.tier === "dealer" ? "required when no verified store" : 'required ("City, ST" or 5-digit zip)',
+        issue: ctx.tier === "dealer" ? "required when no verified store" : 'required ("City, ST", 5-digit zip or Canadian postal code)',
       },
     };
   }
 
-  if (/^\d{5}$/.test(raw)) {
+  if (/^\d{5}$/.test(raw) || isCanadianPostalCode(raw)) {
     const [coords, geo] = await Promise.all([geocodeZipToCoords(raw), lookupZip(raw).catch(() => null)]);
     const city = geo?.city?.trim() || null;
     const state = geo?.stateCode?.trim().toUpperCase() || null;
-    if (!coords && !city) return { error: { field: "location", issue: "unrecognized US zip code" } };
+    if (!coords && !city) return { error: { field: "location", issue: "unrecognized zip / postal code" } };
     const location = city && state ? `${city}, ${state}` : raw;
     return { location, location_zh: cityZh(city, state, location), lat: coords?.lat ?? null, lng: coords?.lng ?? null };
   }
@@ -194,6 +234,19 @@ export async function resolveLocation(
 }
 
 // ─── Row assembly ───────────────────────────────────────────────────
+
+/** API 车况清单(英文 slug)→ 库内 jsonb(中文枚举,过得了 car-condition.sql 的 CHECK);null = 清空 → {} */
+export function conditionToDb(input: ListingInput["condition"]): CarCondition {
+  if (!input) return {};
+  return normalizeCarCondition({
+    service_records: input.service_records,
+    one_owner: input.one_owner,
+    smoker: input.smoker,
+    keys_count: input.keys_count,
+    tires_condition: enumToDb("tires_condition", input.tires_condition),
+    known_issues: input.known_issues?.map((slug) => enumToDb("known_issue", slug)),
+  });
+}
 
 /**
  * cars 行:标题确定性生成(buildCarTitles,与 SQL i18n.car_title 一致);描述 / 标签原样写原文列,
@@ -227,6 +280,11 @@ export function buildCarRow(
     drivetrain: enumToDb("drivetrain", input.drivetrain),
     // 产权状态只在请求里显式给了(含 null)才写:省略时更新保留原值,新建为空
     ...(input.title_status !== undefined ? { title_status: enumToDb("title_status", input.title_status) } : {}),
+    // 车况清单同理:省略保留原值(新建为库默认 {}),null 清空,对象整张替换
+    ...(input.condition !== undefined ? { condition: conditionToDb(input.condition) } : {}),
+    // 币种 / 里程单位同理:省略时更新保留原值、新建取库默认(USD / mi),null = 恢复默认
+    ...(input.currency !== undefined ? { currency: input.currency ?? DEFAULT_CURRENCY } : {}),
+    ...(input.mileage_unit !== undefined ? { mileage_unit: input.mileage_unit ?? DEFAULT_MILEAGE_UNIT } : {}),
     exterior_color: input.exterior_color ?? null,
     interior_color: input.interior_color ?? null,
     vin: input.vin,
@@ -245,19 +303,29 @@ export function buildCarRow(
 
 // ─── Upsert ─────────────────────────────────────────────────────────
 
+/** 可选列组:各自的迁移(title-status.sql / car-currency.sql / car-condition.sql)可能还没执行 */
+const OPTIONAL_COLUMN_GROUPS = [["title_status"], ["currency", "mileage_unit"], ["condition"]] as const;
+
 /**
- * 写 cars 一行;supabase/title-status.sql 还没执行(列不存在)而这次带了 title_status 时,
- * 去掉它再写一次 —— 产权状态静默不存,其他字段照常写入(与其他缺列兜底一致,不让整次 PUT 失败)。
+ * 写 cars 一行;supabase/title-status.sql / car-currency.sql / car-condition.sql 还没执行(列不存在)而这次带了
+ * 对应字段时,去掉缺的那组再写 —— 产权状态 / 币种与里程单位 / 车况清单静默不存,其他字段照常写入(与其他缺列兜底一致,
+ * 不让整次 PUT 失败;币种列不存在时库里本来就只能是美元 / 英里)。
  */
 async function writeCarRow<R extends { error: PostgrestError | null }>(
   row: Record<string, unknown>,
   write: (row: Record<string, unknown>) => PromiseLike<R>,
 ): Promise<R> {
-  const res = await write(row);
-  if (!res.error || !("title_status" in row) || !isMissingColumnNamed(res.error, "title_status")) return res;
-  const rest = { ...row };
-  delete rest.title_status;
-  return write(rest);
+  let current = row;
+  let res = await write(current);
+  for (let i = 0; i < OPTIONAL_COLUMN_GROUPS.length && res.error; i++) {
+    const err = res.error;
+    const group = OPTIONAL_COLUMN_GROUPS.find((cols) => cols.some((c) => c in current && isMissingColumnNamed(err, c)));
+    if (!group) break;
+    current = { ...current };
+    for (const c of group) delete current[c];
+    res = await write(current);
+  }
+  return res;
 }
 
 /** 已有记录;原文 / 标签已按库结构归一(见 findExisting) */
@@ -740,9 +808,27 @@ const INVENTORY_FIELDS = [
 export const INVENTORY_COLS = INVENTORY_FIELDS.join(", ");
 /** 再加内容时钟 content_updated_at(i18n-v2.sql);查询遇到缺列错误时退回 INVENTORY_COLS 重试 */
 export const INVENTORY_COLS_V2 = [...INVENTORY_FIELDS, "content_updated_at" satisfies keyof DbCar].join(", ");
+/**
+ * 库存查询的列集合,从新到旧:内容时钟(i18n-v2.sql)与币种 / 里程单位(car-currency.sql)各自可能没建,
+ * 配合 queryWithColumnFallback;选中的集合不含 content_updated_at 时按 updated_at 排序(见 inventoryOrderColumn)
+ */
+export const INVENTORY_COLUMN_SETS = [
+  `${INVENTORY_COLS_V2}, currency, mileage_unit`,
+  INVENTORY_COLS_V2,
+  `${INVENTORY_COLS}, currency, mileage_unit`,
+  INVENTORY_COLS,
+] as const;
 
-/** content_updated_at 只有按 INVENTORY_COLS_V2 查才有 */
-export type InventoryCar = Pick<DbCar, (typeof INVENTORY_FIELDS)[number] | "content_updated_at">;
+/** 列集合里有内容时钟就按它排,否则按行时钟 updated_at */
+export function inventoryOrderColumn(cols: string): "content_updated_at" | "updated_at" {
+  return cols.includes("content_updated_at") ? "content_updated_at" : "updated_at";
+}
+
+/** content_updated_at / currency / mileage_unit 只有对应列集合查得到 */
+export type InventoryCar = Pick<
+  DbCar,
+  (typeof INVENTORY_FIELDS)[number] | "content_updated_at" | "currency" | "mileage_unit"
+>;
 
 export interface InventoryItem {
   id: string;
@@ -754,8 +840,14 @@ export interface InventoryItem {
   make: string;
   model: string;
   trim: string | null;
+  /** 整数,币种见 currency */
   price: number;
+  /** USD(默认)/ CAD */
+  currency: Currency;
+  /** 整数,单位见 mileage_unit */
   mileage: number;
+  /** mi(默认)/ km */
+  mileage_unit: MileageUnit;
   vin: string | null;
   images: string[];
   image_url: string | null;
@@ -795,7 +887,10 @@ export function serializeInventoryItem(car: InventoryCar, lang: ApiLang, transla
     model: car.model,
     trim: car.trim ?? null,
     price: car.price,
+    // car-currency.sql 未执行时没有这两列 → USD / mi
+    currency: carCurrency(car),
     mileage: car.mileage,
+    mileage_unit: carMileageUnit(car),
     vin: car.vin ?? null,
     images,
     image_url: car.image_url ?? null,

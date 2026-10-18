@@ -9,6 +9,7 @@ import type { CarView, Localized, PostView } from "@/lib/i18n/content/resolve";
 import type { TFn } from "@/lib/i18n/content/types";
 import { avatarUrl } from "@/lib/avatar";
 import { SITE_URL } from "@/lib/seo-pages";
+import { carCurrency, carMileageUnit } from "@/lib/currency";
 import type { DbCar, DbCommunityPost, DbProfile, DbQaQuestion, PublicCar } from "@/lib/types";
 import {
   schemaDriveWheelConfiguration,
@@ -213,9 +214,10 @@ export function vehicleJsonLd({
     fuelType: schemaFuelType(car.fuel_type),
     vehicleTransmission: schemaTransmission(car.transmission),
     driveWheelConfiguration: schemaDriveWheelConfiguration(car.drivetrain),
+    // 里程按车源自己的单位:UN/CEFACT 代码 SMI = 英里、KMT = 公里
     mileageFromOdometer:
       car.mileage > 0
-        ? { "@type": "QuantitativeValue", value: car.mileage, unitCode: "SMI" }
+        ? { "@type": "QuantitativeValue", value: car.mileage, unitCode: carMileageUnit(car) === "km" ? "KMT" : "SMI" }
         : undefined,
     image: images.length > 0 ? images : undefined,
     description: description || undefined,
@@ -226,7 +228,8 @@ export function vehicleJsonLd({
         ? {
             "@type": "Offer",
             price: car.price,
-            priceCurrency: "USD",
+            // 车源自己的币种(USD / CAD;car-currency.sql 未执行时按 USD)
+            priceCurrency: carCurrency(car),
             availability:
               car.status === "active" ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
             itemCondition: "https://schema.org/UsedCondition",

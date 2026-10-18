@@ -1,4 +1,4 @@
-// Public API 枚举双向表:对外用英文 slug,库里存中文(fuel_type / transmission / title_status)
+// Public API 枚举双向表:对外用英文 slug,库里存中文(fuel_type / transmission / title_status / 车况清单)
 // 或大写英文(drivetrain)。内部值绝不外露;*_label 按 lang 走 i18n 词典。
 // 新增 DB 枚举值时在这里补一行即可,读写两侧自动生效。
 
@@ -9,7 +9,14 @@ import { es } from "@/lib/i18n/es";
 import { fr } from "@/lib/i18n/fr";
 import type { ApiLang } from "./types";
 
-export type EnumKind = "fuel_type" | "transmission" | "drivetrain" | "title_status" | "status";
+export type EnumKind =
+  | "fuel_type"
+  | "transmission"
+  | "drivetrain"
+  | "title_status"
+  | "tires_condition"
+  | "known_issue"
+  | "status";
 
 /** slug → DB 值(顺序即文档/OpenAPI 里列出的顺序) */
 const SLUG_TO_DB: Record<EnumKind, Record<string, string>> = {
@@ -41,6 +48,23 @@ const SLUG_TO_DB: Record<EnumKind, Record<string, string>> = {
     rebuilt: "重建产权",
     salvage: "残值产权",
     lemon_buyback: "柠檬回购",
+  },
+  // 车况清单(cars.condition,lib/car-condition.ts;supabase/car-condition.sql):轮胎状况单选、已知问题多选
+  tires_condition: {
+    new: "新",
+    good: "良好",
+    fair: "一般",
+    needs_replacement: "需更换",
+  },
+  known_issue: {
+    engine: "发动机",
+    transmission: "变速箱",
+    air_conditioning: "空调",
+    electrical: "电子系统",
+    oil_leak: "漏油",
+    rust: "车身锈蚀",
+    accident_repair: "事故修复",
+    suspension: "悬挂",
   },
   status: {
     active: "active",

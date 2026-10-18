@@ -1,8 +1,10 @@
 "use client";
 
-// 设置 · 门店与车行认证:门店增删、门店照片、认证申请、账号类型升级
+// 设置 · 门店与车行认证:门店增删、门店照片、贷款 / 付款方式标签、认证申请、账号类型升级。
+// 门店跟随当前操作身份 actingId:切换成已认领的车行账号时管理的是车行的门店(RLS claimant_manage_dealer_stores
+// 按 can_act_as 放行);门店照片仍传到本人的存储目录(store-photos 桶按 auth.uid() 分目录)。
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "@/components/localized-navigation";
 import {
@@ -18,6 +20,17 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { LargeTitle } from "@/components/ios-settings";
 import { useI18n } from "@/components/i18n-provider";
+import { useIdentity } from "@/components/identity-provider";
+import {
+  FINANCING_DISCLAIMER,
+  FINANCING_EXPLAIN,
+  FINANCING_TAGS,
+  normalizeFinancing,
+  sameFinancing,
+  toggleFinancing,
+  type FinancingTag,
+} from "@/lib/dealer-financing";
+import { saveStoreFinancing } from "@/lib/dealer-financing-client";
 import type { DbDealerStore } from "@/lib/types";
 
 const StoreMap = dynamic(
@@ -28,7 +41,9 @@ const StoreMap = dynamic(
 export default function StoresSettingsPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [user, setUser] = useState<string | null>(null);
+  const { authId, actingId, isActingAsClaimed, loading: identityLoading } = useIdentity();
+  // 门店 owner = 当前操作身份(照片的存储目录用本人 authId,见文件头)
+  const user = actingId;
   const [accountType, setAccountType] = useState<"private" | "dealer">("private");
   const [loading, setLoading] = useState(true);
 
@@ -38,24 +53,62 @@ export default function StoresSettingsPage() {
   const [submittingVerification, setSubmittingVerification] = useState<string | null>(null);
   const [upgrading, setUpgrading] = useState(false);
 
+  // 贷款 / 付款方式标签:勾选即保存(按门店串行,始终写最新勾选);保存失败退回上次保存的值
+  const savedFinancingRef = useRef<Record<string, FinancingTag[]>>({});
+  const financingChainRef = useRef<Promise<void>>(Promise.resolve());
+  const [financingSaving, setFinancingSaving] = useState<string | null>(null);
+  const [financingError, setFinancingError] = useState<string | null>(null);
+  // dealer-financing.sql 未执行:读到的门店行没有 financing 字段(或保存时报缺列)→ 不显示勾选区
+  const [financingUnavailable, setFinancingUnavailable] = useState(false);
+  const financingAvailable = !financingUnavailable && stores.some((s) => Array.isArray(s.financing));
+
   useEffect(() => {
-    async function load() {
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      if (!authUser) { router.push("/login"); return; }
-      setUser(authUser.id);
+    if (identityLoading) return;
+    if (!authId) { router.push("/login"); return; }
+    if (!actingId) return;
+    let cancelled = false;
+    (async () => {
       const [profileRes, storeRes] = await Promise.all([
-        supabase.from("profiles").select("account_type").eq("id", authUser.id).maybeSingle(),
-        supabase.from("dealer_stores").select("*").eq("owner_id", authUser.id).order("created_at", { ascending: false }),
+        supabase.from("profiles").select("account_type").eq("id", actingId).maybeSingle(),
+        supabase.from("dealer_stores").select("*").eq("owner_id", actingId).order("created_at", { ascending: false }),
       ]);
+      if (cancelled) return;
+      const loaded = (storeRes.data as DbDealerStore[]) || [];
+      savedFinancingRef.current = Object.fromEntries(loaded.map((st) => [st.id, normalizeFinancing(st.financing)]));
       setAccountType((profileRes.data?.account_type as "private" | "dealer") || "private");
-      setStores((storeRes.data as DbDealerStore[]) || []);
+      setStores(loaded);
       setLoading(false);
-    }
-    load();
-  }, [router]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [identityLoading, authId, actingId, router]);
+
+  function toggleStoreFinancing(storeId: string, tag: FinancingTag) {
+    const store = stores.find((s) => s.id === storeId);
+    if (!store) return;
+    const next = toggleFinancing(store.financing ?? [], tag);
+    setStores((prev) => prev.map((s) => (s.id === storeId ? { ...s, financing: next } : s)));
+    setFinancingError(null);
+    financingChainRef.current = financingChainRef.current.then(async () => {
+      const saved = savedFinancingRef.current[storeId] ?? [];
+      if (sameFinancing(saved, next)) return;
+      setFinancingSaving(storeId);
+      const result = await saveStoreFinancing(storeId, next);
+      setFinancingSaving(null);
+      if (result === "saved") {
+        savedFinancingRef.current[storeId] = next;
+        return;
+      }
+      if (result === "unavailable") setFinancingUnavailable(true);
+      else setFinancingError(storeId);
+      setStores((prev) => prev.map((s) => (s.id === storeId ? { ...s, financing: saved } : s)));
+    });
+  }
 
   async function upgradeToDealer() {
-    if (!user || upgrading) return;
+    // 账号类型只改本人的;以认领的车行身份操作时不显示升级按钮
+    if (!user || upgrading || isActingAsClaimed) return;
     setUpgrading(true);
     await supabase.from("profiles").update({ account_type: "dealer" }).eq("id", user);
     setAccountType("dealer");
@@ -73,7 +126,9 @@ export default function StoresSettingsPage() {
       .insert({ owner_id: user, name: newStore.name, address: fullAddress, zipcode: newStore.zipcode || null, phone: newStore.phone || null, wechat: newStore.wechat || null, lat: result?.lat || null, lng: result?.lng || null })
       .select().single();
     if (!error && data) {
-      setStores((prev) => [data as DbDealerStore, ...prev]);
+      const created = data as DbDealerStore;
+      savedFinancingRef.current[created.id] = normalizeFinancing(created.financing);
+      setStores((prev) => [created, ...prev]);
       setNewStore({ name: "", address: "", address2: "", city: "", state: "", zipcode: "", phone: "", wechat: "" });
     }
     setAddingStore(false);
@@ -87,14 +142,14 @@ export default function StoresSettingsPage() {
 
   async function handleStorePhotoUpload(storeId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const files = e.target.files;
-    if (!files || !user) return;
+    if (!files || !authId) return;
     const store = stores.find((s) => s.id === storeId);
     if (!store) return;
 
     const urls: string[] = [...store.store_photos];
     for (const file of Array.from(files)) {
       const ext = file.name.split(".").pop() || "jpg";
-      const path = `${user}/${storeId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+      const path = `${authId}/${storeId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
       const { error } = await supabase.storage.from("store-photos").upload(path, file);
       if (!error) {
         const { data: { publicUrl } } = supabase.storage.from("store-photos").getPublicUrl(path);
@@ -162,7 +217,7 @@ export default function StoresSettingsPage() {
                 <div className="mt-2 flex h-11 items-center gap-2 rounded-[10px] bg-foreground px-3 font-mono text-xs text-background">
                   <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.5} />{t("认证车行")}
                 </div>
-              ) : hasVerifiedStore ? (
+              ) : hasVerifiedStore && !isActingAsClaimed ? (
                 <div className="mt-2 flex gap-2">
                   <div className="flex h-11 flex-1 items-center justify-center rounded-[10px] bg-foreground font-mono text-xs text-background">{t("个人")}</div>
                   <button
@@ -275,6 +330,41 @@ export default function StoresSettingsPage() {
                         )}
                         {t("申请认证")}
                       </Button>
+                    )}
+                  </div>
+                )}
+
+                {/* 贷款 / 付款方式:勾选即保存,显示在该卖家车源详情的卖家信息里 */}
+                {financingAvailable && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <div className="flex items-center gap-1.5">
+                      <p className="font-mono text-[11px] font-medium">{t("贷款与付款方式")}</p>
+                      {financingSaving === store.id && (
+                        <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" strokeWidth={1.5} />
+                      )}
+                    </div>
+                    <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">
+                      {t("勾选门店实际提供的方式，会显示在车源详情的卖家信息里")}
+                    </p>
+                    <div className="mt-2 space-y-1.5">
+                      {FINANCING_TAGS.map((tag) => (
+                        <label key={tag} className="flex cursor-pointer items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={(store.financing ?? []).includes(tag)}
+                            onChange={() => toggleStoreFinancing(store.id, tag)}
+                            className="mt-0.5 h-4 w-4 shrink-0 accent-primary"
+                          />
+                          <span className="min-w-0">
+                            <span className="block font-mono text-xs">{t(tag)}</span>
+                            <span className="block font-mono text-[10px] text-muted-foreground">{t(FINANCING_EXPLAIN[tag])}</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="mt-2 font-mono text-[10px] text-muted-foreground">{t(FINANCING_DISCLAIMER)}</p>
+                    {financingError === store.id && (
+                      <p className="mt-1 font-mono text-[11px] text-destructive">{t("保存失败，请稍后重试")}</p>
                     )}
                   </div>
                 )}

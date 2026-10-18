@@ -17,7 +17,7 @@ import { SettingsGroup, LargeTitle, SegmentedControl } from "@/components/ios-se
 import { useCachedData } from "@/lib/use-cached-data";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle, carLocation } from "@/lib/i18n";
-import { timeAgo } from "@/lib/format";
+import { formatCarPrice, timeAgo } from "@/lib/format";
 import {
   getSavedSearches,
   removeSavedSearch,
@@ -26,14 +26,6 @@ import {
   type SavedSearch,
 } from "@/lib/saved-searches";
 import type { DbCar } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 export default function FavoritesPage() {
   const router = useRouter();
@@ -121,7 +113,7 @@ export default function FavoritesPage() {
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <Link href={carLink(car.id)}><h3 className="font-mono text-sm font-semibold hover:underline">{carTitle(car, locale)}</h3></Link>
-                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{formatPrice(car.price)} · {carLocation(car, locale)}</p>
+                      <p className="mt-0.5 font-mono text-xs text-muted-foreground">{formatCarPrice(car, car.price)} · {carLocation(car, locale)}</p>
                     </div>
                     <Button variant="secondary" size="sm" className="h-8 w-fit gap-1 px-3 font-mono text-[11px]" onClick={() => removeFavorite(car.id)}>
                       <Heart className="h-3 w-3 fill-current" strokeWidth={1.5} />{t("取消收藏")}

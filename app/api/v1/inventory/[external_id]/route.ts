@@ -8,8 +8,7 @@ import { quotaHeaders } from "@/lib/api/quota";
 import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/response";
 import type { ApiContext } from "@/lib/api/types";
 import {
-  INVENTORY_COLS,
-  INVENTORY_COLS_V2,
+  INVENTORY_COLUMN_SETS,
   finalize,
   formatZodError,
   listingSchema,
@@ -22,7 +21,7 @@ import {
   validationResponse,
   type InventoryCar,
 } from "@/lib/api/listing";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -40,16 +39,16 @@ export async function GET(req: NextRequest, { params }: Params) {
     const ownerId = ctx.owner!.id;
     const { external_id } = await params;
 
-    // 内容时钟 content_updated_at(i18n-v2.sql);库里还没有该列时按旧列集重查(updated_at 即行时钟)
-    const run = (legacy: boolean) =>
+    // 内容时钟 content_updated_at(i18n-v2.sql)/ 币种与里程单位(car-currency.sql)可能还没建:
+    // 按 INVENTORY_COLUMN_SETS 从新到旧重查(没有内容时钟时 updated_at 即行时钟)
+    const run = (cols: string) =>
       supabase
         .from("cars")
-        .select(legacy ? INVENTORY_COLS : INVENTORY_COLS_V2)
+        .select(cols)
         .eq("seller_id", ownerId)
         .eq("external_id", external_id)
         .maybeSingle();
-    let res = await run(false);
-    if (res.error && isMissingColumnError(res.error)) res = await run(true);
+    const res = await queryWithColumnFallback(run, INVENTORY_COLUMN_SETS);
     if (res.error) throw new Error(res.error.message);
     if (!res.data) return finalize(ctx, apiError(404, "not_found", `No listing with external_id "${external_id}"`));
 

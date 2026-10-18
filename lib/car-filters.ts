@@ -14,6 +14,7 @@ import type { DbCar } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
 import { sellerSpeaksLocale } from "@/lib/i18n/languages";
 import { CLEAN_TITLE } from "@/lib/title-status";
+import { carMileageMi, carPriceUsd } from "@/lib/currency";
 
 // 复用 components/search-filters 的规范定义,方便调用方单点导入
 export type { Filters } from "@/components/search-filters";
@@ -59,6 +60,7 @@ export function filtersFromParams(sp: URLSearchParams): Filters {
     oneOwner: sp.get("oneOwner") || "",
     hasCarfax: sp.get("hasCarfax") || "",
     cleanTitle: sp.get("cleanTitle") || "",
+    financing: sp.get("financing") || "",
     hasVideo: sp.get("hasVideo") || "",
     hasPrice: sp.get("hasPrice") || "",
   };
@@ -94,6 +96,7 @@ export function filtersToQuery(f: Filters, sort: SortKey): string {
   if (f.oneOwner) params.set("oneOwner", f.oneOwner);
   if (f.hasCarfax) params.set("hasCarfax", f.hasCarfax);
   if (f.cleanTitle) params.set("cleanTitle", f.cleanTitle);
+  if (f.financing) params.set("financing", f.financing);
   if (f.hasVideo) params.set("hasVideo", f.hasVideo);
   if (f.hasPrice) params.set("hasPrice", f.hasPrice);
   if (sort !== "newest") params.set("sort", sort);
@@ -175,6 +178,12 @@ export interface CarFilterContext {
   insightMap?: Map<string, PriceInsight | null>;
   /** 数据拉取时间,「上架时间」筛选的基准;为 null/不传时跳过该筛选(与数据未就绪时的页面行为一致)。 */
   fetchedAt?: number | null;
+  /**
+   * 「可贷款(无信用/ITIN)」的卖家 id 集合(名下门店带 LOAN_FILTER_TAGS 之一,
+   * lib/dealer-financing-client.ts fetchLoanFinancingSellerIds)。financing 筛选需要;
+   * 不传 / null(还没拉到、列不存在)时该筛选一辆也不命中(与 SQL 侧「没有门店带标签」一致)。
+   */
+  loanSellerIds?: ReadonlySet<string> | null;
 }
 
 // 完整筛选管线(不含排序)。forcedDistanceSort 为 true 表示:位置筛选命中 0 结果、
@@ -184,7 +193,7 @@ export function applyCarFilters(
   filters: Filters,
   ctx: CarFilterContext,
 ): { cars: DbCar[]; forcedDistanceSort: boolean } {
-  const { userCoords, distances, fetchedAt = null } = ctx;
+  const { userCoords, distances, fetchedAt = null, loanSellerIds = null } = ctx;
 
   // 价格评级表:优先用调用方传入的(页面侧已 memo);没传且需要时才即时构建
   let insightMap = ctx.insightMap;
@@ -213,15 +222,16 @@ export function applyCarFilters(
         .filter(Boolean);
       if (models.length > 0 && (!car.model || !models.includes(car.model.trim().toLowerCase()))) return false;
     }
-    if (filters.minPrice && car.price < Number(filters.minPrice)) return false;
-    if (filters.maxPrice && car.price > Number(filters.maxPrice)) return false;
+    // 价格区间是美元、里程上限是英里:加元 / 公里车源先折算再比(同 browse_filtered 的 price_usd / mileage_mi)
+    if (filters.minPrice && carPriceUsd(car) < Number(filters.minPrice)) return false;
+    if (filters.maxPrice && carPriceUsd(car) > Number(filters.maxPrice)) return false;
     if (filters.minYear && car.year < Number(filters.minYear)) return false;
     if (filters.maxYear && car.year > Number(filters.maxYear)) return false;
     if (filters.sellerType && car.profiles?.account_type !== filters.sellerType) return false;
     if (filters.fuelType && !matchesMulti(filters.fuelType, car.fuel_type)) return false;
     if (filters.transmission && !matchesMulti(filters.transmission, car.transmission)) return false;
     if (filters.drivetrain && !matchesMulti(filters.drivetrain, car.drivetrain)) return false;
-    if (filters.maxMileage && car.mileage > Number(filters.maxMileage)) return false;
+    if (filters.maxMileage && carMileageMi(car) > Number(filters.maxMileage)) return false;
     if (filters.exteriorColor && !matchesColorMulti(filters.exteriorColor, car.exterior_color)) return false;
     if (filters.interiorColor && !matchesColorMulti(filters.interiorColor, car.interior_color)) return false;
     if (filters.bodyStyle) {
@@ -229,8 +239,8 @@ export function applyCarFilters(
       if (!style || !filters.bodyStyle.split(",").includes(style)) return false;
     }
     if (paymentPriceCap !== null) {
-      // 电议(price<=0)的车无法估算月供,排除
-      if (car.price <= 0 || car.price > paymentPriceCap) return false;
+      // 电议(price<=0)的车无法估算月供,排除;价格上限是美元
+      if (car.price <= 0 || carPriceUsd(car) > paymentPriceCap) return false;
     }
     if (filters.dealRating) {
       const insight = insightMap?.get(car.id);
@@ -262,6 +272,8 @@ export function applyCarFilters(
     if (filters.hasCarfax === "true" && !car.carfax_url) return false;
     // 产权:只认明确的清白产权;没填(null)或列还不存在(title-status.sql 未执行,字段缺失)都不命中
     if (filters.cleanTitle === "true" && car.title_status !== CLEAN_TITLE) return false;
+    // 可贷款(无信用/ITIN):卖家名下门店带「支持ITIN贷款」或「无信用记录可贷」(同 browse_filtered 的 financing)
+    if (filters.financing === "true" && !loanSellerIds?.has(car.seller_id)) return false;
     if (filters.hasVideo === "true" && !carHasVideo(car)) return false;
     if (filters.hasPrice === "true" && car.price <= 0) return false;
     return true;
@@ -323,14 +335,15 @@ export function sortCars(
 ): DbCar[] {
   const sorted = [...cars];
   switch (sort) {
+    // 价格 / 里程排序按折合美元 / 英里(同 browse_cars 的 browse_price_usd / browse_mileage_mi)
     case "price-asc":
-      sorted.sort((a, b) => a.price - b.price);
+      sorted.sort((a, b) => carPriceUsd(a) - carPriceUsd(b));
       break;
     case "price-desc":
-      sorted.sort((a, b) => b.price - a.price);
+      sorted.sort((a, b) => carPriceUsd(b) - carPriceUsd(a));
       break;
     case "mileage":
-      sorted.sort((a, b) => a.mileage - b.mileage);
+      sorted.sort((a, b) => carMileageMi(a) - carMileageMi(b));
       break;
     case "year":
       sorted.sort((a, b) => b.year - a.year);

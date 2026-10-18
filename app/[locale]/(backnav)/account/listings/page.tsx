@@ -19,6 +19,7 @@ import { useCachedData } from "@/lib/use-cached-data";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle, carLocation, brandShortLabel } from "@/lib/i18n";
 import { MAKES_ZH } from "@/lib/mock-data";
+import { formatCarPrice } from "@/lib/format";
 import type { DbCar } from "@/lib/types";
 
 const DRAFT_KEY = "huaren_post_draft";
@@ -27,14 +28,6 @@ interface PostDraft {
   form: Record<string, string>;
   imageUrls: string[];
   features: string[];
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 const STATUS_MAP: Record<string, { label: string; variant: "default" | "secondary" | "outline" | "destructive" }> = {
@@ -218,7 +211,7 @@ export default function ListingsPage() {
                       )}
                     </div>
                     <p className="mt-0.5 font-mono text-xs text-muted-foreground">
-                      {formatPrice(car.price)} · {carLocation(car, locale)} · {t("{n} 次浏览", { n: car.views_count || 0 })}
+                      {formatCarPrice(car, car.price)} · {carLocation(car, locale)} · {t("{n} 次浏览", { n: car.views_count || 0 })}
                     </p>
                     {relistLocked(car) && (
                       <p className="mt-0.5 font-mono text-[10px] text-muted-foreground">

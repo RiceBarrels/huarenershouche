@@ -10,6 +10,9 @@ import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import type { BundleRow } from "@/lib/i18n/content/types";
 import type { ContactApps } from "@/lib/contact-apps";
+import { carCurrency, carMileageUnit, type Currency, type MileageUnit } from "@/lib/currency";
+import { normalizeCarCondition } from "@/lib/car-condition";
+import { isMissingColumnError, missingColumnName } from "@/lib/supabase-compat";
 import { enumField, enumToSlug, labelFor } from "./enums";
 import type { ApiLang } from "./types";
 
@@ -52,9 +55,44 @@ const CAR_SUMMARY_FIELDS = [
 /** 摘要列 + 内容时钟 content_updated_at(i18n-v2.sql) */
 export const CAR_SUMMARY_COLUMNS = [...CAR_SUMMARY_FIELDS, "content_updated_at" satisfies keyof DbCar].join(", ");
 
-export const CAR_SUMMARY_SELECT = `${CAR_SUMMARY_COLUMNS}, ${CAR_PROFILE_JOIN}`;
-/** 去掉 i18n-v2 新增列:CAR_SUMMARY_SELECT 查询遇到缺列错误(isMissingColumnError)时用它重试一次 */
-export const LEGACY_CAR_SUMMARY_SELECT = `${CAR_SUMMARY_FIELDS.join(", ")}, ${CAR_PROFILE_JOIN}`;
+/** 币种 / 里程单位(supabase/car-currency.sql;两列同进同退) */
+const CAR_UNIT_COLUMNS = "currency, mileage_unit";
+
+/**
+ * 列表查询的降级开关:legacy = 库里还没有 i18n-v2 的 content_updated_at;units = 库里已有币种 / 里程单位列。
+ * 两份迁移互不依赖,缺列重试时按 degradeCarQueryFlags 逐个关掉。
+ */
+export interface CarQueryFlags {
+  legacy: boolean;
+  units: boolean;
+}
+export const CAR_QUERY_FLAGS: CarQueryFlags = { legacy: false, units: true };
+
+/** 缺列错误 → 下一组开关(缺的是币种 / 单位列先关 units,否则退回 legacy);不是缺列错误或已无可降 → null */
+export function degradeCarQueryFlags(err: unknown, flags: CarQueryFlags): CarQueryFlags | null {
+  if (!isMissingColumnError(err)) return null;
+  const col = missingColumnName(err);
+  if (flags.units && (col === "currency" || col === "mileage_unit")) return { ...flags, units: false };
+  if (!flags.legacy) return { ...flags, legacy: true };
+  if (flags.units) return { ...flags, units: false };
+  return null;
+}
+
+/** 列表摘要的 select:按开关带不带 content_updated_at 与币种 / 里程单位 */
+export function carSummarySelect(flags: CarQueryFlags): string {
+  const cols = flags.legacy ? CAR_SUMMARY_FIELDS.join(", ") : CAR_SUMMARY_COLUMNS;
+  return `${cols}${flags.units ? `, ${CAR_UNIT_COLUMNS}` : ""}, ${CAR_PROFILE_JOIN}`;
+}
+
+export const CAR_SUMMARY_SELECT = carSummarySelect(CAR_QUERY_FLAGS);
+/** 列表摘要 select 的全部降级组合,从新到旧(配合 queryWithColumnFallback) */
+export const CAR_SUMMARY_SELECTS = [
+  CAR_SUMMARY_SELECT,
+  carSummarySelect({ legacy: false, units: false }),
+  carSummarySelect({ legacy: true, units: true }),
+  carSummarySelect({ legacy: true, units: false }),
+] as const;
+/** 详情是 *:有哪些列就带哪些(币种 / 单位列未建时缺失,序列化按 USD / mi) */
 export const CAR_DETAIL_SELECT = `*, ${CAR_PROFILE_JOIN}`;
 
 /** join 出来的卖家摘要(比 DbCar.profiles 多 id/username) */
@@ -79,6 +117,21 @@ export interface EnumValue {
   label: string | null;
 }
 
+/**
+ * 车况清单(卖家填写,cars.condition):没填的项为 null;枚举给 { value: slug, label },不外露库内中文。
+ * known_issues:null = 没填;[] = 卖家明确表示无已知问题
+ */
+export interface CarConditionOut {
+  service_records: boolean | null;
+  one_owner: boolean | null;
+  smoker: boolean | null;
+  /** 0..5 */
+  keys_count: number | null;
+  /** new / good / fair / needs_replacement */
+  tires_condition: EnumValue;
+  known_issues: { value: string; label: string }[] | null;
+}
+
 export interface CarSeller {
   id: string;
   username: string | null;
@@ -95,12 +148,17 @@ export interface CarSummary {
   make: string;
   model: string;
   trim: string | null;
-  /** 整数美元;0 = 电议 */
+  /** 整数,币种见 currency;0 = 电议 */
   price: number;
+  /** 同 currency */
   original_price: number | null;
   price_updated_at: string | null;
-  /** 英里 */
+  /** price / original_price 的币种:USD(默认)/ CAD */
+  currency: Currency;
+  /** 整数,单位见 mileage_unit */
   mileage: number;
+  /** mileage 的单位:mi(默认)/ km */
+  mileage_unit: MileageUnit;
   location: { name: string; lat: number | null; lng: number | null };
   image_url: string | null;
   fuel_type: EnumValue;
@@ -148,6 +206,8 @@ export interface CarDetail extends CarSummary {
   images: string[];
   /** 产权状态 clean / rebuilt / salvage / lemon_buyback;卖家没填时 value / label 都是 null */
   title_status: EnumValue;
+  /** 车况清单(卖家填写);car-condition.sql 未执行或没填时各项为 null */
+  condition: CarConditionOut;
   /** 匿名:前 8 + **** + 后 4;带 key:完整 */
   vin: string | null;
   carfax_url: string | null;
@@ -237,7 +297,10 @@ export function serializeCarSummary(car: ApiCarRow, opts: SerializeOpts): CarSum
     price: car.price,
     original_price: car.original_price ?? null,
     price_updated_at: car.price_updated_at ?? null,
+    // 车源自己的币种 / 单位(car-currency.sql 未执行时没有这两列 → USD / mi)
+    currency: carCurrency(car),
     mileage: car.mileage,
+    mileage_unit: carMileageUnit(car),
     location: { name: carLocation(car, lang), lat: car.lat ?? null, lng: car.lng ?? null },
     image_url: car.image_url ?? null,
     fuel_type: enumField("fuel_type", car.fuel_type, lang),
@@ -286,6 +349,20 @@ function featureLabels(bundle: BundleRow | undefined, original: readonly string[
   return out;
 }
 
+/** 库内车况清单 → 对外形状(行里没有这一列 / 非法值一律按没填) */
+export function serializeCondition(raw: unknown, lang: ApiLang): CarConditionOut {
+  const c = normalizeCarCondition(raw);
+  return {
+    service_records: c.service_records ?? null,
+    one_owner: c.one_owner ?? null,
+    smoker: c.smoker ?? null,
+    keys_count: c.keys_count ?? null,
+    tires_condition: enumField("tires_condition", c.tires_condition, lang),
+    known_issues:
+      c.known_issues?.map((v) => ({ value: enumToSlug("known_issue", v) ?? v, label: labelFor(v, lang) ?? v })) ?? null,
+  };
+}
+
 /** 检测结果里的 ISO 639-1 代码;und / other 不是语言代码,不对外 */
 const ISO_639_1 = /^[a-z]{2}$/;
 
@@ -311,6 +388,8 @@ export function serializeCarDetail(
     images: car.images ?? [],
     // CAR_DETAIL_SELECT 是 *:title-status.sql 未执行时没有这一列 → null
     title_status: enumField("title_status", car.title_status, opts.lang),
+    // 同上:car-condition.sql 未执行时没有这一列 → 各项 null
+    condition: serializeCondition(car.condition, opts.lang),
     vin: opts.redact ? maskVin(car.vin) : (car.vin ?? null),
     carfax_url: car.carfax_url ?? null,
     carfax_summary: localizeCarfaxSummary(car.carfax_summary, serverT(opts.lang)),

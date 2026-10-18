@@ -65,6 +65,17 @@ import {
 import { loadContactApps, saveContactApps } from "@/lib/contact-apps-client";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
+import {
+  isCanadianPostalCode,
+  normalizeCanadianPostalCode,
+  normalizeCurrency,
+  normalizeMileageUnit,
+  postalUnitsDecision,
+} from "@/lib/currency";
+import { formatMileage, formatPrice } from "@/lib/format";
+import { CurrencyToggle, MileageUnitToggle } from "@/components/unit-toggle";
+import { CarConditionEditor } from "@/components/car-condition-editor";
+import { isConditionEmpty, normalizeCarCondition, type CarCondition } from "@/lib/car-condition";
 import type { DbDealerStore } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -222,6 +233,8 @@ export interface PostDraft {
   imageUrls: string[];
   features: string[];
   videoUrl?: string | null;
+  // 车况清单(cars.condition);旧草稿没有这个字段
+  checklist?: CarCondition;
 }
 
 function persistDrafts(drafts: PostDraft[]) {
@@ -304,6 +317,7 @@ type StepId =
   | "contact"
   | "carfax"
   | "features"
+  | "checklist"
   | "description";
 
 const STEPS: { id: StepId; title: string; sub?: string; optional?: boolean }[] = [
@@ -319,8 +333,30 @@ const STEPS: { id: StepId; title: string; sub?: string; optional?: boolean }[] =
   { id: "contact", title: "怎么联系你?", sub: "买家将通过这些方式找到你" },
   { id: "carfax", title: "有 Carfax 报告吗?", sub: "粘贴链接自动获取摘要,可跳过", optional: true },
   { id: "features", title: "有哪些配置亮点?", sub: "可跳过", optional: true },
+  { id: "checklist", title: "车况怎么样?", sub: "可跳过，只显示你填写的项", optional: true },
   { id: "description", title: "再介绍几句", sub: "车况、保养历史、卖车原因等,选填" },
 ];
+
+// 车况清单步(选填)只在列已建(supabase/car-condition.sql)且是二手车时出现;插在描述之前,
+// 前面各步的序号不受影响(新车 / 二手只在第 4 步切换,此时还没走到清单步)
+function visibleSteps(checklistAvailable: boolean, carCondition: string) {
+  return checklistAvailable && carCondition === "used" ? STEPS : STEPS.filter((s) => s.id !== "checklist");
+}
+
+// 邮编默认单位 vs 当前币种 / 单位(见 postalUnitsDecision);币种列没建时不做任何自动切换
+function formUnitsDecision(
+  f: { zipcode: string; currency: string; mileage_unit: string; units_manual: string; price: string; mileage: string },
+  unitsAvailable: boolean
+) {
+  if (!unitsAvailable) return { action: "none" } as const;
+  return postalUnitsDecision({
+    zipcode: f.zipcode,
+    currency: f.currency,
+    mileage_unit: f.mileage_unit,
+    manual: !!f.units_manual,
+    hasNumbers: Number(f.price) > 0 || Number(f.mileage) > 0,
+  });
+}
 
 export default function PostCarPage() {
   const router = useRouter();
@@ -339,6 +375,8 @@ export default function PostCarPage() {
   const [videoUploading, setVideoUploading] = useState(false);
   const [featureInput, setFeatureInput] = useState("");
   const [features, setFeatures] = useState<string[]>([]);
+  // 车况清单(cars.condition,选填;固定选项,无自由文本)
+  const [checklist, setChecklist] = useState<CarCondition>({});
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   // 草稿箱:多份草稿 + 当前正在编辑的草稿 id(未编辑过内容前为 null)
@@ -388,6 +426,11 @@ export default function PostCarPage() {
     condition: "used",
     // 产权状态(cars.title_status,选填,存中文枚举;"" = 不填 / 不确定)
     title_status: "",
+    // 价格币种 / 里程单位(cars.currency / cars.mileage_unit):默认美元 / 英里,填加拿大邮编时自动改成加元 / 公里;
+    // units_manual = "1" 表示卖家手动切换过,之后不再随邮编自动改(随草稿保存)
+    currency: "USD",
+    mileage_unit: "mi",
+    units_manual: "",
     vin: "",
     customMake: "",
     seller_name: "",
@@ -438,6 +481,7 @@ export default function PostCarPage() {
     setImageUrls(d.imageUrls || []);
     setFeatures(d.features || []);
     setVideoUrl(d.videoUrl || null);
+    setChecklist(normalizeCarCondition(d.checklist));
     setDraftId(d.id);
     setVinAutoFilled(false);
     // 跳到第一个未完成的必填步,接着上次的进度答
@@ -479,6 +523,7 @@ export default function PostCarPage() {
         imageUrls,
         features,
         videoUrl,
+        checklist,
       };
       setDrafts((prev) => {
         const next = [entry, ...prev.filter((d) => d.id !== id)].slice(0, MAX_DRAFTS);
@@ -486,7 +531,7 @@ export default function PostCarPage() {
         return next;
       });
     }, 500);
-  }, [form, imageUrls, features, videoUrl]);
+  }, [form, imageUrls, features, videoUrl, checklist]);
 
   useEffect(() => {
     return () => {
@@ -576,12 +621,69 @@ export default function PostCarPage() {
     };
   }, []);
 
+  // 车况清单列是否已建(supabase/car-condition.sql):未执行时不出现清单步,发布也不带该字段
+  const [checklistAvailable, setChecklistAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("cars")
+      .select("condition")
+      .limit(0)
+      .then(({ error }) => {
+        if (!cancelled) setChecklistAvailable(!error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const steps = useMemo(() => visibleSteps(checklistAvailable, form.condition), [checklistAvailable, form.condition]);
+
+  // 币种 / 里程单位列是否已建(supabase/car-currency.sql):未执行时不显示切换、不随邮编改默认,
+  // 发布也不带这两列(一律按美元 / 英里),免得加元价格被当成美元存下
+  const [unitsAvailable, setUnitsAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("cars")
+      .select("currency, mileage_unit")
+      .limit(0)
+      .then(({ error }) => {
+        if (!cancelled) setUnitsAvailable(!error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const currency = unitsAvailable ? normalizeCurrency(form.currency) : "USD";
+  const mileageUnit = unitsAvailable ? normalizeMileageUnit(form.mileage_unit) : "mi";
+  // 加拿大邮编输入模式(全键盘 + A1A 1A1 提示):已输入字母开头的邮编,或卖家选了加元
+  const [caPostalMode, setCaPostalMode] = useState(false);
+  const postalTextMode = caPostalMode || /^[A-Za-z]/.test(form.zipcode) || currency === "CAD";
+
+  // 邮编决定默认币种 / 里程单位:加拿大邮编 → 加元 + 公里,美国 zip → 美元 + 英里;卖家手动切换过就不再改。
+  // 价格 / 里程两步在邮编之前:已经填了数字时不能悄悄换单位(数字不会换算,车价 / 里程会差出一截),
+  // 改成在邮编步问一句(unitsDecision.action === "ask",答完才能继续);还没填数字时才直接改。
+  const unitsDecisionFor = (f: typeof form) => formUnitsDecision(f, unitsAvailable);
+  const unitsDecision = unitsDecisionFor(form);
+  // (函数式 setForm,只在需要自动改时才返回新对象)
+  useEffect(() => {
+    setForm((f) => {
+      const d = formUnitsDecision(f, unitsAvailable);
+      return d.action === "auto" ? { ...f, currency: d.currency, mileage_unit: d.mileage_unit } : f;
+    });
+  }, [form.zipcode, unitsAvailable]);
+
+  function setUnits(patch: { currency?: string; mileage_unit?: string }) {
+    setForm((f) => ({ ...f, ...patch, units_manual: "1" }));
+  }
+
   // Auto-resolve zipcode to city name (English + Chinese)
   const [zipCity, setZipCity] = useState("");
   const [zipCityZh, setZipCityZh] = useState("");
-  /* eslint-disable react-hooks/set-state-in-effect -- 邮编不足 5 位时同步清空提示,开销极小 */
+  /* eslint-disable react-hooks/set-state-in-effect -- 邮编不完整时同步清空提示,开销极小 */
   useEffect(() => {
-    if (form.zipcode.length !== 5) {
+    // 美国 5 位 zip 或加拿大邮编(A1A 1A1)
+    if (!/^\d{5}$/.test(form.zipcode) && !isCanadianPostalCode(form.zipcode)) {
       setZipCity("");
       setZipCityZh("");
       return;
@@ -960,15 +1062,17 @@ export default function PostCarPage() {
     // Build location from structured fields
     const fullAddress = [form.address, form.address2].filter(Boolean).join(", ");
     const cityState = [form.city, form.state].filter(Boolean).join(", ");
+    // 加拿大邮编统一写成「A1A 1A1」
+    const zipcode = normalizeCanadianPostalCode(form.zipcode);
     const locationEn = fullAddress
-      ? `${fullAddress}, ${cityState} ${form.zipcode}`.trim()
+      ? `${fullAddress}, ${cityState} ${zipcode}`.trim()
       : cityState
-        ? `${cityState} ${form.zipcode}`.trim()
-        : zipCity || form.zipcode;
-    const locationZh = zipCityZh || cityState || zipCity || form.zipcode;
+        ? `${cityState} ${zipcode}`.trim()
+        : zipCity || zipcode;
+    const locationZh = zipCityZh || cityState || zipCity || zipcode;
 
     // Geocode zipcode to get lat/lng
-    const coords = form.zipcode ? await geocodeZipToCoords(form.zipcode) : null;
+    const coords = zipcode ? await geocodeZipToCoords(zipcode) : null;
 
     // Also save phone to profile（车行身份下经 RPC 更新,普通身份直接更新）
     if (form.phone) {
@@ -1032,6 +1136,12 @@ export default function PostCarPage() {
       carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
       carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
       ...(titleStatus ? { title_status: titleStatus } : {}),
+      // 币种 / 里程单位:列已建(car-currency.sql)才写;没建时库里只能是美元 / 英里(界面也没给切换)
+      ...(unitsAvailable ? { currency, mileage_unit: mileageUnit } : {}),
+      // 车况清单:只有二手车、列已建(car-condition.sql)且填了至少一项才写;没填用库默认 {}
+      ...(form.condition === "used" && checklistAvailable && !isConditionEmpty(checklist)
+        ? { condition: normalizeCarCondition(checklist) }
+        : {}),
       status: "active",
     };
 
@@ -1041,9 +1151,14 @@ export default function PostCarPage() {
       description_original: description,
       features_original: features,
     });
-    // 探测之后产权列又不可用(schema cache 未刷新等):去掉产权再发一次,不挡发布
-    if (insertError && titleStatus && isMissingColumnNamed(insertError, "title_status")) {
-      delete (listing as { title_status?: string }).title_status;
+    // 探测之后可选列又不可用(schema cache 未刷新等):去掉缺的那组(产权 / 币种 + 单位 / 车况)再发,不挡发布
+    const optionalGroups = [["title_status"], ["currency", "mileage_unit"], ["condition"]];
+    for (let i = 0; i < optionalGroups.length && insertError; i++) {
+      const group = optionalGroups.find((cols) =>
+        cols.some((c) => c in listing && isMissingColumnNamed(insertError, c))
+      );
+      if (!group) break;
+      for (const c of group) delete (listing as Record<string, unknown>)[c];
       ({ data, error: insertError } = await insertCar({
         ...listing,
         description_original: description,
@@ -1092,7 +1207,8 @@ export default function PostCarPage() {
       case "mileage":
         return f.mileage !== "" && Number(f.mileage) >= 0;
       case "location":
-        return f.zipcode.length === 5;
+        // 邮编与已填价格 / 里程的单位冲突时,卖家选定币种 / 单位后才能继续
+        return (/^\d{5}$/.test(f.zipcode) || isCanadianPostalCode(f.zipcode)) && unitsDecisionFor(f).action !== "ask";
       case "contact": {
         const digits = f.phone.replace(/\D/g, "");
         return Boolean(f.seller_name.trim()) && digits.length >= 10 && !(contactAppsAvailable && contactAppsInvalid);
@@ -1104,14 +1220,17 @@ export default function PostCarPage() {
   }
 
   function firstIncompleteStep(f: typeof defaultForm, imgs: string[]): number {
-    for (let i = 0; i < STEPS.length; i++) {
-      if (!STEPS[i].optional && !stepComplete(STEPS[i].id, f, imgs)) return i;
+    // 按这份表单自己的新车 / 二手算步骤表(恢复草稿时表单还没生效)
+    const list = visibleSteps(checklistAvailable, f.condition);
+    for (let i = 0; i < list.length; i++) {
+      if (!list[i].optional && !stepComplete(list[i].id, f, imgs)) return i;
     }
-    return STEPS.length - 1;
+    return list.length - 1;
   }
 
-  const current = STEPS[step];
-  const isLast = step === STEPS.length - 1;
+  // 步骤表变短(清单列探测结果变化)时兜底,不越界
+  const current = steps[Math.min(step, steps.length - 1)];
+  const isLast = step >= steps.length - 1;
   const canProceed = stepComplete(current.id);
 
   async function goNext() {
@@ -1126,7 +1245,7 @@ export default function PostCarPage() {
     }
     setError("");
     setDir(1);
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    setStep((s) => Math.min(s + 1, steps.length - 1));
   }
 
   function goPrev() {
@@ -1136,12 +1255,22 @@ export default function PostCarPage() {
     setStep((s) => Math.max(s - 1, 0));
   }
 
+  // 跳回某一步(发布前核对价格 / 里程用)
+  function goToStep(id: StepId) {
+    const i = steps.findIndex((s) => s.id === id);
+    if (i < 0 || i === step) return;
+    setError("");
+    setDir(i > step ? 1 : -1);
+    setStep(i);
+  }
+
   // 主按钮文案:最后一步是发布;可选步没填内容显示「跳过」
   const optionalEmpty =
     (current.id === "details" && !form.transmission && !form.drivetrain && !form.body_type && !form.cylinders && !form.seats) ||
     (current.id === "colors" && !form.exterior_color && !form.interior_color) ||
     (current.id === "carfax" && !form.carfax_url.trim()) ||
-    (current.id === "features" && features.length === 0);
+    (current.id === "features" && features.length === 0) ||
+    (current.id === "checklist" && isConditionEmpty(checklist));
   const mainLabel = isLast
     ? loading ? t("发布中...") : t("发布车辆")
     : current.id === "vin" && vinDecoding ? t("识别中...")
@@ -1169,11 +1298,11 @@ export default function PostCarPage() {
               <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full bg-primary transition-[width] duration-300"
-                  style={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
+                  style={{ width: `${((step + 1) / steps.length) * 100}%` }}
                 />
               </div>
               <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {step + 1}/{STEPS.length}
+                {step + 1}/{steps.length}
               </span>
             </div>
           </div>
@@ -1183,10 +1312,10 @@ export default function PostCarPage() {
             {/* 步骤导航:已完成/当前/未到;必填步全部完成前不可跳到其后 */}
             <aside className="sticky top-24 hidden w-52 shrink-0 md:block">
               <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                {t("发布进度")} {step + 1}/{STEPS.length}
+                {t("发布进度")} {step + 1}/{steps.length}
               </p>
               <ol className="mt-4 space-y-0.5">
-                {STEPS.map((s, i) => {
+                {steps.map((s, i) => {
                   const reachable = i <= firstIncompleteStep(form, imageUrls);
                   const done = i < step && stepComplete(s.id);
                   return (
@@ -1246,7 +1375,9 @@ export default function PostCarPage() {
                 }}
               >
                 {/* 大字提问 */}
-                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{t(current.title)}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
+                  {t(current.id === "mileage" && mileageUnit === "km" ? "跑了多少公里?" : current.title)}
+                </h1>
                 {current.sub && (
                   <p className="mt-1.5 text-sm text-muted-foreground">{t(current.sub)}</p>
                 )}
@@ -1521,7 +1652,7 @@ export default function PostCarPage() {
                                 if (c.value === "used" && titleStatusAvailable) return;
                                 setTimeout(() => {
                                   setDir(1);
-                                  setStep((s) => Math.min(s + 1, STEPS.length - 1));
+                                  setStep((s) => Math.min(s + 1, steps.length - 1));
                                 }, 180);
                               }}
                               className={`flex flex-col items-center gap-1 rounded-2xl py-8 transition-colors ${
@@ -1591,7 +1722,9 @@ export default function PostCarPage() {
                   {current.id === "price" && (
                     <div>
                       <div className="flex items-baseline gap-2">
-                        <span className={`text-3xl font-semibold ${priceCallOnly ? "text-muted-foreground/40" : "text-foreground"}`}>$</span>
+                        <span className={`text-3xl font-semibold ${priceCallOnly ? "text-muted-foreground/40" : "text-foreground"}`}>
+                          {currency === "CAD" ? "CA$" : "$"}
+                        </span>
                         <input
                           autoFocus
                           type="number"
@@ -1604,6 +1737,14 @@ export default function PostCarPage() {
                         />
                       </div>
                       <div className="mt-2 h-px w-full bg-border" />
+                      {/* 币种(car-currency.sql 未执行时不显示,按美元):加拿大邮编会自动切成加元,这里可手动改 */}
+                      {unitsAvailable && (
+                        <CurrencyToggle
+                          className="mt-4"
+                          value={currency}
+                          onChange={(v) => setUnits({ currency: v })}
+                        />
+                      )}
                       <label className="mt-4 flex cursor-pointer items-center gap-2">
                         <input
                           type="checkbox"
@@ -1659,9 +1800,18 @@ export default function PostCarPage() {
                           value={form.mileage}
                           onChange={(e) => update("mileage", e.target.value)}
                         />
-                        <span className="shrink-0 text-lg text-muted-foreground">{t("英里")}</span>
+                        <span className="shrink-0 text-lg text-muted-foreground">
+                          {t(mileageUnit === "km" ? "公里" : "英里")}
+                        </span>
                       </div>
                       <div className="mt-2 h-px w-full bg-border" />
+                      {unitsAvailable && (
+                        <MileageUnitToggle
+                          className="mt-4"
+                          value={mileageUnit}
+                          onChange={(v) => setUnits({ mileage_unit: v })}
+                        />
+                      )}
                     </div>
                   )}
 
@@ -1772,16 +1922,70 @@ export default function PostCarPage() {
                           ))}
                         </div>
                       )}
+                      {/* 美国 5 位 zip 或加拿大邮编(A1A 1A1,字母开头时切到全键盘) */}
                       <input
                         autoFocus
-                        inputMode="numeric"
-                        maxLength={5}
+                        inputMode={postalTextMode ? "text" : "numeric"}
+                        autoCapitalize="characters"
+                        maxLength={7}
                         className="w-full bg-transparent text-3xl font-semibold tracking-widest text-foreground placeholder:text-muted-foreground/40 placeholder:tracking-normal focus:outline-none"
-                        placeholder={t("邮编 Zip Code")}
+                        placeholder={postalTextMode ? "A1A 1A1" : t("邮编 Zip Code")}
                         value={form.zipcode}
-                        onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))}
+                        onChange={(e) => {
+                          const v = e.target.value.toUpperCase();
+                          update(
+                            "zipcode",
+                            /^[A-Z]/.test(v) ? v.replace(/[^A-Z0-9 -]/g, "").slice(0, 7) : v.replace(/\D/g, "").slice(0, 5)
+                          );
+                        }}
                       />
                       <div className="mt-2 h-px w-full bg-border" />
+                      {!postalTextMode && !form.zipcode && (
+                        <button
+                          type="button"
+                          onClick={() => setCaPostalMode(true)}
+                          className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
+                        >
+                          {t("输入加拿大邮编")}
+                        </button>
+                      )}
+                      {/* 邮编和已填数字的单位冲突:问卖家按哪种发布(数字不换算),选完才能继续 */}
+                      {unitsDecision.action === "ask" ? (
+                        <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+                          <p className="text-sm font-medium text-foreground">
+                            {t(unitsDecision.currency === "CAD" ? "这是加拿大邮编，要按加元 / 公里发布吗？" : "这是美国邮编，要按美元 / 英里发布吗？")}
+                          </p>
+                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                            {t("已填的数字不会自动换算。目前将发布为 {price} · {mileage}", {
+                              price: priceCallOnly ? t("电议") : formatPrice(Number(form.price) || 0, currency),
+                              mileage: formatMileage(Number(form.mileage) || 0, mileageUnit),
+                            })}
+                          </p>
+                          <div className="mt-2.5 flex flex-wrap gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setUnits({ currency: unitsDecision.currency, mileage_unit: unitsDecision.mileage_unit })}
+                              className="rounded-full bg-primary/30 px-3 py-1.5 text-sm font-medium text-brand-ink"
+                            >
+                              {t(unitsDecision.currency === "CAD" ? "改成加元 / 公里" : "改成美元 / 英里")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUnits({ currency, mileage_unit: mileageUnit })}
+                              className="rounded-full bg-muted px-3 py-1.5 text-sm text-muted-foreground active:bg-muted/70"
+                            >
+                              {t("保持现在的单位")}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* 加拿大邮编自动切成加元 / 公里时提示一句(卖家手动改过就不再提示) */
+                        unitsAvailable && isCanadianPostalCode(form.zipcode) && !form.units_manual && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {t("加拿大邮编：价格按加元、里程按公里填写，可在价格和里程步骤切换")}
+                          </p>
+                        )
+                      )}
                       {(zipCityZh || zipCity) && (
                         <p className="mt-2 flex items-center gap-1.5 text-sm text-brand-ink">
                           <Check className="h-4 w-4" strokeWidth={2} />
@@ -1973,9 +2177,32 @@ export default function PostCarPage() {
                     </div>
                   )}
 
+                  {/* ==== 车况清单(选填,仅二手车;car-condition.sql 未执行时没有这一步) ==== */}
+                  {current.id === "checklist" && (
+                    <CarConditionEditor value={checklist} onChange={setChecklist} />
+                  )}
+
                   {/* ==== 描述 + 发布 ==== */}
                   {current.id === "description" && (
                     <div>
+                      {/* 发布前核对:价格 / 里程连同币种 / 单位显示出来,点一下回到对应步骤修改 */}
+                      <div className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-md border border-border px-3 py-2 text-xs">
+                        <span className="text-muted-foreground">{t("将发布为")}</span>
+                        <button
+                          type="button"
+                          onClick={() => goToStep("price")}
+                          className="font-mono font-medium tabular-nums text-foreground underline decoration-border underline-offset-2"
+                        >
+                          {priceCallOnly ? t("电议") : formatPrice(Number(form.price) || 0, currency)}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => goToStep("mileage")}
+                          className="font-mono font-medium tabular-nums text-foreground underline decoration-border underline-offset-2"
+                        >
+                          {formatMileage(Number(form.mileage) || 0, mileageUnit)}
+                        </button>
+                      </div>
                       <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Languages className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                         {t("可用任何语言填写，会自动翻译成其他语言")}

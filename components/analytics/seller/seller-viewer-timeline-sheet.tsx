@@ -279,7 +279,7 @@ function VisitRow({ row }: { row: SellerViewerEvent }) {
       <span className="min-w-0 flex-1">
         <span className="block truncate font-medium">{carName(row.car, t, locale)}</span>
         {row.car?.price != null && (
-          <span className="block truncate text-[10px] text-muted-foreground">{formatPrice(row.car.price)}</span>
+          <span className="block truncate text-[10px] text-muted-foreground">{formatPrice(row.car.price, row.car.currency)}</span>
         )}
       </span>
     </>

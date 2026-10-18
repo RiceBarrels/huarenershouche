@@ -1,6 +1,8 @@
 -- Stub of the live Supabase schema (nkboeyveppapmxgfjqqb) relevant to i18n v2.
 -- Columns/policies/grants copied from read-only introspection on 2026-10-12; listing_sources (system_account_id)
 -- and admin_actions (target_type CHECK, policies) from the schema-only dump of 2026-10-14.
+-- dealer_stores: columns from lib/types.ts DbDealerStore (not introspected); public read + the claimant policy of
+-- claim-accounts.sql (browse-cars.sql reads it for the financing filter).
 create role anon nologin;
 create role authenticated nologin;
 create role service_role nologin bypassrls;
@@ -93,6 +95,14 @@ create table public.dealer_reviews (
   rating smallint not null check (rating between 1 and 5), content text not null, created_at timestamptz not null default now()
 );
 
+create table public.dealer_stores (
+  id uuid primary key default gen_random_uuid(), owner_id uuid not null references public.profiles(id) on delete cascade,
+  name text not null, address text not null, zipcode text, lat double precision, lng double precision, phone text,
+  wechat text, store_photos text[] not null default '{}', verification_status text not null default 'unverified',
+  verification_submitted_at timestamptz, verification_reviewed_at timestamptz, verification_note text,
+  created_at timestamptz not null default now()
+);
+
 create or replace function public.handle_updated_at() returns trigger language plpgsql as $$
 begin new.updated_at = now(); return new; end; $$;
 create trigger on_cars_updated before update on public.cars for each row execute function public.handle_updated_at();
@@ -139,6 +149,11 @@ create policy admin_manage_listing_sources on public.listing_sources for all usi
 alter table public.admin_actions enable row level security;
 create policy admin_actions_admin_insert on public.admin_actions for insert with check (public.is_admin());
 create policy admin_actions_admin_read on public.admin_actions for select using (public.is_admin());
+
+alter table public.dealer_stores enable row level security;
+create policy dealer_stores_select on public.dealer_stores for select using (true);
+create policy claimant_manage_dealer_stores on public.dealer_stores for all to authenticated
+  using (public.can_act_as(owner_id)) with check (public.can_act_as(owner_id));
 
 grant usage on schema public to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;

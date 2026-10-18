@@ -1,4 +1,4 @@
-// 第一方访问统计:浏览器端埋点(pageview / car_view → POST /api/vt,见 app/api/vt/route.ts)。
+// 第一方访问统计:浏览器端埋点(pageview / car_view / 点击 → POST /api/vt,见 app/api/vt/route.ts)。
 // 只在浏览器里(effect / 事件回调中)调用;storage / crypto / 网络访问全部 try/catch,埋点绝不影响页面。
 // 访客 id 存 localStorage(clc_vid);会话(clc_session)30 分钟无活动或换了外部来源即换新,
 // 会话来源(站外 referrer + utm)只在会话开始时确定,会话内每条事件都带上。
@@ -18,10 +18,12 @@ import {
 import type {
   AnalyticsEventType,
   AnalyticsPlatform,
-  ContactClickPayload,
+  ClickEventPayload,
+  TrackedFilterChip,
   TrackPayload,
 } from "@/lib/analytics/types";
 import type { ContactChannel } from "@/lib/contact-apps";
+import type { FinancingTag } from "@/lib/dealer-financing";
 
 const VISITOR_KEY = "clc_vid";
 const SESSION_KEY = "clc_session";
@@ -329,7 +331,7 @@ async function accessToken(): Promise<string | null> {
   }
 }
 
-function send(payload: TrackPayload | ContactClickPayload): void {
+function send(payload: TrackPayload | ClickEventPayload): void {
   const url = `${apiOrigin()}/api/vt`;
   const body = JSON.stringify(payload);
   // 网页端优先 sendBeacon(页面跳走也能发出;text/plain 免 CORS 预检)。
@@ -474,21 +476,27 @@ export function trackCarView(carId: string, locale?: string | null): void {
 }
 
 /**
- * 车辆详情页联系按钮点击(微信 / KakaoTalk / LINE / WhatsApp / 短信),写 contact_clicks 表,
- * 用来按界面语言调整 CONTACT_APP_ORDER。沿用当前访客 / 会话,不识别来源、不去重(每次点击都算)。
+ * 点击统计(写 click_events 表,supabase/click-events.sql)。沿用当前访客 / 会话,不识别来源、不去重(每次点击都算)。
+ * 表还没建时服务端静默丢弃。
  */
-export function trackContactClick(carId: string, app: ContactChannel, locale?: string | null): void {
+function trackClick(
+  input: Pick<ClickEventPayload, "kind" | "car_id" | "app" | "target">,
+  locale: string | null | undefined
+): void {
   try {
-    if (!carId || !UUID_RE.test(carId) || !trackingEnabled()) return;
+    if (!trackingEnabled()) return;
+    if (input.car_id !== null && !UUID_RE.test(input.car_id)) return;
     const { session } = resolveSession(readSession(), Date.now(), null, uuidv4);
     writeSession(session);
     const uiLocale = nativeShell() ? nativeUiLocale(locale ?? null) : (locale ?? null);
-    const base: Omit<ContactClickPayload, "token"> = {
-      type: "contact_click",
+    const base: Omit<ClickEventPayload, "token"> = {
+      type: "click",
+      kind: input.kind,
       visitor_id: visitorId(),
       session_id: session.id,
-      car_id: carId.toLowerCase(),
-      app,
+      car_id: input.car_id ? input.car_id.toLowerCase() : null,
+      app: input.app,
+      target: input.target,
       locale: uiLocale ? truncateText(uiLocale, 10) : null,
       platform: currentPlatform(),
     };
@@ -498,4 +506,21 @@ export function trackContactClick(carId: string, app: ContactChannel, locale?: s
   } catch {
     /* 埋点失败不影响页面 */
   }
+}
+
+/** 车辆详情页联系按钮点击(微信 / KakaoTalk / LINE / WhatsApp / 短信),用来按界面语言调整 CONTACT_APP_ORDER */
+export function trackContactClick(carId: string, app: ContactChannel, locale?: string | null): void {
+  if (!carId) return;
+  trackClick({ kind: "contact", car_id: carId, app, target: null }, locale);
+}
+
+/** 详情页卖家卡片的车行贷款标签被点开(看解释) */
+export function trackFinancingTagClick(carId: string, tag: FinancingTag, locale?: string | null): void {
+  if (!carId) return;
+  trackClick({ kind: "financing_tag", car_id: carId, app: null, target: tag }, locale);
+}
+
+/** 列表筛选开关被打开(只记打开,关掉不记) */
+export function trackFilterChipClick(chip: TrackedFilterChip, locale?: string | null): void {
+  trackClick({ kind: "filter_chip", car_id: null, app: null, target: chip }, locale);
 }

@@ -1,7 +1,9 @@
 "use client";
 
 // 主页(手机端)精选车源 tab 流:多分类 + 无限滚动 + 切换动画。
-// · 最新/降价/低价/新能源/低里程 走 Supabase 分页(range),滚到底自动加载;
+// · 最新/降价/新能源 走 Supabase 分页(range),滚到底自动加载;
+// · 低价/低里程 走 /browse 同一个 browse_cars RPC(按折合美元 / 英里排序,加元 / 公里车源才排得对,
+//   和「查看全部」打开的 /browse 顺序一致);RPC 不可用时退回直接按原值排序;
 // · 为你推荐 是客户端排序的列表(rankCars),按页逐步显示;
 // · 切换分类:下划线 layoutId 滑动 + 列表按切换方向滑入/滑出;
 // · 每个分类的已加载数据常驻内存,切回不重新请求。
@@ -13,6 +15,10 @@ import { ChevronRight, Loader2 } from "lucide-react";
 import { CarCard } from "@/components/car-card";
 import { useI18n } from "@/components/i18n-provider";
 import { supabase } from "@/lib/supabase";
+import { fetchBrowsePage } from "@/lib/browse-cars";
+import { INITIAL_FILTERS } from "@/components/search-filters";
+import type { SortKey } from "@/lib/car-filters";
+import type { Locale } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 const PAGE = 8;
@@ -30,10 +36,38 @@ const TAB_DEFS: { key: FeedKey; label: string; browseHref: string }[] = [
   { key: "latest", label: "最新车源", browseHref: "/browse" },
   { key: "recommended", label: "为你推荐", browseHref: "/browse" },
   { key: "dropped", label: "降价捡漏", browseHref: "/browse?priceDropped=true" },
-  { key: "budget", label: "低价好车", browseHref: "/browse?sort=price-asc" },
+  { key: "budget", label: "低价好车", browseHref: "/browse?sort=price-asc&hasPrice=true" },
   { key: "ev", label: "新能源", browseHref: "/browse?fuelType=纯电" },
   { key: "lowmileage", label: "低里程", browseHref: "/browse?sort=mileage" },
 ];
+
+// 低价 / 低里程 tab 跳过电议 / 0 里程(新车 / 未填)时,一次最多连翻几页凑出可显示的车(防止全被跳过时空转)
+const MAX_SKIP_PAGES = 5;
+
+/**
+ * 低价 / 低里程 tab:按 browse_cars 的折合美元 / 英里排序取一页。
+ * 低价排除电议(hasPrice,同「查看全部」链接);低里程在前端去掉 0 里程(browse 没有最低里程筛选),
+ * 与原先直接查询的 price > 0 / mileage > 0 口径一致。
+ * 返回 null = RPC 不可用(未部署 / 出错),调用方退回直接查询;raw = 这一页的原始条数(判断是否到底)。
+ */
+async function fetchConvertedTab(
+  key: "budget" | "lowmileage",
+  locale: Locale,
+  offset: number,
+): Promise<{ rows: DbCar[]; raw: number; nextOffset: number } | null> {
+  const sort: SortKey = key === "budget" ? "price-asc" : "mileage";
+  const filters = key === "budget" ? { ...INITIAL_FILTERS, hasPrice: "true" } : INITIAL_FILTERS;
+  let cursor = offset;
+  for (let i = 0; i < MAX_SKIP_PAGES; i++) {
+    const page = await fetchBrowsePage({ filters, sort, locale, coords: null }, cursor, PAGE);
+    if (!page) return i === 0 ? null : { rows: [], raw: 0, nextOffset: cursor };
+    cursor += PAGE;
+    // 低价再按 price > 0 过一遍:数据库里若还是不认 hasPrice 的旧版 RPC,电议(0)会排在最前
+    const rows = page.items.filter((c) => (key === "budget" ? c.price > 0 : c.mileage > 0));
+    if (rows.length > 0 || page.items.length < PAGE) return { rows, raw: page.items.length, nextOffset: cursor };
+  }
+  return { rows: [], raw: PAGE, nextOffset: cursor };
+}
 
 interface DbTabState {
   items: DbCar[];
@@ -60,7 +94,7 @@ export function HomeFeed({
   recommended: DbCar[];
   showRecommended: boolean;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const tabs = TAB_DEFS.filter(
     (t) => t.key !== "recommended" || (showRecommended && recommended.length > 0),
   );
@@ -86,6 +120,24 @@ export function HomeFeed({
       }));
 
       const offset = (dbState[key] ?? EMPTY_TAB).offset;
+      const converted = key === "budget" || key === "lowmileage" ? await fetchConvertedTab(key, locale, offset) : null;
+      if (converted) {
+        loadingRef.current.delete(key);
+        setDbState((s) => {
+          const cur = s[key] ?? EMPTY_TAB;
+          const seen = new Set(cur.items.map((c) => c.id));
+          return {
+            ...s,
+            [key]: {
+              items: [...cur.items, ...converted.rows.filter((c) => !seen.has(c.id))],
+              offset: converted.nextOffset,
+              hasMore: converted.raw === PAGE,
+              loading: false,
+            },
+          };
+        });
+        return;
+      }
       let q = supabase
         .from("cars")
         .select("*, profiles!seller_id(account_type, avatar_url)")
@@ -134,7 +186,7 @@ export function HomeFeed({
         };
       });
     },
-    [dbState, recommended.length],
+    [dbState, recommended.length, locale],
   );
   const loadRef = useRef(load);
   useEffect(() => {
@@ -144,6 +196,7 @@ export function HomeFeed({
   // 无限滚动:底部哨兵进入视口(提前 600px)就加载下一页
   const sentinelRef = useRef<HTMLDivElement>(null);
   const activeState = active === "recommended" ? null : dbState[active] ?? EMPTY_TAB;
+  const activeOffset = activeState?.offset ?? revealCount;
   const hasMore =
     active === "recommended"
       ? revealCount < recommended.length
@@ -159,7 +212,9 @@ export function HomeFeed({
     );
     obs.observe(el);
     return () => obs.disconnect();
-  }, [active, hasMore]);
+    // activeOffset:一页拉完(哪怕过滤后没有新卡片)就重建观察器,哨兵仍在视口内会立即再拉下一页,
+    // 不会因为「这一页全被过滤掉、列表没变长」卡住
+  }, [active, hasMore, activeOffset]);
 
   // 渲染列表:latest 用 featured 作种子与已拉取页合并去重
   const display = useMemo(() => {

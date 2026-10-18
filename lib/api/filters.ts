@@ -7,6 +7,7 @@
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type ApiErrorDetail } from "./types";
 import { decodeCursor, encodeCursor, intParam } from "./response";
 import { enumSlugs, enumToDb, type EnumKind } from "./enums";
+import { CAD_PER_USD, KM_PER_MI } from "@/lib/currency";
 
 /** 只声明用到的 PostgREST builder 方法,让 lib 不绑死 supabase 泛型签名 */
 export interface CarFilterQuery {
@@ -53,6 +54,19 @@ export function quoteOrValue(s: string): string {
   return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
+/**
+ * 价格 / 里程阈值按美元 / 英里(与站内 /browse 同一口径):加元 / 公里车源比的是换算后的原值阈值。
+ * 库里 price / mileage 是整数,阈值向内取整(gte 向上、lte 向下);先抹掉浮点误差(10000 × 1.38 = 13799.999…)。
+ * 生成 PostgREST or() 串:(非加元 且 price ≥ X) 或 (加元 且 price ≥ X × CAD_PER_USD)。
+ */
+function unitAwareRange(column: "price" | "mileage", op: "gte" | "lte", value: number): string {
+  const [unitCol, other, factor] =
+    column === "price" ? (["currency", "CAD", CAD_PER_USD] as const) : (["mileage_unit", "km", KM_PER_MI] as const);
+  const exact = Math.round(value * factor * 1e6) / 1e6;
+  const converted = op === "gte" ? Math.ceil(exact) : Math.floor(exact);
+  return `and(${unitCol}.neq.${other},${column}.${op}.${value}),and(${unitCol}.eq.${other},${column}.${op}.${converted})`;
+}
+
 function intFilter(
   sp: URLSearchParams,
   name: string,
@@ -89,13 +103,15 @@ function enumFilter(sp: URLSearchParams, name: EnumKind, errors: ApiErrorDetail[
 /**
  * 把 query 参数套到 cars 查询上(不含 status/owner_hidden 公共可见性,路由自己加)。
  * anonymous=true 时 seller_id 直接报错(防匿名按卖家整站扒)。
+ * price_min / price_max 按美元、mileage_max 按英里:units=true(库里已有 currency / mileage_unit 列)时
+ * 加元 / 公里车源按换算后的阈值比(unitAwareRange);units=false(car-currency.sql 未执行)直接比原值。
  * updated_since 比的是内容时钟 content_updated_at(i18n-v2.sql;只在可见内容变化时前进,
  * 浏览数 / 收藏 / 翻译都不算);legacy=true(库里还没有该列,缺列重试时)退回 updated_at。
  */
 export function applyCarQueryFilters<Q extends CarFilterQuery>(
   query: Q,
   sp: URLSearchParams,
-  opts: { anonymous: boolean; legacy?: boolean },
+  opts: { anonymous: boolean; legacy?: boolean; units?: boolean },
 ): { query: Q; errors: ApiErrorDetail[] } {
   const errors: ApiErrorDetail[] = [];
   let q = query;
@@ -115,15 +131,17 @@ export function applyCarQueryFilters<Q extends CarFilterQuery>(
   }
 
   const priceMin = intFilter(sp, "price_min", errors, { min: 0, max: 100_000_000 });
-  if (priceMin != null) q = q.gte("price", priceMin);
+  if (priceMin != null) q = opts.units ? q.or(unitAwareRange("price", "gte", priceMin)) : q.gte("price", priceMin);
   const priceMax = intFilter(sp, "price_max", errors, { min: 0, max: 100_000_000 });
-  if (priceMax != null) q = q.lte("price", priceMax);
+  if (priceMax != null) q = opts.units ? q.or(unitAwareRange("price", "lte", priceMax)) : q.lte("price", priceMax);
   if (priceMin != null && priceMax != null && priceMin > priceMax) {
     errors.push({ field: "price_min", issue: "must be <= price_max" });
   }
 
   const mileageMax = intFilter(sp, "mileage_max", errors, { min: 0, max: 10_000_000 });
-  if (mileageMax != null) q = q.lte("mileage", mileageMax);
+  if (mileageMax != null) {
+    q = opts.units ? q.or(unitAwareRange("mileage", "lte", mileageMax)) : q.lte("mileage", mileageMax);
+  }
 
   for (const kind of ["fuel_type", "transmission", "drivetrain"] as const) {
     const values = enumFilter(sp, kind, errors);

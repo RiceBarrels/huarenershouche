@@ -10,7 +10,10 @@
  *             30 分钟失败窗口)/ 认领人改动与同步复原的信任 / 停放的刷新行 / 译文标记恢复 / 词表 / 搜索 / 内容时钟 /
  *             临时语言检测 / sitemap(混合语言帖子)/ 原文哈希向量 / 重跑上一版迁移(310 项)
  *   browse    browse-cars.sql:观察模式沿用旧分组、强制模式按词表归并孪生词,选项计数 = 筛选结果;列表行不带原文;
- *             「仅清白产权」筛选(title-status.sql,与 lib/car-filters.ts 同一规则)(12 项)
+ *             「仅清白产权」筛选(title-status.sql,与 lib/car-filters.ts 同一规则);
+ *             加元 / 公里车源的价格 / 里程筛选与排序按折合美元 / 英里(car-currency.sql,与 lib/currency.ts 同一换算);
+ *             「可贷款(无信用/ITIN)」筛选按卖家门店标签(dealer-financing.sql,与 lib/dealer-financing.ts 同一规则);
+ *             车况清单 CHECK(car-condition.sql,与 lib/car-condition.ts normalizeCarCondition 同一规则)(38 项)
  *   rollback  i18n-v2-rollback.sql 紧急摘除 → 旧写法 / 认领人 / 标签编辑 → 重新挂载 → sweep 修复(不可信、链接行重建)
  *             → 快速回滚的审核停放 → i18n-v2-cleanup.sql
  *   parity    SQL i18n_norm_tag / hashtag_tokens 与 lib/i18n/hashtags.ts 逐样本一致(URL 与空白样本另核对期望值)
@@ -27,6 +30,9 @@ import { join } from "path";
 import { PGlite } from "@electric-sql/pglite";
 import { HASHTAG_SPLIT_RE, extractHashtags, normTag } from "../lib/i18n/hashtags";
 import { CLEAN_TITLE } from "../lib/title-status";
+import { carMileageMi, carPriceUsd } from "../lib/currency";
+import { hasLoanFinancing } from "../lib/dealer-financing";
+import { normalizeCarCondition } from "../lib/car-condition";
 
 const ROOT = join(import.meta.dir, "..");
 const readSql = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -35,6 +41,9 @@ const SCHEMA = readSql("supabase/i18n-v2.sql");
 const DATA = readSql("supabase/i18n-v2-data.sql");
 const BROWSE = readSql("supabase/browse-cars.sql");
 const TITLE_STATUS = readSql("supabase/title-status.sql");
+const CAR_CURRENCY = readSql("supabase/car-currency.sql");
+const DEALER_FINANCING = readSql("supabase/dealer-financing.sql");
+const CAR_CONDITION = readSql("supabase/car-condition.sql");
 const VERIFY = readSql("supabase/i18n-v2-verify.sql");
 const ROLLBACK = readSql("supabase/i18n-v2-rollback.sql");
 const CLEANUP = readSql("supabase/i18n-v2-cleanup.sql");
@@ -1802,6 +1811,169 @@ update public.cars set title_status = '重建产权' where id = '${C2}';`);
     cj.total === 1 && cj.items.length === 1 && cj.items[0].id === C1 && cj.items.every((i) => i.title_status === CLEAN_TITLE), cj);
   const all = await as<{ j: { total: number } }>("anon", null, `select public.browse_cars('{"filters":{"cleanTitle":""}}'::jsonb) j`);
   check("cleanTitle off does not filter", all.rows[0].j.total === 3, all.rows[0].j);
+
+  // 币种 / 里程单位:browse-cars.sql 自带 add column,car-currency.sql 加 CHECK;两份都可重复执行。
+  // 价格 / 里程筛选与排序按折合美元 / 英里(browse_price_usd / browse_mileage_mi),与 lib/currency.ts 同一换算:
+  // C1 = US$20,000 / 30,000 mi;C2 = CA$26,000(≈ US$18,841)/ 50,000 km(≈ 31,069 mi);C3 = US$19,000 / 40,000 mi。
+  // 按原值比会得出相反的结论(26000 > 20000、50000 > 40000),所以每条断言都能区分「换算了」和「没换算」
+  let curErr: unknown = null;
+  try {
+    await db.exec(CAR_CURRENCY);
+    await db.exec(BROWSE);
+    await db.exec(CAR_CURRENCY);
+  } catch (e) {
+    curErr = e;
+  }
+  check("car-currency.sql + browse-cars.sql re-run without error (either order)", curErr === null, curErr);
+  const defaults = await as<{ currency: string; mileage_unit: string }>("anon", null,
+    `select currency, mileage_unit from public.cars where id = '${C1}'`);
+  check("existing rows default to USD / mi", defaults.rows[0]?.currency === "USD" && defaults.rows[0]?.mileage_unit === "mi", defaults.rows);
+  await db.exec(`update public.cars set price = 20000, mileage = 30000 where id = '${C1}';
+update public.cars set price = 26000, mileage = 50000, currency = 'CAD', mileage_unit = 'km' where id = '${C2}';
+update public.cars set price = 19000, mileage = 40000 where id = '${C3}';`);
+  // 库里只校验 ISO 三位大写格式(支持哪些币种由写入端按 lib/currency.ts 校验)
+  const badCur = await as(null, null, `update public.cars set currency = 'usd' where id = '${C3}'`);
+  check("CHECK rejects a currency that is not a 3-letter uppercase ISO code", !badCur.ok && badCur.constraint === "cars_currency_check", badCur);
+  const badCur2 = await as(null, null, `update public.cars set currency = 'EURO' where id = '${C3}'`);
+  check("CHECK rejects a 4-letter currency code", !badCur2.ok && badCur2.constraint === "cars_currency_check", badCur2);
+  const badUnit = await as(null, null, `update public.cars set mileage_unit = 'miles' where id = '${C3}'`);
+  check("CHECK rejects a mileage_unit outside mi / km", !badUnit.ok && badUnit.constraint === "cars_mileage_unit_check", badUnit);
+  type UnitItem = { id: string; price: number; mileage: number; currency: string; mileage_unit: string };
+  const browseIds = async (p: Record<string, unknown>) => {
+    const r = await as<{ j: { total: number; items: UnitItem[] } }>("anon", null,
+      `select public.browse_cars('${JSON.stringify(p).replace(/'/g, "''")}'::jsonb) j`);
+    return r.rows[0].j;
+  };
+  // TS 侧同一组车(lib/currency.ts 的换算),用来对照 SQL 结果
+  const tsCars = [
+    { id: C1, price: 20000, mileage: 30000, currency: "USD", mileage_unit: "mi" },
+    { id: C2, price: 26000, mileage: 50000, currency: "CAD", mileage_unit: "km" },
+    { id: C3, price: 19000, mileage: 40000, currency: "USD", mileage_unit: "mi" },
+  ];
+  const tsIds = (pred: (c: (typeof tsCars)[number]) => boolean) => tsCars.filter(pred).map((c) => c.id).sort();
+  const sqlIds = (j: { items: UnitItem[] }) => j.items.map((i) => i.id).sort();
+  const same = (a: string[], b: string[]) => a.length === b.length && a.every((v, i) => v === b[i]);
+
+  const minP = await browseIds({ filters: { minPrice: "19500" } });
+  check("minPrice compares CAD listings in USD (CA$26,000 ≈ US$18,841 is below 19,500)",
+    same(sqlIds(minP), [C1]) && same(sqlIds(minP), tsIds((c) => carPriceUsd(c) >= 19500)), minP);
+  const maxP = await browseIds({ filters: { maxPrice: "19000" } });
+  check("maxPrice compares CAD listings in USD (same set as lib/currency carPriceUsd)",
+    same(sqlIds(maxP), [C2, C3].sort()) && same(sqlIds(maxP), tsIds((c) => carPriceUsd(c) <= 19000)), maxP);
+  const maxM = await browseIds({ filters: { maxMileage: "35000" } });
+  check("maxMileage compares km listings in miles (50,000 km ≈ 31,069 mi)",
+    same(sqlIds(maxM), [C1, C2].sort()) && same(sqlIds(maxM), tsIds((c) => carMileageMi(c) <= 35000)), maxM);
+  const cap = await browseIds({ paymentPriceCap: 18900 });
+  check("monthly-budget price cap (USD) converts CAD listings", same(sqlIds(cap), [C2]), cap);
+  const byPrice = await browseIds({ sort: "price-asc" });
+  check("price-asc sorts by USD-equivalent price (CAD car first)",
+    byPrice.items.map((i) => i.id).join() === [C2, C3, C1].join(), byPrice.items.map((i) => i.id));
+  const byPriceDesc = await browseIds({ sort: "price-desc" });
+  check("price-desc sorts by USD-equivalent price", byPriceDesc.items.map((i) => i.id).join() === [C1, C3, C2].join(),
+    byPriceDesc.items.map((i) => i.id));
+  const byMileage = await browseIds({ sort: "mileage" });
+  check("mileage sort uses miles (50,000 km sorts before 40,000 mi)",
+    byMileage.items.map((i) => i.id).join() === [C1, C2, C3].join(), byMileage.items.map((i) => i.id));
+  const c2Row = byPrice.items.find((i) => i.id === C2);
+  check("list rows carry the listing's own currency / mileage_unit and raw values",
+    c2Row?.currency === "CAD" && c2Row?.mileage_unit === "km" && c2Row?.price === 26000 && c2Row?.mileage === 50000, c2Row);
+
+  // 车行贷款标签:browse-cars.sql 自带 add column(定义同 dealer-financing.sql),dealer-financing.sql 加 CHECK + 索引;
+  // 两份谁先执行都行、可重复执行。「可贷款(无信用/ITIN)」= 卖家名下任一门店带 支持ITIN贷款 / 无信用记录可贷,
+  // 与 lib/dealer-financing.ts 的 hasLoanFinancing 同一规则:U1 无门店、U2 只有 自营分期 + 接受现金、S1 有 无信用记录可贷
+  const C4 = "c4c4c4c4-c4c4-c4c4-c4c4-c4c4c4c4c4c4"; // U2 的车
+  const C5 = "c5c5c5c5-c5c5-c5c5-c5c5-c5c5c5c5c5c5"; // S1 的车
+  let finErr: unknown = null;
+  try {
+    await db.exec(DEALER_FINANCING);
+    await db.exec(BROWSE);
+    await db.exec(DEALER_FINANCING);
+  } catch (e) {
+    finErr = e;
+  }
+  check("dealer-financing.sql + browse-cars.sql re-run without error (either order)", finErr === null, finErr);
+  await db.exec(`insert into auth.users(id) values ('${U2}'),('${S1}');
+insert into public.profiles(id, username, account_type) values ('${U2}','d2','dealer'),('${S1}','d3','dealer');
+insert into public.cars(id, seller_id, title, title_zh, year, make, model, price, mileage, location, location_zh, seller_name)
+values ('${C4}','${U2}','2017 Ford Focus','2017 福特 福克斯',2017,'Ford','Focus',9000,60000,'a','b','d2'),
+       ('${C5}','${S1}','2016 Mazda 3','2016 马自达 3',2016,'Mazda','3',8000,70000,'a','b','d3');
+insert into public.dealer_stores(owner_id, name, address) values ('${U2}','D2','x');`);
+  const storeDefault = await as<{ financing: string[] }>("anon", null, `select financing from public.dealer_stores where owner_id = '${U2}'`);
+  check("new stores default to an empty financing array",
+    JSON.stringify(storeDefault.rows[0]?.financing) === "[]", storeDefault.rows);
+  const badFin = await as(null, null, `update public.dealer_stores set financing = '{零首付}' where owner_id = '${U2}'`);
+  check("CHECK rejects a financing tag outside the 4 Chinese values",
+    !badFin.ok && badFin.constraint === "dealer_stores_financing_check", badFin);
+  const nullFin = await as(null, null, `update public.dealer_stores set financing = array[null]::text[] where owner_id = '${U2}'`);
+  check("CHECK rejects null elements", !nullFin.ok && nullFin.constraint === "dealer_stores_financing_check", nullFin);
+  await db.exec(`update public.dealer_stores set financing = '{自营分期,接受现金}' where owner_id = '${U2}';
+insert into public.dealer_stores(owner_id, name, address, financing) values ('${S1}','D3','y','{无信用记录可贷}');`);
+  const stores = { [U1]: [] as string[], [U2]: ["自营分期", "接受现金"], [S1]: ["无信用记录可贷"] };
+  const sellerOf: Record<string, string> = { [C1]: U1, [C2]: U1, [C3]: U1, [C4]: U2, [C5]: S1 };
+  const tsLoan = () => Object.keys(sellerOf).filter((id) => hasLoanFinancing(stores[sellerOf[id]])).sort();
+  const loan = await browseIds({ filters: { financing: "true" } });
+  check("financing filter: only sellers with ITIN / no-credit stores (same set as hasLoanFinancing)",
+    same(sqlIds(loan), [C5]) && same(sqlIds(loan), tsLoan()) && loan.total === 1, loan);
+  check("browse_cars reports financingApplied", (loan as { financingApplied?: boolean }).financingApplied === true, loan);
+  // 车主可以按 can_act_as 改自己的门店(认领人同理);anon 改不了
+  const anonUpd = await as("anon", null, `update public.dealer_stores set financing = '{支持ITIN贷款}' where owner_id = '${U1}' returning id`);
+  check("anon cannot write store financing", anonUpd.ok && anonUpd.rows.length === 0, anonUpd);
+  await db.exec(`insert into public.dealer_stores(owner_id, name, address) values ('${U1}','D1','z');`);
+  const ownUpd = await as("authenticated", U1,
+    `update public.dealer_stores set financing = '{支持ITIN贷款}' where owner_id = '${U1}' returning id`);
+  check("store owner can set financing", ownUpd.ok && ownUpd.rows.length === 1, ownUpd);
+  stores[U1] = ["支持ITIN贷款"];
+  const loan2 = await browseIds({ filters: { financing: "true" } });
+  check("financing filter follows store edits (any store of the seller counts)",
+    same(sqlIds(loan2), tsLoan()) && loan2.total === 4, loan2);
+  const off = await browseIds({ filters: { financing: "" } });
+  check("financing off does not filter", off.total === 5, off.total);
+
+  // 车况清单:car-condition.sql 可重复执行,既有行默认 {};CHECK 与 lib/car-condition.ts 的 normalizeCarCondition 同一规则
+  // (TS 归一后原样不变 ⇔ SQL 接受;已知问题重复项例外:SQL 只管取值,去重由 TS 写入前做)
+  let condErr: unknown = null;
+  try {
+    await db.exec(CAR_CONDITION);
+    await db.exec(CAR_CONDITION);
+    await db.exec(BROWSE);
+  } catch (e) {
+    condErr = e;
+  }
+  check("car-condition.sql re-runs without error", condErr === null, condErr);
+  const condDefault = await as<{ condition: unknown }>("anon", null, `select "condition" from public.cars where id = '${C1}'`);
+  check("existing rows default to an empty checklist", JSON.stringify(condDefault.rows[0]?.condition) === "{}", condDefault.rows);
+  const condSamples: unknown[] = [
+    {},
+    { service_records: true, one_owner: false, smoker: false, keys_count: 2, tires_condition: "良好", known_issues: ["发动机", "漏油"] },
+    { keys_count: 0 },
+    { keys_count: 5, tires_condition: "需更换" },
+    { known_issues: [] },
+    { known_issues: ["发动机", "变速箱", "空调", "电子系统", "漏油", "车身锈蚀", "事故修复", "悬挂"] },
+    { notes: "call 555-0100" },
+    { smoker: "yes" },
+    { one_owner: null },
+    { keys_count: 6 },
+    { keys_count: 2.5 },
+    { keys_count: "2" },
+    { keys_count: -1 },
+    { tires_condition: "excellent" },
+    { known_issues: ["刹车异响"] },
+    { known_issues: "发动机" },
+    { known_issues: [1] },
+    { known_issues: [["发动机"]] },
+    [],
+    "x",
+  ];
+  const condMismatch: unknown[] = [];
+  for (const sample of condSamples) {
+    const r = await as(null, null,
+      `update public.cars set "condition" = '${JSON.stringify(sample).replace(/'/g, "''")}'::jsonb where id = '${C3}'`);
+    const tsOk = JSON.stringify(normalizeCarCondition(sample)) === JSON.stringify(sample);
+    if (r.ok !== tsOk || (!r.ok && r.constraint !== "cars_condition_check")) condMismatch.push({ sample, sql: r.ok, ts: tsOk });
+  }
+  check("CHECK accepts exactly what normalizeCarCondition keeps unchanged", condMismatch.length === 0, condMismatch);
+  const condNull = await as(null, null, `update public.cars set "condition" = null where id = '${C3}'`);
+  check("condition is NOT NULL", !condNull.ok, condNull);
 }
 
 // =====================================================================

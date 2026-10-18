@@ -12,12 +12,13 @@ import {
   parseCarPageParams,
 } from "@/lib/api/filters";
 import {
-  CAR_SUMMARY_SELECT,
-  LEGACY_CAR_SUMMARY_SELECT,
+  CAR_QUERY_FLAGS,
+  carSummarySelect,
+  degradeCarQueryFlags,
   serializeCarSummary,
   type ApiCarRow,
+  type CarQueryFlags,
 } from "@/lib/api/serialize";
-import { isMissingColumnError } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const OPTIONS = handleOptions;
@@ -31,24 +32,29 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
 
     const { params, errors: pageErrors } = parseCarPageParams(sp);
-    // 内容时钟 content_updated_at(i18n-v2.sql)还没建时整条查询报缺列:legacy 用旧列集重查,
-    // updated_since 退回 updated_at。参数校验与 legacy 无关,只看第一次构建的结果
-    const build = (legacy: boolean) =>
+    // 缺列降级(degradeCarQueryFlags):内容时钟 content_updated_at(i18n-v2.sql)还没建时 legacy 用旧列集重查,
+    // updated_since 退回 updated_at;币种 / 里程单位(car-currency.sql)还没建时 units=false,不 select 这两列,
+    // 价格 / 里程条件直接比原值(届时全是美元 / 英里)。参数校验与开关无关,只看第一次构建的结果
+    const build = (flags: CarQueryFlags) =>
       applyCarQueryFilters(
         ctx.supabase
           .from("cars")
-          .select(legacy ? LEGACY_CAR_SUMMARY_SELECT : CAR_SUMMARY_SELECT)
+          .select(carSummarySelect(flags))
           .eq("status", "active")
           .eq("owner_hidden", false),
         sp,
-        { anonymous, legacy },
+        { anonymous, ...flags },
       );
-    const first = build(false);
+    const first = build(CAR_QUERY_FLAGS);
     const errors = [...pageErrors, ...first.errors];
     if (errors.length) return apiError(400, "validation_failed", "Invalid query parameters", errors);
 
     let res = await applyCarSortAndPage(first.query, params);
-    if (res.error && isMissingColumnError(res.error)) res = await applyCarSortAndPage(build(true).query, params);
+    let flags = CAR_QUERY_FLAGS;
+    for (let next = degradeCarQueryFlags(res.error, flags); next; next = degradeCarQueryFlags(res.error, flags)) {
+      flags = next;
+      res = await applyCarSortAndPage(build(flags).query, params);
+    }
     if (res.error) throw new Error(res.error.message);
 
     const rows = (res.data ?? []) as unknown as ApiCarRow[];

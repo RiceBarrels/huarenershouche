@@ -3,21 +3,16 @@
 import { useEffect, useState } from "react";
 import { getPriceHistory, type PriceRecord } from "@/lib/price-history";
 import { useI18n } from "@/components/i18n-provider";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
+import { formatPrice } from "@/lib/format";
+import type { Currency } from "@/lib/currency";
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-export function PriceHistoryChart({ carId }: { carId: string }) {
+// currency:车源自己的币种(本机记录的历史价与车价同币种)
+export function PriceHistoryChart({ carId, currency }: { carId: string; currency?: Currency | null }) {
   const { t } = useI18n();
   const [records, setRecords] = useState<PriceRecord[]>([]);
 
@@ -41,7 +36,7 @@ export function PriceHistoryChart({ carId }: { carId: string }) {
                 className="flex items-center justify-between font-mono text-[11px] text-muted-foreground"
               >
                 <span>{formatDate(rec.date)}</span>
-                <span>{formatPrice(rec.price)}</span>
+                <span>{formatPrice(rec.price, currency)}</span>
               </div>
             );
           }
@@ -67,11 +62,11 @@ export function PriceHistoryChart({ carId }: { carId: string }) {
                       : "text-red-500"
                   }
                 >
-                  {dropped ? "↓" : "↑"} {formatPrice(Math.abs(diff))} (
+                  {dropped ? "↓" : "↑"} {formatPrice(Math.abs(diff), currency)} (
                   {dropped ? "" : "+"}
                   {pct}%)
                 </span>
-                <span>{formatPrice(rec.price)}</span>
+                <span>{formatPrice(rec.price, currency)}</span>
               </span>
             </div>
           );

@@ -34,11 +34,12 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { queryWithColumnFallback } from "@/lib/supabase-compat";
-import { CAR_LIST_COLUMNS, CAR_PROFILE_EMBED } from "@/lib/i18n/content/columns";
+import { CAR_LIST_COLUMN_SETS, CAR_PROFILE_EMBED } from "@/lib/i18n/content/columns";
 import { useI18n } from "@/components/i18n-provider";
 import { useTermLabels } from "@/hooks/use-term-labels";
 import { localizePath } from "@/lib/i18n";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
+import { carCurrency, type Currency } from "@/lib/currency";
 import type { DbCar } from "@/lib/types";
 import {
   applyCarFilters,
@@ -52,6 +53,7 @@ import {
   type SortKey,
 } from "@/lib/car-filters";
 import { getUserCoords } from "@/lib/geocode";
+import { fetchLoanFinancingSellerIds } from "@/lib/dealer-financing-client";
 import { Header } from "@/components/header";
 import { CarCard } from "@/components/car-card";
 import { useCarOverlay } from "@/components/car-overlay-provider";
@@ -85,15 +87,18 @@ const REGION_MIN_MOVE_FRAC = 0.1;
 const VIEWPORT_CAR_LIMIT = 300;
 const VIEWPORT_STORE_LIMIT = 100;
 
-// 视口车源列:卡片列 + 关键词检索要搜的描述(原文 + 中英投影)+ 原始配置标签(统计配置选项)
+// 视口车源列:卡片列(含币种 / 里程单位)+ 关键词检索要搜的描述(原文 + 中英投影)+ 原始配置标签(统计配置选项)
 // + 产权状态(「仅清白产权」筛选)
-const MAP_CAR_SELECT_V2 = `${CAR_LIST_COLUMNS}, description_original, description, description_zh, features_original, ${CAR_PROFILE_EMBED}`;
-// 从新到旧:title-status.sql 未执行时去掉 title_status(该筛选筛不出车);i18n-v2 迁移前再去掉原文列
-const MAP_CAR_SELECTS = [
-  `title_status, ${MAP_CAR_SELECT_V2}`,
-  MAP_CAR_SELECT_V2,
-  `${CAR_LIST_COLUMNS}, description, description_zh, ${CAR_PROFILE_EMBED}`,
-];
+const MAP_V2_EXTRA = "description_original, description, description_zh, features_original";
+const MAP_LEGACY_EXTRA = "description, description_zh";
+// 从新到旧(i18n-v2 > 产权 > 币种 / 单位 的组合):title-status.sql 未执行时去掉 title_status(该筛选筛不出车);
+// car-currency.sql 未执行时去掉币种 / 单位(按 USD / mi);i18n-v2 迁移前再去掉原文列。
+// queryWithColumnFallback 认得出缺哪列时直接跳过含该列的组合
+const MAP_CAR_SELECTS = [MAP_V2_EXTRA, MAP_LEGACY_EXTRA].flatMap((extra) =>
+  ["title_status, ", ""].flatMap((title) =>
+    CAR_LIST_COLUMN_SETS.map((cols) => `${title}${cols}, ${extra}, ${CAR_PROFILE_EMBED}`)
+  )
+);
 // 配置选项:取出现最多的这么多个原始标签查词表,按词条归并后再取前 12
 const FEATURE_LABEL_POOL = 48;
 
@@ -141,12 +146,13 @@ const snapVisible = (i: number, h: number) =>
     i === 0 ? COLLAPSED_MIN_PX + FLOAT_GAP + SAFE_BOTTOM : 0
   );
 
-// 价格胶囊短格式:$8,500 → $8.5k / $23,900 → $24k / 0 → 面议
-function pillPrice(price: number): string {
+// 价格胶囊短格式:$8,500 → $8.5k / $23,900 → $24k / 0 → 面议;加元车源前缀 CA$
+function pillPrice(price: number, currency: Currency): string {
   if (price <= 0) return "面议";
-  if (price < 1000) return `$${price}`;
+  const sym = currency === "CAD" ? "CA$" : "$";
+  if (price < 1000) return `${sym}${price}`;
   const k = price / 1000;
-  return `$${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}k`;
+  return `${sym}${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}k`;
 }
 
 // 同一坐标(zip 质心)会叠很多车:按坐标分组,一组一个标记
@@ -183,6 +189,21 @@ function BrowseMapContent() {
   const [selectedStore, setSelectedStore] = useState<MapStore | null>(null);
   const [storeCars, setStoreCars] = useState<DbCar[] | null>(null);
   const [camera, setCamera] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+
+  // 「可贷款(无信用/ITIN)」筛选要知道哪些卖家的门店带贷款标签:只在打开该筛选时拉(会话内缓存);
+  // 拉到之前 / dealer-financing.sql 未执行时该筛选一辆也不命中(lib/car-filters.ts)
+  const [loanSellerIds, setLoanSellerIds] = useState<Set<string> | null>(null);
+  const wantLoanSellers = filters.financing === "true";
+  useEffect(() => {
+    if (!wantLoanSellers) return;
+    let cancelled = false;
+    fetchLoanFinancingSellerIds().then((ids) => {
+      if (!cancelled) setLoanSellerIds(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [wantLoanSellers]);
 
   // URL → 筛选状态(浏览器前进后退/外部带参进入)
   useEffect(() => {
@@ -428,9 +449,10 @@ function BrowseMapContent() {
       userCoords,
       distances,
       fetchedAt,
+      loanSellerIds,
     });
     return sortCars(result, forcedDistanceSort ? "distance" : sort, distances, locale);
-  }, [cars, filters, userCoords, distances, fetchedAt, sort, locale]);
+  }, [cars, filters, userCoords, distances, fetchedAt, loanSellerIds, sort, locale]);
 
   // 坐标分组 → 地图标记
   const groups = useMemo(() => {
@@ -452,7 +474,9 @@ function BrowseMapContent() {
         lat: group[0].lat!,
         lng: group[0].lng!,
         label:
-          group.length === 1 ? t(pillPrice(group[0].price)) : t("{n} 辆", { n: group.length }),
+          group.length === 1
+            ? t(pillPrice(group[0].price, carCurrency(group[0])))
+            : t("{n} 辆", { n: group.length }),
         image: group[0].image_url || group[0].images?.[0] || undefined,
         selected: selectedKeys.includes(key),
       })
@@ -802,15 +826,18 @@ function BrowseMapContent() {
       // 先切档再定相机:cameraFor 按新档位偏移,标记落在可见区中心
       if (snapIdxRef.current === 0) snapTo(1);
       setCamera(cameraFor(store.lat, store.lng));
-      supabase
-        .from("cars")
-        .select(`${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`)
-        .eq("status", "active")
-        .eq("owner_hidden", false)
-        .eq("seller_id", store.owner_id)
-        .order("created_at", { ascending: false })
-        .limit(60)
-        .then(({ data }) => setStoreCars((data as unknown as DbCar[]) || []));
+      queryWithColumnFallback(
+        (cols) =>
+          supabase
+            .from("cars")
+            .select(`${cols}, ${CAR_PROFILE_EMBED}`)
+            .eq("status", "active")
+            .eq("owner_hidden", false)
+            .eq("seller_id", store.owner_id)
+            .order("created_at", { ascending: false })
+            .limit(60),
+        CAR_LIST_COLUMN_SETS
+      ).then(({ data }) => setStoreCars((data as unknown as DbCar[]) || []));
       return;
     }
     setSelectedStore(null);

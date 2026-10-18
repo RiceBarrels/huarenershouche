@@ -16,14 +16,14 @@ import {
 } from "@/lib/api/response";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type ApiContext } from "@/lib/api/types";
 import {
-  INVENTORY_COLS,
-  INVENTORY_COLS_V2,
+  INVENTORY_COLUMN_SETS,
+  inventoryOrderColumn,
   finalize,
   loadTranslationPending,
   serializeInventoryItem,
   type InventoryCar,
 } from "@/lib/api/listing";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -55,21 +55,21 @@ export async function GET(req: NextRequest) {
     }
     const externalId = sp.get("external_id");
 
-    // 内容时钟 content_updated_at(i18n-v2.sql);库里还没有该列时按 updated_at 重查
-    const run = (legacy: boolean) => {
+    // 内容时钟 content_updated_at(i18n-v2.sql)/ 币种与里程单位(car-currency.sql)可能还没建:
+    // 按 INVENTORY_COLUMN_SETS 从新到旧重查,没有内容时钟时按 updated_at 排
+    const run = (cols: string) => {
       let query = supabase
         .from("cars")
-        .select(legacy ? INVENTORY_COLS : INVENTORY_COLS_V2)
+        .select(cols)
         .eq("seller_id", ownerId) // 含手动发帖(external_id 为空),便于发现可 adopt 的车
-        .order(legacy ? "updated_at" : "content_updated_at", { ascending: false })
+        .order(inventoryOrderColumn(cols), { ascending: false })
         .order("id", { ascending: true })
         .range(offset, offset + limit); // 多取一条判断是否还有下一页
       if (dbStatus) query = query.eq("status", dbStatus);
       if (externalId) query = query.eq("external_id", externalId);
       return query;
     };
-    let res = await run(false);
-    if (res.error && isMissingColumnError(res.error)) res = await run(true);
+    const res = await queryWithColumnFallback(run, INVENTORY_COLUMN_SETS);
     if (res.error) throw new Error(res.error.message);
     const rows = (res.data ?? []) as unknown as InventoryCar[];
     const hasMore = rows.length > limit;

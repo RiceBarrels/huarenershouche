@@ -1,4 +1,15 @@
 import { interpolate } from "@/lib/i18n";
+import {
+  carCurrency,
+  carMileageUnit,
+  normalizeCurrency,
+  normalizeMileageUnit,
+  toMiles,
+  toUsd,
+  type CarUnits,
+  type Currency,
+  type MileageUnit,
+} from "@/lib/currency";
 
 // 相对时间。传入 useI18n() 的 t 才会翻译;不传时按中文原文输出(兼容旧调用)
 type TranslateFn = (text: string, vars?: Record<string, string | number>) => string;
@@ -17,16 +28,51 @@ export function timeAgo(date: string, t: TranslateFn = interpolate): string {
   return t("{n} 年前", { n: Math.floor(months / 12) });
 }
 
-export function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
+// 价格 / 里程按车源自己的币种 / 单位显示(cars.currency / cars.mileage_unit,见 lib/currency.ts);
+// 不传或列不存在时按 USD / mi。固定 en-US 格式(SSR 与客户端一致):USD →「$12,345」,CAD →「CA$12,345」。
+// explicit:美元也写成「US$」,用在和加元并排的「≈」换算里,避免两个「$」分不清。
+export function formatPrice(
+  price: number,
+  currency?: Currency | string | null,
+  opts: { explicit?: boolean } = {}
+): string {
+  const cur = normalizeCurrency(currency);
+  const text = new Intl.NumberFormat("en-US", {
     style: "currency",
-    currency: "USD",
+    currency: cur,
     maximumFractionDigits: 0,
   }).format(price);
+  return opts.explicit && cur === "USD" ? text.replace("$", "US$") : text;
 }
 
-export function formatMileage(miles: number): string {
-  return new Intl.NumberFormat("en-US").format(miles) + " mi";
+/** 里程数字 + 单位:「12,345 mi」/「20,000 km」 */
+export function formatMileage(value: number, unit?: MileageUnit | string | null): string {
+  return new Intl.NumberFormat("en-US").format(Math.round(value)) + " " + normalizeMileageUnit(unit);
+}
+
+/** 车源的价格(默认 car.price,也可传同币种的其他金额,如原价、降价幅度、比价差额) */
+export function formatCarPrice(car: CarUnits, amount: number): string {
+  return formatPrice(amount, carCurrency(car));
+}
+
+/** 车源的里程(带它自己的单位) */
+export function formatCarMileage(car: { mileage: number } & CarUnits): string {
+  return formatMileage(car.mileage, carMileageUnit(car));
+}
+
+/**
+ * 详情页「≈」换算:加元车源给出折合美元(按 lib/currency.ts 的固定近似汇率),美元车源返回 null。
+ * 只是参考,不带「≈」符号,由调用方加。
+ */
+export function approxPriceUsd(car: { price: number } & CarUnits): string | null {
+  if (carCurrency(car) === "USD" || !(car.price > 0)) return null;
+  return formatPrice(Math.round(toUsd(car.price, carCurrency(car)) / 10) * 10, "USD", { explicit: true });
+}
+
+/** 详情页「≈」换算:公里车源给出折合英里,英里车源返回 null */
+export function approxMileageMi(car: { mileage: number } & CarUnits): string | null {
+  if (carMileageUnit(car) === "mi" || !(car.mileage >= 0)) return null;
+  return formatMileage(toMiles(car.mileage, "km"), "mi");
 }
 
 // 全站统一的月供估算口径：0 首付 / 6.5% APR / 60 期

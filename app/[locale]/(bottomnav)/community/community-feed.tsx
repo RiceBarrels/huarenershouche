@@ -39,9 +39,9 @@ import {
   ImageIcon,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import {
-  CAR_LIST_COLUMNS,
+  CAR_LIST_COLUMN_SETS,
   CAR_PROFILE_EMBED,
   LEGACY_POST_COLUMNS,
   POST_AUTHOR_EMBED,
@@ -82,13 +82,15 @@ import {
   fetchFollowingPosts,
 } from "@/lib/community-feed-cache";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
+import { formatCarPrice } from "@/lib/format";
 import type { DbCar, DbCommunityPost } from "@/lib/types";
 
 // 帖子列集(含作者);迁移 SQL 未执行时新列缺失 → 按旧列集重查
 const POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
 const LEGACY_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
 // 插卡车源:卡片列 + 卖家信息(languages 供按界面语言排序)
-const CAR_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+// car-currency.sql 未执行时第二组去掉币种 / 里程单位(缺失按 USD / mi 显示)
+const CAR_SELECTS = CAR_LIST_COLUMN_SETS.map((cols) => `${cols}, ${CAR_PROFILE_EMBED}`);
 
 const SEARCH_TYPE_CHIPS = [
   { key: "", label: "全部" },
@@ -105,14 +107,6 @@ const SEARCH_HISTORY_KEY = "clc_community_search_history";
 function searchQuery(keyword: string): string {
   const q = keyword.trim();
   return /^[#＃]+$/u.test(q) ? "" : q;
-}
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
 }
 
 type FeedItem =
@@ -760,13 +754,17 @@ export default function CommunityFeed() {
     }
     async function loadCars() {
       // 拉较大的候选池,避免「在最新 24 台里挑最近」导致其实并不近;车主隐藏的不展示
-      const { data } = await supabase
-        .from("cars")
-        .select(CAR_SELECT)
-        .eq("status", "active")
-        .eq("owner_hidden", false)
-        .order("created_at", { ascending: false })
-        .limit(200);
+      const { data } = await queryWithColumnFallback(
+        (select) =>
+          supabase
+            .from("cars")
+            .select(select)
+            .eq("status", "active")
+            .eq("owner_hidden", false)
+            .order("created_at", { ascending: false })
+            .limit(200),
+        CAR_SELECTS
+      );
       const cars = (data as unknown as DbCar[]) || [];
       if (cars.length === 0) return;
 
@@ -792,7 +790,10 @@ export default function CommunityFeed() {
         let favoriteCars: DbCar[] = [];
         let viewedCars: DbCar[] = [];
         if (signalIds.length > 0) {
-          const { data: sig } = await supabase.from("cars").select(CAR_LIST_COLUMNS).in("id", signalIds);
+          const { data: sig } = await queryWithColumnFallback(
+            (cols) => supabase.from("cars").select(cols).in("id", signalIds),
+            CAR_LIST_COLUMN_SETS
+          );
           const byId = new Map(((sig as unknown as DbCar[]) || []).map((c) => [c.id, c]));
           favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
           viewedCars = recentIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
@@ -1656,7 +1657,7 @@ export default function CommunityFeed() {
                         </span>
                         <span className="mt-0.5 flex items-center gap-1 font-mono text-xs text-muted-foreground">
                           <span className="text-brand-ink">
-                            {car.price > 0 ? formatPrice(car.price) : t("电议")}
+                            {car.price > 0 ? formatCarPrice(car, car.price) : t("电议")}
                           </span>
                           {distance != null && <span>· {formatDistance(distance)}</span>}
                         </span>
@@ -1774,7 +1775,7 @@ function CarFeedCard({ car, distance, personalized }: { car: DbCar; distance?: n
             {carTitle(car, locale)}
           </h3>
           <p className="mt-0.5 font-mono text-[15px] leading-relaxed text-foreground">
-            {car.price > 0 ? formatPrice(car.price) : t("电议")}
+            {car.price > 0 ? formatCarPrice(car, car.price) : t("电议")}
           </p>
           <div className="relative mt-2.5 overflow-hidden rounded-2xl ring-1 ring-border/60">
             {car.image_url ? (

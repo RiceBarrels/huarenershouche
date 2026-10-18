@@ -170,7 +170,10 @@ export function EventRow({ row, showDate = false, markAnonymous = false }: Event
     // 手机端浮层看车不改 URL,path 是打开浮层时所在的页面
     const onDetailPage = !!row.car_id && row.path === `/car/${row.car_id}`;
     const sub = [
-      row.car?.price != null ? `$${formatNumber(row.car.price, locale)}` : null,
+      // 加元车源前缀 CA$(currency 缺失按美元)
+      row.car?.price != null
+        ? `${row.car.currency === "CAD" ? "CA$" : "$"}${formatNumber(row.car.price, locale)}`
+        : null,
       onDetailPage ? null : t("在 {path} 中打开", { path: row.path }),
     ]
       .filter(Boolean)

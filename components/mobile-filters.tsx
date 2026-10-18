@@ -13,6 +13,8 @@ import { match } from "pinyin-pro";
 import { useI18n } from "@/components/i18n-provider";
 import { interpolate, brandLabel, brandShortLabel, type Locale } from "@/lib/i18n";
 import { triggerHaptic } from "@/lib/haptics";
+import { trackFilterChipClick } from "@/lib/analytics/client";
+import { formatPrice } from "@/lib/format";
 import { IOSSwitch } from "@/components/ios-settings";
 
 // Re-export types and constants from search-filters
@@ -123,8 +125,9 @@ export function getBrandLabel(filters: Filters, t: TFn = interpolate, locale: Lo
 function getPriceYearLabel(filters: Filters, t: TFn): string {
   const parts: string[] = [];
   if (filters.minPrice || filters.maxPrice) {
-    const min = filters.minPrice ? `$${Number(filters.minPrice).toLocaleString()}` : "$0";
-    const max = filters.maxPrice ? `$${Number(filters.maxPrice).toLocaleString()}` : t("不限");
+    // 价格筛选按美元(加元车源已折算),写成 US$ 和卡片上的 CA$ 区分开
+    const min = formatPrice(Number(filters.minPrice) || 0, "USD", { explicit: true });
+    const max = filters.maxPrice ? formatPrice(Number(filters.maxPrice), "USD", { explicit: true }) : t("不限");
     parts.push(`${min}-${max}`);
   }
   if (filters.maxPayment) parts.push(t("月供≤${n}", { n: filters.maxPayment }));
@@ -721,6 +724,7 @@ export function MobileFilterDrawer({
     if (key === "fuelType" && value === "纯电") {
       next.transmission = "";
     }
+    if (key === "financing" && value === "true") trackFilterChipClick("financing", locale);
     onFilter(next);
   }
 
@@ -842,6 +846,8 @@ export function MobileFilterDrawer({
                 onFilter(next);
               }}
             />
+            {/* 价格筛选的数字是美元(加元车源按固定汇率折算后比较) */}
+            <p className="mt-2.5 font-mono text-[11px] text-muted-foreground">{t("按美元筛选，加元车源已折算")}</p>
           </div>
 
           {/* Monthly payment budget */}
@@ -1052,7 +1058,7 @@ export function MobileFilterDrawer({
         color="text-pink-500"
         label={t("更多条件")}
         value={getMoreLabel(filters, t)}
-        active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.cleanTitle || filters.hasVideo || filters.hasPrice)}
+        active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.cleanTitle || filters.financing || filters.hasVideo || filters.hasPrice)}
       >
         <div className="space-y-5">
           {/* Deal rating & price dropped toggles — iOS 分组开关卡 */}

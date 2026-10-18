@@ -20,7 +20,7 @@ export const CONTACT_CHANNELS = [...CONTACT_APPS, "sms"] as const satisfies read
  * 各界面语言下的展示 / 填写顺序:第一个在发布与资料页直接显示,其余收进「更多联系方式」;
  * 详情页按钮也按这个顺序排(只显示卖家填了的)。
  * 顺序是推断:es → WhatsApp 只有单一厂商来源;ko → KakaoTalk、ja → LINE 按母国习惯推断,没有北美侨民数据;
- * zh → 微信;en / fr → WhatsApp。上线后按 contact_clicks(supabase/analytics-contact-click.sql)的点击数据调整。
+ * zh → 微信;en / fr → WhatsApp。上线后按 click_events(supabase/click-events.sql,kind = contact)的点击数据调整。
  */
 export const CONTACT_APP_ORDER: Record<Locale, ContactApp[]> = {
   zh: ["wechat", "whatsapp", "line", "kakao"],

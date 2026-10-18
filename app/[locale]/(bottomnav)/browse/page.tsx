@@ -41,7 +41,9 @@ import { detectUserZip, geocodeZipToCoords } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { fromStoredDeal } from "@/lib/price-insight";
+import { formatPrice } from "@/lib/format";
 import { bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
+import { LOAN_FILTER_LABEL } from "@/lib/dealer-financing";
 import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT } from "@/lib/saved-searches";
 import {
   buildDistances,
@@ -403,8 +405,9 @@ function BrowseContent() {
     }
     if (filters.sellerType) chips.push({ key: "sellerType", label: filters.sellerType === "dealer" ? t("车行") : t("个人") });
     if (filters.minPrice || filters.maxPrice) {
-      const min = filters.minPrice ? `$${Number(filters.minPrice).toLocaleString()}` : "$0";
-      const max = filters.maxPrice ? `$${Number(filters.maxPrice).toLocaleString()}` : t("不限");
+      // 价格筛选按美元(加元车源已折算),写成 US$ 和卡片上的 CA$ 区分开
+      const min = formatPrice(Number(filters.minPrice) || 0, "USD", { explicit: true });
+      const max = filters.maxPrice ? formatPrice(Number(filters.maxPrice), "USD", { explicit: true }) : t("不限");
       chips.push({ key: "price", label: `${min}-${max}` });
     }
     if (filters.minYear || filters.maxYear) {
@@ -464,6 +467,7 @@ function BrowseContent() {
     if (filters.oneOwner === "true") chips.push({ key: "oneOwner", label: t("一手车主") });
     if (filters.hasCarfax === "true") chips.push({ key: "hasCarfax", label: t("有Carfax") });
     if (filters.cleanTitle === "true") chips.push({ key: "cleanTitle", label: t("仅清白产权") });
+    if (filters.financing === "true") chips.push({ key: "financing", label: t(LOAN_FILTER_LABEL) });
     if (filters.hasVideo === "true") chips.push({ key: "hasVideo", label: t("带视频") });
     if (filters.hasPrice === "true") chips.push({ key: "hasPrice", label: t("排除电议") });
     return chips;

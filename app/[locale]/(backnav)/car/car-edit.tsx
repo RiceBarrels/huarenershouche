@@ -24,6 +24,19 @@ import { isCarfaxUrl, normalizeCarfaxUrl, fetchCarfaxSummary, formatCarfaxSummar
 import { useIdentity } from "@/components/identity-provider";
 import { useI18n } from "@/components/i18n-provider";
 import { carTitle, brandLabel } from "@/lib/i18n";
+import {
+  carCurrency,
+  carMileageUnit,
+  extractPostalCode,
+  isCanadianPostalCode,
+  normalizeCanadianPostalCode,
+  normalizeCurrency,
+  normalizeMileageUnit,
+} from "@/lib/currency";
+import { formatPrice } from "@/lib/format";
+import { CurrencyToggle, MileageUnitToggle } from "@/components/unit-toggle";
+import { CarConditionEditor } from "@/components/car-condition-editor";
+import { normalizeCarCondition, type CarCondition } from "@/lib/car-condition";
 import type { DbCar } from "@/lib/types";
 
 const FUEL_TYPES = ["汽油", "柴油", "纯电", "混动", "插电混动"];
@@ -70,10 +83,6 @@ const drivetrainOptions: ComboboxOption[] = [
   { value: "4WD", label: "四驱 4WD" }, { value: "RWD", label: "后驱 RWD" },
 ];
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(price);
-}
-
 export default function EditCarPage() {
   const router = useRouter();
   const params = useRouteParams<{ id: string }>();
@@ -117,9 +126,19 @@ export default function EditCarPage() {
     trim: "", customMake: "", carfax_url: "",
     // 产权状态(cars.title_status);"" = 不确定 / 不填
     title_status: "",
+    // 价格币种 / 里程单位(cars.currency / cars.mileage_unit)
+    currency: "USD",
+    mileage_unit: "mi",
   });
   // 产权状态列是否已建(supabase/title-status.sql;select("*") 的行里有没有这个键)
   const [titleStatusAvailable, setTitleStatusAvailable] = useState(false);
+  // 币种 / 里程单位列是否已建(supabase/car-currency.sql);没建时不显示切换、保存也不带这两列
+  const [unitsAvailable, setUnitsAvailable] = useState(false);
+  // 车况清单(cars.condition,supabase/car-condition.sql);列没建时不显示、保存也不带
+  const [conditionAvailable, setConditionAvailable] = useState(false);
+  const [checklist, setChecklist] = useState<CarCondition>({});
+  // 打开编辑页时从 location 取出的邮编:保存时邮编没改就不重新 geocode(保留原地址 / 坐标)
+  const [loadedZip, setLoadedZip] = useState("");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [carfaxLoading, setCarfaxLoading] = useState(false);
   const [carfaxSummary, setCarfaxSummary] = useState<CarfaxSummary | null>(null);
@@ -161,7 +180,8 @@ export default function EditCarPage() {
       setForm({
         price: String(c.price),
         mileage: String(c.mileage),
-        zipcode: c.location?.match(/\b\d{5}\b/)?.[0] || "",
+        // 美国 5 位 zip 或加拿大邮编(A1A 1A1):取地址里最后一个像邮编的片段(门牌号也常是 5 位数)
+        zipcode: extractPostalCode(c.location),
         phone: c.phone || "",
         seller_name: c.seller_name || "",
         fuel_type: c.fuel_type || "汽油",
@@ -178,8 +198,14 @@ export default function EditCarPage() {
         customMake: isOther ? c.make : "",
         carfax_url: c.carfax_url || "",
         title_status: c.title_status ?? "",
+        currency: carCurrency(c),
+        mileage_unit: carMileageUnit(c),
       });
+      setLoadedZip(extractPostalCode(c.location));
       setTitleStatusAvailable("title_status" in c);
+      setUnitsAvailable("currency" in c && "mileage_unit" in c);
+      setConditionAvailable("condition" in c);
+      setChecklist(normalizeCarCondition(c.condition));
       // 已存的 Carfax 摘要直接展示(car.carfax_summary);重新「获取」后才替换
       setImageUrls([c.image_url, ...(c.images || [])].filter(Boolean) as string[]);
       // 卖家原样填写的标签(cars.features 是含中英词表标签的投影,不在这里编辑)
@@ -283,6 +309,7 @@ export default function EditCarPage() {
 
     let originalPrice = car.original_price;
     let priceUpdatedAt = car.price_updated_at;
+    const newCurrency = unitsAvailable ? normalizeCurrency(form.currency) : carCurrency(car);
 
     if (priceChanged) {
       if (isAdmin || hoursSinceLastChange >= 24) {
@@ -296,12 +323,22 @@ export default function EditCarPage() {
       }
     }
 
-    // Geocode
-    const coords = form.zipcode ? await geocodeZipToCoords(form.zipcode) : null;
-    const [zipEn, zipZh] = form.zipcode
-      ? await Promise.all([lookupZip(form.zipcode, "en"), lookupZip(form.zipcode, "zh")])
+    // 改了币种:旧原价是另一种币种,和新价比「降价」没有意义,清掉原价(这次不算降价)
+    if (newCurrency !== carCurrency(car)) {
+      originalPrice = null;
+      priceUpdatedAt = new Date().toISOString();
+    }
+
+    // Geocode(美国 zip / 加拿大邮编,后者统一写成「A1A 1A1」)。只在卖家改了邮编时重算地址;
+    // 没改就保留原 location(含详细地址)和坐标,只在原来没有坐标时补一次
+    const zipcode = normalizeCanadianPostalCode(form.zipcode);
+    const zipValid = /^\d{5}$/.test(zipcode) || isCanadianPostalCode(zipcode);
+    const zipChanged = zipcode !== loadedZip;
+    const coords = zipValid && (zipChanged || car.lat == null || car.lng == null) ? await geocodeZipToCoords(zipcode) : null;
+    const [zipEn, zipZh] = zipValid && zipChanged
+      ? await Promise.all([lookupZip(zipcode, "en"), lookupZip(zipcode, "zh")])
       : [null, null];
-    const locationEn = zipEn ? `${zipEn.city}, ${zipEn.stateCode} ${form.zipcode}` : car.location;
+    const locationEn = zipEn ? `${zipEn.city}, ${zipEn.stateCode} ${zipcode}` : car.location;
     const locationZh = zipZh?.city || car.location_zh;
 
     // 描述原样保存(任何语言,全空白视为没填);各语言译文由数据库触发器排队、服务端翻译
@@ -333,6 +370,10 @@ export default function EditCarPage() {
       carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : (car.carfax_summary || null),
       // 产权状态:列已建才写(选「不确定」= 清空)
       ...(titleStatusAvailable ? { title_status: isTitleStatus(form.title_status) ? form.title_status : null } : {}),
+      // 币种 / 里程单位:列已建才写
+      ...(unitsAvailable ? { currency: newCurrency, mileage_unit: normalizeMileageUnit(form.mileage_unit) } : {}),
+      // 车况清单:列已建才写(全部清空 = {})
+      ...(conditionAvailable ? { condition: normalizeCarCondition(checklist) } : {}),
     };
 
     // 写原文列;卖家保存即确认原文是自己写的(original_uncertain 只能由非管线写入方清除)
@@ -342,9 +383,14 @@ export default function EditCarPage() {
         .update({ ...base, description_original: description, features_original: features, original_uncertain: false })
         .eq("id", carId);
     let { error: updateError } = await writeV2();
-    // 产权列不可用(schema cache 未刷新等):去掉产权再写一次,不挡保存
-    if (updateError && "title_status" in base && isMissingColumnNamed(updateError, "title_status")) {
-      delete (base as { title_status?: string | null }).title_status;
+    // 可选列不可用(schema cache 未刷新等):去掉缺的那组(产权 / 币种 + 单位 / 车况)再写,不挡保存
+    const optionalGroups = [["title_status"], ["currency", "mileage_unit"], ["condition"]];
+    for (let i = 0; i < optionalGroups.length && updateError; i++) {
+      const group = optionalGroups.find((cols) =>
+        cols.some((c) => c in base && isMissingColumnNamed(updateError, c))
+      );
+      if (!group) break;
+      for (const c of group) delete (base as Record<string, unknown>)[c];
       ({ error: updateError } = await writeV2());
     }
     // 数据库还没有原文列(i18n-v2 迁移前):按旧列写一次
@@ -466,15 +512,34 @@ export default function EditCarPage() {
                 {t("价格 *")}
                 {car.price !== Number(form.price) && Number(form.price) > 0 && (
                   <span className="ml-2 text-[10px] text-muted-foreground/60">
-                    {t("原价 {price}", { price: formatPrice(car.price) })}
+                    {t("原价 {price}", { price: formatPrice(car.price, carCurrency(car)) })}
                   </span>
                 )}
               </Label>
               <Input className="mt-1 h-9 font-mono text-xs" type="number" value={form.price} onChange={(e) => update("price", e.target.value)} required />
+              {/* 币种(car-currency.sql 未执行时不显示,一律美元) */}
+              {unitsAvailable && (
+                <CurrencyToggle
+                  variant="form"
+                  className="mt-1.5"
+                  value={normalizeCurrency(form.currency)}
+                  onChange={(v) => update("currency", v)}
+                />
+              )}
             </div>
             <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">{t("里程 (mi) *")}</Label>
+              <Label className="font-mono text-[11px] text-muted-foreground">
+                {t(unitsAvailable && form.mileage_unit === "km" ? "里程 (km) *" : "里程 (mi) *")}
+              </Label>
               <Input className="mt-1 h-9 font-mono text-xs" type="number" value={form.mileage} onChange={(e) => update("mileage", e.target.value)} required />
+              {unitsAvailable && (
+                <MileageUnitToggle
+                  variant="form"
+                  className="mt-1.5"
+                  value={normalizeMileageUnit(form.mileage_unit)}
+                  onChange={(v) => update("mileage_unit", v)}
+                />
+              )}
             </div>
           </div>
 
@@ -538,11 +603,36 @@ export default function EditCarPage() {
             </div>
           )}
 
+          {/* 车况清单(选填;car-condition.sql 未执行时不显示):固定选项,没填的项详情页不显示 */}
+          {conditionAvailable && (
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">
+                {t("车况清单")} · {t("选填")}
+              </Label>
+              <CarConditionEditor
+                variant="form"
+                className="mt-2 rounded-xl border border-border p-3"
+                value={checklist}
+                onChange={setChecklist}
+              />
+            </div>
+          )}
+
           {/* Location & Contact */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label className="font-mono text-[11px] text-muted-foreground">ZIP Code</Label>
-              <Input className="mt-1 h-9 font-mono text-xs" maxLength={5} inputMode="numeric" value={form.zipcode} onChange={(e) => update("zipcode", e.target.value.replace(/\D/g, "").slice(0, 5))} />
+              <Label className="font-mono text-[11px] text-muted-foreground">ZIP / Postal Code</Label>
+              {/* 美国 5 位 zip 或加拿大邮编(A1A 1A1) */}
+              <Input
+                className="mt-1 h-9 font-mono text-xs"
+                maxLength={7}
+                autoCapitalize="characters"
+                value={form.zipcode}
+                onChange={(e) => {
+                  const v = e.target.value.toUpperCase();
+                  update("zipcode", /^[A-Z]/.test(v) ? v.replace(/[^A-Z0-9 -]/g, "").slice(0, 7) : v.replace(/\D/g, "").slice(0, 5));
+                }}
+              />
             </div>
             <div>
               <Label className="font-mono text-[11px] text-muted-foreground">{t("联系电话")}</Label>

@@ -3,6 +3,8 @@
 // 响应形状对齐 lib/api/serialize.ts / lib/api/listing.ts。描述面向开发者,统一英文。
 
 import { enumCatalog } from "./enums";
+import { CAD_PER_USD, CURRENCIES, KM_PER_MI, MILEAGE_UNITS } from "@/lib/currency";
+import { KEYS_COUNT_MAX, KNOWN_ISSUES } from "@/lib/car-condition";
 import {
   API_SCOPES,
   BATCH_MAX_ITEMS,
@@ -223,8 +225,8 @@ export function buildOpenApi(): Record<string, unknown> {
     CarSummary: {
       type: "object",
       required: [
-        "id", "url", "title", "year", "make", "model", "trim", "price", "original_price", "mileage", "location", "image_url",
-        "fuel_type", "transmission", "drivetrain", "exterior_color", "interior_color", "status", "is_syndicated", "seller",
+        "id", "url", "title", "year", "make", "model", "trim", "price", "original_price", "currency", "mileage", "mileage_unit",
+        "location", "image_url", "fuel_type", "transmission", "drivetrain", "exterior_color", "interior_color", "status", "is_syndicated", "seller",
         "created_at", "updated_at", "expires_at",
       ],
       properties: {
@@ -235,10 +237,12 @@ export function buildOpenApi(): Record<string, unknown> {
         make: { type: "string" },
         model: { type: "string" },
         trim: nullable("string"),
-        price: { type: "integer", description: "USD. `0` = call for price." },
-        original_price: nullable("integer"),
+        price: { type: "integer", description: "Whole units of `currency`. `0` = call for price." },
+        original_price: nullable("integer", { description: "Same currency as `price`." }),
         price_updated_at: nullable("string", { format: "date-time" }),
-        mileage: { type: "integer", description: "Miles." },
+        currency: { type: "string", enum: [...CURRENCIES], description: "Currency of `price` / `original_price`: `USD` (default) or `CAD` (Canadian listings)." },
+        mileage: { type: "integer", description: "Odometer reading in `mileage_unit`." },
+        mileage_unit: { type: "string", enum: [...MILEAGE_UNITS], description: "Unit of `mileage`: `mi` (default) or `km`." },
         location: {
           type: "object",
           required: ["name", "lat", "lng"],
@@ -272,7 +276,7 @@ export function buildOpenApi(): Record<string, unknown> {
           type: "object",
           required: [
             "description", "description_original", "description_lang", "description_translated", "features",
-            "features_original", "images", "title_status", "vin", "views_count", "favorites_count", "seller",
+            "features_original", "images", "title_status", "condition", "vin", "views_count", "favorites_count", "seller",
           ],
           properties: {
             description: {
@@ -301,6 +305,7 @@ export function buildOpenApi(): Record<string, unknown> {
               "title_status",
               "Title brand as declared by the seller (dealer listings: only when the source text says it explicitly). `value` is `null` when not provided — that does not mean clean.",
             ),
+            condition: ref("Condition"),
             vin: { ...nullable("string"), description: "Anonymous requests get a masked VIN (`1HGCV1F3****2345`); keyed requests get the full VIN." },
             carfax_url: nullable("string", { format: "uri" }),
             carfax_summary: nullable("string", { description: "Short Carfax summary (owners, accidents, service records) in the requested `lang`." }),
@@ -324,6 +329,50 @@ export function buildOpenApi(): Record<string, unknown> {
           },
         },
       ],
+    },
+    Condition: {
+      type: "object",
+      description:
+        "Structured condition checklist as declared by the seller. Every item is optional: `null` = not provided (it does not mean \"no\"). Fixed values only — sellers explain details in `description`. Changes to the checklist don't move `updated_at`.",
+      required: ["service_records", "one_owner", "smoker", "keys_count", "tires_condition", "known_issues"],
+      properties: {
+        service_records: nullable("boolean", { description: "Service records available." }),
+        one_owner: nullable("boolean", { description: "One-owner vehicle." }),
+        smoker: nullable("boolean", { description: "Smoked in." }),
+        keys_count: nullable("integer", { minimum: 0, maximum: KEYS_COUNT_MAX, description: "Number of keys." }),
+        tires_condition: enumValue("tires_condition", "Tire condition."),
+        known_issues: {
+          type: ["array", "null"],
+          items: {
+            type: "object",
+            required: ["value", "label"],
+            properties: {
+              value: { type: "string", enum: slugs("known_issue"), description: enumDesc("known_issue") },
+              label: { type: "string" },
+            },
+          },
+          description: "Known issues. `null` = not provided; `[]` = the seller states there are no known issues.",
+        },
+      },
+    },
+    ConditionInput: {
+      type: "object",
+      additionalProperties: false,
+      description:
+        "Condition checklist. Each item may be omitted or `null` (= not provided). Unknown keys are rejected with 400 `validation_failed` — there is no free-text field; put details in `description`.",
+      properties: {
+        service_records: nullable("boolean"),
+        one_owner: nullable("boolean"),
+        smoker: nullable("boolean"),
+        keys_count: nullable("integer", { minimum: 0, maximum: KEYS_COUNT_MAX }),
+        tires_condition: { ...nullable("string"), enum: [...slugs("tires_condition"), null], description: enumDesc("tires_condition") },
+        known_issues: {
+          type: ["array", "null"],
+          maxItems: KNOWN_ISSUES.length,
+          items: { type: "string", enum: slugs("known_issue") },
+          description: `${enumDesc("known_issue")}. \`[]\` = no known issues; duplicates are ignored.`,
+        },
+      },
     },
     Dealer: {
       type: "object",
@@ -356,9 +405,19 @@ export function buildOpenApi(): Record<string, unknown> {
         make: { type: "string", maxLength: 40, description: "English make; common aliases are canonicalised (e.g. `Mercedes` → `Mercedes-Benz`)." },
         model: { type: "string", maxLength: 60 },
         trim: nullable("string", { maxLength: 60 }),
-        price: { type: "integer", minimum: 0, description: "USD, whole dollars. `0` = call for price." },
-        original_price: nullable("integer", { minimum: 0 }),
-        mileage: { type: "integer", minimum: 0, description: "Miles." },
+        price: { type: "integer", minimum: 0, description: "Whole units of `currency` (USD unless you send `currency: \"CAD\"`). `0` = call for price." },
+        original_price: nullable("integer", { minimum: 0, description: "Same currency as `price`." }),
+        currency: {
+          ...nullable("string"),
+          enum: [...CURRENCIES, null],
+          description: "Currency of `price` / `original_price`. Omit to keep the stored value (new listings default to `USD`); `null` resets to `USD`.",
+        },
+        mileage: { type: "integer", minimum: 0, description: "Odometer reading in `mileage_unit` (miles unless you send `mileage_unit: \"km\"`)." },
+        mileage_unit: {
+          ...nullable("string"),
+          enum: [...MILEAGE_UNITS, null],
+          description: "Unit of `mileage`. Omit to keep the stored value (new listings default to `mi`); `null` resets to `mi`.",
+        },
         fuel_type: { type: "string", enum: slugs("fuel_type"), description: enumDesc("fuel_type") },
         transmission: { type: "string", enum: slugs("transmission"), description: enumDesc("transmission") },
         drivetrain: { ...nullable("string"), enum: [...slugs("drivetrain"), null], description: enumDesc("drivetrain") },
@@ -366,6 +425,11 @@ export function buildOpenApi(): Record<string, unknown> {
           ...nullable("string"),
           enum: [...slugs("title_status"), null],
           description: `Title brand: ${enumDesc("title_status")}. Omit to keep the stored value (new listings start empty); send \`null\` to clear it.`,
+        },
+        condition: {
+          oneOf: [ref("ConditionInput"), { type: "null" }],
+          description:
+            "Condition checklist. Omit to keep the stored checklist (new listings start empty); `null` clears it; an object replaces the whole checklist (items you leave out become not provided).",
         },
         exterior_color: nullable("string", { maxLength: 30, description: "Free text in English, e.g. `white`." }),
         interior_color: nullable("string", { maxLength: 30 }),
@@ -396,12 +460,12 @@ export function buildOpenApi(): Record<string, unknown> {
         },
         carfax_url: nullable("string", { format: "uri" }),
         store_id: { ...nullable("string"), format: "uuid", description: "Verified store to attach to. Defaults to the first verified store." },
-        location: nullable("string", { maxLength: 80, description: "City or ZIP. Required for personal accounts; dealers default to the store address." }),
+        location: nullable("string", { maxLength: 80, description: "`City, ST`, a 5-digit US ZIP or a Canadian postal code. Required for personal accounts; dealers default to the store address." }),
       },
     },
     InventoryItem: {
       type: "object",
-      required: ["id", "external_id", "url", "status", "title", "year", "make", "model", "price", "mileage", "images", "location", "created_at", "updated_at", "processing_state"],
+      required: ["id", "external_id", "url", "status", "title", "year", "make", "model", "price", "currency", "mileage", "mileage_unit", "images", "location", "created_at", "updated_at", "processing_state"],
       properties: {
         id: { type: "string", format: "uuid" },
         external_id: nullable("string"),
@@ -412,8 +476,10 @@ export function buildOpenApi(): Record<string, unknown> {
         make: { type: "string" },
         model: { type: "string" },
         trim: nullable("string"),
-        price: { type: "integer" },
-        mileage: { type: "integer" },
+        price: { type: "integer", description: "Whole units of `currency`." },
+        currency: { type: "string", enum: [...CURRENCIES] },
+        mileage: { type: "integer", description: "In `mileage_unit`." },
+        mileage_unit: { type: "string", enum: [...MILEAGE_UNITS] },
         vin: nullable("string"),
         images: { type: "array", items: { type: "string", format: "uri" } },
         image_url: nullable("string", { format: "uri" }),
@@ -610,9 +676,9 @@ export function buildOpenApi(): Record<string, unknown> {
           queryParam("model", { type: "string" }, "Exact model, e.g. `Camry`."),
           queryParam("year_min", { type: "integer" }, ""),
           queryParam("year_max", { type: "integer" }, ""),
-          queryParam("price_min", { type: "integer" }, "USD"),
-          queryParam("price_max", { type: "integer" }, "USD"),
-          queryParam("mileage_max", { type: "integer" }, "Miles"),
+          queryParam("price_min", { type: "integer" }, `USD. CAD listings are compared after converting at a fixed approximate rate (1 USD ≈ ${CAD_PER_USD} CAD).`),
+          queryParam("price_max", { type: "integer" }, "USD (CAD listings converted, as for `price_min`)."),
+          queryParam("mileage_max", { type: "integer" }, `Miles. Listings in km are compared after converting (1 mi = ${KM_PER_MI} km).`),
           queryParam("fuel_type", { type: "string", enum: slugs("fuel_type") }, ""),
           queryParam("transmission", { type: "string", enum: slugs("transmission") }, ""),
           queryParam("drivetrain", { type: "string", enum: slugs("drivetrain") }, ""),
@@ -623,7 +689,11 @@ export function buildOpenApi(): Record<string, unknown> {
             { type: "string", format: "date-time" },
             `Only listings whose visible content changed at or after this instant (${CONTENT_CLOCK_FIELDS}); view counts and translation updates don't count. Use for incremental sync, comparing against \`updated_at\`.`,
           ),
-          queryParam("sort", { type: "string", enum: ["newest", "price_asc", "price_desc", "mileage_asc", "year_desc"], default: "newest" }, ""),
+          queryParam(
+            "sort",
+            { type: "string", enum: ["newest", "price_asc", "price_desc", "mileage_asc", "year_desc"], default: "newest" },
+            "`price_*` / `mileage_asc` order by the stored number in each listing's own `currency` / `mileage_unit` (no conversion).",
+          ),
           LIMIT_PARAM,
           CURSOR_PARAM,
           LANG_PARAM,

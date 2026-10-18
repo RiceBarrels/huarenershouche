@@ -8,14 +8,30 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyBodyStyle } from "@/lib/body-style";
 import { getPriceInsight, toStoredDeal } from "@/lib/price-insight";
 import { MAKES_ZH } from "@/lib/mock-data";
+import { isMissingColumnError } from "@/lib/supabase-compat";
 import type { DbCar } from "@/lib/types";
 
-const META_CAR_COLUMNS =
+const LEGACY_META_CAR_COLUMNS =
   "id, make, model, year, price, mileage, vin, title_zh, location_zh, seller_name, features";
+// 币种 / 里程单位(car-currency.sql):比价前折成美元 / 英里,不拿加元和美元直接比。
+// 列不存在时退回旧列集,全部按 USD / mi 比价(与 SQL 执行前的数据一致)
+const META_CAR_COLUMNS = `${LEGACY_META_CAR_COLUMNS}, currency, mileage_unit`;
 
 type MetaCar = Pick<
   DbCar,
-  "id" | "make" | "model" | "year" | "price" | "mileage" | "vin" | "title_zh" | "location_zh" | "seller_name" | "features"
+  | "id"
+  | "make"
+  | "model"
+  | "year"
+  | "price"
+  | "mileage"
+  | "vin"
+  | "title_zh"
+  | "location_zh"
+  | "seller_name"
+  | "features"
+  | "currency"
+  | "mileage_unit"
 >;
 
 const PAGE_SIZE = 1000; // PostgREST 单次上限
@@ -40,17 +56,23 @@ export function searchPinyin(car: MetaCar): string | null {
 }
 
 async function fetchActiveCars(supabase: SupabaseClient): Promise<MetaCar[]> {
+  // 先探测币种列是否已建(limit 0 只校验列名)
+  const probe = await supabase.from("cars").select("currency, mileage_unit").limit(0);
+  if (probe.error && !isMissingColumnError(probe.error)) {
+    throw new Error(`browse meta: probe columns failed: ${probe.error.message}`);
+  }
+  const columns = probe.error ? LEGACY_META_CAR_COLUMNS : META_CAR_COLUMNS;
   const cars: MetaCar[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from("cars")
-      .select(META_CAR_COLUMNS)
+      .select(columns)
       .eq("status", "active")
       .eq("owner_hidden", false)
       .order("id")
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw new Error(`browse meta: load cars failed: ${error.message}`);
-    cars.push(...((data as MetaCar[]) || []));
+    cars.push(...((data as unknown as MetaCar[]) || []));
     if (!data || data.length < PAGE_SIZE) return cars;
   }
 }
@@ -58,7 +80,8 @@ async function fetchActiveCars(supabase: SupabaseClient): Promise<MetaCar[]> {
 /** 重算全部在售车源的预计算字段并写回,返回写入行数 */
 export async function refreshBrowseMeta(supabase: SupabaseClient): Promise<number> {
   const cars = await fetchActiveCars(supabase);
-  // 比价池 = 全部在售车源(与 /browse 原来前端 getPriceInsight(car, cars) 的基准一致)
+  // 比价池 = 全部在售车源(与 /browse 原来前端 getPriceInsight(car, cars) 的基准一致);
+  // getPriceInsight 内部按美元 / 英里比价,存进 deal 的 delta / marketAvg 是该车自己的币种
   const pool = cars as DbCar[];
   const now = new Date().toISOString();
   const rows = cars.map((car) => ({

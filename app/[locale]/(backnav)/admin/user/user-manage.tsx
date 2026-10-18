@@ -20,6 +20,7 @@ import { Input } from "@/components/ui/input";
 import { LanguagePicker } from "@/components/language-picker";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCarPrice } from "@/lib/format";
 import type { DbProfile, DbCar, DbDealerStore, DbUserIpGeo } from "@/lib/types";
 import { fetchUserIpGeo } from "@/lib/analytics/admin";
 import { formatGeoWithFlag } from "@/lib/analytics/geo";
@@ -572,7 +573,7 @@ export default function AdminUserManagePage() {
                       <p className="truncate text-xs font-medium">{carTitle(car, locale)}</p>
                       <span className="shrink-0 rounded-full bg-muted px-1 py-0.5 text-[10px] text-muted-foreground">{t(carStatusLabel(car))}</span>
                     </div>
-                    <p className="text-[10px] text-muted-foreground">${car.price?.toLocaleString()} · {car.location_zh}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatCarPrice(car, car.price ?? 0)} · {car.location_zh}</p>
                   </div>
                   <div className="flex shrink-0 gap-1">
                     <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => window.open(carLink(car.id), "_blank")} title={t("查看")}>

@@ -7,6 +7,8 @@ import { useI18n } from "@/components/i18n-provider";
 import { brandLabel } from "@/lib/i18n";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
+import { LOAN_FILTER_LABEL } from "@/lib/dealer-financing";
+import { trackFilterChipClick } from "@/lib/analytics/client";
 
 // --- Price breakpoints ---
 const PRICE_STOPS = [
@@ -19,11 +21,6 @@ function priceToIndex(price: number): number {
     if (price >= PRICE_STOPS[i]) return i;
   }
   return 0;
-}
-function formatPriceLabel(price: number): string {
-  if (price >= 200000) return "不限";
-  if (price >= 10000) return `$${(price / 1000).toFixed(0)}k`;
-  return `$${price.toLocaleString()}`;
 }
 
 // --- Mileage breakpoints ---
@@ -70,7 +67,7 @@ const DRIVETRAIN_OPTIONS = [
 
 // 车况与保障开关（更多条件）
 export const CONDITION_TOGGLES: {
-  key: "noAccident" | "oneOwner" | "hasCarfax" | "cleanTitle" | "hasVideo" | "hasPrice";
+  key: "noAccident" | "oneOwner" | "hasCarfax" | "cleanTitle" | "financing" | "hasVideo" | "hasPrice";
   label: string;
 }[] = [
   { key: "noAccident", label: "无事故" },
@@ -78,6 +75,8 @@ export const CONDITION_TOGGLES: {
   { key: "hasCarfax", label: "有Carfax报告" },
   // 只命中 cars.title_status = 清白产权(未填的不算),见 lib/title-status.ts
   { key: "cleanTitle", label: "仅清白产权" },
+  // 卖家门店标了「支持ITIN贷款」或「无信用记录可贷」,见 lib/dealer-financing.ts(打开时记一次点击统计)
+  { key: "financing", label: LOAN_FILTER_LABEL },
   { key: "hasVideo", label: "带视频" },
   { key: "hasPrice", label: "排除电议" },
 ];
@@ -167,6 +166,8 @@ export interface Filters {
   oneOwner: string;
   hasCarfax: string;
   cleanTitle: string;
+  /** "true" = 只看卖家门店支持 ITIN / 无信用记录贷款的车(lib/dealer-financing.ts) */
+  financing: string;
   hasVideo: string;
   hasPrice: string;
 }
@@ -198,6 +199,7 @@ export const INITIAL_FILTERS: Filters = {
   oneOwner: "",
   hasCarfax: "",
   cleanTitle: "",
+  financing: "",
   hasVideo: "",
   hasPrice: "",
 };
@@ -356,6 +358,7 @@ export function SearchFilters({
     if (key === "fuelType" && value === "纯电") {
       next.transmission = "";
     }
+    if (key === "financing" && value === "true") trackFilterChipClick("financing", locale);
     setFilters(next);
     onFilter(next);
   }
@@ -578,6 +581,8 @@ export function SearchFilters({
             onFilter(next);
           }}
         />
+        {/* 价格筛选的数字是美元(加元车源按 lib/currency.ts 固定汇率折算后比较),写明免得加拿大用户当成加元 */}
+        <p className="mt-2 font-mono text-[10px] text-muted-foreground">{t("按美元筛选，加元车源已折算")}</p>
       </Section>
 
       {/* Monthly payment budget */}
@@ -741,6 +746,7 @@ export function SearchFilters({
             filters.oneOwner ||
             filters.hasCarfax ||
             filters.cleanTitle ||
+            filters.financing ||
             filters.hasVideo ||
             filters.hasPrice
           )

@@ -11,20 +11,12 @@ import { sellerSpeaksLocale, localeLanguageCodes, languageLabel } from "@/lib/i1
 import { formatDistance } from "@/lib/geocode";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
-import { estimateMonthlyPayment } from "@/lib/format";
+import { estimateMonthlyPayment, formatCarMileage, formatCarPrice } from "@/lib/format";
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import { useI18n } from "@/components/i18n-provider";
 import { carLocation, carTitle, localizePath } from "@/lib/i18n";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 function daysListed(car: DbCar): number {
   return (Date.now() - new Date(car.created_at).getTime()) / 86400000;
@@ -33,10 +25,6 @@ function daysListed(car: DbCar): number {
 function isHotListing(car: DbCar): boolean {
   const days = Math.max(1, daysListed(car));
   return (car.views_count || 0) / days >= 30 || (car.favorites_count || 0) >= 5;
-}
-
-function formatMileage(miles: number): string {
-  return new Intl.NumberFormat("en-US").format(miles);
 }
 
 function getFavorites(): string[] {
@@ -167,11 +155,11 @@ export function CarCard({
               <div className="flex items-start justify-between gap-2">
                 <span className="flex min-w-0 flex-wrap items-baseline gap-x-1.5">
                   <span className="font-mono text-lg font-bold tracking-tight">
-                    {formatPrice(car.price)}
+                    {formatCarPrice(car, car.price)}
                   </span>
                   {car.original_price && car.original_price > car.price && (
                     <span className="font-mono text-[11px] text-muted-foreground line-through">
-                      {formatPrice(car.original_price)}
+                      {formatCarPrice(car, car.original_price)}
                     </span>
                   )}
                 </span>
@@ -191,7 +179,7 @@ export function CarCard({
                 {carTitle(car, locale)}
               </h3>
               <p className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
-                {t("{year}年", { year: car.year })} · {formatMileage(car.mileage)} mi · {t(car.fuel_type)}
+                {t("{year}年", { year: car.year })} · {formatCarMileage(car)} · {t(car.fuel_type)}
                 {car.source_id ? ` · ${t("系统检索")}` : ""}
               </p>
 
@@ -407,7 +395,7 @@ export function CarCard({
 
             <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
               <span className="font-mono text-xl font-bold">
-                {formatPrice(car.price)}
+                {formatCarPrice(car, car.price)}
               </span>
               {car.original_price && car.original_price > car.price && (
                 <span className="rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold bg-green-500/10 text-green-600 dark:text-green-400">
@@ -416,7 +404,7 @@ export function CarCard({
               )}
               {car.original_price && car.original_price > car.price && (
                 <span className="font-mono text-[11px] text-muted-foreground line-through">
-                  {formatPrice(car.original_price)}
+                  {formatCarPrice(car, car.original_price)}
                 </span>
               )}
               {priceInsight && (
@@ -428,7 +416,8 @@ export function CarCard({
               )}
               {car.price > 0 && (
                 <span className="font-mono text-[11px] text-muted-foreground">
-                  {t("分期 ~${amt}/月", { amt: estimateMonthlyPayment(car.price) })}
+                  {/* 月供金额和车价同币种(加元车源显示 CA$) */}
+                  {t("分期 ~{amt}/月", { amt: formatCarPrice(car, estimateMonthlyPayment(car.price)) })}
                 </span>
               )}
             </div>
@@ -437,7 +426,7 @@ export function CarCard({
               (priceInsight.level === "great" || priceInsight.level === "good") &&
               priceInsight.delta >= 300 && (
                 <p className="mt-1 truncate font-mono text-[12px] text-green-600 dark:text-green-400">
-                  {t("比同类均价低 {price}", { price: formatPrice(priceInsight.delta) })}
+                  {t("比同类均价低 {price}", { price: formatCarPrice(car, priceInsight.delta) })}
                   <span className="text-muted-foreground">
                     {" "}· {t("{n} 台同类对比", { n: priceInsight.sampleSize })}
                   </span>
@@ -449,7 +438,7 @@ export function CarCard({
               <div className="flex min-w-0 items-center gap-1.5">
                 <Gauge className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
-                  {formatMileage(car.mileage)} mi
+                  {formatCarMileage(car)}
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5">

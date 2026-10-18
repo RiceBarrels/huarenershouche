@@ -13,19 +13,9 @@ import { useI18n } from "@/components/i18n-provider";
 import { useTermLabels } from "@/hooks/use-term-labels";
 import { carLocation, carTitle, brandLabel, type Locale } from "@/lib/i18n";
 import { normTag } from "@/lib/i18n/hashtags";
+import { carMileageMi, carPriceUsd } from "@/lib/currency";
+import { approxMileageMi, approxPriceUsd, formatCarMileage, formatCarPrice } from "@/lib/format";
 import type { DbCar } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
-function formatMileage(miles: number): string {
-  return new Intl.NumberFormat("en-US").format(miles);
-}
 
 const COMPARE_FIELDS: { key: keyof DbCar | "make_zh" | "account_type"; label: string }[] = [
   { key: "make_zh", label: "品牌" },
@@ -52,10 +42,15 @@ function getCellValue(
     case "make_zh":
       // zh「宝马 BMW」/ ko「도요타 Toyota」/ en「Toyota」
       return brandLabel(car.make, MAKES_ZH[car.make], t, locale);
-    case "price":
-      return formatPrice(car.price);
-    case "mileage":
-      return `${formatMileage(car.mileage)} mi`;
+    // 车源自己的币种 / 单位;加元 / 公里车源附「≈」折合美元 / 英里,方便和美国车源并排比较
+    case "price": {
+      const approx = approxPriceUsd(car);
+      return approx ? `${formatCarPrice(car, car.price)} ≈ ${approx}` : formatCarPrice(car, car.price);
+    }
+    case "mileage": {
+      const approx = approxMileageMi(car);
+      return approx ? `${formatCarMileage(car)} ≈ ${approx}` : formatCarMileage(car);
+    }
     case "account_type":
       return car.profiles?.account_type === "dealer" ? t("车行") : t("个人");
     case "views_count":
@@ -136,9 +131,10 @@ export function CompareContent() {
     if (selected.length < 2) return null;
     switch (key) {
       case "price":
-        return selected.reduce((a, b) => (a.price < b.price ? a : b)).id;
+        // 混着加元 / 公里车源时按折合美元 / 英里比较
+        return selected.reduce((a, b) => (carPriceUsd(a) < carPriceUsd(b) ? a : b)).id;
       case "mileage":
-        return selected.reduce((a, b) => (a.mileage < b.mileage ? a : b)).id;
+        return selected.reduce((a, b) => (carMileageMi(a) < carMileageMi(b) ? a : b)).id;
       case "year":
         return selected.reduce((a, b) => (a.year > b.year ? a : b)).id;
       default:
@@ -191,7 +187,7 @@ export function CompareContent() {
                 {carTitle(car, locale)}
               </p>
               <p className="font-mono text-sm font-bold">
-                {formatPrice(car.price)}
+                {formatCarPrice(car, car.price)}
               </p>
             </div>
           </div>

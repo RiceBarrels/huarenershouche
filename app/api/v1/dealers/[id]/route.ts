@@ -6,14 +6,13 @@ import { authenticateApi } from "@/lib/api/auth";
 import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/response";
 import { isUuid } from "@/lib/api/filters";
 import {
-  CAR_SUMMARY_SELECT,
-  LEGACY_CAR_SUMMARY_SELECT,
+  CAR_SUMMARY_SELECTS,
   serializeCarSummary,
   serializeDealer,
   type ApiCarRow,
 } from "@/lib/api/serialize";
 import { fetchContactApps } from "@/lib/api/contact-apps";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 import type { DbDealerStore } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +42,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const visibleCars = () =>
       ctx.supabase.from("cars").select("id", { count: "exact", head: true });
-    // 内容时钟 content_updated_at(i18n-v2.sql)还没建时 CAR_SUMMARY_SELECT 报缺列,用旧列集重查一次
+    // 内容时钟 content_updated_at(i18n-v2.sql)/ 币种与里程单位(car-currency.sql)还没建时报缺列,
+    // 按 CAR_SUMMARY_SELECTS 从新到旧重查
     const dealerCars = (select: string) =>
       ctx.supabase
         .from("cars")
@@ -57,14 +57,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const [{ data: profile, error: profErr }, firstCars, { count, error: countErr }, contactApps] = await Promise.all([
       ctx.supabase.from("profiles").select("languages").eq("id", store.owner_id).maybeSingle(),
-      dealerCars(CAR_SUMMARY_SELECT),
+      queryWithColumnFallback(dealerCars, CAR_SUMMARY_SELECTS),
       visibleCars().eq("seller_id", store.owner_id).eq("status", "active").eq("owner_hidden", false),
       // 门店主人的即时通讯账号只给带 key 的请求(列不存在时为空)
       anonymous ? null : fetchContactApps(ctx.supabase, [store.owner_id]),
     ]);
     if (profErr) throw new Error(profErr.message);
-    let carsRes = firstCars;
-    if (carsRes.error && isMissingColumnError(carsRes.error)) carsRes = await dealerCars(LEGACY_CAR_SUMMARY_SELECT);
+    const carsRes = firstCars;
     if (carsRes.error) throw new Error(carsRes.error.message);
     if (countErr) throw new Error(countErr.message);
 

@@ -53,11 +53,11 @@ import { INITIAL_FILTERS, type Filters } from "@/components/search-filters";
 import { FeatureRow } from "@/components/feature-grid";
 import { MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
-import { paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
+import { formatCarPrice, formatPrice, paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import {
-  CAR_LIST_COLUMNS,
+  CAR_LIST_COLUMN_SETS,
   CAR_PROFILE_EMBED,
   LEGACY_POST_COLUMNS,
   POST_AUTHOR_EMBED,
@@ -289,17 +289,10 @@ function buildUrl(params: Record<string, string>) {
   return `/browse?${sp.toString()}`;
 }
 
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
 // 列表列集:车源卡片只取卡片用列(不含描述/内部 id);社区帖带作者。
 // 迁移 SQL 未执行时帖子新列缺失 → 按旧列集重查
-const HOME_CAR_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+// car-currency.sql 未执行时第二组去掉币种 / 里程单位(缺失按 USD / mi 显示)
+const HOME_CAR_SELECTS = CAR_LIST_COLUMN_SETS.map((cols) => `${cols}, ${CAR_PROFILE_EMBED}`);
 const HOME_POST_SELECT = `${POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
 const LEGACY_HOME_POST_SELECT = `${LEGACY_POST_COLUMNS}, ${POST_AUTHOR_EMBED}`;
 
@@ -370,14 +363,18 @@ export default function Home() {
           .order("created_at", { ascending: false })
           .limit(12);
       const [carsRes, countRes, firstPostsRes] = await Promise.all([
-        supabase
-          .from("cars")
-          .select(HOME_CAR_SELECT)
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .order("created_at", { ascending: false })
-          // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
-          .limit(withHistory ? 200 : 60),
+        queryWithColumnFallback(
+          (select) =>
+            supabase
+              .from("cars")
+              .select(select)
+              .eq("status", "active")
+              .eq("owner_hidden", false)
+              .order("created_at", { ascending: false })
+              // 有个性化信号时拉更大的候选池来排序,否则拉一小批用于直发优先展示
+              .limit(withHistory ? 200 : 60),
+          HOME_CAR_SELECTS
+        ),
         supabase
           .from("cars")
           .select("id", { count: "exact", head: true })
@@ -407,7 +404,10 @@ export default function Home() {
         let favoriteCars: DbCar[] = [];
         let viewedCars: DbCar[] = [];
         if (signalIds.length > 0) {
-          const { data: sig } = await supabase.from("cars").select(CAR_LIST_COLUMNS).in("id", signalIds);
+          const { data: sig } = await queryWithColumnFallback(
+            (cols) => supabase.from("cars").select(cols).in("id", signalIds),
+            CAR_LIST_COLUMN_SETS
+          );
           const byId = new Map(((sig as unknown as DbCar[]) || []).map((c) => [c.id, c]));
           // 保持收藏/浏览的原有顺序(浏览按新近度)
           favoriteCars = favIds.map((id) => byId.get(id)).filter(Boolean) as DbCar[];
@@ -994,7 +994,7 @@ export default function Home() {
                     <div className="min-w-0">
                       <p className="truncate font-mono text-[10px]">{carTitle(c, locale)}</p>
                       <p className="font-mono text-[11px] font-bold text-red-500">
-                        {c.price > 0 ? `$${c.price.toLocaleString()}` : t("电议")}
+                        {c.price > 0 ? formatCarPrice(c, c.price) : t("电议")}
                       </p>
                     </div>
                   </div>
@@ -1036,10 +1036,10 @@ export default function Home() {
                         <div className="min-w-0">
                           <p className="truncate font-mono text-[10px]">{carTitle(c, locale)}</p>
                           <p className="font-mono text-[11px] font-bold text-red-500">
-                            {c.price > 0 ? `$${c.price.toLocaleString()}` : t("电议")}
+                            {c.price > 0 ? formatCarPrice(c, c.price) : t("电议")}
                             {useDropped && c.original_price && (
                               <span className="ml-1 font-normal text-muted-foreground line-through">
-                                ${c.original_price.toLocaleString()}
+                                {formatCarPrice(c, c.original_price)}
                               </span>
                             )}
                           </p>

@@ -38,7 +38,16 @@ import {
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { addToCompare, removeFromCompare, isInCompare } from "@/lib/compare";
-import { timeAgo, estimateMonthlyPayment, LOAN_ASSUMPTION } from "@/lib/format";
+import {
+  timeAgo,
+  estimateMonthlyPayment,
+  LOAN_ASSUMPTION,
+  approxMileageMi,
+  approxPriceUsd,
+  formatCarMileage,
+  formatCarPrice,
+} from "@/lib/format";
+import { CAD_PER_USD, carCurrency, carPriceUsd } from "@/lib/currency";
 import { SITE_URL } from "@/lib/seo-pages";
 import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { avatarUrl } from "@/lib/avatar";
@@ -86,7 +95,7 @@ import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { normTag } from "@/lib/i18n/hashtags";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import {
-  CAR_LIST_COLUMNS,
+  CAR_LIST_COLUMN_SETS,
   CAR_PROFILE_EMBED,
   PUBLIC_CAR_COLUMN_SETS,
 } from "@/lib/i18n/content/columns";
@@ -102,20 +111,11 @@ import { QrShare } from "@/components/qr-share";
 import { ContactAppButtons, useSellerContactApps } from "@/components/contact-app-buttons";
 import { hasContactApps } from "@/lib/contact-apps";
 import { TitleStatusBadge } from "@/components/title-status-badge";
+import { DealerFinancingTags } from "@/components/dealer-financing-tags";
+import { CarConditionChecklist } from "@/components/car-condition-checklist";
+import { isConditionEmpty } from "@/lib/car-condition";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar, DbComment, PublicCar } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
-
-function formatMileage(miles: number): string {
-  return new Intl.NumberFormat("en-US").format(miles);
-}
 
 const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv)(\?|$)/i;
 function isVideo(url: string): boolean {
@@ -140,13 +140,16 @@ interface CarDetailProps {
   onRelisted?: () => void;
 }
 
-// 详情整行:公开列 + 卖家资料(不含电话,登录后点开联系方式再单独取);从新到旧三组列集合
-// (title-status.sql / i18n-v2.sql 各自可能还没执行)
+// 详情整行:公开列 + 卖家资料(不含电话,登录后点开联系方式再单独取);从新到旧多组列集合
+// (title-status.sql / i18n-v2.sql / car-currency.sql 各自可能还没执行)
 const CAR_ROW_SELECTS = PUBLIC_CAR_COLUMN_SETS.map((cols) => `${cols}, ${CAR_PROFILE_EMBED}`);
-// 相似车渲染成卡片:列表列集 + 卖家资料(车行 / 系统检索徽标)
-const CAR_CARD_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
-// 市场比价池只用到这几列(最多 150 台,不拉卡片列)
-const PRICE_POOL_SELECT = "id, make, model, year, price, mileage, status, vin";
+// 相似车渲染成卡片:列表列集 + 卖家资料(车行 / 系统检索徽标);car-currency.sql 未执行时第二组去掉币种 / 单位
+const CAR_CARD_SELECTS = CAR_LIST_COLUMN_SETS.map((cols) => `${cols}, ${CAR_PROFILE_EMBED}`);
+// 市场比价池只用到这几列(最多 150 台,不拉卡片列);币种 / 里程单位用于折算成美元 / 英里再比价
+const PRICE_POOL_SELECTS = [
+  "id, make, model, year, price, mileage, status, vin, currency, mileage_unit",
+  "id, make, model, year, price, mileage, status, vin",
+] as const;
 const NO_FEATURES: readonly string[] = [];
 
 /**
@@ -321,34 +324,43 @@ function CarDetailView({
   const make = car?.make;
   const model = car?.model;
   const year = car?.year;
-  const price = car?.price;
+  // 价差比较一律按折合美元(加元车源和美元车源混在一起时不直接比原值)
+  const price = car ? carPriceUsd(car) : undefined;
   useEffect(() => {
     if (!make || year === undefined || price === undefined) return;
     let cancelled = false;
     (async () => {
       // 同品牌车源池：用于市场比价（getPriceInsight / findComparables）
-      const { data: pool } = await supabase
-        .from("cars")
-        .select(PRICE_POOL_SELECT)
-        .eq("status", "active")
-        .eq("owner_hidden", false)
-        .eq("make", make)
-        .limit(150);
+      const { data: pool } = await queryWithColumnFallback(
+        (cols) =>
+          supabase
+            .from("cars")
+            .select(cols)
+            .eq("status", "active")
+            .eq("owner_hidden", false)
+            .eq("make", make)
+            .limit(150),
+        PRICE_POOL_SELECTS
+      );
       if (cancelled) return;
-      setMakePool((pool as DbCar[] | null) || []);
+      setMakePool((pool as unknown as DbCar[] | null) || []);
 
       // 相似车：优先同 make+model（±2 年）按上架时间新到旧，
       // 不足 4 台补同 make 按 |价差| 从小到大，再不足补 ±30% 价格区间
-      const { data: sameMake } = await supabase
-        .from("cars")
-        .select(CAR_CARD_SELECT)
-        .eq("status", "active")
-        .eq("owner_hidden", false)
-        .eq("make", make)
-        .neq("id", carId)
-        .order("created_at", { ascending: false })
-        .limit(24);
-      const sameMakeCars = (sameMake as DbCar[] | null) || [];
+      const { data: sameMake } = await queryWithColumnFallback(
+        (select) =>
+          supabase
+            .from("cars")
+            .select(select)
+            .eq("status", "active")
+            .eq("owner_hidden", false)
+            .eq("make", make)
+            .neq("id", carId)
+            .order("created_at", { ascending: false })
+            .limit(24),
+        CAR_CARD_SELECTS
+      );
+      const sameMakeCars = (sameMake as unknown as DbCar[] | null) || [];
       const modelKey = (model || "").toLowerCase().trim();
       const tier1 = modelKey
         ? sameMakeCars.filter(
@@ -362,23 +374,30 @@ function CarDetailView({
         .filter((c) => !tier1.some((t) => t.id === c.id))
         .sort((a, b) =>
           price > 0
-            ? Math.abs(a.price - price) - Math.abs(b.price - price)
+            ? Math.abs(carPriceUsd(a) - price) - Math.abs(carPriceUsd(b) - price)
             : Math.abs(a.year - year) - Math.abs(b.year - year)
         );
       let picked = [...tier1, ...tier2].slice(0, 4);
       if (picked.length < 4 && price > 0) {
-        const { data: priceSimilar } = await supabase
-          .from("cars")
-          .select(CAR_CARD_SELECT)
-          .eq("status", "active")
-          .eq("owner_hidden", false)
-          .neq("id", carId)
-          .gte("price", price * 0.7)
-          .lte("price", price * 1.3)
-          .limit(8);
-        const extra = ((priceSimilar as DbCar[] | null) || []).filter(
-          (c) => !picked.some((p) => p.id === c.id)
+        // 库里是各车自己的币种:原值区间放宽到能覆盖加元车源(美元价 × CAD_PER_USD),
+        // 拉回来后再按折合美元精确筛 ±30%
+        const { data: priceSimilar } = await queryWithColumnFallback(
+          (select) =>
+            supabase
+              .from("cars")
+              .select(select)
+              .eq("status", "active")
+              .eq("owner_hidden", false)
+              .neq("id", carId)
+              .gte("price", Math.floor(price * 0.7))
+              .lte("price", Math.ceil(price * 1.3 * CAD_PER_USD))
+              .limit(16),
+          CAR_CARD_SELECTS
         );
+        const extra = ((priceSimilar as unknown as DbCar[] | null) || []).filter((c) => {
+          const usd = carPriceUsd(c);
+          return usd >= price * 0.7 && usd <= price * 1.3 && !picked.some((p) => p.id === c.id);
+        });
         picked = [...picked, ...extra].slice(0, 4);
       }
       if (!cancelled) setSimilarCars(picked);
@@ -451,6 +470,9 @@ function CarDetailView({
   const revealedPhone = contactVisible && !phoneLoading ? (car?.phone ?? null) : null;
 
   // 市场比价：与同品牌车源池对比（里程修正后的同类均价）;比价只读价格 / 里程 / 年份等公开列
+  // 加元 / 公里车源附「≈」折合美元 / 英里(美元 / 英里车源为 null,不显示)
+  const approxPrice = car ? approxPriceUsd(car) : null;
+  const approxMileage = car ? approxMileageMi(car) : null;
   const insight = useMemo(
     () => (car ? getPriceInsight(car as DbCar, makePool) : null),
     [car, makePool]
@@ -816,8 +838,14 @@ function CarDetailView({
 
               <div className="mt-4 flex flex-wrap items-baseline gap-2">
                 <span className="font-mono text-2xl font-bold tabular-nums md:text-3xl">
-                  {formatPrice(car.price)}
+                  {formatCarPrice(car, car.price)}
                 </span>
+                {/* 加元车源附折合美元(固定近似汇率,lib/currency.ts);星号对应价格行下方的说明 */}
+                {approxPrice && (
+                  <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                    ≈ {approxPrice}*
+                  </span>
+                )}
                 {insight && (
                   <span
                     className={`rounded-full px-1.5 py-0.5 font-mono text-xs font-semibold ${insight.className}`}
@@ -832,7 +860,7 @@ function CarDetailView({
                 )}
                 {car.original_price && car.original_price > car.price && (
                   <span className="font-mono text-sm text-muted-foreground line-through">
-                    {formatPrice(car.original_price)}
+                    {formatCarPrice(car, car.original_price)}
                   </span>
                 )}
                 {watchedPrice !== null && watchedPrice !== car.price && (
@@ -849,7 +877,7 @@ function CarDetailView({
                       <TrendingUp className="h-3.5 w-3.5" strokeWidth={1.5} />
                     )}
                     {car.price < watchedPrice ? t("降") : t("涨")}
-                    {formatPrice(Math.abs(car.price - watchedPrice))}
+                    {formatCarPrice(car, Math.abs(car.price - watchedPrice))}
                   </span>
                 )}
                 {/* 桌面把浏览/收藏/上架时间这组次要元数据推到行尾,与价格拉开视觉分组(手机保持顺排换行) */}
@@ -869,9 +897,15 @@ function CarDetailView({
                   {t("{time}上架", { time: timeAgo(car.created_at, t) })}
                 </span>
               </div>
+              {/* 汇率说明直接写出来(手机 / App 没有悬停提示) */}
+              {approxPrice && (
+                <p className="mt-1.5 font-mono text-[11px] text-muted-foreground">
+                  * {t("按固定近似汇率换算，仅供参考")}
+                </p>
+              )}
             </div>
 
-            <PriceHistoryChart carId={carId} />
+            <PriceHistoryChart carId={carId} currency={carCurrency(car)} />
 
             {/* 市场价位:min—avg—max 价位条 + 当前车价 marker */}
             <MarketPosition car={car as DbCar} comparables={comparables} insight={insight} />
@@ -907,8 +941,11 @@ function CarDetailView({
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-sm font-medium tabular-nums">
-                    {formatMileage(car.mileage)} mi
+                    {formatCarMileage(car)}
                   </p>
+                  {approxMileage && (
+                    <p className="font-mono text-[10px] tabular-nums text-muted-foreground">≈ {approxMileage}</p>
+                  )}
                 </div>
                 <div className="rounded-xl bg-card p-3">
                   <div className="flex items-center gap-1.5">
@@ -1009,6 +1046,14 @@ function CarDetailView({
                     ))}
                   </div>
                 </div>
+              </Reveal>
+            )}
+
+            {/* 车况清单:只列卖家填了的项,整张没填(或 car-condition.sql 未执行、没有该字段)不显示 */}
+            {!isConditionEmpty(car.condition) && (
+              <Reveal ssrVisible>
+                <Separator className="my-6" />
+                <CarConditionChecklist value={car.condition} />
               </Reveal>
             )}
 
@@ -1151,6 +1196,9 @@ function CarDetailView({
                   </button>
                 </OpenInMaps>
               )}
+
+              {/* 车行贷款 / 付款方式标签(卖家门店自填)+ 合规提示;没有标签不渲染 */}
+              <DealerFinancingTags key={car.seller_id} sellerId={car.seller_id} carId={car.id} />
 
               {car.profiles?.is_system && (
                 <div className="mt-2 space-y-1.5 border-t border-border pt-2">
@@ -1394,7 +1442,7 @@ function CarDetailView({
                       const { nativeShare } = await import("@/lib/capacitor");
                       const shared = await nativeShare({
                         title,
-                        text: `${title} - ${formatPrice(car.price)}`,
+                        text: `${title} - ${formatCarPrice(car, car.price)}`,
                         url: shareUrl,
                       });
                       if (!shared) {
@@ -1488,8 +1536,9 @@ function CarDetailView({
                 <div className="mt-3 rounded-xl bg-muted/50 p-4">
                   <div className="border-l-2 border-foreground pl-3">
                     <p className="font-mono text-xl font-bold">
-                      {/* 固定 en-US 千分位:不随浏览器区域变,SSR 与水合一致 */}
-                      {t("${n}/月*", { n: estimateMonthlyPayment(car.price).toLocaleString("en-US") })}
+                      {/* 月供按车源币种显示(加元 → CA$),写法同 LoanCalculator:金额 + t("/月");formatCarPrice 固定 en-US,SSR 与水合一致 */}
+                      {formatCarPrice(car, estimateMonthlyPayment(car.price))}
+                      {t("/月")}*
                     </p>
                     <p className="mt-0.5 font-mono text-[11px] text-muted-foreground">
                       {t("按 {apr}% APR 估算*", { apr: (LOAN_ASSUMPTION.apr * 100).toFixed(1) })}
@@ -1514,7 +1563,7 @@ function CarDetailView({
                       <div className="h-8 w-8" />
                     </div>
                     <div className="overflow-y-auto px-4 pb-8">
-                      <LoanCalculator price={car.price} />
+                      <LoanCalculator price={car.price} currency={carCurrency(car)} />
                     </div>
                   </NonModalDrawer>
                   <p className="mt-2 font-mono text-[10px] text-muted-foreground/70">
@@ -1600,7 +1649,7 @@ function CarDetailView({
         {/* min-w-0:按钮多时价格块可收缩,标签先截断,不把底栏撑出屏幕 */}
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
-            <p className="shrink-0 font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+            <p className="shrink-0 font-mono text-lg font-bold">{formatCarPrice(car, car.price)}</p>
             {insight && (
               <span
                 className={`min-w-0 truncate rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
@@ -1638,7 +1687,7 @@ function CarDetailView({
               const { nativeShare } = await import("@/lib/capacitor");
               const shared = await nativeShare({
                 title,
-                text: `${title} - ${formatPrice(car.price)}`,
+                text: `${title} - ${formatCarPrice(car, car.price)}`,
                 url: shareUrl,
               });
               if (!shared) {

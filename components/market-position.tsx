@@ -1,6 +1,7 @@
 "use client";
 
 import { formatPrice } from "@/lib/format";
+import { carCurrency, convertCurrency } from "@/lib/currency";
 import { useI18n } from "@/components/i18n-provider";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
@@ -19,7 +20,9 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
   const { t } = useI18n();
   if (!insight || comparables.length === 0 || car.price <= 0) return null;
 
-  const prices = comparables.map((c) => c.price);
+  // 全部按这台车的币种显示:同类里的加元 / 美元车源按固定近似汇率折算(insight 的金额已是这台车的币种)
+  const currency = carCurrency(car);
+  const prices = comparables.map((c) => Math.round(convertCurrency(c.price, carCurrency(c), currency)));
   const avg = insight.marketAvg;
   // 刻度范围覆盖同类最低/最高价、修正后均价与当前车价
   const lo = Math.min(...prices, car.price, avg);
@@ -53,7 +56,7 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
             style={{ left: `${carPct}%` }}
           >
             <span className="whitespace-nowrap font-mono text-[11px] font-bold tabular-nums">
-              {formatPrice(car.price)}
+              {formatPrice(car.price, currency)}
             </span>
             <div className="h-0 w-0 border-x-4 border-t-[5px] border-x-transparent border-t-foreground" />
           </div>
@@ -72,14 +75,14 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
         </div>
         {/* min / avg / max 标签 */}
         <div className="relative mt-1.5 flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground">
-          <span>{t("低")} {formatPrice(lo)}</span>
+          <span>{t("低")} {formatPrice(lo, currency)}</span>
           <span
             className="absolute -translate-x-1/2 whitespace-nowrap"
             style={{ left: `${avgLabelPct}%` }}
           >
-            {t("均价")} {formatPrice(avg)}
+            {t("均价")} {formatPrice(avg, currency)}
           </span>
-          <span>{t("高")} {formatPrice(hi)}</span>
+          <span>{t("高")} {formatPrice(hi, currency)}</span>
         </div>
       </div>
 
@@ -87,11 +90,11 @@ export function MarketPosition({ car, comparables, insight }: MarketPositionProp
       <p className="mt-4 font-mono text-[11px] md:text-xs">
         {insight.delta > 0 ? (
           <span className="font-semibold text-green-600">
-            {t("低于市场均价 {price}", { price: formatPrice(insight.delta) })}
+            {t("低于市场均价 {price}", { price: formatPrice(insight.delta, currency) })}
           </span>
         ) : insight.delta < 0 ? (
           <span className="font-semibold text-orange-600">
-            {t("高于市场均价 {price}", { price: formatPrice(Math.abs(insight.delta)) })}
+            {t("高于市场均价 {price}", { price: formatPrice(Math.abs(insight.delta), currency) })}
           </span>
         ) : (
           <span className="font-semibold text-foreground">{t("与市场均价持平")}</span>

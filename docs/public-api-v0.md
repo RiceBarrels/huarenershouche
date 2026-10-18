@@ -117,6 +117,20 @@ SQL 未执行时带 key 的请求也返回 `{}`。
 `null` —— **null 不代表清白产权**。转载车源只在源站描述 / 标签里明确写出(clean title、rebuilt title、salvage、lemon buyback)时才有值,
 互相矛盾或没写为 null。不敏感,不脱敏;SQL 未执行时恒为 null。
 
+车况清单 `condition`(车源详情,卖家填写;`cars.condition` jsonb,`supabase/car-condition.sql`,规则见 `lib/car-condition.ts`):
+`{ service_records, one_owner, smoker, keys_count, tires_condition, known_issues }`。前三项布尔,`keys_count` 为 0–5 的整数,
+`tires_condition` 为 `{ value, label }`(`new` / `good` / `fair` / `needs_replacement`,库内 `新` / `良好` / `一般` / `需更换`),
+`known_issues` 为 `{ value, label }` 数组(`engine` / `transmission` / `air_conditioning` / `electrical` / `oil_leak` / `rust` /
+`accident_repair` / `suspension`,库内 `发动机` / `变速箱` / `空调` / `电子系统` / `漏油` / `车身锈蚀` / `事故修复` / `悬挂`)。
+没填的项为 `null`(**null 不代表「否」**);`known_issues: []` = 卖家明确表示无已知问题,`null` = 没填。只有固定选项、**没有自由文本**
+(自由文本会绕开翻译管线和 AI 审核,细节写在描述里)。不敏感,不脱敏;不进内容时钟(改清单不移动 `updated_at`);SQL 未执行时各项恒为 null。
+
+币种与里程单位(列表 / 详情 / 门店在售车 / 库存都有):`price` / `original_price` 是 `currency` 币种的整数(`USD` 默认,加拿大车源为 `CAD`),
+`mileage` 的单位是 `mileage_unit`(`mi` 默认,或 `km`);库里存卖家填的原值(`cars.currency` / `cars.mileage_unit`,
+`supabase/car-currency.sql`),不做换算,SQL 未执行时恒为 `USD` / `mi`。列表筛选 `price_min` / `price_max` 按美元、`mileage_max` 按英里,
+加元 / 公里车源按固定近似换算(`lib/currency.ts`:1 USD ≈ 1.38 CAD、1 mi = 1.609344 km,不是实时汇率)后比较,与站内 /browse 同一口径;
+`sort=price_asc|price_desc|mileage_asc` 按各车自己的原值排序(不换算)。
+
 多语言(i18n v2):
 
 - 详情的 `description` 按 `lang` 给译文(该语言 `i18n_bundle` 为 ok 时),否则给原文,**不拿原文冒充译文**;`description_translated` 标明是否为译文,`description_original` 是卖家原文(逐字),`description_lang` 是原文语言(ISO 639-1 两字母代码;检测完成前为 null,检测结果为 `und`(判断不出,如只有车型和数字)或 `other`(不认识的语言)时也为 null)。
@@ -142,13 +156,22 @@ SQL 未执行时带 key 的请求也返回 `{}`。
   "external_id": "STK12345",           // 必填
   "vin": "1HGCV1F3XLA012345",          // 必填(P0 起就要求,做去重与解码)
   "year": 2020, "make": "Honda", "model": "Accord", "trim": "Sport",
-  "price": 18900,                      // 必填,整数美元;0 = 电议
-  "original_price": 19900,
-  "mileage": 41200,                    // 必填,英里
+  "price": 18900,                      // 必填,整数,币种见 currency;0 = 电议
+  "original_price": 19900,             // 与 price 同币种
+  "currency": "USD",                   // USD|CAD;省略 = 保留原值(新建为 USD),null = 恢复 USD
+  "mileage": 41200,                    // 必填,整数,单位见 mileage_unit
+  "mileage_unit": "mi",                // mi|km;省略 = 保留原值(新建为 mi),null = 恢复 mi
   "fuel_type": "gasoline",             // gasoline|hybrid|phev|electric|diesel
   "transmission": "automatic",         // automatic|manual|cvt
   "drivetrain": "fwd",                 // fwd|rwd|awd|4wd
   "title_status": "clean",             // clean|rebuilt|salvage|lemon_buyback;省略 = 保留原值(新建为空),null = 清空
+  "condition": {                       // 车况清单,选填;省略 = 保留原值(新建为空),null = 清空,对象 = 整张替换
+    "service_records": true,           //   各项都可省略或 null(= 没填);未知键 → 400(没有自由文本键)
+    "one_owner": true, "smoker": false,
+    "keys_count": 2,                   //   0–5
+    "tires_condition": "good",         //   new|good|fair|needs_replacement
+    "known_issues": []                 //   engine|transmission|air_conditioning|electrical|oil_leak|rust|accident_repair|suspension;[] = 无已知问题
+  },
   "exterior_color": "white", "interior_color": "black",
   "description": "...",                // 任一语言,原样存为原文;其他语言由 i18n 管线翻译
   "description_lang": "en",            // 已弃用:可传但忽略(原文语言自动检测)
@@ -156,14 +179,14 @@ SQL 未执行时带 key 的请求也返回 `{}`。
   "images": ["https://cdn.dealer.com/1.jpg", "..."],   // 最多 30 张
   "carfax_url": "https://...",
   "store_id": "e0000000-…",            // 多门店时选;省略 = 第一家已认证门店
-  "location": null                     // 车行省略 = 跟随门店地址;个人必填(城市或 zip)
+  "location": null                     // 车行省略 = 跟随门店地址;个人必填(城市、美国 zip 或加拿大邮编)
 }
 ```
 
 服务端处理链(复用现有能力,不另造):
 
 1. 校验 schema(zod)、VIN 格式(`isValidVinFormat`),同 seller 内 VIN 重复 → 409。
-2. 英文枚举 → DB 中文值映射(`gasoline → 汽油`、`rebuilt → 重建产权`),新建 `lib/api/enums.ts` 做双向表。`title_status` 只在请求里显式给出(含 null)时写;`supabase/title-status.sql` 未执行时静默不存,其余字段照常写入。
+2. 英文枚举 → DB 中文值映射(`gasoline → 汽油`、`rebuilt → 重建产权`),新建 `lib/api/enums.ts` 做双向表。`title_status` 只在请求里显式给出(含 null)时写;`supabase/title-status.sql` 未执行时静默不存,其余字段照常写入。`currency` / `mileage_unit` 同理(取值非法 → 400 `validation_failed`);`supabase/car-currency.sql` 未执行时静默不存(库里只有美元 / 英里)。`condition` 同理:只在显式给出时写(null 写成 `{}`),对象按 slug 转成库内中文、重复的已知问题去重,未知键 / 非法取值 → 400 `validation_failed`;`supabase/car-condition.sql` 未执行时静默不存。
 3. `title`/`title_zh` 由 year/make/model/trim 确定性生成(`lib/i18n/car-title.ts` `buildCarTitles`,与 SQL `i18n.car_title` 一致,不经 AI)。
 4. location/lat/lng:车行取门店地址(`dealer_stores`);个人没有门店,必须在请求体传 `location`(或 zip),服务端用 `lib/geocode.ts` 解析坐标。`location_zh` 用 sync 引擎里的 `CITY_ZH` 表。
 5. `seller_name`/`phone` 取 profile。

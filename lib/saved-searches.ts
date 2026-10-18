@@ -2,6 +2,7 @@ import type { DbCar } from "./types";
 import { classifyBodyStyle, bodyStyleLabel, type BodyStyle } from "./body-style";
 import { paymentToPrice } from "./format";
 import { CLEAN_TITLE } from "./title-status";
+import { carMileageMi, carPriceUsd } from "./currency";
 
 const STORAGE_KEY = "huaren_saved_searches";
 const MAX_ITEMS = 20;
@@ -138,6 +139,7 @@ export function describeSearch(params: Record<string, string>): string {
   if (params.oneOwner) parts.push("一手车主");
   if (params.hasCarfax) parts.push("有Carfax");
   if (params.cleanTitle) parts.push("仅清白产权");
+  if (params.financing) parts.push("可贷款(无信用/ITIN)");
   if (params.hasVideo) parts.push("带视频");
   if (params.hasPrice) parts.push("排除电议");
   if (params.features) parts.push(params.features.split(",").join("/"));
@@ -154,8 +156,8 @@ export function carHasVideo(car: Pick<DbCar, "image_url" | "images">): boolean {
 }
 
 /**
- * 新车源提醒用的匹配器。覆盖除 地区/距离/好价评级 以外的全部筛选维度
- * （这三项依赖上下文数据，点进列表页仍会完整过滤）。
+ * 新车源提醒用的匹配器。覆盖除 地区/距离/好价评级/可贷款(financing) 以外的全部筛选维度
+ * （这几项依赖上下文数据——可贷款要查卖家门店——点进列表页仍会完整过滤）。
  * 注意：realtime-notifications 里的 select 列清单必须覆盖这里用到的字段。
  */
 export function carMatchesParams(
@@ -175,15 +177,16 @@ export function carMatchesParams(
     const text = `${car.make} ${car.model} ${car.title} ${car.title_zh}`.toLowerCase();
     if (!text.includes(kw)) return false;
   }
-  if (params.minPrice && car.price < +params.minPrice) return false;
-  if (params.maxPrice && car.price > +params.maxPrice) return false;
+  // 价格 / 月供上限是美元、里程上限是英里:加元 / 公里车源折算后比(同 lib/car-filters.ts)
+  if (params.minPrice && carPriceUsd(car) < +params.minPrice) return false;
+  if (params.maxPrice && carPriceUsd(car) > +params.maxPrice) return false;
   if (params.maxPayment) {
     const maxPrice = paymentToPrice(+params.maxPayment);
-    if (car.price > maxPrice || car.price <= 0) return false;
+    if (carPriceUsd(car) > maxPrice || car.price <= 0) return false;
   }
   if (params.minYear && car.year < +params.minYear) return false;
   if (params.maxYear && car.year > +params.maxYear) return false;
-  if (params.maxMileage && car.mileage > +params.maxMileage) return false;
+  if (params.maxMileage && carMileageMi(car) > +params.maxMileage) return false;
   if (params.fuelType) {
     const fuels = params.fuelType.split(",");
     if (!fuels.includes(car.fuel_type)) return false;

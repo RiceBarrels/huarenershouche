@@ -16,12 +16,15 @@ import {
   truncateText,
 } from "@/lib/analytics/path";
 import { localeFromPath, stripLocale } from "@/lib/i18n";
-import type {
-  AnalyticsDevice,
-  AnalyticsEventType,
-  AnalyticsPlatform,
+import {
+  TRACKED_FILTER_CHIPS,
+  type AnalyticsDevice,
+  type AnalyticsEventType,
+  type AnalyticsPlatform,
+  type ClickKind,
 } from "@/lib/analytics/types";
 import { CONTACT_CHANNELS, type ContactChannel } from "@/lib/contact-apps";
+import { FINANCING_TAGS } from "@/lib/dealer-financing";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -210,32 +213,66 @@ export function parseTrackPayload(body: string): ParsedTrack | null {
   };
 }
 
-// ---------- 联系按钮点击(contact_click) ----------
+// ---------- 点击统计(click:联系按钮 / 车行贷款标签 / 筛选开关) ----------
 
-/** ContactClickPayload(lib/analytics/types.ts)的校验 */
-export const contactClickSchema = z.object({
-  type: z.literal("contact_click"),
+const clickBase = {
   visitor_id: z.string().uuid(),
   session_id: z.string().uuid(),
-  car_id: z.string().uuid(),
-  app: z.enum(CONTACT_CHANNELS),
   locale: optionalText(10),
   platform: z.enum(["web", "ios", "android"]),
   token: z.string().max(MAX_TOKEN).nullish(),
+};
+
+/**
+ * ClickEventPayload(lib/analytics/types.ts)的校验:按 kind 区分必填字段,与 click_events 的
+ * click_events_kind_fields 约束一一对应(contact 带 app + car_id;financing_tag 带标签 + car_id;
+ * filter_chip 只带白名单里的筛选键)
+ */
+export const clickEventSchema = z.discriminatedUnion("kind", [
+  z.object({
+    type: z.literal("click"),
+    kind: z.literal("contact"),
+    car_id: z.string().uuid(),
+    app: z.enum(CONTACT_CHANNELS),
+    ...clickBase,
+  }),
+  z.object({
+    type: z.literal("click"),
+    kind: z.literal("financing_tag"),
+    car_id: z.string().uuid(),
+    target: z.enum(FINANCING_TAGS),
+    ...clickBase,
+  }),
+  z.object({
+    type: z.literal("click"),
+    kind: z.literal("filter_chip"),
+    target: z.enum(TRACKED_FILTER_CHIPS),
+    ...clickBase,
+  }),
+]);
+
+/** batch 1 的旧载荷(type = contact_click):已装旧版 App 包的设备仍会发,按 kind = contact 收 */
+const legacyContactClickSchema = z.object({
+  type: z.literal("contact_click"),
+  car_id: z.string().uuid(),
+  app: z.enum(CONTACT_CHANNELS),
+  ...clickBase,
 });
 
-export interface ParsedContactClick {
+export interface ParsedClickEvent {
+  kind: ClickKind;
   visitor_id: string;
   session_id: string;
-  car_id: string;
-  app: ContactChannel;
+  car_id: string | null;
+  app: ContactChannel | null;
+  target: string | null;
   locale: string | null;
   platform: AnalyticsPlatform;
   token: string | null;
 }
 
-/** 请求体文本 → ParsedContactClick;不是 contact_click / 校验失败 → null(调用方再按 pageview / car_view 解析) */
-export function parseContactClickPayload(body: string): ParsedContactClick | null {
+/** 请求体文本 → ParsedClickEvent;不是点击载荷 / 校验失败 → null(调用方再按 pageview / car_view 解析) */
+export function parseClickPayload(body: string): ParsedClickEvent | null {
   if (!body || body.length > MAX_BODY_BYTES) return null;
   let json: unknown;
   try {
@@ -243,15 +280,21 @@ export function parseContactClickPayload(body: string): ParsedContactClick | nul
   } catch {
     return null;
   }
-  if (!json || typeof json !== "object" || (json as { type?: unknown }).type !== "contact_click") return null;
-  const result = contactClickSchema.safeParse(json);
+  if (!json || typeof json !== "object") return null;
+  const type = (json as { type?: unknown }).type;
+  if (type !== "click" && type !== "contact_click") return null;
+  const result =
+    type === "click" ? clickEventSchema.safeParse(json) : legacyContactClickSchema.safeParse(json);
   if (!result.success) return null;
   const p = result.data;
+  const kind: ClickKind = p.type === "contact_click" ? "contact" : p.kind;
   return {
+    kind,
     visitor_id: p.visitor_id.toLowerCase(),
     session_id: p.session_id.toLowerCase(),
-    car_id: p.car_id.toLowerCase(),
-    app: p.app,
+    car_id: "car_id" in p ? p.car_id.toLowerCase() : null,
+    app: "app" in p ? p.app : null,
+    target: "target" in p ? p.target : null,
     locale: cleanLocale(p.locale),
     platform: p.platform,
     token: p.token?.trim() || null,

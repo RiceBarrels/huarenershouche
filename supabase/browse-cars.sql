@@ -12,14 +12,26 @@
 --
 -- 「仅清白产权」筛选读 cars.title_status(supabase/title-status.sql 负责列 + CHECK)。
 -- 函数体在创建时就要校验列存在,这里先 add column if not exists 兜底,两个文件谁先执行都行。
+--
+-- 价格 / 里程筛选与排序、月供预算按折合美元 / 英里比较(cars.currency / cars.mileage_unit,
+-- supabase/car-currency.sql 负责 CHECK;同样先 add column 兜底,定义与该文件一致)。
+-- 换算见 browse_price_usd / browse_mileage_mi,常量与 lib/currency.ts 的 CAD_PER_USD / KM_PER_MI 一致。
+--
+-- 「可贷款(无信用/ITIN)」筛选读 dealer_stores.financing(supabase/dealer-financing.sql 负责 CHECK + 索引;
+-- 同样先 add column 兜底,定义与该文件一致):卖家名下任一门店含「支持ITIN贷款」或「无信用记录可贷」即命中,
+-- 标签与 lib/dealer-financing.ts 的 LOAN_FILTER_TAGS 一致。
 
 alter table public.cars add column if not exists title_status text;
+alter table public.cars add column if not exists currency text not null default 'USD';
+alter table public.cars add column if not exists mileage_unit text not null default 'mi';
+alter table public.dealer_stores add column if not exists financing text[] not null default '{}';
 
 create table if not exists public.car_browse_meta (
   car_id uuid primary key references public.cars(id) on delete cascade,
   body_style text,
   search_pinyin text,
   -- { level: great|good|fair|high, delta, marketAvg, sampleSize, sameModel }
+  -- 比价时同类车源先折合美元 / 英里(不拿加元和美元直接比);delta / marketAvg 存的是该车自己的币种
   deal jsonb,
   updated_at timestamptz not null default now()
 );
@@ -36,6 +48,24 @@ language sql
 immutable
 as $$
   select case when v ~ '^\s*\d+(\.\d+)?\s*$' then btrim(v)::numeric end
+$$;
+
+-- 车价折合美元:加元按固定近似汇率 1 USD = 1.38 CAD(lib/currency.ts CAD_PER_USD,改了两边一起改)
+create or replace function public.browse_price_usd(p_price numeric, p_currency text)
+returns numeric
+language sql
+immutable
+as $$
+  select case when p_currency = 'CAD' then p_price / 1.38 else p_price end
+$$;
+
+-- 里程折合英里:1 mi = 1.609344 km(lib/currency.ts KM_PER_MI)
+create or replace function public.browse_mileage_mi(p_mileage numeric, p_unit text)
+returns numeric
+language sql
+immutable
+as $$
+  select case when p_unit = 'km' then p_mileage / 1.609344 else p_mileage end
 $$;
 
 -- 逗号分隔的多选值 → 数组(空串 → null,表示不过滤)
@@ -69,6 +99,9 @@ as $$
       m.body_style,
       m.search_pinyin,
       m.deal,
+      -- 价格 / 里程筛选的统一口径(美元 / 英里),与 lib/car-filters.ts 的 carPriceUsd / carMileageMi 一致
+      browse_price_usd(c.price, c.currency) as price_usd,
+      browse_mileage_mi(c.mileage, c.mileage_unit) as mileage_mi,
       case
         when params.ulat is not null and params.ulng is not null
              and coalesce(c.lat, 0) <> 0 and coalesce(c.lng, 0) <> 0
@@ -109,23 +142,25 @@ as $$
       )
       or not exists (select 1 from unnest(browse_list(s.f->>'model')) x where btrim(x) <> '')
     )
-    and (browse_num(s.f->>'minPrice') is null or s.price >= browse_num(s.f->>'minPrice'))
-    and (browse_num(s.f->>'maxPrice') is null or s.price <= browse_num(s.f->>'maxPrice'))
+    -- 价格区间是美元:加元车源折合美元后比较
+    and (browse_num(s.f->>'minPrice') is null or s.price_usd >= browse_num(s.f->>'minPrice'))
+    and (browse_num(s.f->>'maxPrice') is null or s.price_usd <= browse_num(s.f->>'maxPrice'))
     and (browse_num(s.f->>'minYear') is null or s.year >= browse_num(s.f->>'minYear'))
     and (browse_num(s.f->>'maxYear') is null or s.year <= browse_num(s.f->>'maxYear'))
     and (coalesce(s.f->>'sellerType', '') = '' or s.account_type = s.f->>'sellerType')
     and (browse_list(s.f->>'fuelType') is null or s.fuel_type = any(browse_list(s.f->>'fuelType')))
     and (browse_list(s.f->>'transmission') is null or s.transmission = any(browse_list(s.f->>'transmission')))
     and (browse_list(s.f->>'drivetrain') is null or s.drivetrain = any(browse_list(s.f->>'drivetrain')))
-    and (browse_num(s.f->>'maxMileage') is null or s.mileage <= browse_num(s.f->>'maxMileage'))
+    -- 里程上限是英里:公里车源折合英里后比较
+    and (browse_num(s.f->>'maxMileage') is null or s.mileage_mi <= browse_num(s.f->>'maxMileage'))
     and (browse_list(s.f->>'exteriorColor') is null
          or exists (select 1 from unnest(browse_list(s.f->>'exteriorColor')) col where strpos(s.exterior_color, col) > 0))
     and (browse_list(s.f->>'interiorColor') is null
          or exists (select 1 from unnest(browse_list(s.f->>'interiorColor')) col where strpos(s.interior_color, col) > 0))
     and (browse_list(s.f->>'bodyStyle') is null or s.body_style = any(browse_list(s.f->>'bodyStyle')))
-    -- 月供预算:前端把月供换算成价格上限传入;电议(price<=0)无法估算,排除
+    -- 月供预算:前端把月供换算成价格上限(美元)传入;电议(price<=0)无法估算,排除
     and ((p->>'paymentPriceCap') is null
-         or (s.price > 0 and s.price <= (p->>'paymentPriceCap')::numeric))
+         or (s.price > 0 and s.price_usd <= (p->>'paymentPriceCap')::numeric))
     and (coalesce(s.f->>'dealRating', '') = ''
          or (s.f->>'dealRating' = 'great' and s.deal->>'level' = 'great')
          or (s.f->>'dealRating' = 'good' and s.deal->>'level' in ('great', 'good')))
@@ -144,6 +179,11 @@ as $$
     and (coalesce(s.f->>'hasCarfax', '') <> 'true' or coalesce(s.carfax_url, '') <> '')
     -- 产权:只认明确的清白产权,未填(null)不命中
     and (coalesce(s.f->>'cleanTitle', '') <> 'true' or s.title_status = '清白产权')
+    -- 可贷款(无信用/ITIN):卖家名下任一门店带这两个标签之一(同 lib/car-filters.ts 的 LOAN_FILTER_TAGS)
+    and (coalesce(s.f->>'financing', '') <> 'true' or exists (
+          select 1 from public.dealer_stores ds
+          where ds.owner_id = s.seller_id
+            and ds.financing && array['支持ITIN贷款', '无信用记录可贷']::text[]))
     and (coalesce(s.f->>'hasVideo', '') <> 'true' or exists (
           select 1 from unnest(coalesce(s.images, '{}') || s.image_url) u
           where u ~* '\.(mp4|mov|webm|avi|mkv)(\?|$)'))
@@ -161,7 +201,7 @@ as $$
          or (s.dist is not null and s.dist <= browse_num(s.f->>'maxDistance')))
 $$;
 
--- 一页车源:{ total, forcedDistanceSort, items: [车源(不含整组图片/描述) + profiles + distance + deal] }
+-- 一页车源:{ total, forcedDistanceSort, financingApplied, items: [车源(不含整组图片/描述) + profiles + distance + deal] }
 create or replace function public.browse_cars(p jsonb)
 returns jsonb
 language plpgsql
@@ -199,9 +239,10 @@ begin
     select c, fl.dist, pr, m.deal,
       row_number() over (
         order by
-          case when v_sort = 'price-asc' then c.price end asc,
-          case when v_sort = 'price-desc' then c.price end desc,
-          case when v_sort = 'mileage' then c.mileage end asc,
+          -- 价格 / 里程排序按折合美元 / 英里(混着加元 / 公里车源时才有可比性)
+          case when v_sort = 'price-asc' then browse_price_usd(c.price, c.currency) end asc,
+          case when v_sort = 'price-desc' then browse_price_usd(c.price, c.currency) end desc,
+          case when v_sort = 'mileage' then browse_mileage_mi(c.mileage, c.mileage_unit) end asc,
           case when v_sort = 'year' then c.year end desc,
           case when v_sort = 'distance' then fl.dist end asc nulls last,
           -- 默认:卖家会说当前界面语言的优先,再个人/车行直发先于转载,最后按最新
@@ -234,7 +275,9 @@ begin
   from page
   where page.ord > v_offset and page.ord <= v_offset + v_limit;
 
-  return jsonb_build_object('total', v_total, 'forcedDistanceSort', v_forced, 'items', v_items);
+  -- financingApplied:告诉前端本版已按 financing 筛选(旧版没有这个键,前端才做兜底过滤,见 lib/browse-cars.ts)
+  return jsonb_build_object('total', v_total, 'forcedDistanceSort', v_forced, 'items', v_items,
+                            'financingApplied', true);
 end;
 $$;
 
@@ -298,6 +341,8 @@ $$;
 
 grant execute on function public.browse_num(text) to anon, authenticated;
 grant execute on function public.browse_list(text) to anon, authenticated;
+grant execute on function public.browse_price_usd(numeric, text) to anon, authenticated;
+grant execute on function public.browse_mileage_mi(numeric, text) to anon, authenticated;
 grant execute on function public.browse_filtered(jsonb, boolean, boolean) to anon, authenticated;
 grant execute on function public.browse_cars(jsonb) to anon, authenticated;
 grant execute on function public.browse_facets(text, text) to anon, authenticated;

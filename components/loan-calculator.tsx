@@ -6,14 +6,18 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/components/i18n-provider";
+import { formatPrice } from "@/lib/format";
+import type { Currency } from "@/lib/currency";
 
 interface LoanCalculatorProps {
   price: number;
+  /** 车价币种(车源详情传车源自己的币种,工具页默认 USD) */
+  currency?: Currency | null;
 }
 
 const TERM_OPTIONS = [36, 48, 60, 72] as const;
 
-export function LoanCalculator({ price }: LoanCalculatorProps) {
+export function LoanCalculator({ price, currency }: LoanCalculatorProps) {
   const { t } = useI18n();
   const [downPaymentPct, setDownPaymentPct] = useState(20);
   const [loanTerm, setLoanTerm] = useState<number>(60);
@@ -50,11 +54,7 @@ export function LoanCalculator({ price }: LoanCalculatorProps) {
   }, [price, downPayment, loanTerm, interestRate]);
 
   function fmt(n: number) {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      maximumFractionDigits: 0,
-    }).format(Math.round(n));
+    return formatPrice(Math.round(n), currency);
   }
 
   return (

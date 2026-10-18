@@ -29,15 +29,9 @@ import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { useBlockedIds } from "@/lib/blocks";
 import { useCachedData } from "@/lib/use-cached-data";
 import { triggerHaptic } from "@/lib/haptics";
+import { formatCarPrice } from "@/lib/format";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 import type { DbConversation } from "@/lib/types";
-
-function formatPrice(price: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(price);
-}
 
 function timeAgo(
   dateStr: string,
@@ -60,13 +54,18 @@ type ConvRow = DbConversation & { last_message?: string; unread_count?: number }
 export const inboxCacheKey = (userId: string) => `messages_inbox_${userId}`;
 
 async function fetchConversations(userId: string): Promise<ConvRow[]> {
-  const { data } = await supabase
-    .from("conversations")
-    .select("*, cars(id, title, title_zh, image_url, price)")
-    .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
-    .order("last_message_at", { ascending: false });
+  // 车源摘要带币种(加元车源显示 CA$);car-currency.sql 未执行时退回不带 currency 的 join
+  const { data } = await queryWithColumnFallback(
+    (select) =>
+      supabase
+        .from("conversations")
+        .select(select)
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+        .order("last_message_at", { ascending: false }),
+    ["*, cars(id, title, title_zh, image_url, price, currency)", "*, cars(id, title, title_zh, image_url, price)"]
+  );
 
-  const convs = (data as ConvRow[]) || [];
+  const convs = (data as unknown as ConvRow[]) || [];
 
   // Collect all profile IDs and batch-fetch them
   const profileIds = new Set<string>();
@@ -354,7 +353,7 @@ export function ConversationList({ userId, initialConvId, initialOtherUserId }: 
                 {conv.cars && (
                   <p className="mt-1 flex items-center gap-1.5 truncate font-mono text-[11px] text-muted-foreground/70">
                     <span className="inline-block h-1 w-1 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-                    {carTitle(conv.cars, locale)} · {formatPrice(conv.cars.price)}
+                    {carTitle(conv.cars, locale)} · {formatCarPrice(conv.cars, conv.cars.price)}
                   </p>
                 )}
               </div>

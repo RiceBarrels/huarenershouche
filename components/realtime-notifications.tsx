@@ -10,7 +10,7 @@ import { getWatchList, updateWatchedPrice } from "@/lib/price-watch";
 import { carTitle, localizePath, type Locale } from "@/lib/i18n";
 import { buildCarTitles } from "@/lib/i18n/car-title";
 import type { TFn } from "@/lib/i18n/content/types";
-import { formatPrice } from "@/lib/format";
+import { formatCarPrice } from "@/lib/format";
 import { carLink } from "@/lib/static-link";
 import {
   notifyPriceDrop,
@@ -27,19 +27,24 @@ import {
 import type { DbCar } from "@/lib/types";
 
 // 降价检查用到的列:标题按显示语言取 title / title_zh;两列都空时由年份 / 品牌 / 车型 / 配置确定性生成
-type WatchedCar = Pick<DbCar, "id" | "price" | "title" | "title_zh" | "year" | "make" | "model" | "trim">;
+type WatchedCar = Pick<DbCar, "id" | "price" | "title" | "title_zh" | "year" | "make" | "model" | "trim" | "currency">;
+// currency(car-currency.sql)未建时退回不带它的列集,按 USD 显示
+const WATCHED_CAR_SELECTS = [
+  "id, price, title, title_zh, year, make, model, trim, currency",
+  "id, price, title, title_zh, year, make, model, trim",
+] as const;
 
 async function checkPriceWatch(t: TFn, locale: Locale, pathLocale: Locale) {
   const watchList = getWatchList();
   if (watchList.length === 0) return;
 
   const carIds = watchList.map((w) => w.carId);
-  const { data } = await supabase
-    .from("cars")
-    .select("id, price, title, title_zh, year, make, model, trim")
-    .in("id", carIds);
+  const { data } = await queryWithColumnFallback(
+    (cols) => supabase.from("cars").select(cols).in("id", carIds),
+    WATCHED_CAR_SELECTS
+  );
   if (!data) return;
-  for (const car of data as WatchedCar[]) {
+  for (const car of data as unknown as WatchedCar[]) {
     const watched = watchList.find((w) => w.carId === car.id);
     if (!watched || car.price >= watched.price) continue;
     const drop = watched.price - car.price;
@@ -47,9 +52,9 @@ async function checkPriceWatch(t: TFn, locale: Locale, pathLocale: Locale) {
       {
         carId: car.id,
         title: carTitle(car, locale) || carTitle(buildCarTitles(car), locale),
-        drop: formatPrice(drop),
+        drop: formatCarPrice(car, drop),
         pct: Math.round((drop / watched.price) * 100),
-        price: formatPrice(car.price),
+        price: formatCarPrice(car, car.price),
         // 通知点开是整页跳转:网页端带语言前缀,原生端是静态导出那棵树的 /car?id=
         url: localizePath(carLink(car.id), pathLocale),
       },
@@ -62,7 +67,13 @@ async function checkPriceWatch(t: TFn, locale: Locale, pathLocale: Locale) {
 
 const SAVED_SEARCH_CAR_COLUMNS =
   "id, make, model, title, title_zh, price, original_price, year, mileage, fuel_type, transmission, drivetrain, exterior_color, interior_color, carfax_url, carfax_summary, image_url, images, features, created_at, profiles(account_type)";
-const SAVED_SEARCH_CAR_SELECTS = [`title_status, ${SAVED_SEARCH_CAR_COLUMNS}`, SAVED_SEARCH_CAR_COLUMNS] as const;
+// 从新到旧:title_status(title-status.sql)与币种 / 里程单位(car-currency.sql,价格 / 里程条件折算用)各自可能没建
+const SAVED_SEARCH_CAR_SELECTS = [
+  `title_status, currency, mileage_unit, ${SAVED_SEARCH_CAR_COLUMNS}`,
+  `title_status, ${SAVED_SEARCH_CAR_COLUMNS}`,
+  `currency, mileage_unit, ${SAVED_SEARCH_CAR_COLUMNS}`,
+  SAVED_SEARCH_CAR_COLUMNS,
+] as const;
 
 async function checkSavedSearches() {
   const searches = getSavedSearches();

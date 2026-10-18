@@ -4,11 +4,12 @@
 // 返回的车源不含整组图片和描述(卡片用不到);点开详情时 CarDetail 会按 id 重新拉整行。
 
 import { supabase } from "@/lib/supabase";
-import { isMissingFunctionError } from "@/lib/supabase-compat";
+import { isMissingFunctionError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { paymentToPrice } from "@/lib/format";
 import { localeLanguageCodes } from "@/lib/i18n/languages";
 import { CLEAN_TITLE } from "@/lib/title-status";
+import { fetchLoanFinancingSellerIds } from "@/lib/dealer-financing-client";
 import type { Filters, SortKey } from "@/lib/car-filters";
 import type { StoredDeal } from "@/lib/price-insight";
 import type { Locale } from "@/lib/i18n";
@@ -23,6 +24,8 @@ export interface BrowsePage {
   total: number;
   /** 城市名筛不出车、已退回「不按城市」并强制按距离排 */
   forcedDistanceSort: boolean;
+  /** 新版 browse_cars 恒为 true(已按 financing 筛选);旧版没有该键 */
+  financingApplied?: boolean;
   items: BrowseCar[];
 }
 
@@ -71,7 +74,7 @@ export async function fetchBrowsePage(
     p: { ...buildQuery(input), offset, limit },
   });
   if (error || !data) return null;
-  return honorCleanTitle(data as BrowsePage, input.filters, offset);
+  return honorFinancing(honorCleanTitle(data as BrowsePage, input.filters, offset), input.filters, offset);
 }
 
 /**
@@ -83,6 +86,20 @@ export async function fetchBrowsePage(
 function honorCleanTitle(page: BrowsePage, filters: Filters, offset: number): BrowsePage {
   if (filters.cleanTitle !== "true" || page.items.every((c) => c.title_status === CLEAN_TITLE)) return page;
   const items = page.items.filter((c) => c.title_status === CLEAN_TITLE);
+  return { ...page, items, total: offset + items.length };
+}
+
+/**
+ * 「可贷款(无信用/ITIN)」兜底:browse_cars 还是旧版(browse-cars.sql 未重跑)时会忽略 financing,
+ * 这时按同一规则(卖家名下门店带 LOAN_FILTER_TAGS 之一)在前端过滤这一页,总数收成已拿到的条数(同 honorCleanTitle)。
+ * 新版 RPC 带 financingApplied = true,原样通过(不多查一次);卖家集合取不到(网络错误)时不过滤。
+ * dealer-financing.sql 未执行(列不存在)时集合为空 → 一辆也不命中,与 SQL 侧一致。
+ */
+async function honorFinancing(page: BrowsePage, filters: Filters, offset: number): Promise<BrowsePage> {
+  if (filters.financing !== "true" || page.financingApplied || page.items.length === 0) return page;
+  const sellers = await fetchLoanFinancingSellerIds();
+  if (!sellers || page.items.every((c) => sellers.has(c.seller_id))) return page;
+  const items = page.items.filter((c) => sellers.has(c.seller_id));
   return { ...page, items, total: offset + items.length };
 }
 
@@ -113,16 +130,22 @@ export async function fetchBrowseFacets(
 /** 「最近浏览」:按 id 取仍在售的车源,保持传入顺序 */
 export async function fetchCarsByIds(ids: string[]): Promise<DbCar[]> {
   if (ids.length === 0) return [];
-  const { data } = await supabase
-    .from("cars")
-    .select(
-      "id, seller_id, source_id, created_at, title, title_zh, make, model, trim, year, " +
-        "price, original_price, mileage, fuel_type, location, location_zh, lat, lng, image_url, " +
-        "seller_name, phone, views_count, favorites_count, profiles!seller_id(account_type, avatar_url, languages)",
-    )
-    .in("id", ids)
-    .eq("status", "active")
-    .eq("owner_hidden", false);
+  const base =
+    "id, seller_id, source_id, created_at, title, title_zh, make, model, trim, year, " +
+    "price, original_price, mileage, fuel_type, location, location_zh, lat, lng, image_url, " +
+    "seller_name, phone, views_count, favorites_count";
+  const embed = "profiles!seller_id(account_type, avatar_url, languages)";
+  // 币种 / 里程单位(car-currency.sql)未建时退回旧列集,按 USD / mi 显示
+  const { data } = await queryWithColumnFallback(
+    (cols) =>
+      supabase
+        .from("cars")
+        .select(`${cols}, ${embed}`)
+        .in("id", ids)
+        .eq("status", "active")
+        .eq("owner_hidden", false),
+    [`${base}, currency, mileage_unit`, base],
+  );
   const byId = new Map(((data as unknown as DbCar[]) || []).map((c) => [c.id, c]));
   return ids.map((id) => byId.get(id)).filter((c): c is DbCar => !!c);
 }

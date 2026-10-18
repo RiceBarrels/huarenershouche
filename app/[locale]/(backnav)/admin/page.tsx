@@ -18,6 +18,7 @@ import { Header } from "@/components/header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatCarMileage, formatCarPrice } from "@/lib/format";
 import type { DbProfile, DbCar, DbDealerStore, DbListingSource, DbAiModeration, DbClaimRequest, DbUserIpGeo } from "@/lib/types";
 import { fetchUserIpGeo } from "@/lib/analytics/admin";
 import { formatGeoWithFlag } from "@/lib/analytics/geo";
@@ -1292,7 +1293,7 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        ${car.price?.toLocaleString()} · {car.mileage?.toLocaleString()}mi · {car.location} ·{" "}
+                        {formatCarPrice(car, car.price ?? 0)} · {formatCarMileage({ ...car, mileage: car.mileage ?? 0 })} · {car.location} ·{" "}
                         {/* 浏览数即「浏览者」入口(手机上不再多占一个图标按钮的宽度) */}
                         <button
                           type="button"
