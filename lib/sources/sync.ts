@@ -9,6 +9,7 @@ import type { DbCar, DbListingSource } from "@/lib/types";
 import { buildCarTitles } from "@/lib/i18n/car-title";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import { isMissingColumnError } from "@/lib/supabase-compat";
+import { extractTitleStatus } from "@/lib/title-status";
 import { getAdapter } from "./index";
 import { fetchHtml, sleep, type ParsedListing, type SourceListingRef } from "./types";
 import { createServiceClient } from "./service-client";
@@ -179,6 +180,15 @@ async function loadExistingCars(
     })),
     legacy: true,
   };
+}
+
+/**
+ * cars.title_status 是否已建(supabase/title-status.sql)。没建时本轮不提取 / 不写产权,其他照常同步。
+ * limit(0) 只让数据库校验列名;非缺列错误(网络等)按「没有」处理,同样不影响同步。
+ */
+async function hasTitleStatusColumn(supabase: SupabaseClient): Promise<boolean> {
+  const { error } = await supabase.from("cars").select("title_status").limit(0);
+  return !error;
 }
 
 /**
@@ -455,9 +465,10 @@ export async function syncSource(
 
     // 3. Load our existing copies for this source (paged past PostgREST's 1000-row cap), plus the slots
     //    other sellers' cars hold under this source id (never adopted, updated or delisted)
-    const [{ cars: existingCars, legacy }, foreign] = await Promise.all([
+    const [{ cars: existingCars, legacy }, foreign, titleStatusColumn] = await Promise.all([
       loadExistingCars(supabase, source),
       loadForeignSlots(supabase, source),
+      hasTitleStatusColumn(supabase),
     ]);
     const existing = new Map<string, ExistingCar>();
     for (const row of existingCars) {
@@ -497,6 +508,9 @@ export async function syncSource(
       // 原文原样入库 + 确定性标题;原文没变 = 同一哈希,i18n 管线不会重复翻译
       const titles = buildCarTitles(parsed);
       const original = originalText(parsed);
+      // 产权状态只认源站描述 / 标签里明确写出的关键词(clean title / rebuilt title / salvage / lemon buyback),
+      // 互相矛盾或没写 → null,不猜
+      const titleStatus = titleStatusColumn ? extractTitleStatus(original, parsed.features) : null;
 
       try {
         if (!current) {
@@ -508,6 +522,7 @@ export async function syncSource(
                 ...listingColumns(parsed),
                 ...titles,
                 ...originalColumns(original, parsed.features, legacy),
+                ...(titleStatus ? { title_status: titleStatus } : {}),
                 ...locationOverride,
                 seller_id: source.system_account_id,
                 status: "active",
@@ -548,9 +563,13 @@ export async function syncSource(
             ...locationOverride,
           };
           // 原文 / 标签变了才写;认领方改过的文本也会被这里写回源站原文(重新按可信文本处理)
-          if (!sameOriginal(original, current.original) || !sameTagSet(parsed.features, current.features)) {
+          const textChanged =
+            !sameOriginal(original, current.original) || !sameTagSet(parsed.features, current.features);
+          if (textChanged) {
             Object.assign(update, originalColumns(original, parsed.features, legacy));
           }
+          // 产权状态:提取到明确关键词就写(列刚建好时给存量车补上);源站文本变了而关键词没了 → 清空
+          if (titleStatusColumn && (titleStatus || textChanged)) update.title_status = titleStatus;
           // 图片:已全量转存且源站图未变 → 不动;否则(未转存/换图/预算内)重新压缩转存,
           // 预算用完时保持源站外链,下轮同步续传
           const alreadyMirrored = (current.images ?? []).some(isMirroredUrl);

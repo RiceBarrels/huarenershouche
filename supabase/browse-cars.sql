@@ -9,6 +9,11 @@
 --   search_pinyin  中文字段的全拼 + 首字母(拼音搜索,如 kaimeirui / kmr)
 --   deal           好价评级(lib/price-insight.ts,与同类车源比价)
 -- 新发布的车源在下一次计算前没有这三项:车身类型/好价筛选暂不命中、拼音搜不到。
+--
+-- 「仅清白产权」筛选读 cars.title_status(supabase/title-status.sql 负责列 + CHECK)。
+-- 函数体在创建时就要校验列存在,这里先 add column if not exists 兜底,两个文件谁先执行都行。
+
+alter table public.cars add column if not exists title_status text;
 
 create table if not exists public.car_browse_meta (
   car_id uuid primary key references public.cars(id) on delete cascade,
@@ -137,6 +142,8 @@ as $$
     and (coalesce(s.f->>'noAccident', '') <> 'true' or strpos(s.carfax_summary, '无事故') > 0)
     and (coalesce(s.f->>'oneOwner', '') <> 'true' or s.carfax_summary ~ '(^|\D)1 任车主')
     and (coalesce(s.f->>'hasCarfax', '') <> 'true' or coalesce(s.carfax_url, '') <> '')
+    -- 产权:只认明确的清白产权,未填(null)不命中
+    and (coalesce(s.f->>'cleanTitle', '') <> 'true' or s.title_status = '清白产权')
     and (coalesce(s.f->>'hasVideo', '') <> 'true' or exists (
           select 1 from unnest(coalesce(s.images, '{}') || s.image_url) u
           where u ~* '\.(mp4|mov|webm|avi|mkv)(\?|$)'))

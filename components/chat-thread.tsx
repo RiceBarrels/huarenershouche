@@ -9,12 +9,19 @@ import { useI18n } from "@/components/i18n-provider";
 import { userLink } from "@/lib/static-link";
 import { Button } from "@/components/ui/button";
 import { ReportDialog } from "@/components/report-dialog";
+import {
+  ChatTranslateBar,
+  ChatTranslateButton,
+  ChatTranslationNotice,
+  useChatTranslation,
+} from "@/components/chat-translation";
 import type { DbMessage } from "@/lib/types";
 
 // 媒体消息:内容为存储桶里的图片/视频公开 URL,渲染时直接展示
 export const CHAT_MEDIA_RE =
   /^https?:\/\/\S+\.(jpe?g|png|gif|webp|heic|mp4|mov|webm)(\?\S*)?$/i;
 const VIDEO_EXT_RE = /\.(mp4|mov|webm)(\?\S*)?$/i;
+const isMediaMessage = (content: string) => CHAT_MEDIA_RE.test(content);
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -36,7 +43,7 @@ interface ChatThreadProps {
 
 export function ChatThread({ conversationId, currentUserId, otherUsername, onBack, hideHeader }: ChatThreadProps) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [messages, setMessages] = useState<DbMessage[]>([]);
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -50,6 +57,14 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 私信翻译:对方消息的「翻译此消息」、本会话自动翻译开关、对方语言提示(components/chat-translation.tsx)
+  const tr = useChatTranslation({
+    conversationId,
+    currentUserId,
+    otherUserId,
+    messages,
+    isMedia: isMediaMessage,
+  });
 
   useEffect(() => {
     async function loadProfiles() {
@@ -224,6 +239,12 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
             {messages.map((msg) => {
               const isMine = msg.sender_id === currentUserId;
               const sender = avatars[msg.sender_id];
+              // 只有对方发来的文字消息可翻译;译文显示在气泡里,下方是「已从 X 翻译 · 显示原文」
+              const trEntry = isMine ? undefined : tr.entry(msg.id);
+              const translatedText =
+                trEntry?.status === "done" && !trEntry.showOriginal ? trEntry.text : null;
+              const showTranslate =
+                !isMine && tr.canTranslate(msg.id) && (!trEntry || trEntry.status === "failed");
               return (
                 <div
                   key={msg.id}
@@ -271,18 +292,37 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                         </a>
                       )
                     ) : (
-                      <p className="whitespace-pre-wrap font-mono text-sm">
-                        {msg.content}
-                      </p>
+                      <>
+                        <p
+                          className="whitespace-pre-wrap font-mono text-sm"
+                          lang={translatedText !== null ? locale : undefined}
+                        >
+                          {translatedText ?? msg.content}
+                        </p>
+                        {trEntry && (
+                          <ChatTranslationNotice
+                            original={msg.content}
+                            entry={trEntry}
+                            onToggle={() => tr.toggleOriginal(msg.id)}
+                            className="mt-1"
+                          />
+                        )}
+                      </>
                     )}
                     <p
-                      className={`mt-1 font-mono text-[10px] ${
+                      className={`mt-1 flex flex-wrap items-center gap-x-2 font-mono text-[10px] ${
                         CHAT_MEDIA_RE.test(msg.content) ? "px-2 pb-1" : ""
                       } ${
                         isMine ? "text-background/60" : "text-muted-foreground"
                       }`}
                     >
-                      {formatTime(msg.created_at)}
+                      <span>{formatTime(msg.created_at)}</span>
+                      {showTranslate && (
+                        <ChatTranslateButton
+                          failed={trEntry?.status === "failed"}
+                          onClick={() => tr.translate(msg.id)}
+                        />
+                      )}
                     </p>
                   </div>
                 </div>
@@ -294,54 +334,57 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
       </div>
 
       {/* Input */}
-      <div className="border-t border-border px-4 py-3">
-        <div className="flex gap-2">
-          {/* 上传图片/视频 */}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/*,video/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload(file);
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => fileRef.current?.click()}
-            disabled={uploading}
-            aria-label={t("发送图片或视频")}
-            className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-          >
-            {uploading ? (
-              <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
-            ) : (
-              <Plus className="h-4 w-4" strokeWidth={1.5} />
-            )}
-          </button>
-          <textarea
-            ref={inputRef}
-            className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
-            placeholder={t("输入消息...")}
-            rows={1}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
-          />
-          <Button
-            className="self-end gap-1 font-mono text-xs h-10"
-            onClick={handleSend}
-            disabled={!content.trim()}
-          >
-              <><Send className="h-3 w-3" strokeWidth={1.5} /> {t("发送")}</>
-          </Button>
+      <div className="border-t border-border">
+        <ChatTranslateBar tr={tr} />
+        <div className="px-4 py-3">
+          <div className="flex gap-2">
+            {/* 上传图片/视频 */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*,video/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUpload(file);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              aria-label={t("发送图片或视频")}
+              className="flex h-10 w-10 shrink-0 items-center justify-center self-end rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" strokeWidth={1.5} />
+              ) : (
+                <Plus className="h-4 w-4" strokeWidth={1.5} />
+              )}
+            </button>
+            <textarea
+              ref={inputRef}
+              className="flex-1 resize-none rounded-xl bg-muted px-3 py-2 font-mono text-sm placeholder:text-muted-foreground focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
+              placeholder={t("输入消息...")}
+              rows={1}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                }
+              }}
+            />
+            <Button
+              className="self-end gap-1 font-mono text-xs h-10"
+              onClick={handleSend}
+              disabled={!content.trim()}
+            >
+                <><Send className="h-3 w-3" strokeWidth={1.5} /> {t("发送")}</>
+            </Button>
+          </div>
         </div>
       </div>
     </div>

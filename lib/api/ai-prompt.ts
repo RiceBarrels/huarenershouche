@@ -20,6 +20,7 @@ export function buildAiPrompt(site: string = AI_PROMPT_SITE): string {
   const fuel = enumSlugs("fuel_type").join(" | ");
   const trans = enumSlugs("transmission").join(" | ");
   const drive = enumSlugs("drivetrain").join(" | ");
+  const title = enumSlugs("title_status").join(" | ");
   const p = QUOTA_LIMITS.personal;
   const d = QUOTA_LIMITS.dealer;
 
@@ -40,6 +41,7 @@ You are helping a user work with the CLCAuto Public API. CLCAuto is a non-profit
   fuel_type: ${fuel}
   transmission: ${trans}
   drivetrain: ${drive}
+  title_status: ${title}
 - Lists are cursor-paginated: pass cursor = previous next_cursor; limit ≤ ${MAX_PAGE_SIZE} (default ${DEFAULT_PAGE_SIZE}).
 - Error body: { "error": { "code": string, "message": string, "details"?: [{ "field": string, "issue": string }] } }
   400 bad_request / validation_failed · 401 unauthorized / key_revoked / key_expired · 403 insufficient_scope / ip_not_allowed / forbidden / account_banned · 404 not_found · 409 conflict / listing_blocked · 429 rate_limited / quota_exceeded · 500 internal_error
@@ -68,8 +70,9 @@ POST   /inventory/{external_id}/images  { "images": ["https://...", ...] } ≤ $
 
 ## ListingInput (body of PUT, and each item of /inventory/batch)
 Required: vin (17 chars, no I/O/Q), year, make, model, price, mileage, fuel_type, transmission.
-Optional: trim, original_price, drivetrain, exterior_color, interior_color, description, features (string[] ≤ 40), images (https URLs ≤ ${LISTING_MAX_IMAGES}), carfax_url, store_id (dealers with several stores), location.
+Optional: trim, original_price, drivetrain, title_status, exterior_color, interior_color, description, features (string[] ≤ 40), images (https URLs ≤ ${LISTING_MAX_IMAGES}), carfax_url, store_id (dealers with several stores), location.
 - external_id is the dealer's own stock number and goes in the URL path (in batch items it is a body field).
+- title_status: only send it when the user states the title brand (clean title, rebuilt, salvage, lemon buyback) — never infer it from "no accidents" or a Carfax report. Omitting it keeps the stored value; null clears it.
 - location: dealer-tier accounts may omit it (the verified store address is used). Personal accounts MUST send it as "City, ST" or a 5-digit US zip.
 - description and features: send the user's own wording in any language — do NOT translate them yourself. They are stored verbatim and machine-translated into the other site languages. description_lang is deprecated and ignored (the language is detected automatically); omit it.
 - The server decodes the VIN, mirrors the images, runs content moderation and translates asynchronously. The response "processing" array lists what is still running (vin, moderation, translation, images) — do not poll for it; GET /inventory later shows processing_state (images_pending, translation_pending).

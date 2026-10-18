@@ -1,4 +1,4 @@
-// Public API 枚举双向表:对外用英文 slug,库里存中文(fuel_type / transmission)
+// Public API 枚举双向表:对外用英文 slug,库里存中文(fuel_type / transmission / title_status)
 // 或大写英文(drivetrain)。内部值绝不外露;*_label 按 lang 走 i18n 词典。
 // 新增 DB 枚举值时在这里补一行即可,读写两侧自动生效。
 
@@ -9,7 +9,7 @@ import { es } from "@/lib/i18n/es";
 import { fr } from "@/lib/i18n/fr";
 import type { ApiLang } from "./types";
 
-export type EnumKind = "fuel_type" | "transmission" | "drivetrain" | "status";
+export type EnumKind = "fuel_type" | "transmission" | "drivetrain" | "title_status" | "status";
 
 /** slug → DB 值(顺序即文档/OpenAPI 里列出的顺序) */
 const SLUG_TO_DB: Record<EnumKind, Record<string, string>> = {
@@ -34,6 +34,13 @@ const SLUG_TO_DB: Record<EnumKind, Record<string, string>> = {
     rwd: "RWD",
     awd: "AWD",
     "4wd": "4WD",
+  },
+  // 产权状态(cars.title_status,lib/title-status.ts;supabase/title-status.sql)
+  title_status: {
+    clean: "清白产权",
+    rebuilt: "重建产权",
+    salvage: "残值产权",
+    lemon_buyback: "柠檬回购",
   },
   status: {
     active: "active",

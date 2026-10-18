@@ -33,7 +33,7 @@ import {
   X,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 import { CAR_LIST_COLUMNS, CAR_PROFILE_EMBED } from "@/lib/i18n/content/columns";
 import { useI18n } from "@/components/i18n-provider";
 import { useTermLabels } from "@/hooks/use-term-labels";
@@ -86,9 +86,14 @@ const VIEWPORT_CAR_LIMIT = 300;
 const VIEWPORT_STORE_LIMIT = 100;
 
 // 视口车源列:卡片列 + 关键词检索要搜的描述(原文 + 中英投影)+ 原始配置标签(统计配置选项)
-const MAP_CAR_SELECT = `${CAR_LIST_COLUMNS}, description_original, description, description_zh, features_original, ${CAR_PROFILE_EMBED}`;
-// 数据库还没有原文列(i18n-v2 迁移前)时退回的列
-const MAP_CAR_SELECT_LEGACY = `${CAR_LIST_COLUMNS}, description, description_zh, ${CAR_PROFILE_EMBED}`;
+// + 产权状态(「仅清白产权」筛选)
+const MAP_CAR_SELECT_V2 = `${CAR_LIST_COLUMNS}, description_original, description, description_zh, features_original, ${CAR_PROFILE_EMBED}`;
+// 从新到旧:title-status.sql 未执行时去掉 title_status(该筛选筛不出车);i18n-v2 迁移前再去掉原文列
+const MAP_CAR_SELECTS = [
+  `title_status, ${MAP_CAR_SELECT_V2}`,
+  MAP_CAR_SELECT_V2,
+  `${CAR_LIST_COLUMNS}, description, description_zh, ${CAR_PROFILE_EMBED}`,
+];
 // 配置选项:取出现最多的这么多个原始标签查词表,按词条归并后再取前 12
 const FEATURE_LABEL_POOL = 48;
 
@@ -262,8 +267,9 @@ function BrowseMapContent() {
         .lte("lng", r.east)
         .order("created_at", { ascending: false })
         .limit(VIEWPORT_CAR_LIMIT);
-    const [firstCarsRes, storesRes] = await Promise.all([
-      carsInRegion(MAP_CAR_SELECT),
+    // 迁移前数据库缺列(title_status / 原文列):按 MAP_CAR_SELECTS 从新到旧依次重查
+    const [carsRes, storesRes] = await Promise.all([
+      queryWithColumnFallback(carsInRegion, MAP_CAR_SELECTS),
       supabase
         .from("dealer_stores")
         .select("id, owner_id, name, address, lat, lng, store_photos")
@@ -274,11 +280,6 @@ function BrowseMapContent() {
         .lte("lng", r.east)
         .limit(VIEWPORT_STORE_LIMIT),
     ]);
-    // 迁移前数据库没有原文列:按旧列再查一次
-    const carsRes =
-      firstCarsRes.error && isMissingColumnError(firstCarsRes.error)
-        ? await carsInRegion(MAP_CAR_SELECT_LEGACY)
-        : firstCarsRes;
     if (seq !== fetchSeq.current) return;
     let nextStores = (storesRes.data as MapStore[]) || [];
     // 只显示有在售车的店铺,并收集每店最新 3 张车图 + 在售数(标注预览条用)

@@ -70,12 +70,14 @@ const DRIVETRAIN_OPTIONS = [
 
 // 车况与保障开关（更多条件）
 export const CONDITION_TOGGLES: {
-  key: "noAccident" | "oneOwner" | "hasCarfax" | "hasVideo" | "hasPrice";
+  key: "noAccident" | "oneOwner" | "hasCarfax" | "cleanTitle" | "hasVideo" | "hasPrice";
   label: string;
 }[] = [
   { key: "noAccident", label: "无事故" },
   { key: "oneOwner", label: "一手车主" },
   { key: "hasCarfax", label: "有Carfax报告" },
+  // 只命中 cars.title_status = 清白产权(未填的不算),见 lib/title-status.ts
+  { key: "cleanTitle", label: "仅清白产权" },
   { key: "hasVideo", label: "带视频" },
   { key: "hasPrice", label: "排除电议" },
 ];
@@ -164,6 +166,7 @@ export interface Filters {
   noAccident: string;
   oneOwner: string;
   hasCarfax: string;
+  cleanTitle: string;
   hasVideo: string;
   hasPrice: string;
 }
@@ -194,6 +197,7 @@ export const INITIAL_FILTERS: Filters = {
   noAccident: "",
   oneOwner: "",
   hasCarfax: "",
+  cleanTitle: "",
   hasVideo: "",
   hasPrice: "",
 };
@@ -736,6 +740,7 @@ export function SearchFilters({
             filters.noAccident ||
             filters.oneOwner ||
             filters.hasCarfax ||
+            filters.cleanTitle ||
             filters.hasVideo ||
             filters.hasPrice
           )

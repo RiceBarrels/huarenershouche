@@ -1052,7 +1052,7 @@ export function MobileFilterDrawer({
         color="text-pink-500"
         label={t("更多条件")}
         value={getMoreLabel(filters, t)}
-        active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.hasVideo || filters.hasPrice)}
+        active={!!(filters.dealRating || filters.priceDropped || filters.listedWithin || filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.cleanTitle || filters.hasVideo || filters.hasPrice)}
       >
         <div className="space-y-5">
           {/* Deal rating & price dropped toggles — iOS 分组开关卡 */}

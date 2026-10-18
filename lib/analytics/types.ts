@@ -1,6 +1,8 @@
 // 第一方访问统计的共享类型:埋点上报载荷(/api/vt)与管理后台 RPC 返回形状。
 // SQL 侧见 supabase/analytics.sql —— 改字段两边必须同步。
 
+import type { ContactChannel } from "@/lib/contact-apps";
+
 export type AnalyticsEventType = "pageview" | "car_view";
 export type AnalyticsPlatform = "web" | "ios" | "android";
 export type AnalyticsDevice = "desktop" | "mobile" | "tablet";
@@ -33,6 +35,21 @@ export interface TrackPayload {
   /** 触屏设备(iPadOS 桌面版 UA 识别为平板用) */
   touch: boolean;
   /** 已登录时附 Supabase access token,服务端校验后写 user_id */
+  token: string | null;
+}
+
+/**
+ * 详情页联系按钮点击(同走 POST /api/vt,写 contact_clicks 表,见 supabase/analytics-contact-click.sql)。
+ * 不进 analytics_events:那张表的 type 只收 pageview / car_view,后台各项口径都按这两种事件算
+ */
+export interface ContactClickPayload {
+  type: "contact_click";
+  visitor_id: string;
+  session_id: string;
+  car_id: string;
+  app: ContactChannel;
+  locale: string | null;
+  platform: AnalyticsPlatform;
   token: string | null;
 }
 

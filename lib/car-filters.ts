@@ -13,6 +13,7 @@ import type { Filters } from "@/components/search-filters";
 import type { DbCar } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
 import { sellerSpeaksLocale } from "@/lib/i18n/languages";
+import { CLEAN_TITLE } from "@/lib/title-status";
 
 // 复用 components/search-filters 的规范定义,方便调用方单点导入
 export type { Filters } from "@/components/search-filters";
@@ -57,6 +58,7 @@ export function filtersFromParams(sp: URLSearchParams): Filters {
     noAccident: sp.get("noAccident") || "",
     oneOwner: sp.get("oneOwner") || "",
     hasCarfax: sp.get("hasCarfax") || "",
+    cleanTitle: sp.get("cleanTitle") || "",
     hasVideo: sp.get("hasVideo") || "",
     hasPrice: sp.get("hasPrice") || "",
   };
@@ -91,6 +93,7 @@ export function filtersToQuery(f: Filters, sort: SortKey): string {
   if (f.noAccident) params.set("noAccident", f.noAccident);
   if (f.oneOwner) params.set("oneOwner", f.oneOwner);
   if (f.hasCarfax) params.set("hasCarfax", f.hasCarfax);
+  if (f.cleanTitle) params.set("cleanTitle", f.cleanTitle);
   if (f.hasVideo) params.set("hasVideo", f.hasVideo);
   if (f.hasPrice) params.set("hasPrice", f.hasPrice);
   if (sort !== "newest") params.set("sort", sort);
@@ -257,6 +260,8 @@ export function applyCarFilters(
       if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
     }
     if (filters.hasCarfax === "true" && !car.carfax_url) return false;
+    // 产权:只认明确的清白产权;没填(null)或列还不存在(title-status.sql 未执行,字段缺失)都不命中
+    if (filters.cleanTitle === "true" && car.title_status !== CLEAN_TITLE) return false;
     if (filters.hasVideo === "true" && !carHasVideo(car)) return false;
     if (filters.hasPrice === "true" && car.price <= 0) return false;
     return true;

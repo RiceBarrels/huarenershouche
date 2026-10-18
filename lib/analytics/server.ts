@@ -21,6 +21,7 @@ import type {
   AnalyticsEventType,
   AnalyticsPlatform,
 } from "@/lib/analytics/types";
+import { CONTACT_CHANNELS, type ContactChannel } from "@/lib/contact-apps";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -205,6 +206,54 @@ export function parseTrackPayload(body: string): ParsedTrack | null {
     utm_campaign: cleanText(p.utm_campaign, 100),
     platform: p.platform,
     touch: p.touch === true,
+    token: p.token?.trim() || null,
+  };
+}
+
+// ---------- 联系按钮点击(contact_click) ----------
+
+/** ContactClickPayload(lib/analytics/types.ts)的校验 */
+export const contactClickSchema = z.object({
+  type: z.literal("contact_click"),
+  visitor_id: z.string().uuid(),
+  session_id: z.string().uuid(),
+  car_id: z.string().uuid(),
+  app: z.enum(CONTACT_CHANNELS),
+  locale: optionalText(10),
+  platform: z.enum(["web", "ios", "android"]),
+  token: z.string().max(MAX_TOKEN).nullish(),
+});
+
+export interface ParsedContactClick {
+  visitor_id: string;
+  session_id: string;
+  car_id: string;
+  app: ContactChannel;
+  locale: string | null;
+  platform: AnalyticsPlatform;
+  token: string | null;
+}
+
+/** 请求体文本 → ParsedContactClick;不是 contact_click / 校验失败 → null(调用方再按 pageview / car_view 解析) */
+export function parseContactClickPayload(body: string): ParsedContactClick | null {
+  if (!body || body.length > MAX_BODY_BYTES) return null;
+  let json: unknown;
+  try {
+    json = JSON.parse(body);
+  } catch {
+    return null;
+  }
+  if (!json || typeof json !== "object" || (json as { type?: unknown }).type !== "contact_click") return null;
+  const result = contactClickSchema.safeParse(json);
+  if (!result.success) return null;
+  const p = result.data;
+  return {
+    visitor_id: p.visitor_id.toLowerCase(),
+    session_id: p.session_id.toLowerCase(),
+    car_id: p.car_id.toLowerCase(),
+    app: p.app,
+    locale: cleanLocale(p.locale),
+    platform: p.platform,
     token: p.token?.trim() || null,
   };
 }

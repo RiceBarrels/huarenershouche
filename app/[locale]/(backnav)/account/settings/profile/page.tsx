@@ -3,6 +3,8 @@
 // 设置 · 个人资料(iOS 风格):居中大头像 + 分组卡内表单行
 // (label 左 / 无边框输入右,输入后 800ms 自动保存)。
 // 点头像或「更换头像」都打开与「我的」页相同的头像查看器,在「⋯」菜单里更换或恢复默认。
+// 即时通讯联系方式(contact_apps)跟随当前操作身份 actingId:切换成车行时编辑的是车行账号的;
+// 失焦时保存并送 AI 审核,contact-apps.sql 未执行时整组不显示。
 
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "@/components/localized-navigation";
@@ -16,6 +18,15 @@ import { AvatarViewer } from "@/components/avatar-viewer";
 import { SettingsGroup, GroupFooter } from "@/components/ios-settings";
 import { LanguagePicker } from "@/components/language-picker";
 import { useI18n } from "@/components/i18n-provider";
+import { useIdentity } from "@/components/identity-provider";
+import { ContactAppsEditor, type ContactAppsInput } from "@/components/contact-apps-editor";
+import {
+  contactAppsToInput,
+  normalizeContactApps,
+  sameContactApps,
+  type ContactApps,
+} from "@/lib/contact-apps";
+import { loadContactApps, saveContactApps } from "@/lib/contact-apps-client";
 import type { DbProfile } from "@/lib/types";
 
 // iOS 式表单行:label 固定列 + 无边框输入,分隔线从 label 起始缩进
@@ -55,6 +66,59 @@ export default function ProfileSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // 即时通讯联系方式:写到当前操作身份(本人或已认领的车行账号)
+  const { actingId, actingProfile, isActingAsClaimed } = useIdentity();
+  const [contactAvailable, setContactAvailable] = useState(false);
+  const [contactInput, setContactInput] = useState<ContactAppsInput>(() => contactAppsToInput({}));
+  const [contactNotice, setContactNotice] = useState<string | null>(null);
+  const contactInputRef = useRef(contactInput);
+  const savedContactRef = useRef<ContactApps>({});
+  // 保存串行执行:连续失焦时后一次等前一次写完,始终写最新输入
+  const contactChainRef = useRef<Promise<void>>(Promise.resolve());
+  useEffect(() => {
+    contactInputRef.current = contactInput;
+  }, [contactInput]);
+
+  useEffect(() => {
+    if (!actingId) return;
+    let cancelled = false;
+    loadContactApps(actingId).then(({ available, apps }) => {
+      if (cancelled) return;
+      savedContactRef.current = apps;
+      setContactAvailable(available);
+      setContactInput(contactAppsToInput(apps));
+      setContactNotice(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [actingId]);
+
+  function saveContact() {
+    const target = actingId;
+    if (!target) return;
+    contactChainRef.current = contactChainRef.current.then(async () => {
+      const { apps, errors } = normalizeContactApps(contactInputRef.current);
+      // 有不合规的字段先不存(输入框下已提示),改好后再失焦时保存
+      if (Object.keys(errors).length > 0 || sameContactApps(apps, savedContactRef.current)) return;
+      setSaving(true);
+      const result = await saveContactApps(target, apps);
+      setSaving(false);
+      if (result.status === "saved") {
+        savedContactRef.current = apps;
+        setContactNotice(null);
+      } else if (result.status === "blocked") {
+        savedContactRef.current = {};
+        setContactInput(contactAppsToInput({}));
+        setContactNotice(t("即时通讯联系方式未通过审核，已清除"));
+      } else if (result.status === "rate_limited") {
+        setContactNotice(t("操作过于频繁,请稍后再试"));
+      } else if (result.status === "error") {
+        setContactNotice(t("保存失败，请稍后重试"));
+      }
+    });
+  }
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formRef = useRef(form);
@@ -201,6 +265,27 @@ export default function ProfileSettingsPage() {
               </div>
             </SettingsGroup>
             <GroupFooter>{t("选择你能沟通的语言。买家用对应语言浏览时,你的车源会优先展示,并在车辆详情和主页标注。")}</GroupFooter>
+
+            {/* 即时通讯:选填,只给已登录买家看;车辆详情按买家语言排按钮 */}
+            {contactAvailable && (
+              <>
+                <h2 className="mt-6 px-1 font-mono text-xs font-medium text-muted-foreground">
+                  {isActingAsClaimed && actingProfile?.username
+                    ? t("{name} 的即时通讯联系方式", { name: actingProfile.username })
+                    : t("即时通讯联系方式")}
+                </h2>
+                <ContactAppsEditor
+                  variant="settings"
+                  value={contactInput}
+                  onChange={setContactInput}
+                  onBlur={saveContact}
+                />
+                {contactNotice && (
+                  <p className="mt-2 px-5 font-mono text-xs text-destructive">{contactNotice}</p>
+                )}
+                <GroupFooter>{t("选填。只展示给已登录的买家,车辆详情页会按买家的语言排列联系按钮。离开输入框时自动保存。")}</GroupFooter>
+              </>
+            )}
           </>
         )}
       </main>

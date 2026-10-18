@@ -463,6 +463,7 @@ function BrowseContent() {
     if (filters.noAccident === "true") chips.push({ key: "noAccident", label: t("无事故") });
     if (filters.oneOwner === "true") chips.push({ key: "oneOwner", label: t("一手车主") });
     if (filters.hasCarfax === "true") chips.push({ key: "hasCarfax", label: t("有Carfax") });
+    if (filters.cleanTitle === "true") chips.push({ key: "cleanTitle", label: t("仅清白产权") });
     if (filters.hasVideo === "true") chips.push({ key: "hasVideo", label: t("带视频") });
     if (filters.hasPrice === "true") chips.push({ key: "hasPrice", label: t("排除电议") });
     return chips;

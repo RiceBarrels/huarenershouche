@@ -98,13 +98,24 @@ create unique index if not exists cars_seller_external_uniq
 |---|---|---|
 | GET | `/api/v1/cars` | 列表。query:`make, model, year_min, year_max, price_min, price_max, mileage_max, fuel_type, transmission, location, seller_id, updated_since, sort, limit(≤100), cursor` |
 | GET | `/api/v1/cars/{id}` | 详情。含 `profiles` 摘要(账号类型、语言、门店) |
-| GET | `/api/v1/dealers` | 已认证门店列表(lat/lng/phone/wechat) |
+| GET | `/api/v1/dealers` | 已认证门店列表(lat/lng/phone/wechat/contact_apps) |
 | GET | `/api/v1/dealers/{id}` | 门店 + 在售车 |
 | GET | `/api/v1/meta/makes` | 品牌/车型/数量聚合(和 browse 筛选同源) |
 
 响应字段用英文 key,枚举值 **返回英文 slug**(`fuel_type: "gasoline"`),另给 `*_label` 按 `?lang=zh|en|ko…` 翻译好的展示文案。内部中文枚举值不外露。
 
 只返回 `status = 'active'` 且未 `owner_hidden` 的车;`phone` 等联系方式对无 key 的请求脱敏。
+
+即时通讯账号 `contact_apps`(车源详情的 `seller.contact_apps`、门店的 `contact_apps` = 门店主人的):卖家自愿填写(独立表 `profile_contact_apps`,
+`supabase/contact-apps.sql`;不在公开可读的 `profiles` 上),只含已填的键 `wechat` / `kakao` / `line` / `whatsapp`;`whatsapp` 为 E.164
+(`+16265550123`),其余为 `^[A-Za-z0-9._-]{1,32}$` 且不像网址 / 域名的 ID;没填为 `{}`。写入只经站内 `/api/contact-apps`(校验 + AI 审核),
+Public API 不提供写入。与 `phone` / `wechat` 同一脱敏规则:无 key 的请求为 `null`。短信用 `phone`,没有 sms 键。
+SQL 未执行时带 key 的请求也返回 `{}`。
+
+产权状态 `title_status`(车源详情):`{ value, label }`,`value` 为 `clean` / `rebuilt` / `salvage` / `lemon_buyback`(库内存中文
+`清白产权` / `重建产权` / `残值产权` / `柠檬回购`,`cars.title_status`,`supabase/title-status.sql`)。卖家没填时 `value` / `label` 都是
+`null` —— **null 不代表清白产权**。转载车源只在源站描述 / 标签里明确写出(clean title、rebuilt title、salvage、lemon buyback)时才有值,
+互相矛盾或没写为 null。不敏感,不脱敏;SQL 未执行时恒为 null。
 
 多语言(i18n v2):
 
@@ -137,6 +148,7 @@ create unique index if not exists cars_seller_external_uniq
   "fuel_type": "gasoline",             // gasoline|hybrid|phev|electric|diesel
   "transmission": "automatic",         // automatic|manual|cvt
   "drivetrain": "fwd",                 // fwd|rwd|awd|4wd
+  "title_status": "clean",             // clean|rebuilt|salvage|lemon_buyback;省略 = 保留原值(新建为空),null = 清空
   "exterior_color": "white", "interior_color": "black",
   "description": "...",                // 任一语言,原样存为原文;其他语言由 i18n 管线翻译
   "description_lang": "en",            // 已弃用:可传但忽略(原文语言自动检测)
@@ -151,7 +163,7 @@ create unique index if not exists cars_seller_external_uniq
 服务端处理链(复用现有能力,不另造):
 
 1. 校验 schema(zod)、VIN 格式(`isValidVinFormat`),同 seller 内 VIN 重复 → 409。
-2. 英文枚举 → DB 中文值映射(`gasoline → 汽油`),新建 `lib/api/enums.ts` 做双向表。
+2. 英文枚举 → DB 中文值映射(`gasoline → 汽油`、`rebuilt → 重建产权`),新建 `lib/api/enums.ts` 做双向表。`title_status` 只在请求里显式给出(含 null)时写;`supabase/title-status.sql` 未执行时静默不存,其余字段照常写入。
 3. `title`/`title_zh` 由 year/make/model/trim 确定性生成(`lib/i18n/car-title.ts` `buildCarTitles`,与 SQL `i18n.car_title` 一致,不经 AI)。
 4. location/lat/lng:车行取门店地址(`dealer_stores`);个人没有门店,必须在请求体传 `location`(或 zip),服务端用 `lib/geocode.ts` 解析坐标。`location_zh` 用 sync 引擎里的 `CITY_ZH` 表。
 5. `seller_name`/`phone` 取 profile。

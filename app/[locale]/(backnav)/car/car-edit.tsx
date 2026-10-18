@@ -5,7 +5,8 @@ import { useRouter } from "@/components/localized-navigation";
 import { useRouteParams } from "@/lib/use-route-params";
 import { Loader2, Upload, X, Plus, FileText, ExternalLink, Info } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
+import { TITLE_STATUS_EXPLAIN, TITLE_STATUSES, isTitleStatus } from "@/lib/title-status";
 import { requestModeration } from "@/lib/moderation-client";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import { invalidateEntries } from "@/lib/i18n/content/store";
@@ -114,7 +115,11 @@ export default function EditCarPage() {
     fuel_type: "", transmission: "", exterior_color: "", interior_color: "",
     drivetrain: "", description: "", make: "", model: "", year: "",
     trim: "", customMake: "", carfax_url: "",
+    // 产权状态(cars.title_status);"" = 不确定 / 不填
+    title_status: "",
   });
+  // 产权状态列是否已建(supabase/title-status.sql;select("*") 的行里有没有这个键)
+  const [titleStatusAvailable, setTitleStatusAvailable] = useState(false);
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [carfaxLoading, setCarfaxLoading] = useState(false);
   const [carfaxSummary, setCarfaxSummary] = useState<CarfaxSummary | null>(null);
@@ -172,7 +177,9 @@ export default function EditCarPage() {
         trim: c.trim || "",
         customMake: isOther ? c.make : "",
         carfax_url: c.carfax_url || "",
+        title_status: c.title_status ?? "",
       });
+      setTitleStatusAvailable("title_status" in c);
       // 已存的 Carfax 摘要直接展示(car.carfax_summary);重新「获取」后才替换
       setImageUrls([c.image_url, ...(c.images || [])].filter(Boolean) as string[]);
       // 卖家原样填写的标签(cars.features 是含中英词表标签的投影,不在这里编辑)
@@ -324,13 +331,22 @@ export default function EditCarPage() {
       phone: form.phone || null,
       carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
       carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : (car.carfax_summary || null),
+      // 产权状态:列已建才写(选「不确定」= 清空)
+      ...(titleStatusAvailable ? { title_status: isTitleStatus(form.title_status) ? form.title_status : null } : {}),
     };
 
     // 写原文列;卖家保存即确认原文是自己写的(original_uncertain 只能由非管线写入方清除)
-    let { error: updateError } = await supabase
-      .from("cars")
-      .update({ ...base, description_original: description, features_original: features, original_uncertain: false })
-      .eq("id", carId);
+    const writeV2 = () =>
+      supabase
+        .from("cars")
+        .update({ ...base, description_original: description, features_original: features, original_uncertain: false })
+        .eq("id", carId);
+    let { error: updateError } = await writeV2();
+    // 产权列不可用(schema cache 未刷新等):去掉产权再写一次,不挡保存
+    if (updateError && "title_status" in base && isMissingColumnNamed(updateError, "title_status")) {
+      delete (base as { title_status?: string | null }).title_status;
+      ({ error: updateError } = await writeV2());
+    }
     // 数据库还没有原文列(i18n-v2 迁移前):按旧列写一次
     if (updateError && isMissingColumnError(updateError)) {
       ({ error: updateError } = await supabase
@@ -485,6 +501,42 @@ export default function EditCarPage() {
               <Combobox options={tDrivetrainOptions} value={form.drivetrain} onValueChange={(v) => update("drivetrain", v)} className="mt-1" />
             </div>
           </div>
+
+          {/* 产权状态(选填;title-status.sql 未执行时不显示):选中项下方给一句白话解释 */}
+          {titleStatusAvailable && (
+            <div>
+              <Label className="font-mono text-[11px] text-muted-foreground">
+                {t("产权状态")} · {t("选填")}
+              </Label>
+              <div className="mt-1 flex flex-wrap gap-1.5" role="radiogroup" aria-label={t("产权状态")}>
+                {[...TITLE_STATUSES, ""].map((v) => {
+                  const active = form.title_status === v;
+                  return (
+                    <button
+                      key={v || "none"}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      onClick={() => update("title_status", v)}
+                      className={`rounded-md border px-2.5 py-1 font-mono text-xs transition-colors ${
+                        active
+                          ? "border-foreground bg-foreground text-background"
+                          : "border-border bg-background text-foreground hover:bg-muted"
+                      }`}
+                    >
+                      {v ? t(v) : t("不确定 / 不填")}
+                    </button>
+                  );
+                })}
+              </div>
+              {isTitleStatus(form.title_status) && (
+                <p className="mt-1.5 flex items-start gap-1 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                  <Info className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
+                  {t(TITLE_STATUS_EXPLAIN[form.title_status])}
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Location & Contact */}
           <div className="grid grid-cols-2 gap-4">

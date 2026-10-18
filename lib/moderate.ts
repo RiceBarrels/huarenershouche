@@ -23,6 +23,9 @@ export type ModerationKind =
   | "qa_answer"
   | "dealer_review";
 
+/** 可送审的内容类型:翻译管线的实体 + 卖家资料里的即时通讯联系方式(/api/contact-apps,不经翻译管线) */
+export type ModerationContentKind = ModerationKind | "contact_apps";
+
 export interface ModerationVerdict {
   violation: boolean;
   categories: string[];
@@ -67,7 +70,7 @@ const CALL_TIMEOUT_MS = 20_000;
 const MAX_TOKENS = 500;
 const MAX_CATEGORIES = 7;
 
-const KIND_LABELS: Record<ModerationKind, string> = {
+const KIND_LABELS: Record<ModerationContentKind, string> = {
   car: "二手车车辆列表(卖家发布)",
   post: "社区帖子",
   car_comment: "车辆页评论",
@@ -75,6 +78,8 @@ const KIND_LABELS: Record<ModerationKind, string> = {
   qa_question: "问答提问",
   qa_answer: "问答回答",
   dealer_review: "车行评价",
+  contact_apps:
+    "卖家资料里的即时通讯联系方式(微信号 / KakaoTalk ID / LINE ID / WhatsApp 号码;正常的个人或车行账号不算违规,只拦截明显的推广、引流、诈骗账号)",
 };
 const TRANSLATION_LABEL = "平台机器翻译生成的译文或话题标签(可能含多种语言)";
 
@@ -274,7 +279,7 @@ async function moderateChunks(label: string, text: string, deadlineAt: number | 
 
 /** 审核一条用户内容(调用方负责拼好标题 / 正文 / 标签等全部文本);失败时区分系统性 / 内容相关 */
 export async function moderateContentDetailed(
-  kind: ModerationKind,
+  kind: ModerationContentKind,
   text: string,
   opts?: { deadlineAt?: number }
 ): Promise<ModerationOutcome> {
@@ -295,7 +300,7 @@ export async function moderateTranslationOutputDetailed(
 
 /** moderateContentDetailed,失败时返回 null */
 export async function moderateContent(
-  kind: ModerationKind,
+  kind: ModerationContentKind,
   text: string,
   opts?: { deadlineAt?: number }
 ): Promise<ModerationVerdict | null> {

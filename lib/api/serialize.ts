@@ -1,5 +1,5 @@
 // Public API 对外 JSON 形状:英文 key、枚举 slug + label、绝不泄露库内中文枚举值。
-// 匿名请求(redact=true)脱敏联系方式与 VIN;带 key 的请求给全量。
+// 匿名请求(redact=true)脱敏联系方式(phone / wechat / contact_apps)与 VIN;带 key 的请求给全量。
 // 路由只负责查数据,字段整形统一走这里,保证列表/详情/门店在售车形状一致。
 // 描述 / 配置标签按 lang 取 i18n_bundle(译文未就绪时给原文,不拿原文冒充译文),原文另给 *_original。
 
@@ -9,6 +9,7 @@ import { serverT } from "@/lib/i18n/translate";
 import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import type { BundleRow } from "@/lib/i18n/content/types";
+import type { ContactApps } from "@/lib/contact-apps";
 import { enumField, enumToSlug, labelFor } from "./enums";
 import type { ApiLang } from "./types";
 
@@ -145,6 +146,8 @@ export interface CarDetail extends CarSummary {
   /** 卖家原样提交的配置标签 */
   features_original: string[];
   images: string[];
+  /** 产权状态 clean / rebuilt / salvage / lemon_buyback;卖家没填时 value / label 都是 null */
+  title_status: EnumValue;
   /** 匿名:前 8 + **** + 后 4;带 key:完整 */
   vin: string | null;
   carfax_url: string | null;
@@ -155,6 +158,8 @@ export interface CarDetail extends CarSummary {
   seller: CarSeller & {
     /** 匿名请求为 null */
     phone: string | null;
+    /** 卖家主动填写的即时通讯账号(只含已填的键);匿名请求为 null */
+    contact_apps: ContactApps | null;
     /** 车行卖家的第一家已认证门店;个人卖家/无门店为 null */
     store: CarStore | null;
   };
@@ -174,6 +179,8 @@ export interface DealerSummary {
   phone: string | null;
   /** 匿名请求为 null */
   wechat: string | null;
+  /** 门店主人(owner_id)主动填写的即时通讯账号;匿名请求为 null */
+  contact_apps: ContactApps | null;
   store_photos: string[];
   /** 门店主人的沟通语言(profiles.languages) */
   languages: string[];
@@ -184,7 +191,7 @@ export interface DealerSummary {
 
 export interface SerializeOpts {
   lang: ApiLang;
-  /** true = 匿名请求:脱敏 phone/wechat/VIN */
+  /** true = 匿名请求:脱敏 phone/wechat/contact_apps/VIN */
   redact: boolean;
 }
 
@@ -285,7 +292,7 @@ const ISO_639_1 = /^[a-z]{2}$/;
 /** bundle = 该车在 lang 下的 i18n_bundle 行(路由用 getBundle 取;RPC 不可用时为 undefined → 全给原文) */
 export function serializeCarDetail(
   car: ApiCarRow,
-  opts: SerializeOpts & { store?: DbDealerStore | null; bundle?: BundleRow },
+  opts: SerializeOpts & { store?: DbDealerStore | null; bundle?: BundleRow; contactApps?: ContactApps },
 ): CarDetail {
   const summary = serializeCarSummary(car, opts);
   const isDealer = summary.seller.account_type === "dealer";
@@ -302,6 +309,8 @@ export function serializeCarDetail(
     features: featureLabels(bundle, featuresOriginal),
     features_original: featuresOriginal,
     images: car.images ?? [],
+    // CAR_DETAIL_SELECT 是 *:title-status.sql 未执行时没有这一列 → null
+    title_status: enumField("title_status", car.title_status, opts.lang),
     vin: opts.redact ? maskVin(car.vin) : (car.vin ?? null),
     carfax_url: car.carfax_url ?? null,
     carfax_summary: localizeCarfaxSummary(car.carfax_summary, serverT(opts.lang)),
@@ -310,6 +319,7 @@ export function serializeCarDetail(
     seller: {
       ...summary.seller,
       phone: opts.redact ? null : (car.phone ?? null),
+      contact_apps: opts.redact ? null : (opts.contactApps ?? {}),
       store: isDealer ? storeOf(opts.store, opts.redact) : null,
     },
     source_url: car.source_url ?? null,
@@ -318,7 +328,7 @@ export function serializeCarDetail(
 
 export function serializeDealer(
   store: DbDealerStore,
-  opts: SerializeOpts & { languages?: string[] | null; active_count?: number },
+  opts: SerializeOpts & { languages?: string[] | null; active_count?: number; contactApps?: ContactApps },
 ): DealerSummary {
   const out: DealerSummary = {
     id: store.id,
@@ -330,6 +340,7 @@ export function serializeDealer(
     lng: store.lng,
     phone: opts.redact ? null : store.phone,
     wechat: opts.redact ? null : store.wechat,
+    contact_apps: opts.redact ? null : (opts.contactApps ?? {}),
     store_photos: store.store_photos ?? [],
     languages: opts.languages ?? [],
     created_at: store.created_at,

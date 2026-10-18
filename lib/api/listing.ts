@@ -15,7 +15,7 @@ import { geocodeCity, geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { buildCarTitles } from "@/lib/i18n/car-title";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import { getBundles } from "@/lib/i18n/content/server";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
 import { CITY_ZH, isRelistBlocked, originalColumns, sameOriginal, sameTagSet } from "@/lib/sources/sync";
 import { deleteMirroredImages, isMirroredUrl } from "@/lib/sources/images";
 import type { ApiContext, ApiErrorDetail, ApiLang, QuotaInfo } from "./types";
@@ -43,7 +43,7 @@ const httpsUrl = z
   .url({ message: "must be a valid URL" })
   .refine((u) => u.startsWith("https://"), { message: "must be an https URL" });
 
-const enumSlug = (kind: "fuel_type" | "transmission" | "drivetrain") =>
+const enumSlug = (kind: "fuel_type" | "transmission" | "drivetrain" | "title_status") =>
   z
     .string()
     .trim()
@@ -78,6 +78,8 @@ export const listingSchema = z.object({
   fuel_type: enumSlug("fuel_type"),
   transmission: enumSlug("transmission"),
   drivetrain: enumSlug("drivetrain").nullish(),
+  /** 产权状态 clean / rebuilt / salvage / lemon_buyback;省略 = 不改(新建为空),null = 清空 */
+  title_status: enumSlug("title_status").nullish(),
   exterior_color: optionalText(30),
   interior_color: optionalText(30),
   /** 任一语言,原样保存为原文;其他语言由 i18n 管线自动翻译 */
@@ -223,6 +225,8 @@ export function buildCarRow(
     fuel_type: enumToDb("fuel_type", input.fuel_type),
     transmission: enumToDb("transmission", input.transmission),
     drivetrain: enumToDb("drivetrain", input.drivetrain),
+    // 产权状态只在请求里显式给了(含 null)才写:省略时更新保留原值,新建为空
+    ...(input.title_status !== undefined ? { title_status: enumToDb("title_status", input.title_status) } : {}),
     exterior_color: input.exterior_color ?? null,
     interior_color: input.interior_color ?? null,
     vin: input.vin,
@@ -240,6 +244,21 @@ export function buildCarRow(
 }
 
 // ─── Upsert ─────────────────────────────────────────────────────────
+
+/**
+ * 写 cars 一行;supabase/title-status.sql 还没执行(列不存在)而这次带了 title_status 时,
+ * 去掉它再写一次 —— 产权状态静默不存,其他字段照常写入(与其他缺列兜底一致,不让整次 PUT 失败)。
+ */
+async function writeCarRow<R extends { error: PostgrestError | null }>(
+  row: Record<string, unknown>,
+  write: (row: Record<string, unknown>) => PromiseLike<R>,
+): Promise<R> {
+  const res = await write(row);
+  if (!res.error || !("title_status" in row) || !isMissingColumnNamed(res.error, "title_status")) return res;
+  const rest = { ...row };
+  delete rest.title_status;
+  return write(rest);
+}
 
 /** 已有记录;原文 / 标签已按库结构归一(见 findExisting) */
 interface ExistingCar {
@@ -494,11 +513,9 @@ export async function upsertListing(
 
   // 4a. 新建
   if (!existing) {
-    const { data: inserted, error } = await supabase
-      .from("cars")
-      .insert({ ...row, source_images: input.images })
-      .select("id")
-      .single();
+    const { data: inserted, error } = await writeCarRow({ ...row, source_images: input.images }, (r) =>
+      supabase.from("cars").insert(r).select("id").single(),
+    );
     if (error) {
       // 并发同 external_id 撞唯一索引
       if (error.code === "23505") {
@@ -553,7 +570,7 @@ export async function upsertListing(
     delete update.image_url;
   }
 
-  const { error: upErr } = await supabase.from("cars").update(update).eq("id", existing.id);
+  const { error: upErr } = await writeCarRow(update, (r) => supabase.from("cars").update(r).eq("id", existing.id));
   if (upErr) throw new Error(`update: ${upErr.message}`);
 
   const id = existing.id;

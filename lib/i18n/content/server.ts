@@ -4,14 +4,14 @@
 //
 // 容错:代码可能先于 SQL 迁移上线 ——
 // - i18n_bundle 不存在 / 出错:返回 {}(页面显示原文),每个进程只 warn 一次;
-// - 新列不存在:用 LEGACY_* 列集合重试一次;
+// - 新列不存在:用 LEGACY_* 列集合重试一次(车源详情按 PUBLIC_CAR_COLUMN_SETS 从新到旧依次重试);
 // - 其他数据库错误:主体(车源 / 帖子)直接抛出,由错误边界返回 500,避免把暂时故障渲染成 404;
 //   评论属于次要内容,出错时返回空列表。
 
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Locale } from "@/lib/i18n";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import type { DbComment, DbCommunityPost, DbPostComment, PublicCar } from "@/lib/types";
 import {
   CAR_COMMENT_COLUMNS,
@@ -19,11 +19,10 @@ import {
   LEGACY_CAR_COMMENT_COLUMNS,
   LEGACY_POST_COLUMNS,
   LEGACY_POST_COMMENT_COLUMNS,
-  LEGACY_PUBLIC_CAR_COLUMNS,
   POST_AUTHOR_EMBED,
   POST_COLUMNS,
   POST_COMMENT_COLUMNS,
-  PUBLIC_CAR_COLUMNS,
+  PUBLIC_CAR_COLUMN_SETS,
 } from "./columns";
 import type { BundleMap, BundleRow, ContentEntity } from "./types";
 
@@ -99,8 +98,8 @@ export const getPublicCar = cache(async (id: string): Promise<PublicCar | null> 
       .eq("status", "active")
       .eq("owner_hidden", false)
       .maybeSingle();
-  let res = await query(PUBLIC_CAR_COLUMNS);
-  if (res.error && isMissingColumnError(res.error)) res = await query(LEGACY_PUBLIC_CAR_COLUMNS);
+  // title-status.sql / i18n-v2.sql 各自可能还没执行:缺列就换下一组列集合
+  const res = await queryWithColumnFallback(query, PUBLIC_CAR_COLUMN_SETS);
   if (res.error) throw new Error(`getPublicCar(${id}): ${res.error.message}`);
   return (res.data as unknown as PublicCar | null) ?? null;
 });

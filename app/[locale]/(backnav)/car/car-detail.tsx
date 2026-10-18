@@ -88,10 +88,9 @@ import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import {
   CAR_LIST_COLUMNS,
   CAR_PROFILE_EMBED,
-  LEGACY_PUBLIC_CAR_COLUMNS,
-  PUBLIC_CAR_COLUMNS,
+  PUBLIC_CAR_COLUMN_SETS,
 } from "@/lib/i18n/content/columns";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 import { useBundleRow, useLocalized } from "@/hooks/use-localized";
 import { useTermLabels } from "@/hooks/use-term-labels";
 import { LocalizedText } from "@/components/content/localized-text";
@@ -100,6 +99,9 @@ import { sellerSpeaksLocale } from "@/lib/i18n/languages";
 import { languageList } from "@/components/language-picker";
 import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
+import { ContactAppButtons, useSellerContactApps } from "@/components/contact-app-buttons";
+import { hasContactApps } from "@/lib/contact-apps";
+import { TitleStatusBadge } from "@/components/title-status-badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { DbCar, DbComment, PublicCar } from "@/lib/types";
 
@@ -138,9 +140,9 @@ interface CarDetailProps {
   onRelisted?: () => void;
 }
 
-// 详情整行:公开列 + 卖家资料(不含电话,登录后点开联系方式再单独取)
-const CAR_ROW_SELECT = `${PUBLIC_CAR_COLUMNS}, ${CAR_PROFILE_EMBED}`;
-const LEGACY_CAR_ROW_SELECT = `${LEGACY_PUBLIC_CAR_COLUMNS}, ${CAR_PROFILE_EMBED}`;
+// 详情整行:公开列 + 卖家资料(不含电话,登录后点开联系方式再单独取);从新到旧三组列集合
+// (title-status.sql / i18n-v2.sql 各自可能还没执行)
+const CAR_ROW_SELECTS = PUBLIC_CAR_COLUMN_SETS.map((cols) => `${cols}, ${CAR_PROFILE_EMBED}`);
 // 相似车渲染成卡片:列表列集 + 卖家资料(车行 / 系统检索徽标)
 const CAR_CARD_SELECT = `${CAR_LIST_COLUMNS}, ${CAR_PROFILE_EMBED}`;
 // 市场比价池只用到这几列(最多 150 台,不拉卡片列)
@@ -149,13 +151,12 @@ const NO_FEATURES: readonly string[] = [];
 
 /**
  * 拉一辆车的详情整行。可见性交给 RLS:公开车源人人可读,已下架的只有车主 / 认领者 / 管理员可读。
- * i18n-v2.sql 未执行(新列不存在)时退回旧列集。failed = 请求本身出错(网络等),区别于「查无此车」。
+ * title-status.sql / i18n-v2.sql 未执行(新列不存在)时依次退回旧列集。failed = 请求本身出错(网络等),区别于「查无此车」。
  */
 export async function fetchCarRow(id: string): Promise<{ row: PublicCar | null; failed: boolean }> {
   const query = (columns: string) =>
     supabase.from("cars").select(columns).eq("id", id).maybeSingle();
-  let { data, error } = await query(CAR_ROW_SELECT);
-  if (error && isMissingColumnError(error)) ({ data, error } = await query(LEGACY_CAR_ROW_SELECT));
+  const { data, error } = await queryWithColumnFallback(query, CAR_ROW_SELECTS);
   return { row: error ? null : ((data as PublicCar | null) ?? null), failed: !!error };
 }
 
@@ -443,6 +444,11 @@ function CarDetailView({
     };
   }, [carId, contactVisible, user, phoneMissing]);
   const phoneLoading = contactVisible && phoneMissing;
+  // 卖家的即时通讯联系方式:与电话一样不随 SSR 下发,已登录访客在客户端单独取(没填 / SQL 未执行为空)
+  const sellerContactApps = useSellerContactApps(car?.seller_id, !!user);
+  // 手机底栏放了即时通讯按钮时让出分享按钮的位置(分享在卖家卡片的操作列表里仍可用),保证底栏宽度不变
+  const barHasContactApp = !!user && hasContactApps(sellerContactApps);
+  const revealedPhone = contactVisible && !phoneLoading ? (car?.phone ?? null) : null;
 
   // 市场比价：与同品牌车源池对比（里程修正后的同类均价）;比价只读价格 / 里程 / 年份等公开列
   const insight = useMemo(
@@ -961,6 +967,8 @@ function CarDetailView({
                   </p>
                 </div>
               </div>
+              {/* 产权状态:卖家填了才显示,点开看解释(title-status.sql 未执行时没有该字段,不渲染) */}
+              <TitleStatusBadge value={car.title_status} />
             </Reveal>
 
             {car.vin && (
@@ -1192,6 +1200,18 @@ function CarDetailView({
                       {t("登录查看联系方式")}
                     </Button>
                   </Link>
+                )}
+
+                {/* 即时通讯 / 短信(只给已登录访客,只显示卖家填了的) */}
+                {user && (
+                  <ContactAppButtons
+                    variant="sidebar"
+                    apps={sellerContactApps}
+                    carId={carId}
+                    title={title}
+                    shareUrl={shareUrl}
+                    phone={revealedPhone}
+                  />
                 )}
 
                 {/* 浮层模式下 收藏/对比/分享 在顶栏(CarSheetActions),此处不再重复 */}
@@ -1577,18 +1597,19 @@ function CarDetailView({
           paddingBottom: "env(safe-area-inset-bottom, 0px)",
         }}
       >
-        <div className="flex-1">
-          <div className="flex items-baseline gap-1.5">
-            <p className="font-mono text-lg font-bold">{formatPrice(car.price)}</p>
+        {/* min-w-0:按钮多时价格块可收缩,标签先截断,不把底栏撑出屏幕 */}
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 items-baseline gap-1.5 overflow-hidden">
+            <p className="shrink-0 font-mono text-lg font-bold">{formatPrice(car.price)}</p>
             {insight && (
               <span
-                className={`rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
+                className={`min-w-0 truncate rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold ${insight.className}`}
               >
                 {t(insight.label)}
               </span>
             )}
             {car.original_price && car.original_price > car.price && (
-              <span className="rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
+              <span className="shrink-0 rounded-full px-1 py-0.5 font-mono text-[10px] font-semibold bg-green-500/10 text-green-600">
                 -{Math.round((1 - car.price / car.original_price) * 100)}%
               </span>
             )}
@@ -1608,7 +1629,7 @@ function CarDetailView({
             />
           </Button>
         )}
-        {!embedded && (
+        {!embedded && !barHasContactApp && (
           <Button
             variant="secondary"
             size="icon"
@@ -1629,6 +1650,16 @@ function CarDetailView({
           >
             <Share2 className="h-4 w-4" strokeWidth={1.5} />
           </Button>
+        )}
+        {user && (
+          <ContactAppButtons
+            variant="bar"
+            apps={sellerContactApps}
+            carId={carId}
+            title={title}
+            shareUrl={shareUrl}
+            phone={revealedPhone}
+          />
         )}
         {user ? (
           <Button

@@ -124,7 +124,7 @@ function searchUrls(): string[] {
     `- \`bodyStyle\`: ${BODY_STYLE_OPTIONS.map((b) => b.value).join(" | ")}`,
     "- `sellerType`: private | dealer",
     "- `dealRating`: great | good(价格评估);`listedWithin`: 天数 days",
-    "- `noAccident` / `oneOwner` / `hasCarfax` / `priceDropped` / `hasVideo`: true",
+    "- `noAccident` / `oneOwner` / `hasCarfax` / `cleanTitle`(仅清白产权 clean title only) / `priceDropped` / `hasVideo`: true",
     `- \`sort\`: ${SORT_OPTIONS.map((s) => s.value).join(" | ")}`,
   ];
 }

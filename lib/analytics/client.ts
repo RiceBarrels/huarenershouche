@@ -15,7 +15,13 @@ import {
   truncateText,
   type TrackedPath,
 } from "@/lib/analytics/path";
-import type { AnalyticsEventType, AnalyticsPlatform, TrackPayload } from "@/lib/analytics/types";
+import type {
+  AnalyticsEventType,
+  AnalyticsPlatform,
+  ContactClickPayload,
+  TrackPayload,
+} from "@/lib/analytics/types";
+import type { ContactChannel } from "@/lib/contact-apps";
 
 const VISITOR_KEY = "clc_vid";
 const SESSION_KEY = "clc_session";
@@ -323,7 +329,7 @@ async function accessToken(): Promise<string | null> {
   }
 }
 
-function send(payload: TrackPayload): void {
+function send(payload: TrackPayload | ContactClickPayload): void {
   const url = `${apiOrigin()}/api/vt`;
   const body = JSON.stringify(payload);
   // 网页端优先 sendBeacon(页面跳走也能发出;text/plain 免 CORS 预检)。
@@ -462,6 +468,33 @@ export function trackCarView(carId: string, locale?: string | null): void {
     }
     lastCarView = { carId: id, href, at: now };
     report("car_view", where, locale ?? where.locale, id, now);
+  } catch {
+    /* 埋点失败不影响页面 */
+  }
+}
+
+/**
+ * 车辆详情页联系按钮点击(微信 / KakaoTalk / LINE / WhatsApp / 短信),写 contact_clicks 表,
+ * 用来按界面语言调整 CONTACT_APP_ORDER。沿用当前访客 / 会话,不识别来源、不去重(每次点击都算)。
+ */
+export function trackContactClick(carId: string, app: ContactChannel, locale?: string | null): void {
+  try {
+    if (!carId || !UUID_RE.test(carId) || !trackingEnabled()) return;
+    const { session } = resolveSession(readSession(), Date.now(), null, uuidv4);
+    writeSession(session);
+    const uiLocale = nativeShell() ? nativeUiLocale(locale ?? null) : (locale ?? null);
+    const base: Omit<ContactClickPayload, "token"> = {
+      type: "contact_click",
+      visitor_id: visitorId(),
+      session_id: session.id,
+      car_id: carId.toLowerCase(),
+      app,
+      locale: uiLocale ? truncateText(uiLocale, 10) : null,
+      platform: currentPlatform(),
+    };
+    void accessToken()
+      .then((token) => send({ ...base, token }))
+      .catch(() => {});
   } catch {
     /* 埋点失败不影响页面 */
   }

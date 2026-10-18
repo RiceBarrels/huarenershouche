@@ -1,5 +1,5 @@
 // GET /api/v1/dealers — 已认证门店列表。可选 location(地址子串 / 邮编前缀),
-// offset 游标分页(门店表小)。附门店主人的沟通语言与在售车数;匿名脱敏 phone/wechat。
+// offset 游标分页(门店表小)。附门店主人的沟通语言与在售车数;匿名脱敏 phone/wechat/contact_apps。
 
 import type { NextRequest } from "next/server";
 import { authenticateApi } from "@/lib/api/auth";
@@ -14,6 +14,8 @@ import {
   type CarFilterQuery,
 } from "@/lib/api/filters";
 import { serializeDealer } from "@/lib/api/serialize";
+import { fetchContactApps } from "@/lib/api/contact-apps";
+import type { ContactApps } from "@/lib/contact-apps";
 import type { DbDealerStore } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +54,10 @@ export async function GET(req: NextRequest) {
 
     const languages = new Map<string, string[]>();
     const activeCounts = new Map<string, number>();
+    let contactApps = new Map<string, ContactApps>();
     if (ownerIds.length) {
+      // 门店主人的即时通讯账号只给带 key 的请求(列不存在时为空)
+      const contactAppsPromise = anonymous ? null : fetchContactApps(ctx.supabase, ownerIds);
       const carRowsPromise = collectRows<{ seller_id: string }>(
         () =>
           ctx.supabase
@@ -74,6 +79,7 @@ export async function GET(req: NextRequest) {
         languages.set(p.id, p.languages ?? []);
       }
       for (const c of carRows) activeCounts.set(c.seller_id, (activeCounts.get(c.seller_id) ?? 0) + 1);
+      if (contactAppsPromise) contactApps = await contactAppsPromise;
     }
 
     return apiJson({
@@ -83,6 +89,7 @@ export async function GET(req: NextRequest) {
           redact: anonymous,
           languages: languages.get(store.owner_id) ?? [],
           active_count: activeCounts.get(store.owner_id) ?? 0,
+          contactApps: contactApps.get(store.owner_id),
         }),
       ),
       next_cursor: hasMore ? offsetCursor(offset + limit) : null,

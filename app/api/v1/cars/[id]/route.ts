@@ -1,5 +1,5 @@
 // GET /api/v1/cars/{id} — 车源详情。不可见(不存在 / 非 active / owner_hidden)一律 404,
-// 不区分原因。车行卖家附带第一家已认证门店;匿名请求脱敏 phone/wechat/VIN。
+// 不区分原因。车行卖家附带第一家已认证门店;匿名请求脱敏 phone/wechat/contact_apps/VIN。
 // 描述 / 配置标签按 lang 取 i18n_bundle(与车源并行查;RPC 不可用时给原文)。
 
 import type { NextRequest } from "next/server";
@@ -7,6 +7,7 @@ import { authenticateApi } from "@/lib/api/auth";
 import { apiError, apiInternalError, apiJson, handleOptions } from "@/lib/api/response";
 import { isUuid } from "@/lib/api/filters";
 import { CAR_DETAIL_SELECT, serializeCarDetail, type ApiCarRow } from "@/lib/api/serialize";
+import { fetchContactApps } from "@/lib/api/contact-apps";
 import { getBundle } from "@/lib/i18n/content/server";
 import type { DbDealerStore } from "@/lib/types";
 
@@ -37,6 +38,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!data) return apiError(404, "not_found", "Car not found");
     const car = data as unknown as ApiCarRow;
 
+    // 卖家即时通讯账号只给带 key 的请求(列不存在时为空,不影响详情)
+    const contactAppsPromise = anonymous ? null : fetchContactApps(ctx.supabase, [car.seller_id]);
+
     let store: DbDealerStore | null = null;
     if (car.profiles?.account_type === "dealer") {
       const { data: stores, error: storeErr } = await ctx.supabase
@@ -50,8 +54,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       store = (stores?.[0] as DbDealerStore | undefined) ?? null;
     }
 
+    const contactApps = contactAppsPromise ? (await contactAppsPromise).get(car.seller_id) : undefined;
+
     return apiJson({
-      data: serializeCarDetail(car, { lang: ctx.lang, redact: anonymous, store, bundle }),
+      data: serializeCarDetail(car, { lang: ctx.lang, redact: anonymous, store, bundle, contactApps }),
       lang: ctx.lang,
     });
   } catch (err) {

@@ -193,6 +193,20 @@ export function buildOpenApi(): Record<string, unknown> {
         languages: { type: "array", items: { type: "string" }, description: "ISO-639-1 codes the seller can communicate in." },
       },
     },
+    ContactApps: {
+      type: "object",
+      description:
+        "Messenger accounts the seller chose to publish (opt-in; never derived from other fields). Only filled keys are present; `{}` when none. " +
+        "`whatsapp` is E.164 (`+16265550123`, open as `https://wa.me/<digits>`); `wechat` / `kakao` / `line` are IDs matching `^[A-Za-z0-9._-]{1,32}$` " +
+        "(LINE: `https://line.me/ti/p/~<id>`). SMS uses the seller `phone`.",
+      additionalProperties: false,
+      properties: {
+        wechat: { type: "string", pattern: "^[A-Za-z0-9._-]{1,32}$" },
+        kakao: { type: "string", pattern: "^[A-Za-z0-9._-]{1,32}$" },
+        line: { type: "string", pattern: "^[A-Za-z0-9._-]{1,32}$" },
+        whatsapp: { type: "string", pattern: "^\\+[1-9]\\d{6,14}$" },
+      },
+    },
     Store: {
       type: "object",
       required: ["id", "name", "address", "lat", "lng", "phone", "wechat"],
@@ -258,7 +272,7 @@ export function buildOpenApi(): Record<string, unknown> {
           type: "object",
           required: [
             "description", "description_original", "description_lang", "description_translated", "features",
-            "features_original", "images", "vin", "views_count", "favorites_count", "seller",
+            "features_original", "images", "title_status", "vin", "views_count", "favorites_count", "seller",
           ],
           properties: {
             description: {
@@ -283,6 +297,10 @@ export function buildOpenApi(): Record<string, unknown> {
             },
             features_original: { type: "array", items: { type: "string" }, description: "Feature tags exactly as the seller sent them." },
             images: { type: "array", items: { type: "string", format: "uri" } },
+            title_status: enumValue(
+              "title_status",
+              "Title brand as declared by the seller (dealer listings: only when the source text says it explicitly). `value` is `null` when not provided — that does not mean clean.",
+            ),
             vin: { ...nullable("string"), description: "Anonymous requests get a masked VIN (`1HGCV1F3****2345`); keyed requests get the full VIN." },
             carfax_url: nullable("string", { format: "uri" }),
             carfax_summary: nullable("string", { description: "Short Carfax summary (owners, accidents, service records) in the requested `lang`." }),
@@ -294,9 +312,10 @@ export function buildOpenApi(): Record<string, unknown> {
                 ref("Seller"),
                 {
                   type: "object",
-                  required: ["phone", "store"],
+                  required: ["phone", "contact_apps", "store"],
                   properties: {
                     phone: { ...nullable("string"), description: "`null` for anonymous requests." },
+                    contact_apps: { oneOf: [ref("ContactApps"), { type: "null" }], description: "`null` for anonymous requests." },
                     store: { oneOf: [ref("Store"), { type: "null" }], description: "First verified store of a dealer seller; `null` for individuals." },
                   },
                 },
@@ -308,7 +327,7 @@ export function buildOpenApi(): Record<string, unknown> {
     },
     Dealer: {
       type: "object",
-      required: ["id", "owner_id", "name", "address", "zipcode", "lat", "lng", "phone", "wechat", "store_photos", "languages", "created_at"],
+      required: ["id", "owner_id", "name", "address", "zipcode", "lat", "lng", "phone", "wechat", "contact_apps", "store_photos", "languages", "created_at"],
       properties: {
         id: { type: "string", format: "uuid", description: "Store id." },
         owner_id: { type: "string", format: "uuid", description: "Profile that owns the store; use as `seller_id` on `/cars`." },
@@ -319,6 +338,7 @@ export function buildOpenApi(): Record<string, unknown> {
         lng: nullable("number"),
         phone: { ...nullable("string"), description: "`null` for anonymous requests." },
         wechat: { ...nullable("string"), description: "`null` for anonymous requests." },
+        contact_apps: { oneOf: [ref("ContactApps"), { type: "null" }], description: "Messenger accounts of the store owner. `null` for anonymous requests." },
         store_photos: { type: "array", items: { type: "string", format: "uri" } },
         languages: { type: "array", items: { type: "string" } },
         active_count: { type: "integer", description: "Active listings of the owner." },
@@ -342,6 +362,11 @@ export function buildOpenApi(): Record<string, unknown> {
         fuel_type: { type: "string", enum: slugs("fuel_type"), description: enumDesc("fuel_type") },
         transmission: { type: "string", enum: slugs("transmission"), description: enumDesc("transmission") },
         drivetrain: { ...nullable("string"), enum: [...slugs("drivetrain"), null], description: enumDesc("drivetrain") },
+        title_status: {
+          ...nullable("string"),
+          enum: [...slugs("title_status"), null],
+          description: `Title brand: ${enumDesc("title_status")}. Omit to keep the stored value (new listings start empty); send \`null\` to clear it.`,
+        },
         exterior_color: nullable("string", { maxLength: 30, description: "Free text in English, e.g. `white`." }),
         interior_color: nullable("string", { maxLength: 30 }),
         description: nullable("string", {

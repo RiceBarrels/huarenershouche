@@ -1,5 +1,5 @@
 // GET /api/v1/dealers/{id} — 单家已认证门店 + 在售车(最新 50 台)+ 在售总数。
-// 未认证 / 不存在一律 404。
+// 未认证 / 不存在一律 404。匿名请求脱敏 phone/wechat/contact_apps。
 
 import type { NextRequest } from "next/server";
 import { authenticateApi } from "@/lib/api/auth";
@@ -12,6 +12,7 @@ import {
   serializeDealer,
   type ApiCarRow,
 } from "@/lib/api/serialize";
+import { fetchContactApps } from "@/lib/api/contact-apps";
 import { isMissingColumnError } from "@/lib/supabase-compat";
 import type { DbDealerStore } from "@/lib/types";
 
@@ -54,10 +55,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         .order("id", { ascending: false })
         .limit(DEALER_CARS_LIMIT);
 
-    const [{ data: profile, error: profErr }, firstCars, { count, error: countErr }] = await Promise.all([
+    const [{ data: profile, error: profErr }, firstCars, { count, error: countErr }, contactApps] = await Promise.all([
       ctx.supabase.from("profiles").select("languages").eq("id", store.owner_id).maybeSingle(),
       dealerCars(CAR_SUMMARY_SELECT),
       visibleCars().eq("seller_id", store.owner_id).eq("status", "active").eq("owner_hidden", false),
+      // 门店主人的即时通讯账号只给带 key 的请求(列不存在时为空)
+      anonymous ? null : fetchContactApps(ctx.supabase, [store.owner_id]),
     ]);
     if (profErr) throw new Error(profErr.message);
     let carsRes = firstCars;
@@ -74,6 +77,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           ...opts,
           languages: (profile as { languages?: string[] | null } | null)?.languages ?? [],
           active_count,
+          contactApps: contactApps?.get(store.owner_id),
         }),
         cars: rows.map((car) => serializeCarSummary(car, opts)),
       },

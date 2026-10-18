@@ -1,6 +1,7 @@
 import type { DbCar } from "./types";
 import { classifyBodyStyle, bodyStyleLabel, type BodyStyle } from "./body-style";
 import { paymentToPrice } from "./format";
+import { CLEAN_TITLE } from "./title-status";
 
 const STORAGE_KEY = "huaren_saved_searches";
 const MAX_ITEMS = 20;
@@ -136,6 +137,7 @@ export function describeSearch(params: Record<string, string>): string {
   if (params.noAccident) parts.push("无事故");
   if (params.oneOwner) parts.push("一手车主");
   if (params.hasCarfax) parts.push("有Carfax");
+  if (params.cleanTitle) parts.push("仅清白产权");
   if (params.hasVideo) parts.push("带视频");
   if (params.hasPrice) parts.push("排除电议");
   if (params.features) parts.push(params.features.split(",").join("/"));
@@ -221,6 +223,8 @@ export function carMatchesParams(
     if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
   }
   if (params.hasCarfax === "true" && !car.carfax_url) return false;
+  // 只认明确的清白产权(未填 / 列不存在都不命中,与 lib/car-filters.ts 一致)
+  if (params.cleanTitle === "true" && car.title_status !== CLEAN_TITLE) return false;
   if (params.hasVideo === "true" && !carHasVideo(car)) return false;
   if (params.features) {
     const wanted = params.features.split(",");

@@ -21,7 +21,8 @@ import {
   Languages,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError } from "@/lib/supabase-compat";
+import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
+import { TITLE_STATUS_OPTIONS, isTitleStatus } from "@/lib/title-status";
 import { requestModeration } from "@/lib/moderation-client";
 import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,14 @@ import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { FEATURE_SUGGESTIONS } from "@/lib/i18n/tag-suggestions";
 import { useTermLabels } from "@/hooks/use-term-labels";
 import { useIdentity } from "@/components/identity-provider";
+import { ContactAppsEditor, type ContactAppsInput } from "@/components/contact-apps-editor";
+import {
+  contactAppsToInput,
+  normalizeContactApps,
+  sameContactApps,
+  type ContactApps,
+} from "@/lib/contact-apps";
+import { loadContactApps, saveContactApps } from "@/lib/contact-apps-client";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
 import type { DbDealerStore } from "@/lib/types";
@@ -377,6 +386,8 @@ export default function PostCarPage() {
     cylinders: "",
     seats: "",
     condition: "used",
+    // 产权状态(cars.title_status,选填,存中文枚举;"" = 不填 / 不确定)
+    title_status: "",
     vin: "",
     customMake: "",
     seller_name: "",
@@ -387,6 +398,14 @@ export default function PostCarPage() {
   };
 
   const [form, setForm] = useState(defaultForm);
+  // 即时通讯联系方式(profile_contact_apps,账号级资料,不进草稿):available = contact-apps.sql 已执行
+  const [contactAppsAvailable, setContactAppsAvailable] = useState(false);
+  const [savedContactApps, setSavedContactApps] = useState<ContactApps>({});
+  const [contactInput, setContactInput] = useState<ContactAppsInput>(() => contactAppsToInput({}));
+  const contactAppsInvalid = useMemo(
+    () => Object.keys(normalizeContactApps(contactInput).errors).length > 0,
+    [contactInput]
+  );
   // 推荐配置标签的当前语言文案(未取到前走词典)
   const suggestionLabels = useTermLabels("feature", SUGGESTED_FEATURES);
 
@@ -524,6 +543,38 @@ export default function PostCarPage() {
     })();
   }, [actingId, isActingAsClaimed]);
   /* eslint-enable react-hooks/set-state-in-effect */
+
+  // 当前操作身份的即时通讯联系方式(切换成车行时读写车行账号);列不存在时不显示填写入口
+  useEffect(() => {
+    if (!actingId) return;
+    let cancelled = false;
+    loadContactApps(actingId).then(({ available, apps }) => {
+      if (cancelled) return;
+      setContactAppsAvailable(available);
+      setSavedContactApps(apps);
+      setContactInput(contactAppsToInput(apps));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [actingId]);
+
+  // 产权状态列是否已建(supabase/title-status.sql):未执行时隐藏选择,发布也不带该字段。
+  // limit(0) 只让数据库校验列名,不取数据
+  const [titleStatusAvailable, setTitleStatusAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("cars")
+      .select("title_status")
+      .limit(0)
+      .then(({ error }) => {
+        if (!cancelled) setTitleStatusAvailable(!error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Auto-resolve zipcode to city name (English + Chinese)
   const [zipCity, setZipCity] = useState("");
@@ -890,6 +941,11 @@ export default function PostCarPage() {
       return;
     }
 
+    if (contactAppsAvailable && contactAppsInvalid) {
+      setError(t("请检查即时通讯联系方式的格式"));
+      return;
+    }
+
     setLoading(true);
 
     const actualMake = form.make === "Other" ? form.customMake.trim() : form.make;
@@ -926,9 +982,29 @@ export default function PostCarPage() {
       }
     }
 
+    // 即时通讯联系方式有改动才写(经 /api/contact-apps 审核后落库,本人与车行身份通用);
+    // 违规时服务端已清空,停在本页提示,再点发布即可(不带联系方式)。SQL 未执行 / 限流 / 写失败都不挡发布
+    if (contactAppsAvailable) {
+      const { apps } = normalizeContactApps(contactInput);
+      if (!sameContactApps(apps, savedContactApps)) {
+        const saved = await saveContactApps(user, apps);
+        if (saved.status === "blocked") {
+          setSavedContactApps({});
+          setContactInput(contactAppsToInput({}));
+          setLoading(false);
+          setError(t("即时通讯联系方式未通过审核，已清除，可直接重新发布"));
+          return;
+        }
+        if (saved.status === "saved") setSavedContactApps(apps);
+      }
+    }
+
     // 描述(任何语言,全空白视为没填)与配置标签按卖家原文保存;各语言译文、
     // 中英投影列由数据库触发器排队、服务端翻译管线生成,前端不再翻译
     const description = form.description.trim() ? form.description : null;
+    // 产权状态:只有二手车、列已建(title-status.sql)且卖家选了才写;不确定就不写(null)
+    const titleStatus =
+      form.condition === "used" && titleStatusAvailable && isTitleStatus(form.title_status) ? form.title_status : null;
     const listing = {
       seller_id: user,
       ...titles,
@@ -955,21 +1031,28 @@ export default function PostCarPage() {
       lng: coords?.lng || null,
       carfax_url: form.carfax_url ? normalizeCarfaxUrl(form.carfax_url) : null,
       carfax_summary: carfaxSummary ? formatCarfaxSummary(carfaxSummary) : null,
+      ...(titleStatus ? { title_status: titleStatus } : {}),
       status: "active",
     };
 
-    let { data, error: insertError } = await supabase
-      .from("cars")
-      .insert({ ...listing, description_original: description, features_original: features })
-      .select("id")
-      .single();
+    const insertCar = (row: Record<string, unknown>) => supabase.from("cars").insert(row).select("id").single();
+    let { data, error: insertError } = await insertCar({
+      ...listing,
+      description_original: description,
+      features_original: features,
+    });
+    // 探测之后产权列又不可用(schema cache 未刷新等):去掉产权再发一次,不挡发布
+    if (insertError && titleStatus && isMissingColumnNamed(insertError, "title_status")) {
+      delete (listing as { title_status?: string }).title_status;
+      ({ data, error: insertError } = await insertCar({
+        ...listing,
+        description_original: description,
+        features_original: features,
+      }));
+    }
     // 数据库还没有原文列(i18n-v2 迁移前):按旧列再发一次
     if (insertError && isMissingColumnError(insertError)) {
-      ({ data, error: insertError } = await supabase
-        .from("cars")
-        .insert({ ...listing, description_zh: description, features })
-        .select("id")
-        .single());
+      ({ data, error: insertError } = await insertCar({ ...listing, description_zh: description, features }));
     }
 
     if (insertError) {
@@ -1012,7 +1095,7 @@ export default function PostCarPage() {
         return f.zipcode.length === 5;
       case "contact": {
         const digits = f.phone.replace(/\D/g, "");
-        return Boolean(f.seller_name.trim()) && digits.length >= 10;
+        return Boolean(f.seller_name.trim()) && digits.length >= 10 && !(contactAppsAvailable && contactAppsInvalid);
       }
       // 可选步始终可继续
       default:
@@ -1421,37 +1504,86 @@ export default function PostCarPage() {
 
                   {/* ==== 车况 ==== */}
                   {current.id === "condition" && (
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { value: "used", label: "二手", sub: "Used" },
-                        { value: "new", label: "新车", sub: "New" },
-                      ].map((c) => {
-                        const active = form.condition === c.value;
-                        return (
-                          <button
-                            key={c.value}
-                            type="button"
-                            onClick={() => {
-                              update("condition", c.value);
-                              // 点选即前进,少按一次「继续」
-                              setTimeout(() => {
-                                setDir(1);
-                                setStep((s) => Math.min(s + 1, STEPS.length - 1));
-                              }, 180);
-                            }}
-                            className={`flex flex-col items-center gap-1 rounded-2xl py-8 transition-colors ${
-                              active
-                                ? "bg-primary/30"
-                                : "bg-card active:bg-muted"
-                            }`}
-                          >
-                            <span className={`text-xl font-semibold ${active ? "text-brand-ink" : "text-foreground"}`}>
-                              {t(c.label)}
-                            </span>
-                            <span className="text-xs text-muted-foreground">{c.sub}</span>
-                          </button>
-                        );
-                      })}
+                    <div>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { value: "used", label: "二手", sub: "Used" },
+                          { value: "new", label: "新车", sub: "New" },
+                        ].map((c) => {
+                          const active = form.condition === c.value;
+                          return (
+                            <button
+                              key={c.value}
+                              type="button"
+                              onClick={() => {
+                                update("condition", c.value);
+                                // 二手车下方还有选填的产权状态,停在本步;其余点选即前进,少按一次「继续」
+                                if (c.value === "used" && titleStatusAvailable) return;
+                                setTimeout(() => {
+                                  setDir(1);
+                                  setStep((s) => Math.min(s + 1, STEPS.length - 1));
+                                }, 180);
+                              }}
+                              className={`flex flex-col items-center gap-1 rounded-2xl py-8 transition-colors ${
+                                active
+                                  ? "bg-primary/30"
+                                  : "bg-card active:bg-muted"
+                              }`}
+                            >
+                              <span className={`text-xl font-semibold ${active ? "text-brand-ink" : "text-foreground"}`}>
+                                {t(c.label)}
+                              </span>
+                              <span className="text-xs text-muted-foreground">{c.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* 产权状态(选填,仅二手车;title-status.sql 未执行时不显示):每项一句白话解释 */}
+                      {form.condition === "used" && titleStatusAvailable && (
+                        <div className="mt-6">
+                          <p className="text-sm font-medium text-foreground">
+                            {t("产权状态")}
+                            <span className="ml-1.5 text-xs font-normal text-muted-foreground">{t("选填")}</span>
+                          </p>
+                          <div className="mt-2 space-y-2" role="radiogroup" aria-label={t("产权状态")}>
+                            {[
+                              ...TITLE_STATUS_OPTIONS,
+                              { value: "", explain: "不清楚可以先不填,之后可在编辑页补充" },
+                            ].map((o) => {
+                              const active = form.title_status === o.value;
+                              return (
+                                <button
+                                  key={o.value || "none"}
+                                  type="button"
+                                  role="radio"
+                                  aria-checked={active}
+                                  onClick={() => update("title_status", o.value)}
+                                  className={`flex w-full items-start gap-3 rounded-xl px-4 py-3 text-left transition-colors ${
+                                    active ? "bg-primary/30" : "bg-card active:bg-muted"
+                                  }`}
+                                >
+                                  <span
+                                    className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${
+                                      active ? "border-brand-ink" : "border-muted-foreground/40"
+                                    }`}
+                                  >
+                                    {active && <span className="h-2 w-2 rounded-full bg-brand-ink" />}
+                                  </span>
+                                  <span className="min-w-0">
+                                    <span className={`block text-sm font-medium ${active ? "text-brand-ink" : "text-foreground"}`}>
+                                      {o.value ? t(o.value) : t("不确定 / 不填")}
+                                    </span>
+                                    <span className="mt-0.5 block text-xs leading-relaxed text-muted-foreground">
+                                      {t(o.explain)}
+                                    </span>
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -1718,6 +1850,11 @@ export default function PostCarPage() {
                         value={form.phone}
                         onChange={(e) => update("phone", e.target.value)}
                       />
+                      {contactAppsAvailable && (
+                        <div className="pt-2">
+                          <ContactAppsEditor value={contactInput} onChange={setContactInput} />
+                        </div>
+                      )}
                     </div>
                   )}
 

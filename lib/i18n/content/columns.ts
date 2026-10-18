@@ -4,6 +4,8 @@
 //   last_seen_at、api_key_id、external_id)、已冻结的旧版翻译缓存列与 removal_reason。
 // - LEGACY_*:去掉 supabase/i18n-v2.sql 新增的列。代码可能先于 SQL 上线:查询遇到缺列错误
 //   (lib/supabase-compat.ts isMissingColumnError)时用旧列集合重试一次。
+// - 详情另有 supabase/title-status.sql 的 title_status:两份迁移互不依赖,详情查询按
+//   PUBLIC_CAR_COLUMN_SETS 从新到旧依次重试(queryWithColumnFallback)。
 // - 卡片/列表列只用迁移前就存在的列,列表查询不需要旧列重试。
 // 每个列名都用 satisfies 对照 lib/types.ts 的行类型检查,拼错或删列会在编译期报错。
 
@@ -58,7 +60,7 @@ const CAR_DETAIL_LEGACY = [
 ] as const satisfies readonly (keyof DbCar)[];
 
 // i18n-v2.sql 新增的 4 列
-const CAR_DETAIL = [
+const CAR_DETAIL_V2 = [
   ...CAR_DETAIL_LEGACY,
   "description_original",
   "features_original",
@@ -66,12 +68,19 @@ const CAR_DETAIL = [
   "content_updated_at",
 ] as const satisfies readonly (keyof DbCar)[];
 
+// title-status.sql 新增的产权状态(不敏感,进公开载荷)
+const CAR_DETAIL = [...CAR_DETAIL_V2, "title_status"] as const satisfies readonly (keyof DbCar)[];
+
 const CAR_LIST = [...CAR_CARD, "phone"] as const satisfies readonly (keyof DbCar)[];
 
-/** 车源详情(SSR / CarDetail 重新拉取):原文 + 兼容投影 + 内容时钟,不含 phone 与源站内部字段 */
+/** 车源详情(SSR / CarDetail 重新拉取):原文 + 兼容投影 + 内容时钟 + 产权状态,不含 phone 与源站内部字段 */
 export const PUBLIC_CAR_COLUMNS = CAR_DETAIL.join(", ");
-/** PUBLIC_CAR_COLUMNS 去掉 i18n-v2 新增列(SQL 未执行时的重试列) */
+/** PUBLIC_CAR_COLUMNS 去掉 title_status(title-status.sql 未执行时的重试列) */
+export const V2_PUBLIC_CAR_COLUMNS = CAR_DETAIL_V2.join(", ");
+/** PUBLIC_CAR_COLUMNS 去掉 i18n-v2 新增列与 title_status(i18n-v2.sql 未执行时的重试列) */
 export const LEGACY_PUBLIC_CAR_COLUMNS = CAR_DETAIL_LEGACY.join(", ");
+/** 详情查询的列集合,从新到旧;配合 lib/supabase-compat.ts 的 queryWithColumnFallback 使用 */
+export const PUBLIC_CAR_COLUMN_SETS = [PUBLIC_CAR_COLUMNS, V2_PUBLIC_CAR_COLUMNS, LEGACY_PUBLIC_CAR_COLUMNS] as const;
 /** 卖家信息 join(account_type 判断车行、languages 用于按界面语言排序) */
 export const CAR_PROFILE_EMBED =
   "profiles!seller_id(account_type, avatar_url, is_system, claimed_by, languages)";

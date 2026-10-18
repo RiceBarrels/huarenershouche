@@ -68,6 +68,7 @@ const FIELDS: { name: string; type: string; required: string; desc: string }[] =
   { name: "mileage", type: "integer", required: "必填", desc: "英里" },
   { name: "fuel_type / transmission", type: "enum", required: "必填", desc: "见下方枚举表" },
   { name: "drivetrain", type: "enum", required: "可选", desc: "见下方枚举表" },
+  { name: "title_status", type: "enum", required: "可选", desc: "产权状态,见下方枚举表;省略则保留原值,null 清空" },
   { name: "exterior_color / interior_color", type: "string", required: "可选", desc: "英文" },
   { name: "description", type: "string", required: "可选", desc: "任一语言,其他语言自动翻译" },
   { name: "description_lang", type: "string", required: "可选", desc: "已弃用:可传但会被忽略(语言自动检测)" },
@@ -198,6 +199,7 @@ export default function DevelopersPage() {
     { kind: "fuel_type", label: "燃料" },
     { kind: "transmission", label: "变速箱" },
     { kind: "drivetrain", label: "驱动" },
+    { kind: "title_status", label: "产权状态" },
     { kind: "status", label: "状态" },
   ];
 

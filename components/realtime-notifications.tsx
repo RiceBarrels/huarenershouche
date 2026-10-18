@@ -2,6 +2,7 @@
 
 import { useEffect, useEffectEvent } from "react";
 import { supabase } from "@/lib/supabase";
+import { queryWithColumnFallback } from "@/lib/supabase-compat";
 import { useRealtimeNotifications } from "@/lib/use-realtime-notifications";
 import { useIdentity } from "@/components/identity-provider";
 import { useI18n } from "@/components/i18n-provider";
@@ -59,6 +60,10 @@ async function checkPriceWatch(t: TFn, locale: Locale, pathLocale: Locale) {
   }
 }
 
+const SAVED_SEARCH_CAR_COLUMNS =
+  "id, make, model, title, title_zh, price, original_price, year, mileage, fuel_type, transmission, drivetrain, exterior_color, interior_color, carfax_url, carfax_summary, image_url, images, features, created_at, profiles(account_type)";
+const SAVED_SEARCH_CAR_SELECTS = [`title_status, ${SAVED_SEARCH_CAR_COLUMNS}`, SAVED_SEARCH_CAR_COLUMNS] as const;
+
 async function checkSavedSearches() {
   const searches = getSavedSearches();
   if (searches.length === 0) return;
@@ -68,16 +73,17 @@ async function checkSavedSearches() {
     searches[0].lastCheckedAt
   );
 
-  // 列清单需覆盖 carMatchesParams 用到的所有字段
-  const { data } = await supabase
-    .from("cars")
-    .select(
-      "id, make, model, title, title_zh, price, original_price, year, mileage, fuel_type, transmission, drivetrain, exterior_color, interior_color, carfax_url, carfax_summary, image_url, images, features, created_at, profiles(account_type)"
-    )
-    .eq("status", "active")
-    .gt("created_at", earliest)
-    .order("created_at", { ascending: false })
-    .limit(100);
+  // 列清单需覆盖 carMatchesParams 用到的所有字段。title_status(title-status.sql)未执行时退回不带它的列集:
+  // 「仅清白产权」的已存搜索届时一辆都不命中(与 car-filters 同规则),其他搜索照常提醒
+  const query = (columns: string) =>
+    supabase
+      .from("cars")
+      .select(columns)
+      .eq("status", "active")
+      .gt("created_at", earliest)
+      .order("created_at", { ascending: false })
+      .limit(100);
+  const { data } = await queryWithColumnFallback(query, SAVED_SEARCH_CAR_SELECTS);
 
   const cars = ((data as unknown) as DbCar[] | null) ?? [];
   const now = new Date().toISOString();

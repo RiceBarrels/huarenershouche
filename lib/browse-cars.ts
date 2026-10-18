@@ -8,6 +8,7 @@ import { isMissingFunctionError } from "@/lib/supabase-compat";
 import { MAKES_ZH } from "@/lib/mock-data";
 import { paymentToPrice } from "@/lib/format";
 import { localeLanguageCodes } from "@/lib/i18n/languages";
+import { CLEAN_TITLE } from "@/lib/title-status";
 import type { Filters, SortKey } from "@/lib/car-filters";
 import type { StoredDeal } from "@/lib/price-insight";
 import type { Locale } from "@/lib/i18n";
@@ -70,7 +71,19 @@ export async function fetchBrowsePage(
     p: { ...buildQuery(input), offset, limit },
   });
   if (error || !data) return null;
-  return data as BrowsePage;
+  return honorCleanTitle(data as BrowsePage, input.filters, offset);
+}
+
+/**
+ * 「仅清白产权」兜底:数据库里的 browse_cars 还是旧版(browse-cars.sql 未重跑)时会忽略 cleanTitle,
+ * 返回的页里混着非清白 / 未填的车(列不存在时连 title_status 字段都没有)。这时按 lib/car-filters.ts
+ * 同一规则在前端过滤这一页,并把总数收成已拿到的条数(不再翻页,避免 offset 与服务端错位)。
+ * 新版 RPC 返回的车都是清白产权,原样通过。
+ */
+function honorCleanTitle(page: BrowsePage, filters: Filters, offset: number): BrowsePage {
+  if (filters.cleanTitle !== "true" || page.items.every((c) => c.title_status === CLEAN_TITLE)) return page;
+  const items = page.items.filter((c) => c.title_status === CLEAN_TITLE);
+  return { ...page, items, total: offset + items.length };
 }
 
 export interface FacetOption {

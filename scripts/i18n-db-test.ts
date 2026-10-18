@@ -9,7 +9,8 @@
  *   main      迁移 / 写入守卫 / 队列 CAS / 审核(审核键 mod_hash、审核队列、独立预算、每位作者的每日额度、
  *             30 分钟失败窗口)/ 认领人改动与同步复原的信任 / 停放的刷新行 / 译文标记恢复 / 词表 / 搜索 / 内容时钟 /
  *             临时语言检测 / sitemap(混合语言帖子)/ 原文哈希向量 / 重跑上一版迁移(310 项)
- *   browse    browse-cars.sql:观察模式沿用旧分组、强制模式按词表归并孪生词,选项计数 = 筛选结果;列表行不带原文(8 项)
+ *   browse    browse-cars.sql:观察模式沿用旧分组、强制模式按词表归并孪生词,选项计数 = 筛选结果;列表行不带原文;
+ *             「仅清白产权」筛选(title-status.sql,与 lib/car-filters.ts 同一规则)(12 项)
  *   rollback  i18n-v2-rollback.sql 紧急摘除 → 旧写法 / 认领人 / 标签编辑 → 重新挂载 → sweep 修复(不可信、链接行重建)
  *             → 快速回滚的审核停放 → i18n-v2-cleanup.sql
  *   parity    SQL i18n_norm_tag / hashtag_tokens 与 lib/i18n/hashtags.ts 逐样本一致(URL 与空白样本另核对期望值)
@@ -25,6 +26,7 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { PGlite } from "@electric-sql/pglite";
 import { HASHTAG_SPLIT_RE, extractHashtags, normTag } from "../lib/i18n/hashtags";
+import { CLEAN_TITLE } from "../lib/title-status";
 
 const ROOT = join(import.meta.dir, "..");
 const readSql = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -32,6 +34,7 @@ const STUB = readSql("scripts/fixtures/live-schema-stub.sql");
 const SCHEMA = readSql("supabase/i18n-v2.sql");
 const DATA = readSql("supabase/i18n-v2-data.sql");
 const BROWSE = readSql("supabase/browse-cars.sql");
+const TITLE_STATUS = readSql("supabase/title-status.sql");
 const VERIFY = readSql("supabase/i18n-v2-verify.sql");
 const ROLLBACK = readSql("supabase/i18n-v2-rollback.sql");
 const CLEANUP = readSql("supabase/i18n-v2-cleanup.sql");
@@ -1776,6 +1779,29 @@ values ('${C1}','${U1}','2019 Toyota Camry','2019 丰田 凯美瑞',2019,'Toyota
     page.rows[0].j.items.every((i) => !("description_original" in i) && !("other_i18n" in i)), Object.keys(page.rows[0].j.items[0]));
   const kw = await as<{ j: { total: number } }>("anon", null, `select public.browse_cars('{"tokens":[{"t":"차량"}]}'::jsonb) j`);
   check("keyword search hits a Korean original", kw.rows[0].j.total === 1, kw.rows[0].j);
+
+  // 产权状态:browse-cars.sql 自带 add column(存根里没有这一列也能建函数),title-status.sql 加 CHECK;两份都可重复执行
+  let tsErr: unknown = null;
+  try {
+    await db.exec(TITLE_STATUS);
+    await db.exec(TITLE_STATUS);
+    await db.exec(BROWSE);
+  } catch (e) {
+    tsErr = e;
+  }
+  check("title-status.sql + browse-cars.sql re-run without error", tsErr === null, tsErr);
+  await db.exec(`update public.cars set title_status = '清白产权' where id = '${C1}';
+update public.cars set title_status = '重建产权' where id = '${C2}';`);
+  const bad = await as(null, null, `update public.cars set title_status = 'clean' where id = '${C3}'`);
+  check("CHECK rejects a title_status outside the 4 Chinese values", !bad.ok && bad.constraint === "cars_title_status_check", bad);
+  // 与 lib/car-filters.ts 同一规则:只有 title_status === CLEAN_TITLE 命中,null(C3)与重建(C2)都不命中
+  const clean = await as<{ j: { total: number; items: Array<{ id: string; title_status: string | null }> } }>("anon", null,
+    `select public.browse_cars('{"filters":{"cleanTitle":"true"}}'::jsonb) j`);
+  const cj = clean.rows[0].j;
+  check("cleanTitle filter matches only explicit clean titles (null / rebuilt excluded, same rule as car-filters.ts)",
+    cj.total === 1 && cj.items.length === 1 && cj.items[0].id === C1 && cj.items.every((i) => i.title_status === CLEAN_TITLE), cj);
+  const all = await as<{ j: { total: number } }>("anon", null, `select public.browse_cars('{"filters":{"cleanTitle":""}}'::jsonb) j`);
+  check("cleanTitle off does not filter", all.rows[0].j.total === 3, all.rows[0].j);
 }
 
 // =====================================================================

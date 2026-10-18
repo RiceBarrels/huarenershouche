@@ -1,3 +1,5 @@
+import type { TitleStatus } from "@/lib/title-status";
+
 export interface DbCar {
   id: string;
   seller_id: string;
@@ -37,6 +39,8 @@ export interface DbCar {
   removal_reason?: "moderation" | "admin" | "other" | null;
   // 旧版保存的原文可能经过机器处理(迁移标记),卖家确认保存后清除
   original_uncertain?: boolean;
+  // 产权状态(lib/title-status.ts,存中文,t() 渲染);null = 未填。supabase/title-status.sql 执行前没有这一列
+  title_status?: TitleStatus | null;
   seller_name: string;
   phone: string | null;
   carfax_url: string | null;
