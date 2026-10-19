@@ -30,9 +30,9 @@ import { EASE } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
 const MOSAIC = [
-  "toyota", "honda", "tesla", "ford",
-  "bmw", "mercedes-benz", "hyundai", "lexus",
-  "subaru", "audi", "kia", "nissan",
+  "Toyota", "Honda", "Tesla", "Ford",
+  "BMW", "Mercedes-Benz", "Hyundai", "Lexus",
+  "Subaru", "Audi", "Kia", "Nissan",
 ];
 
 interface Point {
@@ -323,40 +323,39 @@ function WelcomePage({ reduced }: { reduced: boolean }) {
   const { t } = useI18n();
   return (
     <div className="flex flex-col items-center text-center">
-      <motion.div
-        className="grid grid-cols-4 gap-2.5"
-        initial="hidden"
-        animate="visible"
-        variants={{ hidden: {}, visible: { transition: { staggerChildren: reduced ? 0 : 0.035 } } }}
-        aria-hidden
-      >
-        {MOSAIC.map((make, i) => (
-          <motion.div
-            key={make}
-            variants={{
-              hidden: { opacity: 0, scale: reduced ? 1 : 0.6, y: reduced ? 0 : 8 },
-              visible: { opacity: 1, scale: 1, y: 0, transition: { duration: reduced ? 0 : 0.35, ease: EASE } },
-            }}
-            // 中间两格错开一点高度,让方阵不呆板
-            className={cn(i % 4 === 1 && "translate-y-2", i % 4 === 2 && "-translate-y-1")}
-          >
-            <BrandLogo make={make} size="lg" />
-          </motion.div>
-        ))}
-      </motion.div>
-      <Stagger reduced={reduced} className="mt-10">
+      <Stagger reduced={reduced}>
         <Item>
           <h1 className="font-logo text-4xl tracking-tight sm:text-5xl">{t("欢迎来到常來車網")}</h1>
         </Item>
         <Item>
           <p className="mt-3 font-mono text-sm tracking-wide">{t("买车卖车 · 就上常來車網")}</p>
         </Item>
-        <Item>
-          <p className="mx-auto mt-4 max-w-sm font-mono text-sm leading-relaxed text-muted-foreground">
-            {t("免费发布,用你习惯的语言看车、问价、成交。")}
-          </p>
-        </Item>
       </Stagger>
+      {/* 无底块 4×3 品牌格:只放有完整矢量图的品牌,留白代替边框;依次淡入 */}
+      <motion.div
+        className="mt-10 grid w-full max-w-sm grid-cols-4 gap-x-2 gap-y-5"
+        initial="hidden"
+        animate="visible"
+        variants={{ hidden: {}, visible: { transition: { staggerChildren: reduced ? 0 : 0.04 } } }}
+        aria-hidden
+      >
+        {MOSAIC.map((make) => (
+          <motion.div
+            key={make}
+            className="flex flex-col items-center gap-1.5 text-foreground/80"
+            variants={{
+              hidden: { opacity: 0, y: reduced ? 0 : 4 },
+              visible: { opacity: 1, y: 0, transition: { duration: reduced ? 0 : 0.3, ease: EASE } },
+            }}
+          >
+            <BrandLogo make={make} size="lg" />
+            <span className="font-mono text-[10px] leading-tight text-muted-foreground">{make}</span>
+          </motion.div>
+        ))}
+      </motion.div>
+      <p className="mx-auto mt-10 max-w-sm font-mono text-sm leading-relaxed text-muted-foreground">
+        {t("免费发布,用你习惯的语言看车、问价、成交。")}
+      </p>
     </div>
   );
 }

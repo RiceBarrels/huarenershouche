@@ -1,0 +1,58 @@
+# 品牌 logo 来源与授权(lib/brand-logos.ts / public/brand-logos/)。授权栏是查证当天 Commons 文件页模板或上游声明。
+# 生成:Chrome 渲染源 SVG → 按墨迹裁 viewBox、按视觉面积算宽高百分比(规则见 lib/brand-logos.ts 顶部注释)。
+brand	file	source	url	license	checked	modification
+Acura	public/brand-logos/acura.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Aston Martin	public/brand-logos/aston-martin.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Audi	public/brand-logos/audi.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Bentley	public/brand-logos/bentley.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+BMW	public/brand-logos/bmw.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Bugatti	public/brand-logos/bugatti.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Buick	public/brand-logos/buick.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Buick-logo.svg	Pd-textlogo(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;删元素:源文件 14 个 path 只留第 3–9 个(三盾),去掉外框/圆环/BUICK 字样
+Cadillac	public/brand-logos/cadillac.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Chevrolet	public/brand-logos/chevrolet.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Chrysler	public/brand-logos/chrysler.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Dodge	public/brand-logos/dodge.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Dodge_black_logo.svg	PD-textlogo + Trademarked(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Ferrari	public/brand-logos/ferrari.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Fiat	public/brand-logos/fiat.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Ford	public/brand-logos/ford.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+GMC	public/brand-logos/gmc.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:GMC-Logo.svg	PD-textlogo + trademarked(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;渐变填充改纯色(单色 mask 只用透明度),坐标保留 1 位小数
+Honda	public/brand-logos/honda.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Hummer	public/brand-logos/hummer.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Hummer.svg	PD-textlogo + Trademarked(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Hyundai	public/brand-logos/hyundai.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Infiniti	public/brand-logos/infiniti.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Isuzu	public/brand-logos/isuzu.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Isuzu.svg	PD-textlogo + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Jaguar	public/brand-logos/jaguar.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Jaguar_2024.svg	PD-textlogo + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Jeep	public/brand-logos/jeep.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Kia	public/brand-logos/kia.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Lamborghini	public/brand-logos/lamborghini.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Land Rover	public/brand-logos/land-rover.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Land_Rover_2023.svg	PD-shape + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Lexus	public/brand-logos/lexus.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Lexus.svg	PD-textlogo + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;裁剪:只留 L 徽标,去掉右侧字标
+Lincoln	public/brand-logos/lincoln.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Lincoln_logo.svg	PD-textlogo + Trademarked(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;裁剪:只留星徽,去掉下方字标
+Lucid	public/brand-logos/lucid.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Maserati	public/brand-logos/maserati.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Maybach	public/brand-logos/maybach.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Maybach_symbol.svg	PD-shape + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Mazda	public/brand-logos/mazda.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+McLaren	public/brand-logos/mclaren.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Mercedes-Benz	public/brand-logos/mercedes-benz.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Mercedes-Benz_(2025).svg	PD-textlogo(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;裁剪:只留三叉星徽,去掉下方字标
+Mercury	public/brand-logos/mercury.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Mercury_Logo_(automobile_company).svg	PD-textlogo + Trademarked(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;裁剪:只留圆形徽标,去掉下方字标
+Mini	public/brand-logos/mini.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Mitsubishi	public/brand-logos/mitsubishi.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Nissan	public/brand-logos/nissan.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Polestar	public/brand-logos/polestar.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Pontiac	public/brand-logos/pontiac.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Pontiac_dart_emblem.svg	PD-textlogo + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Porsche	public/brand-logos/porsche.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Ram	public/brand-logos/ram.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Rivian	public/brand-logos/rivian.svg	Wikimedia Commons	https://commons.wikimedia.org/wiki/File:Rivian_logo.svg	PD-shape + Trademark(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Rolls-Royce	public/brand-logos/rolls-royce.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Saturn	public/brand-logos/saturn.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Smart	public/brand-logos/smart.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Subaru	public/brand-logos/subaru.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Suzuki	public/brand-logos/suzuki.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Tesla	public/brand-logos/tesla.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Toyota	public/brand-logos/toyota.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Volkswagen	public/brand-logos/volkswagen.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Volvo	public/brand-logos/volvo.svg	simple-icons 16.35.0	https://github.com/simple-icons/simple-icons	CC0-1.0(商标仍归厂商)	2026-10-19	单色 mask;viewBox 裁到墨迹边界;无其他改动
+Genesis	(无,字母占位)	—	—	—	2026-10-19	Commons 仅有 CC BY-SA 4.0 文件
+Alfa Romeo	(无,字母占位)	—	—	—	2026-10-19	Commons 只有车型字标,没有车标
+Lotus	(无,字母占位)	—	—	—	2026-10-19	未找到授权清楚的矢量图
+Scion	(无,字母占位)	—	—	—	2026-10-19	未找到授权清楚的矢量图
