@@ -2213,4 +2213,17 @@ export const fr: Record<string, string> = {
   "收到本票先打电话给开票银行核实真伪": "Si vous recevez un chèque de banque, appelez la banque émettrice pour le vérifier",
   "款项确认到账后再交出产权证": "Ne remettez le titre de propriété qu'une fois les fonds encaissés",
   "不要接受「多付再退差价」的付款方式": "N'acceptez jamais un trop-perçu accompagné d'une demande de remboursement de la différence",
+  // 注册后 onboarding(components/onboarding-screen.tsx)
+  "欢迎来到常來車網": "Bienvenue sur CLCAuto",
+  "站内聊,交易更安心": "Discutez sur le site, en toute confiance",
+  "站内私信,不用先留电话": "Contactez les vendeurs sans donner votre numéro",
+  "聊天里自动提醒定金和转账骗局": "Le chat vous alerte sur les arnaques à l'acompte et au virement",
+  "会说你语言的卖家排在前面": "Les vendeurs qui parlent votre langue d'abord",
+  "再问三件小事": "Trois petites questions",
+  "可以跳过,之后在「我的 · 偏好」里随时修改。": "Facultatif — modifiable à tout moment dans Moi · Préférences.",
+  "用你的语言看车": "Cherchez dans votre langue",
+  "界面语言随时切换": "Changez la langue de l'interface à tout moment",
+  "免费发布,用你习惯的语言看车、问价、成交。": "Publiez gratuitement. Cherchez, échangez et achetez dans votre langue.",
+  "还没想好": "Je ne sais pas encore",
+  "以后再说": "Plus tard",
 };

@@ -25,7 +25,7 @@ import type {
 } from "@/lib/analytics/types";
 import type { ContactChannel } from "@/lib/contact-apps";
 import type { FinancingTag } from "@/lib/dealer-financing";
-import type { SetupAnswerTarget } from "@/lib/preferences";
+import type { OnboardingTarget, SetupAnswerTarget } from "@/lib/preferences";
 
 const VISITOR_KEY = "clc_vid";
 const SESSION_KEY = "clc_session";
@@ -535,4 +535,9 @@ export function trackSetupAnswer(target: SetupAnswerTarget, locale?: string | nu
 /** 私信交易提示:显示(每条消息每个会话期只记一次,由调用方去重)/ 点了提示里的「举报」;不上报消息内容 */
 export function trackScamNotice(target: ScamNoticeTarget, locale?: string | null): void {
   trackClick({ kind: "scam_notice", car_id: null, app: null, target }, locale);
+}
+
+/** 注册后 onboarding:看到第 N 页 / 在第 N 页跳过 / 走完;不带任何个人信息 */
+export function trackOnboarding(target: OnboardingTarget, locale?: string | null): void {
+  trackClick({ kind: "onboarding", car_id: null, app: null, target }, locale);
 }

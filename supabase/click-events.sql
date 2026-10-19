@@ -16,6 +16,7 @@
 --                  setup:skipped,lib/preferences.ts SETUP_ANSWER_TARGETS),car_id 为空;邮编从不上报
 --   scam_notice    私信交易提示(定金 / 转账 / 礼品卡关键词或外部链接,lib/scam-signals.ts);target = impression(显示,
 --                  每条消息每个会话期一次)/ report(点了提示里的举报),car_id 为空;从不上报消息内容
+--   onboarding     注册后的引导轮播;target = view:N(看到第 N 页)/ skip:N(在第 N 页跳过)/ done(走完),car_id 为空
 -- 隐私与 analytics_events 一致:不存 IP / UA / 地区;user_id 只在已登录且 token 校验通过时写;
 -- 删除账号前删掉该账号及其设备上的点击(click_events_forget_user);180 天后由 pg_cron 清理。
 -- =============================================================
@@ -23,7 +24,7 @@
 create table if not exists public.click_events (
   id          bigint generated always as identity primary key,
   created_at  timestamptz not null default now(),
-  kind        text not null check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer', 'scam_notice')),
+  kind        text not null check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer', 'scam_notice', 'onboarding')),
   app         text check (app is null or app in ('wechat', 'kakao', 'line', 'whatsapp', 'sms')),
   target      text check (char_length(target) <= 32),
   car_id      uuid references public.cars(id) on delete set null,
@@ -43,13 +44,15 @@ create table if not exists public.click_events (
         and target ~ '^(ui|country|own|setup):[A-Za-z0-9]{1,12}$')
     or (kind = 'scam_notice' and app is null and car_id is null
         and target in ('impression', 'report'))
+    or (kind = 'onboarding' and app is null and car_id is null
+        and target ~ '^((view|skip):[1-9]|done)$')
   )
 );
 
 -- 表已存在(旧版本文件执行过)时,create table if not exists 不会更新约束:这里按当前定义重建,可重复执行
 alter table public.click_events drop constraint if exists click_events_kind_check;
 alter table public.click_events add constraint click_events_kind_check
-  check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer', 'scam_notice'));
+  check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer', 'scam_notice', 'onboarding'));
 alter table public.click_events drop constraint if exists click_events_kind_fields;
 alter table public.click_events add constraint click_events_kind_fields check (
   (kind = 'contact' and app is not null and target is null)
@@ -61,6 +64,8 @@ alter table public.click_events add constraint click_events_kind_fields check (
       and target ~ '^(ui|country|own|setup):[A-Za-z0-9]{1,12}$')
   or (kind = 'scam_notice' and app is null and car_id is null
       and target in ('impression', 'report'))
+  or (kind = 'onboarding' and app is null and car_id is null
+      and target ~ '^((view|skip):[1-9]|done)$')
 );
 
 comment on table public.click_events is

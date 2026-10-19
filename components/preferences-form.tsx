@@ -1,6 +1,7 @@
 "use client";
 
-// 偏好三问(界面密度 / 居住地 / 计划持有年限),/account/setup 页和取名后的可选第二步共用。
+// 偏好三问(界面密度 / 居住地 / 计划持有年限),/account/setup 页、取名后的可选第二步(App)和网页 onboarding 末页共用。
+// 居住地 / 持有年限都有「还没想好」(= 不回答),不回答时界面保持默认。
 // 每个选择立即写入 clc_prefs(usePreferences),全站即时生效;选项变化上报 setup_answer(不含邮编)。
 // 居住地只存在本机,不写 profiles、不公开展示。
 
@@ -25,6 +26,9 @@ import {
 import { isPostalCodeFor, normalizePostalCode, postalInputMaxLength, sanitizePostalInput } from "@/lib/postal";
 import { cn } from "@/lib/utils";
 
+/** 「还没想好」:不回答这一题(偏好里删掉该项,各处按原有默认逻辑) */
+const UNSURE = "unsure" as const;
+
 /** 一组可选按钮(单选,两列网格);用于选项较多、分段控件放不下的题 */
 function OptionGrid<T extends string>({
   options,
@@ -32,7 +36,7 @@ function OptionGrid<T extends string>({
   onChange,
 }: {
   options: { value: T; label: string }[];
-  value: T | undefined;
+  value: T;
   onChange: (v: T) => void;
 }) {
   return (
@@ -85,7 +89,13 @@ export function PreferencesForm({ className }: { className?: string }) {
     trackSetupAnswer(`ui:${ui}`, locale);
   }
 
-  function setCountry(c: PrefCountry) {
+  function setCountry(c: PrefCountry | typeof UNSURE) {
+    if (c === UNSURE) {
+      update({ country: undefined, postal: undefined });
+      setPostalDraft("");
+      trackSetupAnswer("country:unsure", locale);
+      return;
+    }
     const keep = c !== "other" && isPostalCodeFor(postalDraft, c);
     update({ country: c, postal: keep ? normalizePostalCode(postalDraft) : undefined });
     if (!keep) setPostalDraft("");
@@ -100,7 +110,12 @@ export function PreferencesForm({ className }: { className?: string }) {
     else if (isPostalCodeFor(value, postalCountry)) update({ postal: normalizePostalCode(value) });
   }
 
-  function setOwnership(o: OwnershipLength) {
+  function setOwnership(o: OwnershipLength | typeof UNSURE) {
+    if (o === UNSURE) {
+      update({ ownership: undefined });
+      trackSetupAnswer("own:unsure", locale);
+      return;
+    }
     update({ ownership: o });
     trackSetupAnswer(`own:${o}`, locale);
   }
@@ -124,8 +139,11 @@ export function PreferencesForm({ className }: { className?: string }) {
       <GroupHeader>{t("你住在哪里?")}</GroupHeader>
       <SettingsGroup className="space-y-3 p-3">
         <OptionGrid
-          options={PREF_COUNTRIES.map((v) => ({ value: v, label: t(PREF_COUNTRY_LABELS[v]) }))}
-          value={country}
+          options={[
+            ...PREF_COUNTRIES.map((v) => ({ value: v as PrefCountry | typeof UNSURE, label: t(PREF_COUNTRY_LABELS[v]) })),
+            { value: UNSURE, label: t("还没想好") },
+          ]}
+          value={country ?? UNSURE}
           onChange={setCountry}
         />
         {postalCountry && (
@@ -152,8 +170,11 @@ export function PreferencesForm({ className }: { className?: string }) {
       <GroupHeader>{t("买到车后打算开多久?")}</GroupHeader>
       <SettingsGroup className="p-3">
         <OptionGrid
-          options={OWNERSHIP_LENGTHS.map((v) => ({ value: v, label: t(OWNERSHIP_LABELS[v]) }))}
-          value={prefs.ownership}
+          options={[
+            ...OWNERSHIP_LENGTHS.map((v) => ({ value: v as OwnershipLength | typeof UNSURE, label: t(OWNERSHIP_LABELS[v]) })),
+            { value: UNSURE, label: t("还没想好") },
+          ]}
+          value={prefs.ownership ?? UNSURE}
           onChange={setOwnership}
         />
       </SettingsGroup>

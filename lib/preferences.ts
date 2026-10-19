@@ -33,6 +33,8 @@ export interface Preferences {
   postal?: string;
   ownership?: OwnershipLength;
   setupDone?: SetupDone;
+  /** 注册后的 onboarding 轮播看过(走完 / 跳过);只在本机,换设备新账号期内可能再出一次 */
+  onboarded?: SetupDone;
   updatedAt?: string;
 }
 
@@ -73,6 +75,7 @@ export function normalizePreferences(input: unknown): Preferences {
   }
   if (isOneOf(OWNERSHIP_LENGTHS, o.ownership)) out.ownership = o.ownership;
   if (o.setupDone === "completed" || o.setupDone === "skipped") out.setupDone = o.setupDone;
+  if (o.onboarded === "completed" || o.onboarded === "skipped") out.onboarded = o.onboarded;
   if (typeof o.updatedAt === "string" && o.updatedAt.length <= 40) out.updatedAt = o.updatedAt;
   return out;
 }
@@ -169,6 +172,9 @@ export const SETUP_ANSWER_TARGETS = [
   ...UI_DENSITIES.map((v) => `ui:${v}` as const),
   ...PREF_COUNTRIES.map((v) => `country:${v}` as const),
   ...OWNERSHIP_LENGTHS.map((v) => `own:${v}` as const),
+  // 「还没想好」= 清掉这一题
+  "country:unsure",
+  "own:unsure",
   "setup:completed",
   "setup:skipped",
 ] as const;
@@ -176,4 +182,29 @@ export type SetupAnswerTarget = (typeof SETUP_ANSWER_TARGETS)[number];
 
 export function isSetupAnswerTarget(v: unknown): v is SetupAnswerTarget {
   return typeof v === "string" && (SETUP_ANSWER_TARGETS as readonly string[]).includes(v);
+}
+
+// ---------- 注册后 onboarding(components/onboarding-screen.tsx) ----------
+
+/** 账号创建后多久内算「新用户」:老账号不弹;取名 drawer 之后、邮箱注册验证回来都落在这个窗口里 */
+export const ONBOARDING_WINDOW_MS = 72 * 3600 * 1000;
+
+export const ONBOARDING_PAGES = 4;
+
+export function shouldShowOnboarding(prefs: Preferences, accountCreatedAt: string | null | undefined, now: number = Date.now()): boolean {
+  if (prefs.onboarded || !accountCreatedAt) return false;
+  const created = Date.parse(accountCreatedAt);
+  return Number.isFinite(created) && now - created >= -60_000 && now - created < ONBOARDING_WINDOW_MS;
+}
+
+/** click_events kind = onboarding 的 target:view:N 看到第 N 页 / skip:N 在第 N 页跳过 / done 走完 */
+export const ONBOARDING_TARGETS = [
+  ...Array.from({ length: ONBOARDING_PAGES }, (_, i) => `view:${i + 1}`),
+  ...Array.from({ length: ONBOARDING_PAGES }, (_, i) => `skip:${i + 1}`),
+  "done",
+] as const;
+export type OnboardingTarget = string;
+
+export function isOnboardingTarget(v: unknown): v is OnboardingTarget {
+  return typeof v === "string" && (ONBOARDING_TARGETS as readonly string[]).includes(v);
 }
