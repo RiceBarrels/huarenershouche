@@ -17,6 +17,7 @@ import {
 } from "@/lib/analytics/path";
 import { localeFromPath, stripLocale } from "@/lib/i18n";
 import {
+  SCAM_NOTICE_TARGETS,
   TRACKED_FILTER_CHIPS,
   type AnalyticsDevice,
   type AnalyticsEventType,
@@ -227,7 +228,7 @@ const clickBase = {
 /**
  * ClickEventPayload(lib/analytics/types.ts)的校验:按 kind 区分必填字段,与 click_events 的
  * click_events_kind_fields 约束一一对应(contact 带 app + car_id;financing_tag 带标签 + car_id;
- * filter_chip 只带白名单里的筛选键)
+ * filter_chip 只带白名单里的筛选键;scam_notice 只带 impression / report)
  */
 export const clickEventSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -254,6 +255,12 @@ export const clickEventSchema = z.discriminatedUnion("kind", [
     type: z.literal("click"),
     kind: z.literal("setup_answer"),
     target: z.string().max(32).refine(isSetupAnswerTarget),
+    ...clickBase,
+  }),
+  z.object({
+    type: z.literal("click"),
+    kind: z.literal("scam_notice"),
+    target: z.enum(SCAM_NOTICE_TARGETS),
     ...clickBase,
   }),
 ]);

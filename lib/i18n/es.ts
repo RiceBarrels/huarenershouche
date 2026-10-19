@@ -2205,4 +2205,12 @@ export const es: Record<string, string> = {
   "回答三个问题,让找车更顺手": "Responde tres preguntas para personalizar tu búsqueda",
   "约 30 秒": "Unos 30 s",
   "随时可以在「我的 · 偏好」里修改。": "Puedes cambiarlo cuando quieras en Yo · Preferencias.",
+  "交易提示:看车前不要付定金,警惕要求转账/礼品卡/本票的对方": "Consejo de seguridad: no pagues ningún depósito antes de ver el coche y ten cuidado si te piden transferencias, tarjetas de regalo o cheques de caja.",
+  "买家": "Compradores",
+  "付款前先看车,并核对产权证和 VIN 与车辆一致": "Ve el auto antes de pagar y comprueba que el título y el VIN coincidan con el vehículo",
+  "不要为了「留车」提前付定金": "Nunca pagues un depósito solo para apartar un auto",
+  "价格明显低于市场又催你马上付款,要格外警惕": "Ten mucho cuidado si el precio está muy por debajo del mercado y te presionan para pagar de inmediato",
+  "收到本票先打电话给开票银行核实真伪": "Si recibes un cheque de caja, llama al banco emisor para verificarlo",
+  "款项确认到账后再交出产权证": "Entrega el título solo cuando el pago se haya acreditado",
+  "不要接受「多付再退差价」的付款方式": "Nunca aceptes un pago de más con la petición de devolver la diferencia",
 };

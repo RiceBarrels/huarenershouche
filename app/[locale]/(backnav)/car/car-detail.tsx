@@ -110,6 +110,7 @@ import { useOverlay } from "@/components/car-overlay-provider";
 import { QrShare } from "@/components/qr-share";
 import { ContactAppButtons, useSellerContactApps } from "@/components/contact-app-buttons";
 import { hasContactApps } from "@/lib/contact-apps";
+import { TradeSafetyCard } from "@/components/trade-safety-card";
 import { TitleStatusBadge } from "@/components/title-status-badge";
 import { deriveCountry } from "@/lib/postal";
 import { DealerFinancingTags } from "@/components/dealer-financing-tags";
@@ -1478,6 +1479,9 @@ function CarDetailView({
                 </ReportDialog>
               </div>
             </div>
+
+            {/* 交易安全提示(默认收起;手机端为流式元素,不影响底部固定联系栏) */}
+            <TradeSafetyCard />
 
             {/* 车辆位置:地址 + OpenStreetMap 地图 + 一键导航 */}
             {(storeAddress || (car.lat != null && car.lng != null)) && (

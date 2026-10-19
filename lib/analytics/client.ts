@@ -19,6 +19,7 @@ import type {
   AnalyticsEventType,
   AnalyticsPlatform,
   ClickEventPayload,
+  ScamNoticeTarget,
   TrackedFilterChip,
   TrackPayload,
 } from "@/lib/analytics/types";
@@ -529,4 +530,9 @@ export function trackFilterChipClick(chip: TrackedFilterChip, locale?: string | 
 /** 偏好设置页(/account/setup)的回答,验证「三问各自的选择分布」假设;邮编从不上报 */
 export function trackSetupAnswer(target: SetupAnswerTarget, locale?: string | null): void {
   trackClick({ kind: "setup_answer", car_id: null, app: null, target }, locale);
+}
+
+/** 私信交易提示:显示(每条消息每个会话期只记一次,由调用方去重)/ 点了提示里的「举报」;不上报消息内容 */
+export function trackScamNotice(target: ScamNoticeTarget, locale?: string | null): void {
+  trackClick({ kind: "scam_notice", car_id: null, app: null, target }, locale);
 }

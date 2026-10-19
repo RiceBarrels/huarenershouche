@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "@/components/localized-navigation";
-import { ArrowLeft, Send, Loader2, Plus, Flag } from "lucide-react";
+import { ArrowLeft, Send, Loader2, Plus, Flag, ShieldAlert, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
 import { userLink } from "@/lib/static-link";
 import { Button } from "@/components/ui/button";
-import { ReportDialog } from "@/components/report-dialog";
+import { FRAUD_REPORT_REASON, ReportDialog } from "@/components/report-dialog";
+import { hasScamSignal, scamNoticeDismissKey } from "@/lib/scam-signals";
+import { trackScamNotice } from "@/lib/analytics/client";
 import {
   ChatTranslateBar,
   ChatTranslateButton,
@@ -22,6 +24,31 @@ export const CHAT_MEDIA_RE =
   /^https?:\/\/\S+\.(jpe?g|png|gif|webp|heic|mp4|mov|webm)(\?\S*)?$/i;
 const VIDEO_EXT_RE = /\.(mp4|mov|webm)(\?\S*)?$/i;
 const isMediaMessage = (content: string) => CHAT_MEDIA_RE.test(content);
+
+// 交易提示的曝光去重:每条消息每个浏览器会话只记一次(sessionStorage 不可用时退回内存)
+const SCAM_SEEN_KEY = "scam-notice-seen";
+const scamSeenMemory = new Set<string>();
+function markScamNoticeSeen(messageId: string): boolean {
+  if (scamSeenMemory.has(messageId)) return false;
+  scamSeenMemory.add(messageId);
+  try {
+    const seen: string[] = JSON.parse(sessionStorage.getItem(SCAM_SEEN_KEY) || "[]");
+    if (seen.includes(messageId)) return false;
+    seen.push(messageId);
+    sessionStorage.setItem(SCAM_SEEN_KEY, JSON.stringify(seen.slice(-200)));
+  } catch {
+    /* 无痕模式等:只按内存去重 */
+  }
+  return true;
+}
+
+function readScamDismissed(conversationId: string): boolean {
+  try {
+    return localStorage.getItem(scamNoticeDismissKey(conversationId)) === "1";
+  } catch {
+    return false; // 不可用(或服务端渲染):照常显示
+  }
+}
 
 function formatTime(dateStr: string): string {
   const d = new Date(dateStr);
@@ -54,6 +81,8 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
     Record<string, { username: string; avatar_url: string | null }>
   >({});
   const [otherUserId, setOtherUserId] = useState<string | null>(null);
+  // 交易提示(lib/scam-signals.ts):只给收信人看,按会话关掉后整段对话不再显示
+  const [dismissedConvs, setDismissedConvs] = useState<string[]>([]);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -87,6 +116,32 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
     }
     loadProfiles();
   }, [conversationId, currentUserId]);
+
+  // 读 localStorage 放在渲染里:提示只在消息加载完(纯客户端)后才出现,不涉及 SSR 水合
+  const scamDismissed = dismissedConvs.includes(conversationId) || readScamDismissed(conversationId);
+
+  function dismissScamNotice() {
+    setDismissedConvs((prev) => [...prev, conversationId]);
+    try {
+      localStorage.setItem(scamNoticeDismissKey(conversationId), "1");
+    } catch {
+      /* 只在本次打开期间隐藏 */
+    }
+  }
+
+  // 对方发来的、命中风险信号的文字消息(自己发的永远不提示)
+  const isScamFlagged = (msg: DbMessage) =>
+    msg.sender_id !== currentUserId && !isMediaMessage(msg.content) && hasScamSignal(msg.content);
+
+  // 曝光埋点:提示真正显示出来时,每条消息每个会话期一次
+  useEffect(() => {
+    if (scamDismissed) return;
+    for (const m of messages) {
+      if (m.sender_id !== currentUserId && !isMediaMessage(m.content) && hasScamSignal(m.content)) {
+        if (markScamNoticeSeen(m.id)) trackScamNotice("impression", locale);
+      }
+    }
+  }, [messages, scamDismissed, currentUserId, locale]);
 
   function goProfile(id: string) {
     router.push(userLink(id));
@@ -245,9 +300,10 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                 trEntry?.status === "done" && !trEntry.showOriginal ? trEntry.text : null;
               const showTranslate =
                 !isMine && tr.canTranslate(msg.id) && (!trEntry || trEntry.status === "failed");
+              const showScamNotice = !scamDismissed && isScamFlagged(msg);
               return (
+                <div key={msg.id}>
                 <div
-                  key={msg.id}
                   className={`flex items-end gap-2 ${isMine ? "flex-row-reverse" : ""}`}
                 >
                   {/* 头像:自己/对方都显示,点击进主页 */}
@@ -325,6 +381,41 @@ export function ChatThread({ conversationId, currentUserId, otherUsername, onBac
                       )}
                     </p>
                   </div>
+                </div>
+                {showScamNotice && (
+                  <div className="ml-10 mt-1 flex max-w-[75%] items-start gap-1.5 rounded-[0.3rem] border border-border bg-background px-2 py-1.5 font-mono text-[11px] leading-snug text-muted-foreground">
+                    <ShieldAlert className="mt-px h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
+                    <span className="min-w-0 flex-1">
+                      {t("交易提示:看车前不要付定金,警惕要求转账/礼品卡/本票的对方")}
+                      {otherUserId && (
+                        <>
+                          {" · "}
+                          <ReportDialog
+                            targetType="user"
+                            targetId={otherUserId}
+                            defaultReason={FRAUD_REPORT_REASON}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => trackScamNotice("report", locale)}
+                              className="underline underline-offset-2 transition-colors hover:text-foreground"
+                            >
+                              {t("举报")}
+                            </button>
+                          </ReportDialog>
+                        </>
+                      )}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={dismissScamNotice}
+                      aria-label={t("关闭")}
+                      className="shrink-0 transition-colors hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" strokeWidth={1.5} />
+                    </button>
+                  </div>
+                )}
                 </div>
               );
             })}

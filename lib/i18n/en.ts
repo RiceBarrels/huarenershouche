@@ -2402,4 +2402,12 @@ export const en: Record<string, string> = {
   "回答三个问题,让找车更顺手": "Answer three quick questions to tailor your search",
   "约 30 秒": "About 30 sec",
   "随时可以在「我的 · 偏好」里修改。": "You can change these anytime under Profile · Preferences.",
+  "交易提示:看车前不要付定金,警惕要求转账/礼品卡/本票的对方": "Safety tip: don't pay a deposit before seeing the car, and be careful if anyone asks for a wire transfer, gift cards or a cashier's check.",
+  "买家": "Buyers",
+  "付款前先看车,并核对产权证和 VIN 与车辆一致": "See the car before paying, and check that the title and VIN match the vehicle",
+  "不要为了「留车」提前付定金": "Never pay a deposit just to hold a car",
+  "价格明显低于市场又催你马上付款,要格外警惕": "Be extra careful when the price is well below market and you're pressured to pay right away",
+  "收到本票先打电话给开票银行核实真伪": "When you receive a cashier's check, call the issuing bank to verify it",
+  "款项确认到账后再交出产权证": "Hand over the title only after the funds have cleared",
+  "不要接受「多付再退差价」的付款方式": "Never accept an overpayment with a request to refund the difference",
 };

@@ -37,6 +37,9 @@ const UGC_REASONS = [
   "其他",
 ];
 
+/** 诈骗类举报原因(两套原因里都有;私信交易提示的「举报」用它预选) */
+export const FRAUD_REPORT_REASON = "虚假信息 / 诈骗";
+
 const TITLES: Record<ReportTargetType, string> = {
   car: "举报此车辆",
   post: "举报此帖子",
@@ -48,20 +51,29 @@ const TITLES: Record<ReportTargetType, string> = {
 export function ReportDialog({
   targetType = "car",
   targetId,
+  defaultReason,
   children,
 }: {
   targetType?: ReportTargetType;
   targetId: string;
+  /** 打开时预选的原因(必须是当前类型原因列表里的值,否则忽略) */
+  defaultReason?: string;
   children: React.ReactNode;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState("");
+  const reasons = targetType === "car" ? CAR_REASONS : UGC_REASONS;
+  const initialReason = defaultReason && reasons.includes(defaultReason) ? defaultReason : "";
+  const [selected, setSelected] = useState(initialReason);
   const [detail, setDetail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
 
-  const reasons = targetType === "car" ? CAR_REASONS : UGC_REASONS;
+  // 每次打开都回到预选原因(上次没提交就关掉时也一样)
+  function handleOpenChange(next: boolean) {
+    if (next) setSelected(initialReason);
+    setOpen(next);
+  }
 
   async function handleSubmit() {
     if (!selected) return;
@@ -83,13 +95,13 @@ export function ReportDialog({
     setTimeout(() => {
       setOpen(false);
       setDone(false);
-      setSelected("");
+      setSelected(initialReason);
       setDetail("");
     }, 1500);
   }
 
   return (
-    <Drawer open={open} onOpenChange={setOpen}>
+    <Drawer open={open} onOpenChange={handleOpenChange}>
       <DrawerTrigger asChild>{children}</DrawerTrigger>
       <DrawerContent className="max-h-[85vh]">
         <div className="flex items-center justify-between px-4 pb-2 pt-4">

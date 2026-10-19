@@ -3,7 +3,7 @@
 // 客户端 lib/analytics/client.ts 用 sendBeacon / fetch(keepalive) 发 text/plain JSON(免 CORS 预检),
 // 这里过滤机器人、校验载荷、解析 UA 与 Vercel 边缘地理头、校验登录 token,再用 service role 写 analytics_events。
 // 永远回 204(客户端不读结果)。隐私:不存 IP(只用于内存限流),referrer 只留 origin + pathname。
-// 点击统计(type = click:详情页联系按钮 / 车行贷款标签 / 列表筛选开关;旧版 App 包的 contact_click 同样收)
+// 点击统计(type = click:详情页联系按钮 / 车行贷款标签 / 列表筛选开关 / 偏好设置回答 / 私信交易提示;旧版 App 包的 contact_click 同样收)
 // 也走这里,写 click_events 表(supabase/click-events.sql),表还没建时静默丢弃。
 
 import { NextRequest, NextResponse, userAgent } from "next/server";
