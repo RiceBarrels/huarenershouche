@@ -65,7 +65,7 @@ const FIELDS: { name: string; type: string; required: string; desc: string }[] =
   { name: "trim", type: "string", required: "可选", desc: "" },
   { name: "price", type: "integer", required: "必填", desc: "整数,币种见 currency;0 = 电议" },
   { name: "original_price", type: "integer", required: "可选", desc: "" },
-  { name: "currency", type: "enum", required: "可选", desc: "USD(默认)或 CAD;省略则保留原值,null 恢复 USD" },
+  { name: "currency", type: "enum", required: "可选", desc: "USD(默认)、CAD、AUD 或 NZD;省略则保留原值,null 恢复 USD" },
   { name: "mileage", type: "integer", required: "必填", desc: "整数,单位见 mileage_unit" },
   { name: "mileage_unit", type: "enum", required: "可选", desc: "mi(默认)或 km;省略则保留原值,null 恢复 mi" },
   { name: "fuel_type / transmission", type: "enum", required: "必填", desc: "见下方枚举表" },

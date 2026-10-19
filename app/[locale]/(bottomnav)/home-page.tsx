@@ -479,9 +479,9 @@ export default function Home() {
     ? getLocationLabel(searchFilters, t)
     : t(userLocation?.zhName?.split(" · ").pop() || "全美");
 
-  // 更多筛选已选条件数(不含关键词与默认距离)
+  // 更多筛选已选条件数(不含关键词与默认距离;country 只是邮编的附属信息)
   const searchActiveCount = Object.entries(searchFilters).filter(
-    ([k, v]) => v && k !== "keyword" && !(k === "maxDistance" && v === "50")
+    ([k, v]) => v && k !== "keyword" && k !== "country" && !(k === "maxDistance" && v === "50")
   ).length;
 
   function handleSearch() {

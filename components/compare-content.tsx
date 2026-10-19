@@ -42,14 +42,14 @@ function getCellValue(
     case "make_zh":
       // zh「宝马 BMW」/ ko「도요타 Toyota」/ en「Toyota」
       return brandLabel(car.make, MAKES_ZH[car.make], t, locale);
-    // 车源自己的币种 / 单位;加元 / 公里车源附「≈」折合美元 / 英里,方便和美国车源并排比较
+    // 车源自己的币种 / 单位;非美元 / 公里车源附「≈」折合美元 / 英里,方便和美国车源并排比较;里程单位按界面语言
     case "price": {
       const approx = approxPriceUsd(car);
       return approx ? `${formatCarPrice(car, car.price)} ≈ ${approx}` : formatCarPrice(car, car.price);
     }
     case "mileage": {
-      const approx = approxMileageMi(car);
-      return approx ? `${formatCarMileage(car)} ≈ ${approx}` : formatCarMileage(car);
+      const approx = approxMileageMi(car, t);
+      return approx ? `${formatCarMileage(car, t)} ≈ ${approx}` : formatCarMileage(car, t);
     }
     case "account_type":
       return car.profiles?.account_type === "dealer" ? t("车行") : t("个人");

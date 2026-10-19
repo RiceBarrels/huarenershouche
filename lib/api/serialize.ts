@@ -11,6 +11,7 @@ import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import type { BundleRow } from "@/lib/i18n/content/types";
 import type { ContactApps } from "@/lib/contact-apps";
 import { carCurrency, carMileageUnit, type Currency, type MileageUnit } from "@/lib/currency";
+import { carCountry, type Country } from "@/lib/postal";
 import { normalizeCarCondition } from "@/lib/car-condition";
 import { isMissingColumnError, missingColumnName } from "@/lib/supabase-compat";
 import { enumField, enumToSlug, labelFor } from "./enums";
@@ -153,13 +154,15 @@ export interface CarSummary {
   /** 同 currency */
   original_price: number | null;
   price_updated_at: string | null;
-  /** price / original_price 的币种:USD(默认)/ CAD */
+  /** price / original_price 的币种:USD(默认)/ CAD / AUD / NZD */
   currency: Currency;
   /** 整数,单位见 mileage_unit */
   mileage: number;
   /** mileage 的单位:mi(默认)/ km */
   mileage_unit: MileageUnit;
   location: { name: string; lat: number | null; lng: number | null };
+  /** 车所在国家 US / CA / AU / NZ —— 库里没有这一列,按坐标 / location 读时推断(lib/postal.ts carCountry) */
+  country: Country;
   image_url: string | null;
   fuel_type: EnumValue;
   transmission: EnumValue;
@@ -302,6 +305,7 @@ export function serializeCarSummary(car: ApiCarRow, opts: SerializeOpts): CarSum
     mileage: car.mileage,
     mileage_unit: carMileageUnit(car),
     location: { name: carLocation(car, lang), lat: car.lat ?? null, lng: car.lng ?? null },
+    country: carCountry(car),
     image_url: car.image_url ?? null,
     fuel_type: enumField("fuel_type", car.fuel_type, lang),
     transmission: enumField("transmission", car.transmission, lang),

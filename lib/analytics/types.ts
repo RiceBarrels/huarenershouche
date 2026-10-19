@@ -175,7 +175,7 @@ export interface AnalyticsCarInfo {
   trim?: string | null;
   image_url: string | null;
   price: number | null;
-  /** 价格币种(USD / CAD);analytics.sql 重新执行且 car-currency.sql 已建列后才有,缺失按 USD */
+  /** 价格币种(USD / CAD / AUD / NZD);analytics.sql 重新执行且 car-currency.sql 已建列后才有,缺失按 USD */
   currency?: string | null;
   year: number | null;
   make: string | null;

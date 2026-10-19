@@ -1,7 +1,7 @@
 import type { DbCar } from "./types";
 import { classifyBodyStyle, bodyStyleLabel, type BodyStyle } from "./body-style";
 import { paymentToPrice } from "./format";
-import { CLEAN_TITLE } from "./title-status";
+import { isCleanTitle } from "./title-status";
 import { carMileageMi, carPriceUsd } from "./currency";
 
 const STORAGE_KEY = "huaren_saved_searches";
@@ -226,8 +226,8 @@ export function carMatchesParams(
     if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
   }
   if (params.hasCarfax === "true" && !car.carfax_url) return false;
-  // 只认明确的清白产权(未填 / 列不存在都不命中,与 lib/car-filters.ts 一致)
-  if (params.cleanTitle === "true" && car.title_status !== CLEAN_TITLE) return false;
+  // 只认明确的清白产权 / 澳新「无欠款(PPSR 已查)」(未填 / 列不存在都不命中,与 lib/car-filters.ts 一致)
+  if (params.cleanTitle === "true" && !isCleanTitle(car.title_status)) return false;
   if (params.hasVideo === "true" && !carHasVideo(car)) return false;
   if (params.features) {
     const wanted = params.features.split(",");

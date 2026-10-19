@@ -18,7 +18,9 @@ import {
   fetchBrowseFacets,
   fetchBrowsePage,
   fetchCarsByIds,
+  FIRST_BROWSE_CURSOR,
   type BrowseCar,
+  type BrowseCursor,
   type BrowseQueryInput,
   type FacetOption,
 } from "@/lib/browse-cars";
@@ -37,17 +39,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { MAKES_ZH } from "@/lib/mock-data";
-import { detectUserZip, geocodeZipToCoords } from "@/lib/geocode";
+import { detectUserPostal, geocodeZipToCoords, type UserPostal } from "@/lib/geocode";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import { getSearchHistory, addSearchHistory, clearSearchHistory } from "@/lib/search-history";
 import { fromStoredDeal } from "@/lib/price-insight";
-import { formatPrice } from "@/lib/format";
+import { formatMileageCap, formatPrice } from "@/lib/format";
 import { bodyStyleLabel, type BodyStyle } from "@/lib/body-style";
 import { LOAN_FILTER_LABEL } from "@/lib/dealer-financing";
 import { saveSearch, isSearchSaved, SAVED_SEARCHES_EVENT } from "@/lib/saved-searches";
 import {
   buildDistances,
   filtersFromParams,
+  postalFilter,
   filtersToQuery,
   INITIAL_FILTERS,
   SORT_OPTIONS,
@@ -55,6 +58,7 @@ import {
   type SortKey,
 } from "@/lib/car-filters";
 import { BackToTop } from "@/components/back-to-top";
+import { postalLocationLabel } from "@/components/postal-filter";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import {
   Drawer,
@@ -73,6 +77,15 @@ interface BrowseCache {
   coords: { lat: number; lng: number } | null;
   total: number;
   items: BrowseCar[];
+  /** 翻页游标与是否还有下一页(旧缓存没有:按「已加载条数 / 总数」还原) */
+  cursor?: BrowseCursor;
+  hasMore?: boolean;
+}
+
+// 翻页状态:服务端游标(旧版 RPC 前端兜底过滤时 offset ≠ 已加载条数)+ 服务端是否还有没扫到的行
+interface PageState {
+  cursor: BrowseCursor;
+  hasMore: boolean;
 }
 
 // 绘制前还原缓存(社区同款):useEffect 在首帧后才跑会闪一下加载页
@@ -92,6 +105,7 @@ function BrowseContent() {
   // 当前条件下已加载的车源(按页追加)与总数
   const [items, setItems] = useState<BrowseCar[]>([]);
   const [total, setTotal] = useState(0);
+  const [paging, setPaging] = useState<PageState>({ cursor: FIRST_BROWSE_CURSOR, hasMore: false });
   const [loading, setLoading] = useState(true);
   // 换条件后新结果到达前:旧列表保留但变淡
   const [refreshing, setRefreshing] = useState(false);
@@ -110,7 +124,8 @@ function BrowseContent() {
     features: [],
   });
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [userZip, setUserZip] = useState("");
+  // 自动定位到的邮编 + 国家(只用于算距离,不做筛选)
+  const [userPostal, setUserPostal] = useState<UserPostal | null>(null);
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const searchWrapperRef = useRef<HTMLDivElement>(null);
@@ -223,7 +238,7 @@ function BrowseContent() {
   const loadFirstPage = useCallback(async (q: BrowseQueryInput, key: string) => {
     activeRef.current = { key, query: q };
     setRefreshing(true);
-    const page = await fetchBrowsePage(q, 0);
+    const page = await fetchBrowsePage(q, FIRST_BROWSE_CURSOR);
     if (activeRef.current?.key !== key) return;
     setRefreshing(false);
     setLoading(false);
@@ -232,7 +247,15 @@ function BrowseContent() {
     shownKeyRef.current = key;
     setItems(page.items);
     setTotal(page.total);
-    writeSessionCache<BrowseCache>(BROWSE_CACHE_KEY, { key, coords: q.coords, total: page.total, items: page.items });
+    setPaging({ cursor: page.next, hasMore: page.hasMore });
+    writeSessionCache<BrowseCache>(BROWSE_CACHE_KEY, {
+      key,
+      coords: q.coords,
+      total: page.total,
+      items: page.items,
+      cursor: page.next,
+      hasMore: page.hasMore,
+    });
   }, []);
 
   useEffect(() => {
@@ -241,25 +264,30 @@ function BrowseContent() {
     loadFirstPage(query, queryKey);
   }, [cacheChecked, query, queryKey, loadFirstPage]);
 
-  // 触底拉下一页(offset = 已加载条数;去重防止两页之间有新车上架导致错位重复)
+  // 触底拉下一页(从服务端游标接着要;去重防止两页之间有新车上架导致错位重复)
   async function loadMore() {
     const active = activeRef.current;
-    if (!active || active.key !== shownKeyRef.current || loadingMoreRef.current || items.length >= total) return;
+    if (!active || active.key !== shownKeyRef.current || loadingMoreRef.current || !paging.hasMore) return;
     loadingMoreRef.current = true;
     setLoadingMore(true);
-    const page = await fetchBrowsePage(active.query, items.length);
+    const page = await fetchBrowsePage(active.query, paging.cursor);
     loadingMoreRef.current = false;
     setLoadingMore(false);
     if (!page || activeRef.current?.key !== active.key) return;
     const seen = new Set(items.map((c) => c.id));
     const merged = [...items, ...page.items.filter((c) => !seen.has(c.id))];
+    // 扫到底时总数收成实际条数(去重后的)
+    const nextTotal = page.hasMore ? page.total : merged.length;
     setItems(merged);
-    setTotal(page.total);
+    setTotal(nextTotal);
+    setPaging({ cursor: page.next, hasMore: page.hasMore });
     writeSessionCache<BrowseCache>(BROWSE_CACHE_KEY, {
       key: active.key,
       coords: active.query.coords,
-      total: page.total,
+      total: nextTotal,
       items: merged,
+      cursor: page.next,
+      hasMore: page.hasMore,
     });
   }
   const loadMoreRef = useRef(loadMore);
@@ -276,6 +304,10 @@ function BrowseContent() {
       shownKeyRef.current = cached.key;
       setItems(cached.items);
       setTotal(cached.total);
+      setPaging({
+        cursor: cached.cursor ?? { offset: cached.items.length, dropped: 0 },
+        hasMore: cached.hasMore ?? cached.items.length < cached.total,
+      });
       setUserCoords(cached.coords);
       setLoading(false);
     }
@@ -286,40 +318,44 @@ function BrowseContent() {
       fetchCarsByIds(recentIds).then((recent) => setRecentCars(recent.slice(0, 6)));
     }
 
-    // Auto-detect user zipcode for distance calculation only (don't auto-filter)
-    if (!userZip) {
-      detectUserZip().then((zip) => {
-        if (zip) setUserZip(zip);
+    // Auto-detect user postcode for distance calculation only (don't auto-filter)
+    if (!userPostal) {
+      detectUserPostal().then((p) => {
+        if (p) setUserPostal(p);
       });
     }
 
     // 定位权限刚被授予时重试——mount 时那次可能因无权限失败
     function onLocationGranted() {
-      detectUserZip().then((zip) => {
-        if (zip) setUserZip(zip);
+      detectUserPostal().then((p) => {
+        if (p) setUserPostal(p);
       });
     }
     window.addEventListener("clc-location-granted", onLocationGranted);
     return () => window.removeEventListener("clc-location-granted", onLocationGranted);
   }, []);
 
-  // 距离计算基准:优先用「位置」筛选里输入的 Zipcode,没有则用自动定位到的 zip
-  const effectiveZip = /^\d{5}$/.test(filters.location) ? filters.location : userZip;
-  // 只在 zip 从有效变无效时清坐标:挂载时 zip 还没定位到,不能把缓存还原的坐标清掉
-  const prevZipRef = useRef(effectiveZip);
+  // 距离计算基准:优先用「位置」筛选里输入的邮编(美 / 加 / 澳 / 新,4 位按所选国家),
+  // 没有则用自动定位到的邮编。key = "邮编|国家",空串 = 没有
+  const filterPostal = postalFilter(filters);
+  const effectivePostal = filterPostal ?? userPostal;
+  const effectiveKey = effectivePostal ? `${effectivePostal.code}|${effectivePostal.country}` : "";
+  // 只在邮编从有效变无效时清坐标:挂载时邮编还没定位到,不能把缓存还原的坐标清掉
+  const prevKeyRef = useRef(effectiveKey);
 
   useEffect(() => {
-    const prevZip = prevZipRef.current;
-    prevZipRef.current = effectiveZip;
-    if (/^\d{5}$/.test(effectiveZip)) {
-      geocodeZipToCoords(effectiveZip).then((coords) => {
+    const prevKey = prevKeyRef.current;
+    prevKeyRef.current = effectiveKey;
+    if (effectiveKey) {
+      const [code, country] = effectiveKey.split("|");
+      geocodeZipToCoords(code, country).then((coords) => {
         setUserCoords(coords);
       });
-    } else if (/^\d{5}$/.test(prevZip)) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- zip 失效时清空坐标
+    } else if (prevKey) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- 邮编失效时清空坐标
       setUserCoords(null);
     }
-  }, [effectiveZip]);
+  }, [effectiveKey]);
 
   // 「最近浏览」卡片的距离(列表卡片的距离由服务端算好)
   const recentDistances = useMemo(() => buildDistances(recentCars, userCoords), [recentCars, userCoords]);
@@ -380,6 +416,8 @@ function BrowseContent() {
         .join(",");
     } else {
       (next as Record<string, string>)[key] = "";
+      // 国家是邮编的附属信息,随位置一起清
+      if (key === "location") next.country = "";
     }
     setFilters(next);
   }
@@ -400,12 +438,12 @@ function BrowseContent() {
     if (filters.location) {
       chips.push({
         key: "location",
-        label: /^\d{5}$/.test(filters.location) ? `Zip ${filters.location}` : filters.location,
+        label: postalLocationLabel(filters.location, filters.country, t),
       });
     }
     if (filters.sellerType) chips.push({ key: "sellerType", label: filters.sellerType === "dealer" ? t("车行") : t("个人") });
     if (filters.minPrice || filters.maxPrice) {
-      // 价格筛选按美元(加元车源已折算),写成 US$ 和卡片上的 CA$ 区分开
+      // 价格筛选按美元(其他币种车源已折算),写成 US$ 和卡片上的 CA$ / A$ / NZ$ 区分开
       const min = formatPrice(Number(filters.minPrice) || 0, "USD", { explicit: true });
       const max = filters.maxPrice ? formatPrice(Number(filters.maxPrice), "USD", { explicit: true }) : t("不限");
       chips.push({ key: "price", label: `${min}-${max}` });
@@ -430,7 +468,7 @@ function BrowseContent() {
         chips.push({ key: "drivetrain", label: v });
       }
     }
-    if (filters.maxMileage) chips.push({ key: "maxMileage", label: t("≤{n}万mi", { n: (Number(filters.maxMileage) / 10000).toFixed(0) }) });
+    if (filters.maxMileage) chips.push({ key: "maxMileage", label: formatMileageCap(Number(filters.maxMileage), t, { upTo: true }) });
     if (filters.exteriorColor) {
       for (const v of filters.exteriorColor.split(",")) {
         chips.push({ key: "exteriorColor", label: t("外" + v + "色") });
@@ -491,7 +529,7 @@ function BrowseContent() {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [items.length, total]);
+  }, [items.length, total, paging]);
 
   return (
     <PullToRefresh onRefresh={() => loadFirstPage(query, queryKey)}>
@@ -892,7 +930,8 @@ function BrowseContent() {
                 Loading
               </p>
             </motion.div>
-          ) : items.length > 0 ? (
+          ) : items.length > 0 || paging.hasMore ? (
+            /* 旧版 RPC 前端兜底过滤时这一页可能一辆都没留下,但服务端还有没扫到的行:照常放哨兵继续翻,不显示「无结果」 */
             <>
             {/* 规则网格:行行顶部对齐(替代瀑布流);列数比原来少一档,卡片更宽 */}
             <div className={`grid grid-cols-1 gap-3 transition-opacity md:grid-cols-2 md:gap-4 xl:grid-cols-3 min-[1920px]:grid-cols-4 min-[2560px]:grid-cols-5 ${refreshing ? "opacity-50" : ""}`}>
@@ -908,7 +947,7 @@ function BrowseContent() {
             </div>
             {/* 无限滚动哨兵 */}
             <div ref={resultsSentinelRef} className="h-px" aria-hidden="true" />
-            {items.length < total && (
+            {paging.hasMore && (
               <p className="flex items-center justify-center gap-2 py-6 text-center font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground/50">
                 {loadingMore && <Loader2 className="h-3 w-3 animate-spin" strokeWidth={1.5} />}
                 Showing {items.length} / {total}

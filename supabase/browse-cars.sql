@@ -15,11 +15,17 @@
 --
 -- 价格 / 里程筛选与排序、月供预算按折合美元 / 英里比较(cars.currency / cars.mileage_unit,
 -- supabase/car-currency.sql 负责 CHECK;同样先 add column 兜底,定义与该文件一致)。
--- 换算见 browse_price_usd / browse_mileage_mi,常量与 lib/currency.ts 的 CAD_PER_USD / KM_PER_MI 一致。
+-- 换算见 browse_price_usd / browse_mileage_mi,常量与 lib/currency.ts 的 UNITS_PER_USD(CAD / AUD / NZD)/ KM_PER_MI 一致。
 --
 -- 「可贷款(无信用/ITIN)」筛选读 dealer_stores.financing(supabase/dealer-financing.sql 负责 CHECK + 索引;
 -- 同样先 add column 兜底,定义与该文件一致):卖家名下任一门店含「支持ITIN贷款」或「无信用记录可贷」即命中,
 -- 标签与 lib/dealer-financing.ts 的 LOAN_FILTER_TAGS 一致。
+--
+-- 位置是邮编时(美国 5 位 zip / 加拿大 A1A 1A1 / 澳大利亚、新西兰 4 位,browse_postal_countries)不做城市名匹配,
+-- 先按国家筛、再按距离:国家 = 参数 p.country(前端按邮编格式 + 用户选的国家给出;澳 / 新邮编格式相同,只能靠它区分),
+-- 没给时按 filters.location 的邮编格式推断(4 位 → 澳 / 新都算)。库里没有 cars.country 列,车源国家读时推断
+-- (browse_car_country:坐标外接框 → location 文本里的国家名 / 州省代码 → 邮编格式,都推不出按美国),
+-- 规则与 lib/postal.ts 的 countriesFromCoords / countriesFromText / deriveCountry / postalCountries 逐条一致,改了两边一起改。
 
 alter table public.cars add column if not exists title_status text;
 alter table public.cars add column if not exists currency text not null default 'USD';
@@ -31,7 +37,7 @@ create table if not exists public.car_browse_meta (
   body_style text,
   search_pinyin text,
   -- { level: great|good|fair|high, delta, marketAvg, sampleSize, sameModel }
-  -- 比价时同类车源先折合美元 / 英里(不拿加元和美元直接比);delta / marketAvg 存的是该车自己的币种
+  -- 比价时同类车源先折合美元 / 英里(不拿加元 / 澳元 / 纽元和美元直接比);delta / marketAvg 存的是该车自己的币种
   deal jsonb,
   updated_at timestamptz not null default now()
 );
@@ -50,13 +56,19 @@ as $$
   select case when v ~ '^\s*\d+(\.\d+)?\s*$' then btrim(v)::numeric end
 $$;
 
--- 车价折合美元:加元按固定近似汇率 1 USD = 1.38 CAD(lib/currency.ts CAD_PER_USD,改了两边一起改)
+-- 车价折合美元:固定近似汇率 1 USD = 1.38 CAD / 1.52 AUD / 1.7 NZD
+-- (lib/currency.ts UNITS_PER_USD,改了两边一起改;新增币种两边各加一行)。其他 / 未知币种按美元(同 normalizeCurrency)
 create or replace function public.browse_price_usd(p_price numeric, p_currency text)
 returns numeric
 language sql
 immutable
 as $$
-  select case when p_currency = 'CAD' then p_price / 1.38 else p_price end
+  select case p_currency
+    when 'CAD' then p_price / 1.38
+    when 'AUD' then p_price / 1.52
+    when 'NZD' then p_price / 1.7
+    else p_price
+  end
 $$;
 
 -- 里程折合英里:1 mi = 1.609344 km(lib/currency.ts KM_PER_MI)
@@ -77,6 +89,91 @@ as $$
   select case when coalesce(v, '') = '' then null else string_to_array(v, ',') end
 $$;
 
+-- 筛选值是不是邮编、在哪些国家的格式下成立(lib/postal.ts postalCountries):
+-- 5 位 / ZIP+4 → {US},A1A 1A1 → {CA},4 位 → {AU,NZ},其他(城市名 / 空)→ {}
+create or replace function public.browse_postal_countries(v text)
+returns text[]
+language sql
+immutable
+as $$
+  select case
+    when btrim(coalesce(v, '')) ~ '^[0-9]{5}(-[0-9]{4})?$' then array['US']
+    when btrim(coalesce(v, '')) ~ '^[A-Za-z][0-9][A-Za-z][ -]?[0-9][A-Za-z][0-9]$' then array['CA']
+    when btrim(coalesce(v, '')) ~ '^[0-9]{4}$' then array['AU', 'NZ']
+    else '{}'::text[]
+  end
+$$;
+
+-- 坐标落在哪些国家的外接框里(lib/postal.ts countriesFromCoords,顺序 US, CA, AU, NZ)。
+-- 没有坐标(null / 0,与距离计算同一口径)→ {};美加边境西经 123.3°–95.15° 按北纬 49° 切开,其余重叠区返回 {US,CA}
+create or replace function public.browse_coord_countries(p_lat double precision, p_lng double precision)
+returns text[]
+language sql
+immutable
+as $$
+  select case
+    when coalesce(p_lat, 0) = 0 or coalesce(p_lng, 0) = 0 then '{}'::text[]
+    else array_remove(array[
+      case when (p_lat between 24.3 and 49.4 and p_lng between -125 and -66.9
+                 and not (p_lng between -123.3 and -95.15 and p_lat >= 49))
+             or (p_lat between 51 and 71.5 and p_lng between -180 and -129.9)
+             or (p_lat between 18.5 and 22.5 and p_lng between -161 and -154.5) then 'US' end,
+      case when p_lat between 41.6 and 83.2 and p_lng between -141 and -52.6
+                and not (p_lng between -123.3 and -95.15 and p_lat < 49) then 'CA' end,
+      case when p_lat between -44 and -9 and p_lng between 112 and 154 then 'AU' end,
+      case when p_lat between -47.5 and -34 and p_lng between 166 and 179 then 'NZ' end
+    ], null)
+  end
+$$;
+
+-- location 文本推断出的候选国家(lib/postal.ts TEXT_COUNTRY_RULES,按顺序第一条命中的):
+-- 国家名 → 澳洲州缩写 → 加拿大省代码 / 邮编 → 美国州代码 / zip → 末尾 4 位(澳 / 新)。
+-- 边界用显式的非字母数字字符(不用 \y:UTF-8 下汉字算单词字符,和 JS 的 \b 不一致)
+create or replace function public.browse_text_countries(p_text text)
+returns text[]
+language sql
+immutable
+as $$
+  select case
+    when btrim(coalesce(p_text, '')) = '' then '{}'::text[]
+    when p_text ~* '(new zealand|aotearoa|新西兰|新西蘭|紐西蘭|纽西兰)' then array['NZ']
+    when p_text ~ '(^|[^A-Za-z0-9])NZ([^A-Za-z0-9]|$)' then array['NZ']
+    when p_text ~* '(australia|澳大利亚|澳大利亞|澳洲)' then array['AU']
+    when p_text ~ '(^|[^A-Za-z0-9])(NSW|VIC|QLD|TAS|ACT)([^A-Za-z0-9]|$)' then array['AU']
+    when p_text ~* '(canada|加拿大)' then array['CA']
+    when p_text ~ ',\s*(AB|BC|MB|NB|NL|NS|ON|PE|QC|SK|YT|NU)([^A-Za-z0-9]|$)' then array['CA']
+    when p_text ~ '(^|[^A-Za-z0-9])[A-Za-z][0-9][A-Za-z][ -]?[0-9][A-Za-z][0-9]([^A-Za-z0-9]|$)' then array['CA']
+    when p_text ~* '(united states|美国|美國)' then array['US']
+    when p_text ~ '(^|[^A-Za-z0-9])USA([^A-Za-z0-9]|$)' then array['US']
+    when p_text ~ ',\s*(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)([^A-Za-z0-9]|$)' then array['US']
+    when p_text ~ '(^|[^A-Za-z0-9])[0-9]{5}([^A-Za-z0-9]|$)' then array['US']
+    when p_text ~ '(^|[^A-Za-z0-9])[0-9]{4}\s*$' then array['AU', 'NZ']
+    else '{}'::text[]
+  end
+$$;
+
+-- 车源国家(lib/postal.ts carCountry):坐标唯一 → 坐标;坐标在美加重叠区 → 文本里落在候选内的国家,否则候选第一个;
+-- 没有坐标 → 文本(先 location,推不出再 location_zh);都推不出 → 'US'(既有车源都是美国的)
+create or replace function public.browse_car_country(p_lat double precision, p_lng double precision,
+                                                     p_location text, p_location_zh text)
+returns text
+language sql
+immutable
+as $$
+  with sig as (
+    select browse_coord_countries(p_lat, p_lng) as cc,
+           coalesce(nullif(browse_text_countries(p_location), '{}'::text[]), browse_text_countries(p_location_zh)) as tc
+  )
+  select case
+    when cardinality(cc) = 1 then cc[1]
+    when cardinality(cc) > 1 then coalesce(
+      (select x from unnest(tc) with ordinality u(x, i) where x = any(cc) order by i limit 1), cc[1])
+    when cardinality(tc) > 0 then tc[1]
+    else 'US'
+  end
+  from sig
+$$;
+
 -- 命中筛选的车源 id + 距离(英里,无用户坐标或车无经纬度时为 null)。
 -- p 的结构见 lib/browse-cars.ts 的 BrowseQuery。
 -- use_location:是否应用「城市名」位置筛选;use_distance:是否应用最大距离
@@ -90,7 +187,12 @@ as $$
     select
       p->'filters' as f,
       (p->>'lat')::double precision as ulat,
-      (p->>'lng')::double precision as ulng
+      (p->>'lng')::double precision as ulng,
+      -- 国家筛选:显式 country 参数优先,否则按 location 的邮编格式推断;{} = 不筛
+      case when upper(btrim(coalesce(p->>'country', ''))) in ('US', 'CA', 'AU', 'NZ')
+           then array[upper(btrim(p->>'country'))]
+           else browse_postal_countries(p->'filters'->>'location')
+      end as countries
   ),
   scored as (
     select
@@ -110,7 +212,8 @@ as $$
                + cos(radians(params.ulat)) * cos(radians(c.lat))
                  * power(sin(radians(c.lng - params.ulng) / 2), 2)))
       end as dist,
-      params.f
+      params.f,
+      params.countries
     from public.cars c
     cross join params
     left join public.profiles pr on pr.id = c.seller_id
@@ -177,8 +280,8 @@ as $$
     and (coalesce(s.f->>'noAccident', '') <> 'true' or strpos(s.carfax_summary, '无事故') > 0)
     and (coalesce(s.f->>'oneOwner', '') <> 'true' or s.carfax_summary ~ '(^|\D)1 任车主')
     and (coalesce(s.f->>'hasCarfax', '') <> 'true' or coalesce(s.carfax_url, '') <> '')
-    -- 产权:只认明确的清白产权,未填(null)不命中
-    and (coalesce(s.f->>'cleanTitle', '') <> 'true' or s.title_status = '清白产权')
+    -- 产权:只认明确的清白产权(含澳新「无欠款(PPSR 已查)」,与 lib/title-status.ts CLEAN_TITLE_STATUSES 一致),未填(null)不命中
+    and (coalesce(s.f->>'cleanTitle', '') <> 'true' or s.title_status in ('清白产权', '无欠款(PPSR 已查)'))
     -- 可贷款(无信用/ITIN):卖家名下任一门店带这两个标签之一(同 lib/car-filters.ts 的 LOAN_FILTER_TAGS)
     and (coalesce(s.f->>'financing', '') <> 'true' or exists (
           select 1 from public.dealer_stores ds
@@ -188,10 +291,13 @@ as $$
           select 1 from unnest(coalesce(s.images, '{}') || s.image_url) u
           where u ~* '\.(mp4|mov|webm|avi|mkv)(\?|$)'))
     and (coalesce(s.f->>'hasPrice', '') <> 'true' or s.price > 0)
-    -- 位置:5 位 zip 不硬过滤(交给距离);城市名做子串匹配
+    -- 国家:邮编筛选先按国家(车源国家读时推断,同 lib/car-filters.ts 的 carCountry),再交给下面的距离
+    and (cardinality(s.countries) = 0
+         or browse_car_country(s.lat, s.lng, s.location, s.location_zh) = any(s.countries))
+    -- 位置:邮编(美 / 加 / 澳 / 新)不做文本匹配(上面已按国家筛、交给距离);城市名做子串匹配
     and (not use_location
          or coalesce(s.f->>'location', '') = ''
-         or s.f->>'location' ~ '^\d{5}$'
+         or cardinality(browse_postal_countries(s.f->>'location')) > 0
          or strpos(lower(coalesce(s.location, '')), lower(s.f->>'location')) > 0
          or strpos(coalesce(s.location_zh, ''), s.f->>'location') > 0)
     -- 最大距离:有用户坐标才生效
@@ -215,7 +321,7 @@ declare
   v_langs text[] := array(select jsonb_array_elements_text(coalesce(p->'langs', '[]'::jsonb)));
   v_empty_langs_match boolean := coalesce((p->>'emptyLangsMatch')::boolean, false);
   v_loc text := coalesce(p->'filters'->>'location', '');
-  v_use_location boolean := v_loc <> '' and v_loc !~ '^\d{5}$';
+  v_use_location boolean := v_loc <> '' and cardinality(browse_postal_countries(v_loc)) = 0;
   v_forced boolean := false;
   v_total bigint;
   v_items jsonb;
@@ -275,9 +381,10 @@ begin
   from page
   where page.ord > v_offset and page.ord <= v_offset + v_limit;
 
-  -- financingApplied:告诉前端本版已按 financing 筛选(旧版没有这个键,前端才做兜底过滤,见 lib/browse-cars.ts)
+  -- financingApplied / countryApplied:告诉前端本版已按 financing / country 筛选
+  -- (旧版没有这两个键,前端才做兜底过滤,见 lib/browse-cars.ts)
   return jsonb_build_object('total', v_total, 'forcedDistanceSort', v_forced, 'items', v_items,
-                            'financingApplied', true);
+                            'financingApplied', true, 'countryApplied', true);
 end;
 $$;
 
@@ -343,6 +450,10 @@ grant execute on function public.browse_num(text) to anon, authenticated;
 grant execute on function public.browse_list(text) to anon, authenticated;
 grant execute on function public.browse_price_usd(numeric, text) to anon, authenticated;
 grant execute on function public.browse_mileage_mi(numeric, text) to anon, authenticated;
+grant execute on function public.browse_postal_countries(text) to anon, authenticated;
+grant execute on function public.browse_coord_countries(double precision, double precision) to anon, authenticated;
+grant execute on function public.browse_text_countries(text) to anon, authenticated;
+grant execute on function public.browse_car_country(double precision, double precision, text, text) to anon, authenticated;
 grant execute on function public.browse_filtered(jsonb, boolean, boolean) to anon, authenticated;
 grant execute on function public.browse_cars(jsonb) to anon, authenticated;
 grant execute on function public.browse_facets(text, text) to anon, authenticated;

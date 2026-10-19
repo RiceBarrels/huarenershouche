@@ -59,7 +59,8 @@ async function fetchConvertedTab(
   const filters = key === "budget" ? { ...INITIAL_FILTERS, hasPrice: "true" } : INITIAL_FILTERS;
   let cursor = offset;
   for (let i = 0; i < MAX_SKIP_PAGES; i++) {
-    const page = await fetchBrowsePage({ filters, sort, locale, coords: null }, cursor, PAGE);
+    // 这两个 tab 不带 country / cleanTitle / financing,不会触发前端兜底过滤,服务端 offset 就是已翻的页数 × PAGE
+    const page = await fetchBrowsePage({ filters, sort, locale, coords: null }, { offset: cursor, dropped: 0 }, PAGE);
     if (!page) return i === 0 ? null : { rows: [], raw: 0, nextOffset: cursor };
     cursor += PAGE;
     // 低价再按 price > 0 过一遍:数据库里若还是不认 hasPrice 的旧版 RPC,电议(0)会排在最前

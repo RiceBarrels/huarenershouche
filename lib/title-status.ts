@@ -2,19 +2,62 @@
 //
 // 和 fuel_type 等枚举一样库里存中文,界面用 t(值) 渲染;Public API 的英文 slug 见 lib/api/enums.ts。
 // null = 卖家没填 / 转载源没有明确写:不猜,也不当成清白产权(「仅清白产权」筛选不命中 null)。
+//
+// 按国家分两套(库里没有国家列,国家读时推断 / 发布页显式选择,见 lib/postal.ts):
+//   美国 / 加拿大:产权品牌(clean / rebuilt / salvage / lemon buyback)
+//   澳大利亚 / 新西兰:没有美式产权品牌,买二手车查的是官方 PPSR 登记(有没有未结清的贷款担保)和
+//   是否被保险公司判定报废(written-off)—— 只给「无欠款(PPSR 已查)」「曾报废(written-off)」两项,
+//   并链接官方 PPSR 查询页(只给链接,不接任何付费查询 API)。
+// 发布 / 编辑页按车所在国家只列出对应那一套;已存的值不因国家推断变化而被改写。
 
-export const TITLE_STATUSES = ["清白产权", "重建产权", "残值产权", "柠檬回购"] as const;
+import { normalizeCountry, type Country } from "@/lib/postal";
+
+/** 美国 / 加拿大的产权品牌(顺序即展示顺序) */
+export const US_TITLE_STATUSES = ["清白产权", "重建产权", "残值产权", "柠檬回购"] as const;
+/** 澳大利亚 / 新西兰:PPSR 无欠款 / 曾报废 */
+export const ANZ_TITLE_STATUSES = ["无欠款(PPSR 已查)", "曾报废(written-off)"] as const;
+
+/** 全部合法值(= supabase/title-status.sql 的 CHECK 列表,两边一起改) */
+export const TITLE_STATUSES = [...US_TITLE_STATUSES, ...ANZ_TITLE_STATUSES] as const;
 export type TitleStatus = (typeof TITLE_STATUSES)[number];
 
 export const CLEAN_TITLE: TitleStatus = "清白产权";
+export const PPSR_CLEAR: TitleStatus = "无欠款(PPSR 已查)";
+
+/**
+ * 「仅清白产权」筛选命中的值:美式清白产权 + 澳新「无欠款(PPSR 已查)」(与「曾报废」互斥,卖家声明已查过官方登记)。
+ * lib/car-filters.ts / lib/saved-searches.ts / lib/browse-cars.ts 与 supabase/browse-cars.sql 的 browse_filtered 同一规则。
+ */
+export const CLEAN_TITLE_STATUSES: readonly TitleStatus[] = [CLEAN_TITLE, PPSR_CLEAR];
 
 export function isTitleStatus(v: unknown): v is TitleStatus {
   return typeof v === "string" && (TITLE_STATUSES as readonly string[]).includes(v);
 }
 
-/** 非清白产权(重建 / 残值 / 柠檬回购):详情页用中性警示样式(琥珀 / 石色,不用红色) */
+/** 是否算「清白」(「仅清白产权」筛选口径);null / 表外值都不算 */
+export function isCleanTitle(v: unknown): boolean {
+  return typeof v === "string" && (CLEAN_TITLE_STATUSES as readonly string[]).includes(v);
+}
+
+/** 非清白(重建 / 残值 / 柠檬回购 / 曾报废):详情页用中性警示样式(琥珀 / 石色,不用红色) */
 export function isBrandedTitle(v: TitleStatus | null | undefined): boolean {
-  return !!v && v !== CLEAN_TITLE;
+  return !!v && !isCleanTitle(v);
+}
+
+/** 澳 / 新两国用 PPSR 那一套;其余(美 / 加 / 推不出)用美式产权品牌 */
+function usesAnzTitles(country: string | null | undefined): boolean {
+  const c = normalizeCountry(country);
+  return c === "AU" || c === "NZ";
+}
+
+/** 该国发布 / 编辑页列出的产权选项(顺序即展示顺序) */
+export function titleStatusesFor(country: string | null | undefined): readonly TitleStatus[] {
+  return usesAnzTitles(country) ? ANZ_TITLE_STATUSES : US_TITLE_STATUSES;
+}
+
+/** 值是否属于该国那一套(发布页:卖家后来改了国家,先前选的另一套产权不写) */
+export function isTitleStatusFor(v: unknown, country: string | null | undefined): v is TitleStatus {
+  return isTitleStatus(v) && titleStatusesFor(country).includes(v);
 }
 
 /** 每种产权一句白话解释(中文作 i18n key,界面 t() 渲染) */
@@ -23,6 +66,8 @@ export const TITLE_STATUS_EXPLAIN: Record<TitleStatus, string> = {
   重建产权: "曾被保险公司判定全损,修复并重新通过检验后上路;会影响贷款、保险和转售",
   残值产权: "被保险公司判定全损,通常需修复并通过检验(转为重建产权)后才能上牌上路",
   柠檬回购: "因反复出现质量问题,被厂家按柠檬法回购后再次出售",
+  "无欠款(PPSR 已查)": "卖家已在官方 PPSR 登记查过:车上没有未结清的贷款 / 融资担保;买家成交前可凭 VIN 自行再查",
+  "曾报废(written-off)": "曾被保险公司判定为报废(written-off),记录会留在登记系统;能否重新上牌视报废类别和当地规定,会影响贷款、保险和转售",
 };
 
 /** 供列表 / 下拉用:{ value, explain },顺序即展示顺序 */
@@ -30,6 +75,23 @@ export const TITLE_STATUS_OPTIONS: { value: TitleStatus; explain: string }[] = T
   value,
   explain: TITLE_STATUS_EXPLAIN[value],
 }));
+
+/** 该国的产权选项 { value, explain } */
+export function titleStatusOptionsFor(country: string | null | undefined): { value: TitleStatus; explain: string }[] {
+  return titleStatusesFor(country).map((value) => ({ value, explain: TITLE_STATUS_EXPLAIN[value] }));
+}
+
+/** 官方 PPSR 查询页(政府官网首页,站内再进车辆查询;只放链接,不调付费接口) */
+export const PPSR_LINKS: Partial<Record<Country, string>> = {
+  AU: "https://www.ppsr.gov.au/", // 澳大利亚 AFSA(Australian Financial Security Authority)
+  NZ: "https://www.ppsr.govt.nz/", // 新西兰 MBIE / Companies Office
+};
+
+/** 该国的 PPSR 官网;美 / 加 / 推不出 → null */
+export function ppsrLinkFor(country: string | null | undefined): string | null {
+  const c = normalizeCountry(country);
+  return (c && PPSR_LINKS[c]) || null;
+}
 
 // ===== 转载源关键词提取(lib/sources/sync.ts):只认明确写出的关键词,冲突或没写 → null =====
 

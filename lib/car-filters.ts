@@ -13,8 +13,9 @@ import type { Filters } from "@/components/search-filters";
 import type { DbCar } from "@/lib/types";
 import type { Locale } from "@/lib/i18n";
 import { sellerSpeaksLocale } from "@/lib/i18n/languages";
-import { CLEAN_TITLE } from "@/lib/title-status";
+import { isCleanTitle } from "@/lib/title-status";
 import { carMileageMi, carPriceUsd } from "@/lib/currency";
+import { carCountry, postalFromFilter, type Country } from "@/lib/postal";
 
 // 复用 components/search-filters 的规范定义,方便调用方单点导入
 export type { Filters } from "@/components/search-filters";
@@ -40,8 +41,9 @@ export function filtersFromParams(sp: URLSearchParams): Filters {
     maxPrice: sp.get("maxPrice") || "",
     minYear: sp.get("minYear") || "",
     maxYear: sp.get("maxYear") || "",
-    // 主页搜索表单用 zip 参数传 Zipcode,统一并入 location(位置筛选只认 zip/城市名)
+    // 主页搜索表单用 zip 参数传 Zipcode,统一并入 location(位置筛选只认邮编/城市名)
     location: sp.get("location") || sp.get("zip") || "",
+    country: sp.get("country") || "",
     sellerType: sp.get("sellerType") || "",
     fuelType: sp.get("fuelType") || "",
     transmission: sp.get("transmission") || "",
@@ -78,6 +80,7 @@ export function filtersToQuery(f: Filters, sort: SortKey): string {
   if (f.minYear) params.set("minYear", f.minYear);
   if (f.maxYear) params.set("maxYear", f.maxYear);
   if (f.location) params.set("location", f.location);
+  if (f.country) params.set("country", f.country);
   if (f.sellerType) params.set("sellerType", f.sellerType);
   if (f.fuelType) params.set("fuelType", f.fuelType);
   if (f.transmission) params.set("transmission", f.transmission);
@@ -154,6 +157,15 @@ function matchesColorMulti(filterVal: string, carVal: string | undefined | null)
   if (!filterVal) return true;
   if (!carVal) return false;
   return filterVal.split(",").some((c) => carVal.includes(c));
+}
+
+/**
+ * 位置筛选是邮编时的「邮编 + 国家」(lib/postal.ts):美国 zip / 加拿大邮编按格式定国家,
+ * 4 位(澳 / 新共用)按 filters.country,没给按澳大利亚。不是邮编(城市名 / 空)返回 null。
+ * /browse 的地理编码、browse_cars 的 country 参数、下面的客户端筛选都走它,三处口径一致。
+ */
+export function postalFilter(f: Pick<Filters, "location" | "country">): { code: string; country: Country } | null {
+  return postalFromFilter(f.location, f.country);
 }
 
 // 距离表:userCoords -> 每辆有经纬度的车的直线距离(英里),carId -> miles
@@ -270,8 +282,8 @@ export function applyCarFilters(
       if (!car.carfax_summary || !/(?:^|\D)1 任车主/.test(car.carfax_summary)) return false;
     }
     if (filters.hasCarfax === "true" && !car.carfax_url) return false;
-    // 产权:只认明确的清白产权;没填(null)或列还不存在(title-status.sql 未执行,字段缺失)都不命中
-    if (filters.cleanTitle === "true" && car.title_status !== CLEAN_TITLE) return false;
+    // 产权:只认明确的清白产权(含澳新「无欠款(PPSR 已查)」,CLEAN_TITLE_STATUSES);没填(null)或列还不存在(title-status.sql 未执行,字段缺失)都不命中
+    if (filters.cleanTitle === "true" && !isCleanTitle(car.title_status)) return false;
     // 可贷款(无信用/ITIN):卖家名下门店带「支持ITIN贷款」或「无信用记录可贷」(同 browse_filtered 的 financing)
     if (filters.financing === "true" && !loanSellerIds?.has(car.seller_id)) return false;
     if (filters.hasVideo === "true" && !carHasVideo(car)) return false;
@@ -279,11 +291,13 @@ export function applyCarFilters(
     return true;
   }
 
+  // 邮编:先按国家筛(车源国家读时推断,lib/postal.ts carCountry;同 browse_filtered 的 browse_car_country),
+  // 再交给距离筛选/排序(以该邮编为中心);没有「筛不出车就放宽」的回退
+  const postal = postalFilter(filters);
+
   function applyLocationFilter(car: DbCar): boolean {
     if (!filters.location) return true;
     const loc = filters.location;
-    // Zipcode:不做硬过滤,由距离筛选/排序(以该 zip 为中心)处理
-    if (/^\d{5}$/.test(loc)) return true;
     // 城市名(主页「按地区找车」入口链接):子串匹配
     return (
       car.location.toLowerCase().includes(loc.toLowerCase()) ||
@@ -297,7 +311,9 @@ export function applyCarFilters(
   // Try applying location filter
   let result: DbCar[];
   let usingDistanceFallback = false;
-  if (filters.location) {
+  if (postal) {
+    result = nonLocFiltered.filter((car) => carCountry(car) === postal.country);
+  } else if (filters.location) {
     const locFiltered = nonLocFiltered.filter(applyLocationFilter);
     if (locFiltered.length > 0) {
       result = locFiltered;

@@ -5,10 +5,13 @@ import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLabel } from "@/lib/i18n";
+import { formatMileageCap } from "@/lib/format";
 import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 import { LOAN_FILTER_LABEL } from "@/lib/dealer-financing";
 import { trackFilterChipClick } from "@/lib/analytics/client";
+import { COUNTRIES, COUNTRY_LABELS } from "@/lib/postal";
+import { postalHint, usePostalFilterInput } from "@/components/postal-filter";
 
 // --- Price breakpoints ---
 const PRICE_STOPS = [
@@ -32,14 +35,6 @@ function mileageToIndex(miles: number): number {
     if (miles >= MILEAGE_STOPS[i]) return i;
   }
   return MILEAGE_STOPS.length - 1;
-}
-function formatMileageLabel(
-  miles: number,
-  t: (text: string, vars?: Record<string, string | number>) => string
-): string {
-  if (miles >= 999999) return t("不限");
-  if (miles >= 10000) return t("{n}万mi", { n: (miles / 10000).toFixed(0) });
-  return `${miles.toLocaleString()} mi`;
 }
 
 const FUEL_OPTIONS = [
@@ -73,7 +68,7 @@ export const CONDITION_TOGGLES: {
   { key: "noAccident", label: "无事故" },
   { key: "oneOwner", label: "一手车主" },
   { key: "hasCarfax", label: "有Carfax报告" },
-  // 只命中 cars.title_status = 清白产权(未填的不算),见 lib/title-status.ts
+  // 只命中 cars.title_status = 清白产权 / 澳新「无欠款(PPSR 已查)」(未填的不算),见 lib/title-status.ts isCleanTitle
   { key: "cleanTitle", label: "仅清白产权" },
   // 卖家门店标了「支持ITIN贷款」或「无信用记录可贷」,见 lib/dealer-financing.ts(打开时记一次点击统计)
   { key: "financing", label: LOAN_FILTER_LABEL },
@@ -148,6 +143,11 @@ export interface Filters {
   minYear: string;
   maxYear: string;
   location: string;
+  /**
+   * 位置是邮编时的国家(US / CA / AU / NZ,lib/postal.ts)。只有 4 位邮编(澳 / 新共用)才写,
+   * 美国 zip / 加拿大邮编按格式定国家、这里留空;不是邮编时无意义
+   */
+  country: string;
   sellerType: string;
   fuelType: string;
   transmission: string;
@@ -181,6 +181,7 @@ export const INITIAL_FILTERS: Filters = {
   minYear: "",
   maxYear: "",
   location: "",
+  country: "",
   sellerType: "",
   fuelType: "",
   transmission: "",
@@ -327,27 +328,24 @@ export function SearchFilters({
 }) {
   const { t, locale } = useI18n();
   const [filters, setFilters] = useState<Filters>(initialFilters || INITIAL_FILTERS);
-  // Zipcode 输入的本地缓冲(未满 5 位时不写入 filters)
-  const [zip, setZip] = useState(() =>
-    /^\d{5}$/.test((initialFilters || INITIAL_FILTERS).location)
-      ? (initialFilters || INITIAL_FILTERS).location
-      : ""
-  );
   useEffect(() => {
     if (initialFilters) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- 父组件(URL/清空)改了筛选条件时同步到本地状态
       setFilters(initialFilters);
-      if (/^\d{5}$/.test(initialFilters.location)) {
-        setZip(initialFilters.location);
-      } else if (!initialFilters.location) {
-        // 外部清空(如「清空所有筛选」)时同步清掉;输入中的不完整值保留
-        setZip((z) => (/^\d{5}$/.test(z) ? "" : z));
-      }
     }
   }, [initialFilters]);
 
+  // 国家 + 邮编输入(components/postal-filter.tsx):未填完 / 不符合所选国家格式时不写入 filters
+  const postal = usePostalFilterInput(filters.location, filters.country, (patch) => {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    onFilter(next);
+  });
+  const locationHint = postalHint(filters.location, filters.country, t);
+
+  // country 只是邮编的附属信息,不单独算一项
   const activeCount = Object.entries(filters).filter(
-    ([k, v]) => v && k !== "keyword"
+    ([k, v]) => v && k !== "keyword" && k !== "country"
   ).length;
 
   const isElectric = filters.fuelType === "纯电"; // only hide when exclusively electric
@@ -401,37 +399,41 @@ export function SearchFilters({
       {/* Location — zipcode + distance */}
       {/* 距离默认值 "50" 不算"已选",避免提示点常亮失去意义 */}
       <Section title={t("位置")} active={!!filters.location || (!!filters.maxDistance && filters.maxDistance !== INITIAL_FILTERS.maxDistance)}>
+        {/* 先选国家:澳大利亚 / 新西兰邮编都是 4 位,靠国家区分 */}
+        <div className="mb-2 flex flex-wrap gap-1.5">
+          {COUNTRIES.map((c) => (
+            <button
+              key={c}
+              type="button"
+              className={`rounded-full px-2.5 py-1 font-mono text-[11px] transition-colors ${postal.country === c ? PILL_ON : PILL_OFF}`}
+              onClick={() => postal.onCountryChange(c)}
+            >
+              {t(COUNTRY_LABELS[c])}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2">
           <input
-            placeholder={t("输入 Zipcode")}
+            placeholder={postal.examplePlaceholder ?? t("输入 Zipcode")}
             className={`h-9 min-w-0 flex-1 rounded-xl px-3 font-mono text-xs outline-none placeholder:text-muted-foreground/60 ${IOS_FILL}`}
-            maxLength={5}
-            inputMode="numeric"
-            value={zip}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, "").slice(0, 5);
-              setZip(val);
-              if (val.length === 5) update("location", val);
-              else if (filters.location) update("location", "");
-            }}
+            maxLength={postal.maxLength}
+            inputMode={postal.inputMode}
+            autoCapitalize="characters"
+            value={postal.zip}
+            onChange={(e) => postal.onZipChange(e.target.value)}
           />
-          {zip && (
+          {postal.zip && (
             <button
               type="button"
               className="font-mono text-[10px] text-muted-foreground hover:text-foreground"
-              onClick={() => {
-                setZip("");
-                update("location", "");
-              }}
+              onClick={postal.clear}
             >
               {t("清除")}
             </button>
           )}
         </div>
         <p className="mt-1.5 font-mono text-[10px] text-muted-foreground">
-          {/^\d{5}$/.test(filters.location)
-            ? t("以 Zip {zip} 为中心按距离筛选", { zip: filters.location })
-            : t("不填则以自动定位的位置计算距离")}
+          {locationHint ?? t("不填则以自动定位的位置计算距离")}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           <span className="font-mono text-[10px] text-muted-foreground">{t("距离")}</span>
@@ -581,8 +583,8 @@ export function SearchFilters({
             onFilter(next);
           }}
         />
-        {/* 价格筛选的数字是美元(加元车源按 lib/currency.ts 固定汇率折算后比较),写明免得加拿大用户当成加元 */}
-        <p className="mt-2 font-mono text-[10px] text-muted-foreground">{t("按美元筛选，加元车源已折算")}</p>
+        {/* 价格筛选的数字是美元(加元 / 澳元 / 纽元车源按 lib/currency.ts 固定汇率折算后比较),写明免得非美国用户当成本地币种 */}
+        <p className="mt-2 font-mono text-[10px] text-muted-foreground">{t("按美元筛选，其他币种车源已折算")}</p>
       </Section>
 
       {/* Monthly payment budget */}
@@ -690,7 +692,7 @@ export function SearchFilters({
       {/* Mileage slider with breakpoints */}
       <Section title={t("最高里程")} active={!!filters.maxMileage}>
         <p className="font-mono text-[11px] text-foreground">
-          {formatMileageLabel(MILEAGE_STOPS[mileageIdx], t)}
+          {formatMileageCap(MILEAGE_STOPS[mileageIdx], t)}
         </p>
         <Slider
           className="mt-2"

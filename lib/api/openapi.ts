@@ -3,7 +3,8 @@
 // 响应形状对齐 lib/api/serialize.ts / lib/api/listing.ts。描述面向开发者,统一英文。
 
 import { enumCatalog } from "./enums";
-import { CAD_PER_USD, CURRENCIES, KM_PER_MI, MILEAGE_UNITS } from "@/lib/currency";
+import { CURRENCIES, KM_PER_MI, MILEAGE_UNITS, NON_USD_CURRENCIES, UNITS_PER_USD } from "@/lib/currency";
+import { COUNTRIES } from "@/lib/postal";
 import { KEYS_COUNT_MAX, KNOWN_ISSUES } from "@/lib/car-condition";
 import {
   API_SCOPES,
@@ -17,6 +18,13 @@ import {
   DEFAULT_KEY_RATE_LIMIT_PER_MIN,
   type ApiErrorCode,
 } from "./types";
+
+// 「1 USD ≈ 1.38 CAD, 1.52 AUD, 1.7 NZD」:汇率说明从 lib/currency.ts 的汇率表生成,新增币种不用改这里
+const RATE_NOTE = NON_USD_CURRENCIES.map((c) => `${UNITS_PER_USD[c]} ${c}`).join(", ");
+
+// 响应里的 country 是读时推断的(库里没有国家列,lib/postal.ts carCountry)
+const COUNTRY_DERIVED_DESC =
+  "Country of the car: `US`, `CA`, `AU` or `NZ`. Derived, not stored: inferred from the coordinates, then the location text (country / state names), then the postcode format; `US` when nothing tells.";
 
 type Json = Record<string, unknown>;
 
@@ -226,7 +234,7 @@ export function buildOpenApi(): Record<string, unknown> {
       type: "object",
       required: [
         "id", "url", "title", "year", "make", "model", "trim", "price", "original_price", "currency", "mileage", "mileage_unit",
-        "location", "image_url", "fuel_type", "transmission", "drivetrain", "exterior_color", "interior_color", "status", "is_syndicated", "seller",
+        "location", "country", "image_url", "fuel_type", "transmission", "drivetrain", "exterior_color", "interior_color", "status", "is_syndicated", "seller",
         "created_at", "updated_at", "expires_at",
       ],
       properties: {
@@ -240,7 +248,7 @@ export function buildOpenApi(): Record<string, unknown> {
         price: { type: "integer", description: "Whole units of `currency`. `0` = call for price." },
         original_price: nullable("integer", { description: "Same currency as `price`." }),
         price_updated_at: nullable("string", { format: "date-time" }),
-        currency: { type: "string", enum: [...CURRENCIES], description: "Currency of `price` / `original_price`: `USD` (default) or `CAD` (Canadian listings)." },
+        currency: { type: "string", enum: [...CURRENCIES], description: "Currency of `price` / `original_price`: `USD` (default), `CAD` (Canada), `AUD` (Australia) or `NZD` (New Zealand)." },
         mileage: { type: "integer", description: "Odometer reading in `mileage_unit`." },
         mileage_unit: { type: "string", enum: [...MILEAGE_UNITS], description: "Unit of `mileage`: `mi` (default) or `km`." },
         location: {
@@ -251,6 +259,11 @@ export function buildOpenApi(): Record<string, unknown> {
             lat: nullable("number"),
             lng: nullable("number"),
           },
+        },
+        country: {
+          type: "string",
+          enum: [...COUNTRIES],
+          description: COUNTRY_DERIVED_DESC,
         },
         image_url: { ...nullable("string"), format: "uri", description: "Cover image." },
         fuel_type: enumValue("fuel_type", "Fuel type."),
@@ -405,7 +418,7 @@ export function buildOpenApi(): Record<string, unknown> {
         make: { type: "string", maxLength: 40, description: "English make; common aliases are canonicalised (e.g. `Mercedes` → `Mercedes-Benz`)." },
         model: { type: "string", maxLength: 60 },
         trim: nullable("string", { maxLength: 60 }),
-        price: { type: "integer", minimum: 0, description: "Whole units of `currency` (USD unless you send `currency: \"CAD\"`). `0` = call for price." },
+        price: { type: "integer", minimum: 0, description: "Whole units of `currency` (USD unless you send another supported `currency`, e.g. `\"CAD\"` / `\"AUD\"`). `0` = call for price." },
         original_price: nullable("integer", { minimum: 0, description: "Same currency as `price`." }),
         currency: {
           ...nullable("string"),
@@ -424,7 +437,7 @@ export function buildOpenApi(): Record<string, unknown> {
         title_status: {
           ...nullable("string"),
           enum: [...slugs("title_status"), null],
-          description: `Title brand: ${enumDesc("title_status")}. Omit to keep the stored value (new listings start empty); send \`null\` to clear it.`,
+          description: `Title brand: ${enumDesc("title_status")}. \`ppsr_clear\` / \`written_off\` are the Australian / New Zealand options (official PPSR check: no money owing / recorded insurance write-off); the US / CA brands are the others. Omit to keep the stored value (new listings start empty); send \`null\` to clear it.`,
         },
         condition: {
           oneOf: [ref("ConditionInput"), { type: "null" }],
@@ -460,12 +473,22 @@ export function buildOpenApi(): Record<string, unknown> {
         },
         carfax_url: nullable("string", { format: "uri" }),
         store_id: { ...nullable("string"), format: "uuid", description: "Verified store to attach to. Defaults to the first verified store." },
-        location: nullable("string", { maxLength: 80, description: "`City, ST`, a 5-digit US ZIP or a Canadian postal code. Required for personal accounts; dealers default to the store address." }),
+        location: nullable("string", {
+          maxLength: 80,
+          description:
+            "`City, ST`, a 5-digit US ZIP, a Canadian postal code or a 4-digit Australian / New Zealand postcode (send `country` with it — both use 4 digits). Required for personal accounts; dealers default to the store address.",
+        }),
+        country: {
+          ...nullable("string"),
+          enum: [...COUNTRIES, null],
+          description:
+            "Country of the car (case-insensitive). Optional, except with a 4-digit postcode in `location` (`AU` or `NZ`); must match the postcode format when both are sent. Steers geocoding, and on a new listing it picks the default `currency` / `mileage_unit` when you omit them (`US` → USD / mi, `CA` → CAD / km, `AU` → AUD / km, `NZ` → NZD / km). Not stored as such: responses carry a derived `country`.",
+        },
       },
     },
     InventoryItem: {
       type: "object",
-      required: ["id", "external_id", "url", "status", "title", "year", "make", "model", "price", "currency", "mileage", "mileage_unit", "images", "location", "created_at", "updated_at", "processing_state"],
+      required: ["id", "external_id", "url", "status", "title", "year", "make", "model", "price", "currency", "mileage", "mileage_unit", "images", "location", "country", "created_at", "updated_at", "processing_state"],
       properties: {
         id: { type: "string", format: "uuid" },
         external_id: nullable("string"),
@@ -487,6 +510,7 @@ export function buildOpenApi(): Record<string, unknown> {
         transmission: ref("EnumValue"),
         drivetrain: ref("EnumValue"),
         location: { type: "string" },
+        country: { type: "string", enum: [...COUNTRIES], description: COUNTRY_DERIVED_DESC },
         created_at: { type: "string", format: "date-time" },
         updated_at: {
           type: "string",
@@ -676,8 +700,8 @@ export function buildOpenApi(): Record<string, unknown> {
           queryParam("model", { type: "string" }, "Exact model, e.g. `Camry`."),
           queryParam("year_min", { type: "integer" }, ""),
           queryParam("year_max", { type: "integer" }, ""),
-          queryParam("price_min", { type: "integer" }, `USD. CAD listings are compared after converting at a fixed approximate rate (1 USD ≈ ${CAD_PER_USD} CAD).`),
-          queryParam("price_max", { type: "integer" }, "USD (CAD listings converted, as for `price_min`)."),
+          queryParam("price_min", { type: "integer" }, `USD. Listings in other currencies are compared after converting at fixed approximate rates (1 USD ≈ ${RATE_NOTE}).`),
+          queryParam("price_max", { type: "integer" }, "USD (other currencies converted, as for `price_min`)."),
           queryParam("mileage_max", { type: "integer" }, `Miles. Listings in km are compared after converting (1 mi = ${KM_PER_MI} km).`),
           queryParam("fuel_type", { type: "string", enum: slugs("fuel_type") }, ""),
           queryParam("transmission", { type: "string", enum: slugs("transmission") }, ""),

@@ -11,9 +11,12 @@
  *             临时语言检测 / sitemap(混合语言帖子)/ 原文哈希向量 / 重跑上一版迁移(310 项)
  *   browse    browse-cars.sql:观察模式沿用旧分组、强制模式按词表归并孪生词,选项计数 = 筛选结果;列表行不带原文;
  *             「仅清白产权」筛选(title-status.sql,与 lib/car-filters.ts 同一规则);
- *             加元 / 公里车源的价格 / 里程筛选与排序按折合美元 / 英里(car-currency.sql,与 lib/currency.ts 同一换算);
+ *             非美元 / 公里车源的价格 / 里程筛选与排序按折合美元 / 英里(car-currency.sql,与 lib/currency.ts 同一换算,
+ *             browse_price_usd 汇率表逐币种对照 UNITS_PER_USD);
  *             「可贷款(无信用/ITIN)」筛选按卖家门店标签(dealer-financing.sql,与 lib/dealer-financing.ts 同一规则);
- *             车况清单 CHECK(car-condition.sql,与 lib/car-condition.ts normalizeCarCondition 同一规则)(38 项)
+ *             车况清单 CHECK(car-condition.sql,与 lib/car-condition.ts normalizeCarCondition 同一规则);
+ *             邮编国家筛选(美 / 加 / 澳 / 新,先国家再距离):browse_postal_countries / browse_coord_countries /
+ *             browse_text_countries / browse_car_country 与 lib/postal.ts 逐样本一致,country 参数与 lib/car-filters.ts 同一结果(60 项)
  *   rollback  i18n-v2-rollback.sql 紧急摘除 → 旧写法 / 认领人 / 标签编辑 → 重新挂载 → sweep 修复(不可信、链接行重建)
  *             → 快速回滚的审核停放 → i18n-v2-cleanup.sql
  *   parity    SQL i18n_norm_tag / hashtag_tokens 与 lib/i18n/hashtags.ts 逐样本一致(URL 与空白样本另核对期望值)
@@ -29,10 +32,13 @@ import { readFileSync } from "fs";
 import { join } from "path";
 import { PGlite } from "@electric-sql/pglite";
 import { HASHTAG_SPLIT_RE, extractHashtags, normTag } from "../lib/i18n/hashtags";
-import { CLEAN_TITLE } from "../lib/title-status";
-import { carMileageMi, carPriceUsd } from "../lib/currency";
+import { CLEAN_TITLE, TITLE_STATUSES, isCleanTitle } from "../lib/title-status";
+import { CURRENCIES, carMileageMi, carPriceUsd, toUsd } from "../lib/currency";
 import { hasLoanFinancing } from "../lib/dealer-financing";
 import { normalizeCarCondition } from "../lib/car-condition";
+import { carCountry, countriesFromCoords, countriesFromText, postalCountries } from "../lib/postal";
+import { applyCarFilters, INITIAL_FILTERS } from "../lib/car-filters";
+import type { DbCar } from "../lib/types";
 
 const ROOT = join(import.meta.dir, "..");
 const readSql = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -1799,10 +1805,29 @@ values ('${C1}','${U1}','2019 Toyota Camry','2019 丰田 凯美瑞',2019,'Toyota
     tsErr = e;
   }
   check("title-status.sql + browse-cars.sql re-run without error", tsErr === null, tsErr);
+  // 早先版本只有美式四项的约束:重跑 title-status.sql 要换成含澳新两项的新约束
+  let tsUpgradeErr: unknown = null;
+  try {
+    await db.exec(`alter table public.cars drop constraint cars_title_status_check;
+alter table public.cars add constraint cars_title_status_check
+  check (title_status is null or title_status in ('清白产权', '重建产权', '残值产权', '柠檬回购'));`);
+    await db.exec(TITLE_STATUS);
+  } catch (e) {
+    tsUpgradeErr = e;
+  }
+  check("title-status.sql upgrades the old 4-value CHECK", tsUpgradeErr === null, tsUpgradeErr);
+  // CHECK 列表与 lib/title-status.ts TITLE_STATUSES 一致:六个值都能写
+  const accepted: string[] = [];
+  for (const v of TITLE_STATUSES) {
+    const r = await as(null, null, `update public.cars set title_status = '${v}' where id = '${C3}'`);
+    if (r.ok) accepted.push(v);
+  }
+  check("CHECK accepts every TITLE_STATUSES value (incl. AU / NZ)", accepted.length === TITLE_STATUSES.length, accepted);
   await db.exec(`update public.cars set title_status = '清白产权' where id = '${C1}';
-update public.cars set title_status = '重建产权' where id = '${C2}';`);
+update public.cars set title_status = '重建产权' where id = '${C2}';
+update public.cars set title_status = null where id = '${C3}';`);
   const bad = await as(null, null, `update public.cars set title_status = 'clean' where id = '${C3}'`);
-  check("CHECK rejects a title_status outside the 4 Chinese values", !bad.ok && bad.constraint === "cars_title_status_check", bad);
+  check("CHECK rejects a title_status outside the Chinese values", !bad.ok && bad.constraint === "cars_title_status_check", bad);
   // 与 lib/car-filters.ts 同一规则:只有 title_status === CLEAN_TITLE 命中,null(C3)与重建(C2)都不命中
   const clean = await as<{ j: { total: number; items: Array<{ id: string; title_status: string | null }> } }>("anon", null,
     `select public.browse_cars('{"filters":{"cleanTitle":"true"}}'::jsonb) j`);
@@ -1811,6 +1836,15 @@ update public.cars set title_status = '重建产权' where id = '${C2}';`);
     cj.total === 1 && cj.items.length === 1 && cj.items[0].id === C1 && cj.items.every((i) => i.title_status === CLEAN_TITLE), cj);
   const all = await as<{ j: { total: number } }>("anon", null, `select public.browse_cars('{"filters":{"cleanTitle":""}}'::jsonb) j`);
   check("cleanTitle off does not filter", all.rows[0].j.total === 3, all.rows[0].j);
+  // 澳新:「无欠款(PPSR 已查)」算清白(isCleanTitle),「曾报废(written-off)」不算 —— 两侧同一规则
+  for (const [v, expectHit] of [["无欠款(PPSR 已查)", true], ["曾报废(written-off)", false]] as const) {
+    await db.exec(`update public.cars set title_status = '${v}' where id = '${C3}'`);
+    const r = await as<{ j: { items: Array<{ id: string }> } }>("anon", null,
+      `select public.browse_cars('{"filters":{"cleanTitle":"true"}}'::jsonb) j`);
+    const hit = r.rows[0].j.items.some((i) => i.id === C3);
+    check(`cleanTitle ${expectHit ? "matches" : "excludes"} ${v} (same as isCleanTitle)`, hit === expectHit && isCleanTitle(v) === expectHit, r.rows[0].j);
+  }
+  await db.exec(`update public.cars set title_status = null where id = '${C3}'`);
 
   // 币种 / 里程单位:browse-cars.sql 自带 add column,car-currency.sql 加 CHECK;两份都可重复执行。
   // 价格 / 里程筛选与排序按折合美元 / 英里(browse_price_usd / browse_mileage_mi),与 lib/currency.ts 同一换算:
@@ -1877,6 +1911,18 @@ update public.cars set price = 19000, mileage = 40000 where id = '${C3}';`);
   const c2Row = byPrice.items.find((i) => i.id === C2);
   check("list rows carry the listing's own currency / mileage_unit and raw values",
     c2Row?.currency === "CAD" && c2Row?.mileage_unit === "km" && c2Row?.price === 26000 && c2Row?.mileage === 50000, c2Row);
+  // browse_price_usd 的汇率表与 lib/currency.ts UNITS_PER_USD 逐币种一致(新增币种只改一边会在这里失败);
+  // 不认识的币种按美元(同 normalizeCurrency)。SQL numeric 精确除,TS toUsd 只抹浮点尾差,比到 1e-6
+  const rateSamples = [13800, 15200, 17000, 26000, 1];
+  let rateMismatch: unknown = null;
+  for (const cur of [...CURRENCIES, "EUR"]) {
+    for (const amt of rateSamples) {
+      const r = await db.query<{ v: string }>(`select public.browse_price_usd(${amt}, '${cur}')::text v`);
+      const sqlV = Number(r.rows[0].v);
+      if (Math.abs(sqlV - toUsd(amt, cur)) > 1e-6) rateMismatch ??= { cur, amt, sqlV, ts: toUsd(amt, cur) };
+    }
+  }
+  check("browse_price_usd matches lib/currency toUsd for every supported currency (unknown → USD)", rateMismatch === null, rateMismatch);
 
   // 车行贷款标签:browse-cars.sql 自带 add column(定义同 dealer-financing.sql),dealer-financing.sql 加 CHECK + 索引;
   // 两份谁先执行都行、可重复执行。「可贷款(无信用/ITIN)」= 卖家名下任一门店带 支持ITIN贷款 / 无信用记录可贷,
@@ -1928,6 +1974,127 @@ insert into public.dealer_stores(owner_id, name, address, financing) values ('${
     same(sqlIds(loan2), tsLoan()) && loan2.total === 4, loan2);
   const off = await browseIds({ filters: { financing: "" } });
   check("financing off does not filter", off.total === 5, off.total);
+
+  // 邮编国家筛选(J3):库里没有 cars.country 列,车源国家读时推断 —— browse_coord_countries(坐标外接框)
+  // → browse_text_countries(location 文本)→ 都推不出按美国,与 lib/postal.ts 的 countriesFromCoords /
+  // countriesFromText / carCountry 逐条一致;邮编格式 browse_postal_countries 对照 postalCountries。
+  const arr = (v: string) => `${v.replace(/'/g, "''")}`;
+  const postalSamples = ["90210", "90210-1234", " 10001 ", "M5V 3L9", "m5v3l9", "M5V-3L9", "2000", "1010", "200", "123456",
+    "M5V", "Sydney", "", "A1A 1A", "0800"];
+  const postalMismatch: unknown[] = [];
+  for (const v of postalSamples) {
+    const r = await db.query<{ v: string[] }>(`select public.browse_postal_countries('${arr(v)}') v`);
+    if (r.rows[0].v.join() !== postalCountries(v).join()) postalMismatch.push({ v, sql: r.rows[0].v, ts: postalCountries(v) });
+  }
+  check("browse_postal_countries matches lib/postal postalCountries", postalMismatch.length === 0, postalMismatch);
+  const coordSamples: [number | null, number | null][] = [
+    [34.05, -118.24], [40.71, -74.0], [47.61, -122.33], [49.28, -123.12], [48.43, -123.37], [51.05, -114.07],
+    [43.65, -79.38], [45.5, -73.57], [42.33, -83.05], [44.65, -63.57], [61.22, -149.9], [58.3, -134.42], [21.31, -157.86],
+    [-33.87, 151.21], [-37.81, 144.96], [-31.95, 115.86], [-42.88, 147.33], [-36.85, 174.76], [-41.29, 174.78],
+    [-45.87, 170.5], [0, 0], [null, null], [0, 151.2], [35.68, 139.69], [49.0, -100.0], [48.99, -100.0],
+  ];
+  const coordMismatch: unknown[] = [];
+  for (const [lat, lng] of coordSamples) {
+    const r = await db.query<{ v: string[] }>(`select public.browse_coord_countries(${lat ?? "null"}, ${lng ?? "null"}) v`);
+    const ts = countriesFromCoords(lat, lng);
+    if (r.rows[0].v.join() !== ts.join()) coordMismatch.push({ lat, lng, sql: r.rows[0].v, ts });
+  }
+  check("browse_coord_countries matches lib/postal countriesFromCoords", coordMismatch.length === 0, coordMismatch);
+  const textSamples = [
+    "Sydney, NSW 2000, Australia", "Auckland, Auckland 1010, New Zealand", "Melbourne VIC 3000", "Perth, WA 6000",
+    "Toronto, ON M5V 3L9", "10520 Yonge St, Richmond Hill, ON L4C 3C7", "Vancouver, BC", "Ontario, CA 91761",
+    "Los Angeles, CA 90012", "12345 Main St, Irvine, CA 92618", "Irvine, CA", "1234 Main St, Austin, TX",
+    "Christchurch 8011", "Wellington, NZ", "Hobart TAS 7000", "悉尼", "澳洲悉尼", "新西兰奥克兰", "加拿大多伦多",
+    "美国纽约", "a", "", "Seattle, WA 98101, USA", "Calgary AB T2P 1J9", "Brisbane QLD 4000", "Canberra ACT 2600",
+    "Main St 2000", "Sydney NSW", "NEW ZEALAND", "Halifax, NS B3H 1A1",
+  ];
+  const textMismatch: unknown[] = [];
+  for (const v of textSamples) {
+    const r = await db.query<{ v: string[] }>(`select public.browse_text_countries('${arr(v)}') v`);
+    const ts = countriesFromText(v);
+    if (r.rows[0].v.join() !== ts.join()) textMismatch.push({ v, sql: r.rows[0].v, ts });
+  }
+  check("browse_text_countries matches lib/postal countriesFromText", textMismatch.length === 0, textMismatch);
+  // 组合:坐标优先,美加重叠区靠文本,没坐标靠文本,都没有按美国
+  const carSamples: { lat: number | null; lng: number | null; location: string; location_zh: string }[] = [
+    { lat: -33.87, lng: 151.21, location: "Sydney 2000", location_zh: "悉尼" },
+    { lat: -36.85, lng: 174.76, location: "Auckland 1010", location_zh: "奥克兰" },
+    { lat: null, lng: null, location: "Auckland 1010", location_zh: "奥克兰" },
+    { lat: null, lng: null, location: "Auckland, Auckland 1010, New Zealand", location_zh: "奥克兰" },
+    { lat: 43.65, lng: -79.38, location: "Toronto, ON M5V 3L9", location_zh: "多伦多" },
+    { lat: 42.33, lng: -83.05, location: "Detroit, MI 48226", location_zh: "底特律" },
+    { lat: 42.31, lng: -83.04, location: "a", location_zh: "b" },
+    { lat: 45.5, lng: -73.57, location: "x", location_zh: "加拿大蒙特利尔" },
+    { lat: null, lng: null, location: "a", location_zh: "b" },
+    { lat: null, lng: null, location: "a", location_zh: "新西兰" },
+    { lat: 0, lng: 0, location: "Toronto, ON", location_zh: "" },
+    { lat: -33.87, lng: 151.21, location: "Los Angeles, CA 90012", location_zh: "" },
+  ];
+  const carMismatch: unknown[] = [];
+  for (const c of carSamples) {
+    const r = await db.query<{ v: string }>(
+      `select public.browse_car_country(${c.lat ?? "null"}, ${c.lng ?? "null"}, '${arr(c.location)}', '${arr(c.location_zh)}') v`);
+    if (r.rows[0].v !== carCountry(c)) carMismatch.push({ c, sql: r.rows[0].v, ts: carCountry(c) });
+  }
+  check("browse_car_country matches lib/postal carCountry (coords → text → US)", carMismatch.length === 0, carMismatch);
+  check("country inference samples resolve as expected",
+    carSamples.map((c) => carCountry(c)).join() === "AU,NZ,AU,NZ,CA,US,US,CA,US,NZ,CA,AU", carSamples.map((c) => carCountry(c)));
+
+  // 列表:C1 洛杉矶(有坐标)、C2 Irvine(只有文本)、C3 多伦多、C4 悉尼、C5 奥克兰
+  await db.exec(`update public.cars set lat = 34.05, lng = -118.24, location = 'Los Angeles, CA 90012' where id = '${C1}';
+update public.cars set lat = null, lng = null, location = 'Irvine, CA 92618' where id = '${C2}';
+update public.cars set lat = 43.65, lng = -79.38, location = 'Toronto, ON M5V 3L9' where id = '${C3}';
+update public.cars set lat = -33.87, lng = 151.21, location = 'Sydney, NSW 2000, Australia', location_zh = '悉尼' where id = '${C4}';
+update public.cars set lat = -36.85, lng = 174.76, location = 'Auckland, Auckland 1010, New Zealand', location_zh = '奥克兰' where id = '${C5}';`);
+  const geoCars = (await db.query<DbCar>(`select * from public.cars`)).rows;
+  const tsGeo = (filters: Partial<typeof INITIAL_FILTERS>, coords: { lat: number; lng: number } | null = null) => {
+    const f = { ...INITIAL_FILTERS, maxDistance: "", ...filters };
+    const distances = new Map<string, number>();
+    if (coords) {
+      for (const c of geoCars) {
+        if (c.lat && c.lng) {
+          const R = 3958.8;
+          const dLat = ((c.lat - coords.lat) * Math.PI) / 180;
+          const dLng = ((c.lng - coords.lng) * Math.PI) / 180;
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos((coords.lat * Math.PI) / 180) * Math.cos((c.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+          distances.set(c.id, R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+        }
+      }
+    }
+    return applyCarFilters(geoCars, f, { userCoords: coords, distances }).cars.map((c) => c.id).sort();
+  };
+  const byCountry = async (country: string) => sqlIds(await browseIds({ country, filters: { maxDistance: "" } }));
+  check("country=US → only US listings (coords or zip text)", same(await byCountry("US"), [C1, C2].sort()), await byCountry("US"));
+  check("country=CA → Toronto", same(await byCountry("CA"), [C3]), await byCountry("CA"));
+  check("country=AU → Sydney", same(await byCountry("AU"), [C4]), await byCountry("AU"));
+  check("country=NZ → Auckland", same(await byCountry("NZ"), [C5]), await byCountry("NZ"));
+  // 前端实际发的:邮编放进 country 参数、location 置空(lib/browse-cars.ts buildQuery);SQL 也认 location 里的原始邮编
+  const au2000 = await browseIds({ filters: { location: "2000", maxDistance: "" } });
+  check("4-digit postcode without country → AU + NZ listings (format only)", same(sqlIds(au2000), [C4, C5].sort()), au2000);
+  const nz1010 = await browseIds({ filters: { location: "1010", maxDistance: "" }, country: "NZ" });
+  check("4-digit postcode + country=NZ → NZ only (same set as applyCarFilters)",
+    same(sqlIds(nz1010), [C5]) && same(sqlIds(nz1010), tsGeo({ location: "1010", country: "NZ" })), nz1010);
+  const au2000ts = tsGeo({ location: "2000", country: "AU" });
+  check("applyCarFilters: 4-digit postcode + AU → Sydney", same(au2000ts, [C4]), au2000ts);
+  const usZip = await browseIds({ filters: { location: "90012", maxDistance: "" } });
+  check("US zip in location → US listings, no text match (same as applyCarFilters)",
+    same(sqlIds(usZip), [C1, C2].sort()) && same(sqlIds(usZip), tsGeo({ location: "90012" })), usZip);
+  const caPostal = await browseIds({ filters: { location: "m5v3l9", maxDistance: "" } });
+  check("Canadian postal code in location → CA listings", same(sqlIds(caPostal), [C3]) && same(tsGeo({ location: "m5v3l9" }), [C3]), caPostal);
+  const sydney = { lat: -33.87, lng: 151.21 };
+  const near = await browseIds({ country: "AU", ...sydney, filters: { maxDistance: "50" } });
+  check("country then distance: AU within 50 mi of Sydney 2000",
+    same(sqlIds(near), [C4]) && same(sqlIds(near), tsGeo({ location: "2000", country: "AU", maxDistance: "50" }, sydney)), near);
+  const melbourne = { lat: -37.81, lng: 144.96 };
+  const far = await browseIds({ country: "AU", ...melbourne, filters: { maxDistance: "50" } });
+  check("country then distance: nothing within 50 mi of Melbourne", far.total === 0 && tsGeo({ location: "3000", country: "AU", maxDistance: "50" }, melbourne).length === 0, far);
+  const anyDist = await browseIds({ country: "NZ", ...sydney, filters: { maxDistance: "" } });
+  check("distance unlimited still filters by country first", same(sqlIds(anyDist), [C5]), anyDist);
+  check("browse_cars reports countryApplied", (anyDist as { countryApplied?: boolean }).countryApplied === true, anyDist);
+  const city = await browseIds({ filters: { location: "Sydney", maxDistance: "" } });
+  check("city-name location still substring-matches (no country filter)", same(sqlIds(city), [C4]) && same(tsGeo({ location: "Sydney" }), [C4]), city);
+  const noLoc = await browseIds({ filters: { maxDistance: "" } });
+  check("no location → no country filter", noLoc.total === 5, noLoc.total);
 
   // 车况清单:car-condition.sql 可重复执行,既有行默认 {};CHECK 与 lib/car-condition.ts 的 normalizeCarCondition 同一规则
   // (TS 归一后原样不变 ⇔ SQL 接受;已知问题重复项例外:SQL 只管取值,去重由 TS 写入前做)

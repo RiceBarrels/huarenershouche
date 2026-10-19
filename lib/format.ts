@@ -29,8 +29,9 @@ export function timeAgo(date: string, t: TranslateFn = interpolate): string {
 }
 
 // 价格 / 里程按车源自己的币种 / 单位显示(cars.currency / cars.mileage_unit,见 lib/currency.ts);
-// 不传或列不存在时按 USD / mi。固定 en-US 格式(SSR 与客户端一致):USD →「$12,345」,CAD →「CA$12,345」。
-// explicit:美元也写成「US$」,用在和加元并排的「≈」换算里,避免两个「$」分不清。
+// 不传或列不存在时按 USD / mi。固定 en-US 格式(SSR 与客户端一致):USD →「$12,345」,CAD →「CA$12,345」,
+// AUD →「A$12,345」,NZD →「NZ$12,345」(和 lib/currency.ts CURRENCY_PREFIX 一致)。
+// explicit:美元也写成「US$」,用在和其他币种并排的「≈」换算里,避免两个「$」分不清。
 export function formatPrice(
   price: number,
   currency?: Currency | string | null,
@@ -45,9 +46,35 @@ export function formatPrice(
   return opts.explicit && cur === "USD" ? text.replace("$", "US$") : text;
 }
 
-/** 里程数字 + 单位:「12,345 mi」/「20,000 km」 */
-export function formatMileage(value: number, unit?: MileageUnit | string | null): string {
-  return new Intl.NumberFormat("en-US").format(Math.round(value)) + " " + normalizeMileageUnit(unit);
+/** 里程单位的界面文案 key(t("英里") / t("公里"));和数字拼接以外的地方(输入框后缀等)也用它 */
+export function mileageUnitKey(unit?: MileageUnit | string | null): "英里" | "公里" {
+  return normalizeMileageUnit(unit) === "km" ? "公里" : "英里";
+}
+
+/**
+ * 里程数字 + 单位。界面上一律传 t(useI18n().t / 服务端 serverT(locale)),单位按界面语言显示:
+ * zh「58,459 英里」、en「58,459 miles」、ko「58,459 마일」、公里各语言「20,000 km / 公里」。
+ * 不传 t 时输出机器可读的代码「12,345 mi」/「20,000 km」(只给日志 / 自测这类非界面场景;API v1、JSON-LD 本来就各自输出代码)。
+ */
+export function formatMileage(value: number, unit?: MileageUnit | string | null, t?: TranslateFn): string {
+  const n = new Intl.NumberFormat("en-US").format(Math.round(value));
+  return `${n} ${t ? t(mileageUnitKey(unit)) : normalizeMileageUnit(unit)}`;
+}
+
+/**
+ * 筛选里程上限(滑块刻度 / 筛选 chip / 筛选抽屉的当前值)。筛选值恒按英里比较(lib/car-filters.ts carMileageMi),
+ * 所以单位固定 t("英里"),和车卡的「58,459 英里」同一套单位文案:
+ * zh「5万英里」/「≤5万英里」、en「50k miles」、ko「5만 마일」;不足 1 万走 formatMileage;999999 及以上为「不限」。
+ * upTo:前面加「≤」(chip / 抽屉里显示的是上限)。
+ */
+export function formatMileageCap(miles: number, t: TranslateFn, opts: { upTo?: boolean } = {}): string {
+  if (miles >= 999999) return t("不限");
+  if (miles >= 10000) {
+    const n = (miles / 10000).toFixed(0);
+    return opts.upTo ? t("≤{n}万英里", { n }) : t("{n}万英里", { n });
+  }
+  const text = formatMileage(miles, "mi", t);
+  return opts.upTo ? `≤${text}` : text;
 }
 
 /** 车源的价格(默认 car.price,也可传同币种的其他金额,如原价、降价幅度、比价差额) */
@@ -55,13 +82,13 @@ export function formatCarPrice(car: CarUnits, amount: number): string {
   return formatPrice(amount, carCurrency(car));
 }
 
-/** 车源的里程(带它自己的单位) */
-export function formatCarMileage(car: { mileage: number } & CarUnits): string {
-  return formatMileage(car.mileage, carMileageUnit(car));
+/** 车源的里程(带它自己的单位;界面上传 t,见 formatMileage) */
+export function formatCarMileage(car: { mileage: number } & CarUnits, t?: TranslateFn): string {
+  return formatMileage(car.mileage, carMileageUnit(car), t);
 }
 
 /**
- * 详情页「≈」换算:加元车源给出折合美元(按 lib/currency.ts 的固定近似汇率),美元车源返回 null。
+ * 详情页「≈」换算:非美元车源(加元 / 澳元 / 纽元)给出折合美元(按 lib/currency.ts 的固定近似汇率),美元车源返回 null。
  * 只是参考,不带「≈」符号,由调用方加。
  */
 export function approxPriceUsd(car: { price: number } & CarUnits): string | null {
@@ -69,10 +96,10 @@ export function approxPriceUsd(car: { price: number } & CarUnits): string | null
   return formatPrice(Math.round(toUsd(car.price, carCurrency(car)) / 10) * 10, "USD", { explicit: true });
 }
 
-/** 详情页「≈」换算:公里车源给出折合英里,英里车源返回 null */
-export function approxMileageMi(car: { mileage: number } & CarUnits): string | null {
+/** 详情页「≈」换算:公里车源给出折合英里,英里车源返回 null(界面上传 t,见 formatMileage) */
+export function approxMileageMi(car: { mileage: number } & CarUnits, t?: TranslateFn): string | null {
   if (carMileageUnit(car) === "mi" || !(car.mileage >= 0)) return null;
-  return formatMileage(toMiles(car.mileage, "km"), "mi");
+  return formatMileage(toMiles(car.mileage, "km"), "mi", t);
 }
 
 // 全站统一的月供估算口径：0 首付 / 6.5% APR / 60 期

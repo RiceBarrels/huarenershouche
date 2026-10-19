@@ -48,6 +48,9 @@ const SLUG_TO_DB: Record<EnumKind, Record<string, string>> = {
     rebuilt: "重建产权",
     salvage: "残值产权",
     lemon_buyback: "柠檬回购",
+    // 澳大利亚 / 新西兰(lib/title-status.ts ANZ_TITLE_STATUSES):PPSR 已查无欠款 / 曾被判定报废
+    ppsr_clear: "无欠款(PPSR 已查)",
+    written_off: "曾报废(written-off)",
   },
   // 车况清单(cars.condition,lib/car-condition.ts;supabase/car-condition.sql):轮胎状况单选、已知问题多选
   tires_condition: {

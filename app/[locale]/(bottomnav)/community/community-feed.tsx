@@ -60,7 +60,7 @@ import { Footer } from "@/components/footer";
 import { PullToRefresh } from "@/components/pull-to-refresh";
 import { carLink, userLink } from "@/lib/static-link";
 import {
-  detectUserZip,
+  detectUserPostal,
   geocodeZipToCoords,
   haversineDistance,
   formatDistance,
@@ -771,8 +771,9 @@ export default function CommunityFeed() {
       // 用户定位(用于距离)
       let coords: { lat: number; lng: number } | null = null;
       try {
-        const zip = await detectUserZip();
-        if (zip) coords = await geocodeZipToCoords(zip);
+        // 邮编带上国家(澳 / 新都是 4 位,按国家地理编码)
+        const postal = await detectUserPostal();
+        if (postal) coords = await geocodeZipToCoords(postal.code, postal.country);
       } catch {
         /* 无定位则跳过距离 */
       }

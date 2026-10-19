@@ -47,7 +47,7 @@ import {
   formatCarMileage,
   formatCarPrice,
 } from "@/lib/format";
-import { CAD_PER_USD, carCurrency, carPriceUsd } from "@/lib/currency";
+import { MAX_UNITS_PER_USD, MIN_UNITS_PER_USD, carCurrency, carPriceUsd } from "@/lib/currency";
 import { SITE_URL } from "@/lib/seo-pages";
 import { NonModalDrawer } from "@/components/non-modal-drawer";
 import { avatarUrl } from "@/lib/avatar";
@@ -111,6 +111,7 @@ import { QrShare } from "@/components/qr-share";
 import { ContactAppButtons, useSellerContactApps } from "@/components/contact-app-buttons";
 import { hasContactApps } from "@/lib/contact-apps";
 import { TitleStatusBadge } from "@/components/title-status-badge";
+import { deriveCountry } from "@/lib/postal";
 import { DealerFinancingTags } from "@/components/dealer-financing-tags";
 import { CarConditionChecklist } from "@/components/car-condition-checklist";
 import { isConditionEmpty } from "@/lib/car-condition";
@@ -379,8 +380,8 @@ function CarDetailView({
         );
       let picked = [...tier1, ...tier2].slice(0, 4);
       if (picked.length < 4 && price > 0) {
-        // 库里是各车自己的币种:原值区间放宽到能覆盖加元车源(美元价 × CAD_PER_USD),
-        // 拉回来后再按折合美元精确筛 ±30%
+        // 库里是各车自己的币种:原值区间放宽到能覆盖所有支持币种的车源(美元价 × 汇率最小 / 最大值,
+        // lib/currency.ts),拉回来后再按折合美元精确筛 ±30%
         const { data: priceSimilar } = await queryWithColumnFallback(
           (select) =>
             supabase
@@ -389,8 +390,8 @@ function CarDetailView({
               .eq("status", "active")
               .eq("owner_hidden", false)
               .neq("id", carId)
-              .gte("price", Math.floor(price * 0.7))
-              .lte("price", Math.ceil(price * 1.3 * CAD_PER_USD))
+              .gte("price", Math.floor(price * 0.7 * MIN_UNITS_PER_USD))
+              .lte("price", Math.ceil(price * 1.3 * MAX_UNITS_PER_USD))
               .limit(16),
           CAR_CARD_SELECTS
         );
@@ -470,9 +471,9 @@ function CarDetailView({
   const revealedPhone = contactVisible && !phoneLoading ? (car?.phone ?? null) : null;
 
   // 市场比价：与同品牌车源池对比（里程修正后的同类均价）;比价只读价格 / 里程 / 年份等公开列
-  // 加元 / 公里车源附「≈」折合美元 / 英里(美元 / 英里车源为 null,不显示)
+  // 非美元 / 公里车源附「≈」折合美元 / 英里(美元 / 英里车源为 null,不显示);里程单位按界面语言
   const approxPrice = car ? approxPriceUsd(car) : null;
-  const approxMileage = car ? approxMileageMi(car) : null;
+  const approxMileage = car ? approxMileageMi(car, t) : null;
   const insight = useMemo(
     () => (car ? getPriceInsight(car as DbCar, makePool) : null),
     [car, makePool]
@@ -840,7 +841,7 @@ function CarDetailView({
                 <span className="font-mono text-2xl font-bold tabular-nums md:text-3xl">
                   {formatCarPrice(car, car.price)}
                 </span>
-                {/* 加元车源附折合美元(固定近似汇率,lib/currency.ts);星号对应价格行下方的说明 */}
+                {/* 非美元车源附折合美元(固定近似汇率,lib/currency.ts);星号对应价格行下方的说明 */}
                 {approxPrice && (
                   <span className="font-mono text-sm tabular-nums text-muted-foreground">
                     ≈ {approxPrice}*
@@ -941,7 +942,7 @@ function CarDetailView({
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-sm font-medium tabular-nums">
-                    {formatCarMileage(car)}
+                    {formatCarMileage(car, t)}
                   </p>
                   {approxMileage && (
                     <p className="font-mono text-[10px] tabular-nums text-muted-foreground">≈ {approxMileage}</p>
@@ -1004,8 +1005,9 @@ function CarDetailView({
                   </p>
                 </div>
               </div>
-              {/* 产权状态:卖家填了才显示,点开看解释(title-status.sql 未执行时没有该字段,不渲染) */}
-              <TitleStatusBadge value={car.title_status} />
+              {/* 产权状态:卖家填了才显示,点开看解释(title-status.sql 未执行时没有该字段,不渲染);
+                  澳新两项附 PPSR 官网链接,国家按坐标 / location 读时推断 */}
+              <TitleStatusBadge value={car.title_status} country={deriveCountry(car)} />
             </Reveal>
 
             {car.vin && (

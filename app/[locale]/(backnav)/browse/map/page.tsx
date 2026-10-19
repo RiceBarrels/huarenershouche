@@ -39,7 +39,7 @@ import { useI18n } from "@/components/i18n-provider";
 import { useTermLabels } from "@/hooks/use-term-labels";
 import { localizePath } from "@/lib/i18n";
 import { readDualCache, writeDualCache } from "@/lib/session-cache";
-import { carCurrency, type Currency } from "@/lib/currency";
+import { carCurrency, currencyPrefix, type Currency } from "@/lib/currency";
 import type { DbCar } from "@/lib/types";
 import {
   applyCarFilters,
@@ -146,10 +146,10 @@ const snapVisible = (i: number, h: number) =>
     i === 0 ? COLLAPSED_MIN_PX + FLOAT_GAP + SAFE_BOTTOM : 0
   );
 
-// 价格胶囊短格式:$8,500 → $8.5k / $23,900 → $24k / 0 → 面议;加元车源前缀 CA$
+// 价格胶囊短格式:$8,500 → $8.5k / $23,900 → $24k / 0 → 面议;非美元车源前缀 CA$ / A$ / NZ$
 function pillPrice(price: number, currency: Currency): string {
   if (price <= 0) return "面议";
-  const sym = currency === "CAD" ? "CA$" : "$";
+  const sym = currencyPrefix(currency);
   if (price < 1000) return `${sym}${price}`;
   const k = price / 1000;
   return `${sym}${k < 10 ? k.toFixed(1).replace(/\.0$/, "") : Math.round(k)}k`;
@@ -510,6 +510,8 @@ function BrowseMapContent() {
   const activeCount = useMemo(() => {
     let n = 0;
     for (const k of Object.keys(INITIAL_FILTERS) as (keyof Filters)[]) {
+      // country 只是邮编的附属信息,不单独算一项
+      if (k === "country") continue;
       if (k === "maxDistance") {
         if (filters[k] && filters[k] !== "50") n++;
       } else if (filters[k]) {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * currency-selftest — 加拿大车源币种 / 里程单位(lib/currency.ts、lib/format.ts)与依赖它的纯逻辑回归用例。不连库。
+ * currency-selftest — 车源币种(USD / CAD / AUD / NZD)/ 里程单位(lib/currency.ts、lib/format.ts)与依赖它的纯逻辑回归用例。不连库。
  *
  * Usage:
  *   bun scripts/currency-selftest.ts
@@ -9,12 +9,23 @@
  * 覆盖:换算常量与缺列默认值(USD / mi)、加拿大邮编识别与默认单位、价格 / 里程显示、详情页「≈」换算、
  * 比价(lib/price-insight.ts)不拿加元和美元直接比、/browse 客户端筛选与排序(lib/car-filters.ts,
  * 与 supabase/browse-cars.sql 的 browse_price_usd / browse_mileage_mi 同一口径;SQL 侧见 i18n-db-test 的 browse 套件)、
- * 缺列重试跳过已知缺失列的集合(lib/supabase-compat.ts queryWithColumnFallback)。
+ * 缺列重试跳过已知缺失列的集合(lib/supabase-compat.ts queryWithColumnFallback)、澳元 / 纽元汇率与前缀、
+ * 里程单位按界面语言显示(formatMileage 传 t)、API v1 价格 / 里程阈值的 PostgREST or() 串(lib/api/filters.ts unitAwareRange)。
  */
 
 import {
   CAD_PER_USD,
+  CURRENCIES,
+  CURRENCY_PREFIX,
   KM_PER_MI,
+  MAX_UNITS_PER_USD,
+  MIN_UNITS_PER_USD,
+  NON_USD_CURRENCIES,
+  UNITS_PER_USD,
+  currencyPrefix,
+  isCurrency,
+  normalizeCurrency,
+  toUsd,
   carCurrency,
   carMileageMi,
   carMileageUnit,
@@ -26,8 +37,10 @@ import {
   postalUnitsDecision,
   unitsForPostalCode,
 } from "@/lib/currency";
-import { approxMileageMi, approxPriceUsd, formatCarMileage, formatCarPrice, formatMileage, formatPrice } from "@/lib/format";
+import { approxMileageMi, approxPriceUsd, formatCarMileage, formatCarPrice, formatMileage, formatMileageCap, formatPrice } from "@/lib/format";
 import { getPriceInsight } from "@/lib/price-insight";
+import { serverT } from "@/lib/i18n/translate";
+import { unitAwareRange } from "@/lib/api/filters";
 import { applyCarFilters, sortCars, INITIAL_FILTERS } from "@/lib/car-filters";
 import { missingColumnName, queryWithColumnFallback } from "@/lib/supabase-compat";
 import type { DbCar } from "@/lib/types";
@@ -154,6 +167,78 @@ check("US zip with USD/mi → none", postalUnitsDecision({ ...base, zipcode: "90
 check("US zip with CAD/km and numbers → ask USD/mi", JSON.stringify(postalUnitsDecision({ zipcode: "90210", currency: "CAD", mileage_unit: "km", manual: false, hasNumbers: true })) === JSON.stringify({ action: "ask", currency: "USD", mileage_unit: "mi" }));
 check("incomplete postal → none", postalUnitsDecision({ ...base, zipcode: "M5V", hasNumbers: true }).action === "none");
 check("CA postal with CAD/km already → none", postalUnitsDecision({ zipcode: "M5V 2T6", currency: "CAD", mileage_unit: "km", manual: false, hasNumbers: true }).action === "none");
+
+// ---------- 澳元 / 纽元(多市场币种) ----------
+check("every supported currency has a rate and a prefix",
+  CURRENCIES.every((c) => UNITS_PER_USD[c] > 0 && !!CURRENCY_PREFIX[c]) && UNITS_PER_USD.USD === 1);
+check("AUD / NZD are supported, EUR is not", isCurrency("AUD") && isCurrency("NZD") && !isCurrency("EUR") && normalizeCurrency("EUR") === "USD");
+check("NON_USD_CURRENCIES = CAD, AUD, NZD", NON_USD_CURRENCIES.join() === "CAD,AUD,NZD", NON_USD_CURRENCIES);
+check("AUD / NZD rates are sane fixed approximations",
+  UNITS_PER_USD.AUD > 1 && UNITS_PER_USD.AUD < 2 && UNITS_PER_USD.NZD > 1 && UNITS_PER_USD.NZD < 2.2);
+check("widest rate bounds cover every currency", MAX_UNITS_PER_USD === Math.max(...Object.values(UNITS_PER_USD)) && MIN_UNITS_PER_USD === 1);
+check("AUD converts to USD exactly (15200 / 1.52)", toUsd(15200, "AUD") === 10000, toUsd(15200, "AUD"));
+check("NZD converts to USD exactly (17000 / 1.7)", toUsd(17000, "NZD") === 10000, toUsd(17000, "NZD"));
+check("formatPrice AUD → A$", formatPrice(12345, "AUD") === "A$12,345", formatPrice(12345, "AUD"));
+check("formatPrice NZD → NZ$", formatPrice(12345, "NZD") === "NZ$12,345", formatPrice(12345, "NZD"));
+check("currencyPrefix matches formatPrice for every currency",
+  CURRENCIES.every((c) => formatPrice(1000, c) === `${currencyPrefix(c)}1,000`));
+check("currencyPrefix explicit USD / unknown", currencyPrefix("USD", { explicit: true }) === "US$" && currencyPrefix("EUR") === "$" && currencyPrefix(null) === "$");
+check("≈ USD for AUD cars", approxPriceUsd({ price: 30400, currency: "AUD" }) === "US$20,000", approxPriceUsd({ price: 30400, currency: "AUD" }));
+check("carPriceUsd for NZD", carPriceUsd({ price: 34000, currency: "NZD" }) === 20000);
+
+// ---------- 里程单位按界面语言(M0) ----------
+const zhT = serverT("zh");
+const enT = serverT("en");
+const koT = serverT("ko");
+check("zh: miles label is 英里", formatMileage(58459, "mi", zhT) === "58,459 英里", formatMileage(58459, "mi", zhT));
+check("zh: km label is 公里", formatMileage(20000, "km", zhT) === "20,000 公里", formatMileage(20000, "km", zhT));
+check("en: miles label is localized", formatMileage(58459, "mi", enT) === `58,459 ${enT("英里")}` && enT("英里") !== "英里", formatMileage(58459, "mi", enT));
+check("ko: miles label is localized", formatCarMileage({ mileage: 58459 }, koT) === `58,459 ${koT("英里")}` && koT("英里") !== "英里");
+check("every locale has both unit labels",
+  ["en", "ko", "ja", "es", "fr"].every((l) => serverT(l)("英里") !== "英里" && serverT(l)("公里") !== "公里"));
+check("≈ miles uses the UI label when t is passed",
+  approxMileageMi({ mileage: 50000, mileage_unit: "km" }, zhT) === "31,069 英里", approxMileageMi({ mileage: 50000, mileage_unit: "km" }, zhT));
+// 筛选里程上限(滑块 / chip / 抽屉):和车卡同一套「英里」文案,不再出现裸「mi」
+check("zh: mileage cap slider label", formatMileageCap(50000, zhT) === "5万英里", formatMileageCap(50000, zhT));
+check("zh: mileage cap chip label", formatMileageCap(50000, zhT, { upTo: true }) === "≤5万英里", formatMileageCap(50000, zhT, { upTo: true }));
+check("zh: mileage cap below 10k / unlimited",
+  formatMileageCap(0, zhT) === "0 英里" && formatMileageCap(999999, zhT) === zhT("不限"), formatMileageCap(0, zhT));
+const capKeys: string[] = [];
+formatMileageCap(300000, (k) => (capKeys.push(k), k));
+formatMileageCap(300000, (k) => (capKeys.push(k), k), { upTo: true });
+check("mileage cap uses the 英里 keys (no raw mi)", capKeys.join("|") === "{n}万英里|≤{n}万英里", capKeys);
+check("no t → machine codes (unchanged)", formatMileage(58459) === "58,459 mi" && formatCarMileage({ mileage: 1, mileage_unit: "km" }) === "1 km");
+
+// ---------- API v1 价格 / 里程阈值 or() 串 ----------
+check("price gte or() covers every non-USD currency",
+  unitAwareRange("price", "gte", 10000) ===
+    "and(currency.not.in.(CAD,AUD,NZD),price.gte.10000),and(currency.eq.CAD,price.gte.13800),and(currency.eq.AUD,price.gte.15200),and(currency.eq.NZD,price.gte.17000)",
+  unitAwareRange("price", "gte", 10000));
+check("mileage lte or() rounds inward",
+  unitAwareRange("mileage", "lte", 35000) === "and(mileage_unit.not.in.(km),mileage.lte.35000),and(mileage_unit.eq.km,mileage.lte.56327)",
+  unitAwareRange("mileage", "lte", 35000));
+// 语义对照:把 or() 串当成「按币种选阈值」求值,和 carPriceUsd 比较结果逐台一致(整数价格,阈值向内取整)
+function orMatches(expr: string, cur: string, price: number): boolean {
+  for (const m of expr.matchAll(/and\(currency\.(not\.in\.\(([A-Z,]+)\)|eq\.([A-Z]{3})),price\.(gte|lte)\.(\d+)\)/g)) {
+    const applies = m[2] ? !m[2].split(",").includes(cur) : m[3] === cur;
+    if (applies) return m[4] === "gte" ? price >= Number(m[5]) : price <= Number(m[5]);
+  }
+  return false;
+}
+let orMismatch: unknown = null;
+for (const cur of [...CURRENCIES, "EUR"]) {
+  for (const op of ["gte", "lte"] as const) {
+    for (const x of [9999, 10000, 12345, 19500]) {
+      const expr = unitAwareRange("price", op, x);
+      for (let price = Math.floor(x * 0.9); price <= Math.ceil(x * 1.8); price += 7) {
+        const usd = carPriceUsd({ price, currency: cur });
+        const want = op === "gte" ? usd >= x : usd <= x;
+        if (orMatches(expr, cur, price) !== want) orMismatch ??= { cur, op, x, price, usd };
+      }
+    }
+  }
+}
+check("price or() agrees with carPriceUsd for every currency (unknown → USD)", orMismatch === null, orMismatch);
 
 // ---------- 缺列重试 ----------
 check("missingColumnName 42703", missingColumnName({ code: "42703", message: "column cars.currency does not exist" }) === "currency");

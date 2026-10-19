@@ -1,12 +1,19 @@
 "use client";
 
-// 价格币种 / 里程单位切换(cars.currency / cars.mileage_unit,lib/currency.ts):发布页与编辑页共用的两选一分段按钮。
+// 价格币种 / 里程单位切换(cars.currency / cars.mileage_unit,lib/currency.ts):发布页与编辑页共用的分段按钮。
+// 选项直接取 lib/currency.ts 的 CURRENCIES / MILEAGE_UNITS(新增币种时在下面的文案表补一项,Record 类型会提醒)。
+// 只在 car-currency.sql 已执行(列已建)时由调用方渲染,所以列没建时澳元 / 纽元等选项不会出现。
 // variant="wizard" 跟发布向导的胶囊样式(选中薄荷绿底 + 深墨字),"form" 跟编辑页的小号描边按钮。
 
 import { useI18n } from "@/components/i18n-provider";
 import { CURRENCIES, MILEAGE_UNITS, type Currency, type MileageUnit } from "@/lib/currency";
 
-const CURRENCY_LABEL: Record<Currency, string> = { USD: "美元 (USD)", CAD: "加元 (CAD)" };
+const CURRENCY_LABEL: Record<Currency, string> = {
+  USD: "美元 (USD)",
+  CAD: "加元 (CAD)",
+  AUD: "澳元 (AUD)",
+  NZD: "纽元 (NZD)",
+};
 const MILEAGE_UNIT_LABEL: Record<MileageUnit, string> = { mi: "英里 (mi)", km: "公里 (km)" };
 
 type Variant = "wizard" | "form";

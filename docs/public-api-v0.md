@@ -112,8 +112,10 @@ create unique index if not exists cars_seller_external_uniq
 Public API 不提供写入。与 `phone` / `wechat` 同一脱敏规则:无 key 的请求为 `null`。短信用 `phone`,没有 sms 键。
 SQL 未执行时带 key 的请求也返回 `{}`。
 
-产权状态 `title_status`(车源详情):`{ value, label }`,`value` 为 `clean` / `rebuilt` / `salvage` / `lemon_buyback`(库内存中文
-`清白产权` / `重建产权` / `残值产权` / `柠檬回购`,`cars.title_status`,`supabase/title-status.sql`)。卖家没填时 `value` / `label` 都是
+产权状态 `title_status`(车源详情):`{ value, label }`,`value` 为 `clean` / `rebuilt` / `salvage` / `lemon_buyback`(美 / 加),
+或澳 / 新的 `ppsr_clear`(PPSR 已查、无欠款)/ `written_off`(曾被判定报废)(库内存中文 `清白产权` / `重建产权` / `残值产权` /
+`柠檬回购` / `无欠款(PPSR 已查)` / `曾报废(written-off)`,`cars.title_status`,`supabase/title-status.sql`)。发布 / 编辑页按车所在国家
+只给对应那一套;API 写入不按国家限制,但请只给澳 / 新车源发 `ppsr_clear` / `written_off`。卖家没填时 `value` / `label` 都是
 `null` —— **null 不代表清白产权**。转载车源只在源站描述 / 标签里明确写出(clean title、rebuilt title、salvage、lemon buyback)时才有值,
 互相矛盾或没写为 null。不敏感,不脱敏;SQL 未执行时恒为 null。
 
@@ -125,11 +127,17 @@ SQL 未执行时带 key 的请求也返回 `{}`。
 没填的项为 `null`(**null 不代表「否」**);`known_issues: []` = 卖家明确表示无已知问题,`null` = 没填。只有固定选项、**没有自由文本**
 (自由文本会绕开翻译管线和 AI 审核,细节写在描述里)。不敏感,不脱敏;不进内容时钟(改清单不移动 `updated_at`);SQL 未执行时各项恒为 null。
 
-币种与里程单位(列表 / 详情 / 门店在售车 / 库存都有):`price` / `original_price` 是 `currency` 币种的整数(`USD` 默认,加拿大车源为 `CAD`),
+币种与里程单位(列表 / 详情 / 门店在售车 / 库存都有):`price` / `original_price` 是 `currency` 币种的整数(`USD` 默认;加拿大车源 `CAD`、澳洲 `AUD`、新西兰 `NZD`,支持列表见 `lib/currency.ts` 的 `CURRENCIES`,写入时按它校验,其他代码 400),
 `mileage` 的单位是 `mileage_unit`(`mi` 默认,或 `km`);库里存卖家填的原值(`cars.currency` / `cars.mileage_unit`,
 `supabase/car-currency.sql`),不做换算,SQL 未执行时恒为 `USD` / `mi`。列表筛选 `price_min` / `price_max` 按美元、`mileage_max` 按英里,
-加元 / 公里车源按固定近似换算(`lib/currency.ts`:1 USD ≈ 1.38 CAD、1 mi = 1.609344 km,不是实时汇率)后比较,与站内 /browse 同一口径;
+非美元 / 公里车源按固定近似换算(`lib/currency.ts`:1 USD ≈ 1.38 CAD ≈ 1.52 AUD ≈ 1.7 NZD、1 mi = 1.609344 km,不是实时汇率)后比较,与站内 /browse 同一口径;
 `sort=price_asc|price_desc|mileage_asc` 按各车自己的原值排序(不换算)。
+
+国家(列表 / 详情 / 库存都有 `country`:`US` / `CA` / `AU` / `NZ`):**派生字段**,库里没有国家列,按 `lib/postal.ts` 的 `carCountry`
+读时推断 —— 先看坐标(简单外接框),再看 location 文本里的国家名 / 州省代码,最后看邮编格式,都推不出按 `US`。
+写入时可选传 `country`:4 位邮编(澳 / 新格式相同)必须带上,且须与邮编格式一致(否则 400 `validation_failed`,`field: "country"`);
+它决定地理编码查哪国,新建且没给 `currency` / `mileage_unit` 时按国家取默认(`AU` → AUD / km、`NZ` → NZD / km、`CA` → CAD / km、`US` → USD / mi);
+不传 `country` 时行为不变(新建为 USD / mi)。澳 / 新车源的 location 末尾会补英文国名,保证以后推断得出。
 
 多语言(i18n v2):
 
@@ -158,13 +166,14 @@ SQL 未执行时带 key 的请求也返回 `{}`。
   "year": 2020, "make": "Honda", "model": "Accord", "trim": "Sport",
   "price": 18900,                      // 必填,整数,币种见 currency;0 = 电议
   "original_price": 19900,             // 与 price 同币种
-  "currency": "USD",                   // USD|CAD;省略 = 保留原值(新建为 USD),null = 恢复 USD
+  "currency": "USD",                   // USD|CAD|AUD|NZD;省略 = 保留原值(新建为 USD),null = 恢复 USD
   "mileage": 41200,                    // 必填,整数,单位见 mileage_unit
   "mileage_unit": "mi",                // mi|km;省略 = 保留原值(新建为 mi),null = 恢复 mi
+  "country": "US",                     // 选填 US|CA|AU|NZ;4 位邮编必填;新建且省略 currency / mileage_unit 时按国家取默认;不入库(响应里的 country 是推断的)
   "fuel_type": "gasoline",             // gasoline|hybrid|phev|electric|diesel
   "transmission": "automatic",         // automatic|manual|cvt
   "drivetrain": "fwd",                 // fwd|rwd|awd|4wd
-  "title_status": "clean",             // clean|rebuilt|salvage|lemon_buyback;省略 = 保留原值(新建为空),null = 清空
+  "title_status": "clean",             // clean|rebuilt|salvage|lemon_buyback(美 / 加)|ppsr_clear|written_off(澳 / 新);省略 = 保留原值(新建为空),null = 清空
   "condition": {                       // 车况清单,选填;省略 = 保留原值(新建为空),null = 清空,对象 = 整张替换
     "service_records": true,           //   各项都可省略或 null(= 没填);未知键 → 400(没有自由文本键)
     "one_owner": true, "smoker": false,
@@ -179,7 +188,7 @@ SQL 未执行时带 key 的请求也返回 `{}`。
   "images": ["https://cdn.dealer.com/1.jpg", "..."],   // 最多 30 张
   "carfax_url": "https://...",
   "store_id": "e0000000-…",            // 多门店时选;省略 = 第一家已认证门店
-  "location": null                     // 车行省略 = 跟随门店地址;个人必填(城市、美国 zip 或加拿大邮编)
+  "location": null                     // 车行省略 = 跟随门店地址;个人必填(城市、美国 zip、加拿大邮编或澳 / 新 4 位邮编 + country)
 }
 ```
 

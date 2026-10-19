@@ -1,11 +1,14 @@
 // 车源币种 / 里程单位(cars.currency / cars.mileage_unit,supabase/car-currency.sql)—— 纯模块(server / client / Bun 通用)。
 //
-// 加拿大车源用加元 + 公里,美国车源用美元 + 英里;库里存车源自己的原值,不做换算。
+// 美国车源用美元 + 英里,加拿大车源用加元 + 公里,澳洲 / 新西兰车源用澳元 / 纽元 + 公里;库里存车源自己的原值,不做换算。
 // 列不存在(SQL 未执行)或值缺失时一律按 USD / mi 处理(既有车源都是美国的)。
 // 需要跨币种比较的地方(比价池、/browse 价格 / 里程筛选与排序、月供预算)统一先换算成 USD / 英里,
 // 换算常量只在这里定义一份;supabase/browse-cars.sql 的 browse_price_usd / browse_mileage_mi 抄了同样的数,改了两边一起改。
+// 库里 currency 的 CHECK 只校验 ISO 三位格式,所以所有写入路径(发布页、编辑页、API v1)都必须先用 isCurrency 校验这份列表。
 
-export const CURRENCIES = ["USD", "CAD"] as const;
+import { resolvePostalCountry, type Country } from "@/lib/postal";
+
+export const CURRENCIES = ["USD", "CAD", "AUD", "NZD"] as const;
 export type Currency = (typeof CURRENCIES)[number];
 
 export const MILEAGE_UNITS = ["mi", "km"] as const;
@@ -20,8 +23,40 @@ export const DEFAULT_MILEAGE_UNIT: MileageUnit = "mi";
  */
 export const CAD_PER_USD = 1.38;
 
-/** 1 美元 ≈ 多少单位该币种(固定近似汇率,同上);新增市场币种时在 CURRENCIES 和这里各加一项 */
-export const UNITS_PER_USD: Record<Currency, number> = { USD: 1, CAD: CAD_PER_USD };
+/** 1 美元 ≈ 多少澳元(固定近似汇率,用途同上) */
+export const AUD_PER_USD = 1.52;
+
+/** 1 美元 ≈ 多少纽元(固定近似汇率,用途同上) */
+export const NZD_PER_USD = 1.7;
+
+/**
+ * 1 美元 ≈ 多少单位该币种(固定近似汇率,同上);新增市场币种时在 CURRENCIES、这里、
+ * CURRENCY_PREFIX 和 browse-cars.sql 的 browse_price_usd 各加一项。
+ */
+export const UNITS_PER_USD: Record<Currency, number> = { USD: 1, CAD: CAD_PER_USD, AUD: AUD_PER_USD, NZD: NZD_PER_USD };
+
+/** 美元以外的支持币种(按原值粗筛 / PostgREST or() 串逐个币种换算阈值用) */
+export const NON_USD_CURRENCIES = CURRENCIES.filter((c) => c !== "USD") as Exclude<Currency, "USD">[];
+
+/**
+ * 支持币种里「1 美元折多少单位」的最大值。服务端只能按原值筛价时(比价池、SEO 列表),
+ * 美元上限 × 它 = 能覆盖所有币种车源的原值上限,拉回来再按折合美元精筛。
+ */
+export const MAX_UNITS_PER_USD = Math.max(...CURRENCIES.map((c) => UNITS_PER_USD[c]));
+
+/** 同上的最小值(原值下限放宽用;目前就是 USD 的 1) */
+export const MIN_UNITS_PER_USD = Math.min(...CURRENCIES.map((c) => UNITS_PER_USD[c]));
+
+/**
+ * 金额前缀(和 lib/format.ts formatPrice 用的 Intl en-US 输出一致):USD「$」、CAD「CA$」、AUD「A$」、NZD「NZ$」。
+ * explicit:美元也写成「US$」(和其他币种并排时分得清)。输入框前缀、地图价格胶囊这类不走 formatPrice 的地方用。
+ */
+export const CURRENCY_PREFIX: Record<Currency, string> = { USD: "$", CAD: "CA$", AUD: "A$", NZD: "NZ$" };
+
+export function currencyPrefix(currency: Currency | string | null | undefined, opts: { explicit?: boolean } = {}): string {
+  const cur = normalizeCurrency(currency);
+  return opts.explicit && cur === "USD" ? "US$" : CURRENCY_PREFIX[cur];
+}
 
 /** 1 英里 = 1.609344 公里(国际定义的精确值) */
 export const KM_PER_MI = 1.609344;
@@ -111,44 +146,34 @@ export function carMileageMi(car: { mileage: number } & CarUnits): number {
   return toMiles(car.mileage, car.mileage_unit);
 }
 
-// ===== 发布页默认值:加拿大邮编 → 加元 + 公里 =====
+// ===== 发布页默认值:国家 → 币种 + 里程单位 =====
+// 邮编格式 / 国家判断在 lib/postal.ts;这里只管「哪个国家默认用什么币种和单位」。
+// 下面几个邮编工具原先定义在这里,保留转出口兼容既有调用方。
+export { CA_POSTAL_RE, isCanadianPostalCode, normalizeCanadianPostalCode, extractPostalCode } from "@/lib/postal";
 
-/** 加拿大邮编(A1A 1A1,中间空格 / 连字符可省) */
-export const CA_POSTAL_RE = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
+/** 各国默认币种 / 里程单位:美国 USD + mi,加拿大 CAD + km,澳大利亚 AUD + km,新西兰 NZD + km */
+export const COUNTRY_UNITS: Record<Country, { currency: Currency; mileage_unit: MileageUnit }> = {
+  US: { currency: "USD", mileage_unit: "mi" },
+  CA: { currency: "CAD", mileage_unit: "km" },
+  AU: { currency: "AUD", mileage_unit: "km" },
+  NZ: { currency: "NZD", mileage_unit: "km" },
+};
 
-export function isCanadianPostalCode(s: string | null | undefined): boolean {
-  return !!s && CA_POSTAL_RE.test(s.trim());
-}
-
-/** 统一成大写「A1A 1A1」;不是加拿大邮编时原样返回(去首尾空格) */
-export function normalizeCanadianPostalCode(s: string): string {
-  const v = s.trim();
-  if (!CA_POSTAL_RE.test(v)) return v;
-  const compact = v.replace(/[ -]/g, "").toUpperCase();
-  return `${compact.slice(0, 3)} ${compact.slice(3)}`;
-}
-
-/**
- * 从车源 location 里取邮编(编辑页回填用)。发布页拼的是「详细地址, 城市, 州 邮编」,邮编在最后;
- * 门牌号也常是 5 位数(加拿大 Markham / Richmond Hill 一带很多),所以取「最后一个」像邮编的片段,
- * 不能先找 5 位数字。ZIP+4 只取前 5 位;加拿大邮编统一成「A1A 1A1」。取不到返回 ""。
- */
-export function extractPostalCode(location: string | null | undefined): string {
-  const re = /\b(\d{5})(?:-\d{4})?\b|\b([A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d)\b/g;
-  let last = "";
-  for (const m of (location || "").matchAll(re)) last = m[1] || normalizeCanadianPostalCode(m[2]);
-  return last;
+export function unitsForCountry(country: Country): { currency: Currency; mileage_unit: MileageUnit } {
+  return { ...COUNTRY_UNITS[country] };
 }
 
 /**
- * 邮编对应的默认币种 / 里程单位:加拿大邮编 → CAD + km,美国 5 位 zip → USD + mi,
- * 其他(没填完 / 格式不对)→ null,调用方保持当前值。卖家手动切换过就不再自动改。
+ * 邮编对应的默认币种 / 里程单位:格式唯一的(美国 5 位 zip / 加拿大邮编)按格式;4 位(澳 / 新共用)按 country
+ * (卖家显式选的国家),country 不是澳 / 新时无法判断;其他(没填完 / 格式不对)→ null,调用方保持当前值。
+ * 卖家手动切换过就不再自动改(见 postalUnitsDecision)。
  */
-export function unitsForPostalCode(code: string | null | undefined): { currency: Currency; mileage_unit: MileageUnit } | null {
-  const v = (code || "").trim();
-  if (isCanadianPostalCode(v)) return { currency: "CAD", mileage_unit: "km" };
-  if (/^\d{5}$/.test(v)) return { currency: "USD", mileage_unit: "mi" };
-  return null;
+export function unitsForPostalCode(
+  code: string | null | undefined,
+  country?: string | null,
+): { currency: Currency; mileage_unit: MileageUnit } | null {
+  const c = resolvePostalCountry(code, country);
+  return c ? unitsForCountry(c) : null;
 }
 
 /**
@@ -159,6 +184,8 @@ export function unitsForPostalCode(code: string | null | undefined): { currency:
  */
 export function postalUnitsDecision(input: {
   zipcode: string | null | undefined;
+  /** 卖家选的国家(4 位邮编靠它区分澳 / 新;格式唯一的邮编以格式为准) */
+  country?: string | null;
   currency: string | null | undefined;
   mileage_unit: string | null | undefined;
   /** 卖家手动切换过币种 / 单位 */
@@ -166,7 +193,7 @@ export function postalUnitsDecision(input: {
   /** 价格或里程已填了大于 0 的数字 */
   hasNumbers: boolean;
 }): { action: "none" } | { action: "auto" | "ask"; currency: Currency; mileage_unit: MileageUnit } {
-  const units = unitsForPostalCode(input.zipcode);
+  const units = unitsForPostalCode(input.zipcode, input.country);
   if (!units || input.manual) return { action: "none" };
   if (normalizeCurrency(input.currency) === units.currency && normalizeMileageUnit(input.mileage_unit) === units.mileage_unit) {
     return { action: "none" };

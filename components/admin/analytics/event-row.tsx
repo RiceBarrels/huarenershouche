@@ -17,6 +17,7 @@ import {
 } from "@/lib/static-link";
 import { deviceLabel, formatNumber, platformLabel } from "@/components/analytics/format";
 import type { AnalyticsCarInfo, AnalyticsEventRow } from "@/lib/analytics/types";
+import { currencyPrefix } from "@/lib/currency";
 
 type TFn = (text: string, vars?: Record<string, string | number>) => string;
 
@@ -170,9 +171,9 @@ export function EventRow({ row, showDate = false, markAnonymous = false }: Event
     // 手机端浮层看车不改 URL,path 是打开浮层时所在的页面
     const onDetailPage = !!row.car_id && row.path === `/car/${row.car_id}`;
     const sub = [
-      // 加元车源前缀 CA$(currency 缺失按美元)
+      // 非美元车源前缀 CA$ / A$ / NZ$(currency 缺失 / 不认识按美元)
       row.car?.price != null
-        ? `${row.car.currency === "CAD" ? "CA$" : "$"}${formatNumber(row.car.price, locale)}`
+        ? `${currencyPrefix(row.car.currency)}${formatNumber(row.car.price, locale)}`
         : null,
       onDetailPage ? null : t("在 {path} 中打开", { path: row.path }),
     ]

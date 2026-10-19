@@ -50,6 +50,15 @@ export function missingColumnName(err: unknown): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * 违反名为 constraint 的 CHECK(23514「violates check constraint "cars_title_status_check"」)。
+ * 用于库里还是旧版约束(新枚举值所在的 SQL 没重跑)时去掉该字段重试,而不是整次写入失败。
+ */
+export function isCheckViolationNamed(err: unknown, constraint: string): boolean {
+  const { code, message } = errorParts(err);
+  return code === "23514" && message.includes(constraint);
+}
+
 /** "a, b, c" 列集合 → 列名集合 */
 function columnSetNames(columns: string): Set<string> {
   return new Set(columns.split(",").map((c) => c.trim()).filter(Boolean));

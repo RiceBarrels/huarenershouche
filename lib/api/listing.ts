@@ -15,7 +15,7 @@ import { geocodeCity, geocodeZipToCoords, lookupZip } from "@/lib/geocode";
 import { buildCarTitles } from "@/lib/i18n/car-title";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
 import { getBundles } from "@/lib/i18n/content/server";
-import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
+import { isCheckViolationNamed, isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
 import {
   CURRENCIES,
   DEFAULT_CURRENCY,
@@ -23,10 +23,19 @@ import {
   MILEAGE_UNITS,
   carCurrency,
   carMileageUnit,
-  isCanadianPostalCode,
+  unitsForCountry,
   type Currency,
   type MileageUnit,
 } from "@/lib/currency";
+import {
+  COUNTRIES,
+  COUNTRY_NAMES_EN,
+  carCountry,
+  countriesFromText,
+  postalCountries,
+  postalQuery,
+  type Country,
+} from "@/lib/postal";
 import {
   CONDITION_KEYS,
   KEYS_COUNT_MAX,
@@ -109,10 +118,18 @@ export const listingSchema = z.object({
   price: z.number().int().min(0),
   original_price: z.number().int().min(0).nullish(),
   mileage: z.number().int().min(0),
-  /** price / original_price 的币种 USD / CAD;省略 = 新建为 USD、更新保留原值,null = 恢复默认 USD */
+  /** price / original_price 的币种(lib/currency.ts CURRENCIES:USD / CAD / AUD / NZD);省略 = 新建为 USD、更新保留原值,null = 恢复默认 USD */
   currency: z.enum(CURRENCIES, { message: `must be one of: ${CURRENCIES.join(", ")}` }).nullish(),
   /** mileage 的单位 mi / km;省略 = 新建为 mi、更新保留原值,null = 恢复默认 mi */
   mileage_unit: z.enum(MILEAGE_UNITS, { message: `must be one of: ${MILEAGE_UNITS.join(", ")}` }).nullish(),
+  /**
+   * 车所在国家 US / CA / AU / NZ(大小写不敏感)。可选:4 位邮编(澳 / 新共用)必填;决定地理编码查哪国;
+   * 新建且没给 currency / mileage_unit 时按国家取默认(AU → AUD / km 等)。库里不存这一列,响应里的 country 是读时推断的
+   */
+  country: z.preprocess(
+    (v) => (typeof v === "string" ? v.trim().toUpperCase() : v),
+    z.enum(COUNTRIES, { message: `must be one of: ${COUNTRIES.join(", ")}` }).nullish(),
+  ),
   fuel_type: enumSlug("fuel_type"),
   transmission: enumSlug("transmission"),
   drivetrain: enumSlug("drivetrain").nullish(),
@@ -130,7 +147,7 @@ export const listingSchema = z.object({
   images: z.array(httpsUrl).max(LISTING_MAX_IMAGES).default([]),
   carfax_url: httpsUrl.nullish(),
   store_id: z.string().uuid().nullish(),
-  /** 个人档必填:"City, ST"、5 位 zip 或加拿大邮编(A1A 1A1);车行省略则跟随门店 */
+  /** 个人档必填:"City, ST"、美国 5 位 zip、加拿大邮编(A1A 1A1)或澳 / 新 4 位邮编(需带 country);车行省略则跟随门店 */
   location: optionalText(80),
 });
 
@@ -172,6 +189,16 @@ export interface ResolvedLocation {
   location_zh: string;
   lat: number | null;
   lng: number | null;
+  /** 车所在国家(读时推断的同一规则,lib/postal.ts carCountry;门店 / 文本地址没给 country 时由此得出) */
+  country: Country;
+}
+
+/**
+ * 库里没有国家列,读时靠坐标 / location 文本推断(lib/postal.ts carCountry)。推断结果和实际国家不一致
+ * (如「Toronto」没写省份、坐标又在美加重叠区)时在 location 末尾补英文国名,保证以后读得出来
+ */
+function ensureCountryInLocation(location: string, lat: number | null, lng: number | null, country: Country): string {
+  return carCountry({ lat, lng, location }) === country ? location : `${location}, ${COUNTRY_NAMES_EN[country]}`;
 }
 
 function cityZh(city: string | null, state: string | null, fallback: string): string {
@@ -185,12 +212,23 @@ function storeLocation(store: DbDealerStore): ResolvedLocation {
   const city = m?.[1]?.trim() ?? null;
   const state = m?.[2] ?? null;
   const location = city && state ? `${city}, ${state}` : store.address;
-  return { location, location_zh: cityZh(city, state, location), lat: store.lat ?? null, lng: store.lng ?? null };
+  const lat = store.lat ?? null;
+  const lng = store.lng ?? null;
+  // 门店国家:坐标 / 完整门店地址推断(解析出的「City, ST」可能丢了国家信息)
+  const country = carCountry({ lat, lng, location: store.address });
+  return {
+    location: ensureCountryInLocation(location, lat, lng, country),
+    location_zh: cityZh(city, state, location),
+    lat,
+    lng,
+    country,
+  };
 }
 
 /**
  * 车行:门店地址(store_id 指定或第一家已认证门店);个人 / 车行显式传 location:
- * 5 位 zip / 加拿大邮编 → 反查城市 + 坐标;否则按 "City, ST" 文本 geocode。地理编码失败只丢坐标,不报错。
+ * 邮编(美国 5 位 zip / 加拿大邮编 / 澳新 4 位,后者必须带 country)→ 按国家反查城市 + 坐标;
+ * 否则按 "City, ST" 文本 geocode(国家 = country,没给按文本推断,再没有按美国)。地理编码失败只丢坐标,不报错。
  */
 export async function resolveLocation(
   ctx: ApiContext,
@@ -210,27 +248,52 @@ export async function resolveLocation(
     return {
       error: {
         field: "location",
-        issue: ctx.tier === "dealer" ? "required when no verified store" : 'required ("City, ST", 5-digit zip or Canadian postal code)',
+        issue:
+          ctx.tier === "dealer"
+            ? "required when no verified store"
+            : 'required ("City, ST", 5-digit US zip, Canadian postal code, or a 4-digit AU / NZ postcode with country)',
       },
     };
   }
 
-  if (/^\d{5}$/.test(raw) || isCanadianPostalCode(raw)) {
-    const [coords, geo] = await Promise.all([geocodeZipToCoords(raw), lookupZip(raw).catch(() => null)]);
+  const cands = postalCountries(raw);
+  if (cands.length > 0) {
+    // 邮编格式与显式 country 冲突 / 4 位邮编没说是澳还是新:400(不猜)
+    if (input.country && !cands.includes(input.country)) {
+      return { error: { field: "country", issue: `does not match the postcode format of location (${cands.join(" or ")})` } };
+    }
+    if (cands.length > 1 && !input.country) {
+      return { error: { field: "country", issue: `required for a 4-digit postcode: ${cands.join(" or ")}` } };
+    }
+    const country = input.country ?? cands[0];
+    const q = postalQuery(raw, country)!;
+    const [coords, geo] = await Promise.all([
+      geocodeZipToCoords(q.code, country),
+      lookupZip(q.code, "en", country).catch(() => null),
+    ]);
     const city = geo?.city?.trim() || null;
-    const state = geo?.stateCode?.trim().toUpperCase() || null;
+    // 州 / 省缩写统一大写(新西兰大区没有缩写,是全称,原样保留)
+    const rawState = geo?.stateCode?.trim() || null;
+    const state = rawState && rawState.length <= 3 ? rawState.toUpperCase() : rawState;
     if (!coords && !city) return { error: { field: "location", issue: "unrecognized zip / postal code" } };
-    const location = city && state ? `${city}, ${state}` : raw;
-    return { location, location_zh: cityZh(city, state, location), lat: coords?.lat ?? null, lng: coords?.lng ?? null };
+    const base = city && state ? `${city}, ${state}` : q.code;
+    const lat = coords?.lat ?? null;
+    const lng = coords?.lng ?? null;
+    return { location: ensureCountryInLocation(base, lat, lng, country), location_zh: cityZh(city, state, base), lat, lng, country };
   }
 
   const text = raw.replace(/\s+/g, " ");
   const m = text.match(/^(.+?),\s*([A-Za-z]{2})$/);
   const city = m ? m[1].trim() : null;
   const state = m ? m[2].toUpperCase() : null;
-  const location = city && state ? `${city}, ${state}` : text;
-  const coords = await geocodeCity(location);
-  return { location, location_zh: cityZh(city, state, location), lat: coords?.lat ?? null, lng: coords?.lng ?? null };
+  const base = city && state ? `${city}, ${state}` : text;
+  // 文本地址的国家:显式 country > 文本里能唯一推断的 > 美国
+  const fromText = countriesFromText(base);
+  const country: Country = input.country ?? (fromText.length === 1 ? fromText[0] : "US");
+  const coords = await geocodeCity(base, country);
+  const lat = coords?.lat ?? null;
+  const lng = coords?.lng ?? null;
+  return { location: ensureCountryInLocation(base, lat, lng, country), location_zh: cityZh(city, state, base), lat, lng, country };
 }
 
 // ─── Row assembly ───────────────────────────────────────────────────
@@ -310,6 +373,7 @@ const OPTIONAL_COLUMN_GROUPS = [["title_status"], ["currency", "mileage_unit"], 
  * 写 cars 一行;supabase/title-status.sql / car-currency.sql / car-condition.sql 还没执行(列不存在)而这次带了
  * 对应字段时,去掉缺的那组再写 —— 产权状态 / 币种与里程单位 / 车况清单静默不存,其他字段照常写入(与其他缺列兜底一致,
  * 不让整次 PUT 失败;币种列不存在时库里本来就只能是美元 / 英里)。
+ * 库里的产权 CHECK 还是旧版(只有美式四项,title-status.sql 没重跑)而这次写的是澳新两项时同样去掉 title_status 再写。
  */
 async function writeCarRow<R extends { error: PostgrestError | null }>(
   row: Record<string, unknown>,
@@ -319,7 +383,13 @@ async function writeCarRow<R extends { error: PostgrestError | null }>(
   let res = await write(current);
   for (let i = 0; i < OPTIONAL_COLUMN_GROUPS.length && res.error; i++) {
     const err = res.error;
-    const group = OPTIONAL_COLUMN_GROUPS.find((cols) => cols.some((c) => c in current && isMissingColumnNamed(err, c)));
+    const group = OPTIONAL_COLUMN_GROUPS.find((cols) =>
+      cols.some(
+        (c) =>
+          c in current &&
+          (isMissingColumnNamed(err, c) || (c === "title_status" && isCheckViolationNamed(err, "cars_title_status_check"))),
+      ),
+    );
     if (!group) break;
     current = { ...current };
     for (const c of group) delete current[c];
@@ -577,6 +647,14 @@ export async function upsertListing(
   if (!q.ok) return { ok: false, response: quotaExceededResponse(q.quota) };
 
   const row = buildCarRow(ctx, input, loc, legacy);
+  // 新建且显式给了 country、没给 currency / mileage_unit:按国家取默认(lib/currency.ts COUNTRY_UNITS,AU → AUD / km 等,
+  // 值都在 CURRENCIES / MILEAGE_UNITS 里)。更新时省略仍是保留原值;不给 country 时行为不变(USD / mi)。
+  // 币种列没建(car-currency.sql 未执行)时 writeCarRow 会去掉这两列,库里只能是美元 / 英里
+  if (created && input.country) {
+    const units = unitsForCountry(input.country);
+    if (input.currency === undefined) row.currency = units.currency;
+    if (input.mileage_unit === undefined) row.mileage_unit = units.mileage_unit;
+  }
   const now = new Date().toISOString();
 
   // 4a. 新建
@@ -800,6 +878,8 @@ const INVENTORY_FIELDS = [
   "drivetrain",
   "location",
   "location_zh",
+  "lat",
+  "lng",
   "created_at",
   "updated_at",
   "expires_at",
@@ -842,7 +922,7 @@ export interface InventoryItem {
   trim: string | null;
   /** 整数,币种见 currency */
   price: number;
-  /** USD(默认)/ CAD */
+  /** USD(默认)/ CAD / AUD / NZD */
   currency: Currency;
   /** 整数,单位见 mileage_unit */
   mileage: number;
@@ -855,6 +935,8 @@ export interface InventoryItem {
   transmission: { value: string | null; label: string | null };
   drivetrain: { value: string | null; label: string | null };
   location: string;
+  /** 车所在国家 US / CA / AU / NZ —— 库里没有这一列,按坐标 / location 读时推断(lib/postal.ts carCountry) */
+  country: Country;
   created_at: string;
   /** 可见内容最后一次变化(content_updated_at;没查到该列时为 updated_at) */
   updated_at: string;
@@ -898,6 +980,7 @@ export function serializeInventoryItem(car: InventoryCar, lang: ApiLang, transla
     transmission: enumField("transmission", car.transmission, lang),
     drivetrain: enumField("drivetrain", car.drivetrain, lang),
     location: lang === "zh" ? car.location_zh || car.location : car.location,
+    country: carCountry(car),
     created_at: car.created_at,
     updated_at: car.content_updated_at ?? car.updated_at,
     expires_at: car.expires_at ?? null,

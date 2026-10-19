@@ -1,4 +1,4 @@
-import { isCanadianPostalCode, normalizeCanadianPostalCode } from "@/lib/currency";
+import { normalizeCountry, postalCountries, postalQuery, type Country } from "@/lib/postal";
 
 export interface GeoResult {
   city: string;
@@ -244,21 +244,30 @@ const CA_PROVINCE_ABBR: Record<string, string> = {
   Quebec: "QC", Québec: "QC", Saskatchewan: "SK", "Northwest Territories": "NT", Nunavut: "NU", Yukon: "YT",
 };
 
-/** 邮编 → 地理编码参数:美国 5 位 zip 或加拿大邮编(统一成「A1A 1A1」) */
-function postalQuery(zip: string): { code: string; country: "US" | "CA" } {
-  return isCanadianPostalCode(zip)
-    ? { code: normalizeCanadianPostalCode(zip), country: "CA" }
-    : { code: zip, country: "US" };
+// 澳大利亚州 / 领地缩写(Nominatim 回退只给全称;新西兰大区没有通行缩写,保留全称)
+const AU_STATE_ABBR: Record<string, string> = {
+  "New South Wales": "NSW", Victoria: "VIC", Queensland: "QLD", "Western Australia": "WA", "South Australia": "SA",
+  Tasmania: "TAS", "Australian Capital Territory": "ACT", "Northern Territory": "NT",
+};
+
+/** Nominatim 回退的州 / 省全称 → 缩写(按国家查表,查不到原样返回) */
+function regionAbbr(state: string, country: Country): string {
+  const table = country === "CA" ? CA_PROVINCE_ABBR : country === "AU" ? AU_STATE_ABBR : country === "US" ? STATE_ABBR : null;
+  return (table && table[state]) || state;
 }
 
 /**
- * Lookup by US zip code or Canadian postal code
+ * 邮编反查城市:美国 zip / 加拿大邮编 / 澳大利亚、新西兰 4 位邮编(lib/postal.ts)。
+ * country = 卖家选的国家;4 位邮编靠它区分澳 / 新(没给按澳大利亚),格式唯一的邮编以格式为准。
  */
 export async function lookupZip(
   rawZip: string,
-  lang: "en" | "zh" = "en"
+  lang: "en" | "zh" = "en",
+  countryHint?: string | null
 ): Promise<GeoResult | null> {
-  const { code: zip, country } = postalQuery(rawZip);
+  const q = postalQuery(rawZip, countryHint);
+  if (!q) return null;
+  const { code: zip, country } = q;
   if (useGoogle()) {
     const result = await googleGeocode(
       { address: zip, components: `country:${country}` },
@@ -296,8 +305,7 @@ export async function lookupZip(
       addr?.county ||
       "";
     const state = addr?.state || "";
-    const stateCode =
-      lang === "en" ? (country === "CA" ? CA_PROVINCE_ABBR[state] : STATE_ABBR[state]) || state : state;
+    const stateCode = lang === "en" ? regionAbbr(state, country) : state;
     return {
       city,
       state,
@@ -315,8 +323,8 @@ export async function lookupZip(
 export async function searchCities(query: string): Promise<GeoResult[]> {
   if (!query || query.length < 2) return [];
 
-  const zipMatch = query.match(/^\d{5}$/);
-  if (zipMatch) {
+  // 格式唯一的邮编(美国 zip / 加拿大邮编)直接反查;4 位分不出澳 / 新,按城市名搜
+  if (postalCountries(query).length === 1) {
     const result = await lookupZip(query);
     return result ? [result] : [];
   }
@@ -381,10 +389,26 @@ export async function getUserCoords(): Promise<{
   }
 }
 
+/** 定位得到的邮编 + 国家(四国之一;国家来自逆地理编码结果,4 位邮编靠它区分澳 / 新) */
+export interface UserPostal {
+  code: string;
+  country: Country;
+}
+
+/** 逆地理编码给的邮编 + 国家代码 → 规范邮编;不是该国格式(或不在四国)返回 null */
+function toUserPostal(rawCode: unknown, rawCountry: unknown): UserPostal | null {
+  if (typeof rawCode !== "string") return null;
+  const country = normalizeCountry(rawCountry);
+  // 美国 ZIP+4 / 带后缀的写法只取前 5 位
+  const code = country === "US" ? rawCode.trim().slice(0, 5) : rawCode.trim();
+  const q = country ? postalQuery(code, country) : null;
+  return q && q.country === country ? q : null;
+}
+
 /**
- * Auto-detect user's zipcode via browser geolocation + reverse geocode
+ * Auto-detect user's postcode (+ country) via browser geolocation + reverse geocode
  */
-export async function detectUserZip(): Promise<string | null> {
+export async function detectUserPostal(): Promise<UserPostal | null> {
   try {
     const pos = await getCurrentPosition();
 
@@ -393,11 +417,11 @@ export async function detectUserZip(): Promise<string | null> {
         latlng: `${pos.coords.latitude},${pos.coords.longitude}`,
       });
       if (result) {
-        const pc = result.address_components?.find((c: any) =>
-          c.types?.includes("postal_code")
-        );
-        if (pc?.short_name && /^\d{5}/.test(pc.short_name))
-          return pc.short_name.slice(0, 5);
+        const comps: { types?: string[]; short_name?: string }[] = result.address_components || [];
+        const pc = comps.find((c) => c.types?.includes("postal_code"));
+        const country = comps.find((c) => c.types?.includes("country"));
+        const found = toUserPostal(pc?.short_name, country?.short_name);
+        if (found) return found;
       }
     }
 
@@ -408,22 +432,30 @@ export async function detectUserZip(): Promise<string | null> {
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const zip = data.address?.postcode;
-    if (zip && /^\d{5}/.test(zip)) return zip.slice(0, 5);
-    return null;
+    return toUserPostal(data.address?.postcode, data.address?.country_code);
   } catch {
     return null;
   }
 }
 
 /**
- * Geocode a US zipcode / Canadian postal code to coordinates
+ * Auto-detect user's zipcode / postcode(只要邮编;需要国家时用 detectUserPostal)
+ */
+export async function detectUserZip(): Promise<string | null> {
+  return (await detectUserPostal())?.code ?? null;
+}
+
+/**
+ * 邮编 → 坐标:美国 zip / 加拿大邮编 / 澳大利亚、新西兰 4 位邮编。
+ * countryHint = 显式国家(4 位邮编靠它区分澳 / 新,没给按澳大利亚);不是完整邮编返回 null。
  */
 export async function geocodeZipToCoords(
-  rawZip: string
+  rawZip: string,
+  countryHint?: string | null
 ): Promise<{ lat: number; lng: number } | null> {
-  if (!/^\d{5}$/.test(rawZip) && !isCanadianPostalCode(rawZip)) return null;
-  const { code: zip, country } = postalQuery(rawZip);
+  const q = postalQuery(rawZip, countryHint);
+  if (!q) return null;
+  const { code: zip, country } = q;
 
   if (useGoogle()) {
     const result = await googleGeocode({
@@ -459,21 +491,25 @@ export async function geocodeZipToCoords(
 const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
 
 export async function geocodeCity(
-  location: string
+  location: string,
+  countryHint?: string | null
 ): Promise<{ lat: number; lng: number } | null> {
-  if (geocodeCache.has(location)) return geocodeCache.get(location)!;
+  // 限定国家查(默认美国);澳 / 新 / 加的城市名要传 countryHint,否则同名美国城市优先
+  const country = normalizeCountry(countryHint) ?? "US";
+  const cacheKey = `${country}:${location}`;
+  if (geocodeCache.has(cacheKey)) return geocodeCache.get(cacheKey)!;
 
   if (useGoogle()) {
     const result = await googleGeocode({
       address: location,
-      components: "country:US",
+      components: `country:${country}`,
     });
     if (result?.geometry?.location) {
       const coords = {
         lat: result.geometry.location.lat,
         lng: result.geometry.location.lng,
       };
-      geocodeCache.set(location, coords);
+      geocodeCache.set(cacheKey, coords);
       return coords;
     }
   }
@@ -481,7 +517,7 @@ export async function geocodeCity(
   // Fallback: Nominatim
   try {
     const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&countrycodes=us&format=json&limit=1`,
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&countrycodes=${country.toLowerCase()}&format=json&limit=1`,
       { headers: { "User-Agent": "clcauto/1.0" } }
     );
     if (!res.ok) return null;
@@ -491,7 +527,7 @@ export async function geocodeCity(
       lat: parseFloat(data[0].lat),
       lng: parseFloat(data[0].lon),
     };
-    geocodeCache.set(location, coords);
+    geocodeCache.set(cacheKey, coords);
     return coords;
   } catch {
     return null;

@@ -14,8 +14,10 @@ import { useI18n } from "@/components/i18n-provider";
 import { interpolate, brandLabel, brandShortLabel, type Locale } from "@/lib/i18n";
 import { triggerHaptic } from "@/lib/haptics";
 import { trackFilterChipClick } from "@/lib/analytics/client";
-import { formatPrice } from "@/lib/format";
+import { formatMileageCap, formatPrice } from "@/lib/format";
 import { IOSSwitch } from "@/components/ios-settings";
+import { COUNTRIES, COUNTRY_LABELS } from "@/lib/postal";
+import { postalHint, postalLocationLabel, usePostalFilterInput, type PostalPatch } from "@/components/postal-filter";
 
 // Re-export types and constants from search-filters
 import {
@@ -49,11 +51,6 @@ function mileageToIndex(miles: number): number {
     if (miles >= MILEAGE_STOPS[i]) return i;
   }
   return MILEAGE_STOPS.length - 1;
-}
-function formatMileageLabel(miles: number, t: TFn): string {
-  if (miles >= 999999) return t("不限");
-  if (miles >= 10000) return t("{n}万mi", { n: (miles / 10000).toFixed(0) });
-  return `${miles.toLocaleString()} mi`;
 }
 
 const FUEL_OPTIONS = [
@@ -109,8 +106,7 @@ const INTERIOR_COLOR_OPTIONS = [
 // t/locale 为可选参数以兼容旧调用方(不传则维持中文输出)
 export function getLocationLabel(filters: Filters, t: TFn = interpolate): string {
   if (!filters.location) return t("不限");
-  if (/^\d{5}$/.test(filters.location)) return `Zip ${filters.location}`;
-  return filters.location;
+  return postalLocationLabel(filters.location, filters.country, t);
 }
 
 export function getBrandLabel(filters: Filters, t: TFn = interpolate, locale: Locale = "zh"): string {
@@ -125,7 +121,7 @@ export function getBrandLabel(filters: Filters, t: TFn = interpolate, locale: Lo
 function getPriceYearLabel(filters: Filters, t: TFn): string {
   const parts: string[] = [];
   if (filters.minPrice || filters.maxPrice) {
-    // 价格筛选按美元(加元车源已折算),写成 US$ 和卡片上的 CA$ 区分开
+    // 价格筛选按美元(其他币种车源已折算),写成 US$ 和卡片上的 CA$ / A$ / NZ$ 区分开
     const min = formatPrice(Number(filters.minPrice) || 0, "USD", { explicit: true });
     const max = filters.maxPrice ? formatPrice(Number(filters.maxPrice), "USD", { explicit: true }) : t("不限");
     parts.push(`${min}-${max}`);
@@ -454,53 +450,73 @@ function FilterRow({
   );
 }
 
-// --- Location drawer content: 只按 Zipcode + 距离范围筛选 ---
+// --- Location drawer content: 只按国家 + 邮编 + 距离范围筛选 ---
 export function LocationDrawerContent({
   filters,
   onUpdate,
+  onPatch,
 }: {
   filters: Filters;
   onUpdate: (key: keyof Filters, value: string) => void;
+  /**
+   * 一次改 location + country 两个键(邮编和国家要一起写)。不传时依次调 onUpdate ——
+   * 只有 onUpdate 用函数式 setState(连续两次调用不会互相覆盖)时才能省略
+   */
+  onPatch?: (patch: PostalPatch) => void;
 }) {
   const { t } = useI18n();
-  const [zip, setZip] = useState(
-    /^\d{5}$/.test(filters.location) ? filters.location : ""
+  const postal = usePostalFilterInput(
+    filters.location,
+    filters.country,
+    onPatch ??
+      ((patch) => {
+        onUpdate("location", patch.location);
+        onUpdate("country", patch.country);
+      })
   );
+  const hint = postalHint(filters.location, filters.country, t);
 
   return (
     <div>
-      {/* Zip code input */}
+      {/* 先选国家:澳大利亚 / 新西兰邮编都是 4 位,靠国家区分 */}
+      <div className="mb-2.5 flex flex-wrap gap-2">
+        {COUNTRIES.map((c) => (
+          <button
+            key={c}
+            type="button"
+            className={pillCls(postal.country === c)}
+            onClick={() => {
+              triggerHaptic();
+              postal.onCountryChange(c);
+            }}
+          >
+            {t(COUNTRY_LABELS[c])}
+          </button>
+        ))}
+      </div>
+      {/* Zip / postal code input */}
       <div className="flex items-center gap-2">
         <FilterInput
-          placeholder={t("输入 Zip Code")}
+          placeholder={postal.examplePlaceholder ?? t("输入 Zip Code")}
           className="flex-1"
-          inputMode="numeric"
-          maxLength={5}
-          value={zip}
-          onChange={(e) => {
-            const val = e.target.value.replace(/\D/g, "").slice(0, 5);
-            setZip(val);
-            if (val.length === 5) onUpdate("location", val);
-            else if (filters.location) onUpdate("location", "");
-          }}
+          inputMode={postal.inputMode}
+          autoCapitalize="characters"
+          maxLength={postal.maxLength}
+          value={postal.zip}
+          onChange={(e) => postal.onZipChange(e.target.value)}
         />
-        {zip && (
+        {postal.zip && (
           <button
             type="button"
             className="shrink-0 font-mono text-[13px] text-brand-ink active:opacity-60"
-            onClick={() => {
-              setZip("");
-              onUpdate("location", "");
-            }}
+            onClick={postal.clear}
           >
             {t("清除")}
           </button>
         )}
       </div>
       <p className="mt-1.5 px-1 font-mono text-[11px] text-muted-foreground">
-        {/^\d{5}$/.test(filters.location)
-          ? t("以 Zip {zip} 为中心按距离筛选", { zip: filters.location })
-          : t("不填则以自动定位的位置计算距离")}
+        {hint ?? t("不填则以自动定位的位置计算距离")}
       </p>
 
       {/* 距离范围 */}
@@ -749,7 +765,7 @@ export function MobileFilterDrawer({
         value={getLocationLabel(filters, t)}
         active={!!filters.location}
       >
-        <LocationDrawerContent filters={filters} onUpdate={update} />
+        <LocationDrawerContent filters={filters} onUpdate={update} onPatch={(patch) => onFilter({ ...filters, ...patch })} />
       </FilterRow>
 
       {/* Brand */}
@@ -846,8 +862,8 @@ export function MobileFilterDrawer({
                 onFilter(next);
               }}
             />
-            {/* 价格筛选的数字是美元(加元车源按固定汇率折算后比较) */}
-            <p className="mt-2.5 font-mono text-[11px] text-muted-foreground">{t("按美元筛选，加元车源已折算")}</p>
+            {/* 价格筛选的数字是美元(加元 / 澳元 / 纽元车源按固定汇率折算后比较) */}
+            <p className="mt-2.5 font-mono text-[11px] text-muted-foreground">{t("按美元筛选，其他币种车源已折算")}</p>
           </div>
 
           {/* Monthly payment budget */}
@@ -943,13 +959,13 @@ export function MobileFilterDrawer({
         icon={<Gauge className="h-[18px] w-[18px]" strokeWidth={1.5} />}
         color="text-orange-500"
         label={t("最高里程")}
-        value={filters.maxMileage ? t("≤{n}万mi", { n: (Number(filters.maxMileage) / 10000).toFixed(0) }) : t("不限")}
+        value={filters.maxMileage ? formatMileageCap(Number(filters.maxMileage), t, { upTo: true }) : t("不限")}
         active={!!filters.maxMileage}
       >
         <div>
           <SectionTitle>{t("最高里程")}</SectionTitle>
           <p className={`mt-1.5 font-mono text-[13px] ${filters.maxMileage ? "text-brand-ink" : "text-muted-foreground"}`}>
-            {formatMileageLabel(MILEAGE_STOPS[mileageIdx], t)}
+            {formatMileageCap(MILEAGE_STOPS[mileageIdx], t)}
           </p>
           <Slider
             className="mt-4"

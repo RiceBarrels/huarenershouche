@@ -1293,7 +1293,7 @@ export default function AdminPage() {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground">
-                        {formatCarPrice(car, car.price ?? 0)} · {formatCarMileage({ ...car, mileage: car.mileage ?? 0 })} · {car.location} ·{" "}
+                        {formatCarPrice(car, car.price ?? 0)} · {formatCarMileage({ ...car, mileage: car.mileage ?? 0 }, t)} · {car.location} ·{" "}
                         {/* 浏览数即「浏览者」入口(手机上不再多占一个图标按钮的宽度) */}
                         <button
                           type="button"

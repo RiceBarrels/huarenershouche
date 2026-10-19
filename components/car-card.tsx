@@ -179,7 +179,7 @@ export function CarCard({
                 {carTitle(car, locale)}
               </h3>
               <p className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
-                {t("{year}年", { year: car.year })} · {formatCarMileage(car)} · {t(car.fuel_type)}
+                {t("{year}年", { year: car.year })} · {formatCarMileage(car, t)} · {t(car.fuel_type)}
                 {car.source_id ? ` · ${t("系统检索")}` : ""}
               </p>
 
@@ -438,7 +438,7 @@ export function CarCard({
               <div className="flex min-w-0 items-center gap-1.5">
                 <Gauge className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
-                  {formatCarMileage(car)}
+                  {formatCarMileage(car, t)}
                 </span>
               </div>
               <div className="flex min-w-0 items-center gap-1.5">

@@ -7,7 +7,7 @@
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE, type ApiErrorDetail } from "./types";
 import { decodeCursor, encodeCursor, intParam } from "./response";
 import { enumSlugs, enumToDb, type EnumKind } from "./enums";
-import { CAD_PER_USD, KM_PER_MI } from "@/lib/currency";
+import { KM_PER_MI, NON_USD_CURRENCIES, UNITS_PER_USD } from "@/lib/currency";
 
 /** 只声明用到的 PostgREST builder 方法,让 lib 不绑死 supabase 泛型签名 */
 export interface CarFilterQuery {
@@ -55,16 +55,23 @@ export function quoteOrValue(s: string): string {
 }
 
 /**
- * 价格 / 里程阈值按美元 / 英里(与站内 /browse 同一口径):加元 / 公里车源比的是换算后的原值阈值。
+ * 价格 / 里程阈值按美元 / 英里(与站内 /browse 同一口径):非美元 / 公里车源比的是换算后的原值阈值。
  * 库里 price / mileage 是整数,阈值向内取整(gte 向上、lte 向下);先抹掉浮点误差(10000 × 1.38 = 13799.999…)。
- * 生成 PostgREST or() 串:(非加元 且 price ≥ X) 或 (加元 且 price ≥ X × CAD_PER_USD)。
+ * 生成 PostgREST or() 串,每个支持的非美元币种一段(汇率表 lib/currency.ts UNITS_PER_USD):
+ *   (币种不在 CAD/AUD/NZD 里 且 price ≥ X) 或 (CAD 且 price ≥ X × 1.38) 或 (AUD 且 price ≥ X × 汇率) …
+ * 「不在列表里」也覆盖库里万一出现的其他 ISO 代码(读取时 normalizeCurrency 按美元算,这里同一口径)。
  */
-function unitAwareRange(column: "price" | "mileage", op: "gte" | "lte", value: number): string {
-  const [unitCol, other, factor] =
-    column === "price" ? (["currency", "CAD", CAD_PER_USD] as const) : (["mileage_unit", "km", KM_PER_MI] as const);
-  const exact = Math.round(value * factor * 1e6) / 1e6;
-  const converted = op === "gte" ? Math.ceil(exact) : Math.floor(exact);
-  return `and(${unitCol}.neq.${other},${column}.${op}.${value}),and(${unitCol}.eq.${other},${column}.${op}.${converted})`;
+export function unitAwareRange(column: "price" | "mileage", op: "gte" | "lte", value: number): string {
+  const groups: [string, number][] =
+    column === "price" ? NON_USD_CURRENCIES.map((c) => [c, UNITS_PER_USD[c]]) : [["km", KM_PER_MI]];
+  const unitCol = column === "price" ? "currency" : "mileage_unit";
+  const parts = [`and(${unitCol}.not.in.(${groups.map(([code]) => code).join(",")}),${column}.${op}.${value})`];
+  for (const [code, factor] of groups) {
+    const exact = Math.round(value * factor * 1e6) / 1e6;
+    const converted = op === "gte" ? Math.ceil(exact) : Math.floor(exact);
+    parts.push(`and(${unitCol}.eq.${code},${column}.${op}.${converted})`);
+  }
+  return parts.join(",");
 }
 
 function intFilter(
@@ -104,7 +111,7 @@ function enumFilter(sp: URLSearchParams, name: EnumKind, errors: ApiErrorDetail[
  * 把 query 参数套到 cars 查询上(不含 status/owner_hidden 公共可见性,路由自己加)。
  * anonymous=true 时 seller_id 直接报错(防匿名按卖家整站扒)。
  * price_min / price_max 按美元、mileage_max 按英里:units=true(库里已有 currency / mileage_unit 列)时
- * 加元 / 公里车源按换算后的阈值比(unitAwareRange);units=false(car-currency.sql 未执行)直接比原值。
+ * 非美元(加元 / 澳元 / 纽元)/ 公里车源按换算后的阈值比(unitAwareRange);units=false(car-currency.sql 未执行)直接比原值。
  * updated_since 比的是内容时钟 content_updated_at(i18n-v2.sql;只在可见内容变化时前进,
  * 浏览数 / 收藏 / 翻译都不算);legacy=true(库里还没有该列,缺列重试时)退回 updated_at。
  */

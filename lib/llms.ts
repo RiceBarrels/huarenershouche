@@ -89,7 +89,7 @@ function header(): string[] {
     `- 语言 / Languages: 每个页面都有 ${LOCALES.length} 个语言版本,路径前缀 ${langs}(中文 /zh 为主站)。下文链接以 /zh 为例,替换前缀即得其他语言版本;/cars/* 分类落地页与使用条款只有中文版。Every page exists under each locale prefix; /cars/* landing pages and the terms are Chinese-only.`,
     "- 车源详情 / Listing detail: `/zh/car/{id}`;卖家或车行主页 / Seller or dealer page: `/zh/user/{id}`。",
     "- 卖家会标注沟通语言(如中文、English、한국어),列表默认把讲当前界面语言的卖家排在前面。Sellers declare the languages they speak; listings rank sellers who speak the current UI language first.",
-    "- 价格默认美元(USD)、里程默认英里(miles);加拿大车源按卖家所填用加元(CAD)/ 公里(km)显示,详情页附按固定近似汇率的折算。筛选参数 minPrice / maxPrice 按美元、maxMileage 按英里,加元 / 公里车源折算后比较。Prices default to USD and mileage to miles; Canadian listings show CAD / km as entered by the seller (detail pages add an approximate conversion). Price filters are in USD and mileage filters in miles; CAD / km listings are converted before comparing.",
+    "- 价格默认美元(USD)、里程默认英里(miles);加拿大 / 澳洲 / 新西兰车源按卖家所填用加元(CAD)/ 澳元(AUD)/ 纽元(NZD)及公里(km)显示,详情页附按固定近似汇率的折算。筛选参数 minPrice / maxPrice 按美元、maxMileage 按英里,其他币种 / 公里车源折算后比较。Prices default to USD and mileage to miles; Canadian, Australian and New Zealand listings show CAD / AUD / NZD and km as entered by the seller (detail pages add an approximate conversion). Price filters are in USD and mileage filters in miles; other currencies and km listings are converted before comparing.",
     "- 平台不经手交易款项,买家通过站内私信或卖家留的联系方式直接沟通。The platform does not handle payments; buyers contact sellers directly.",
   ];
 }
@@ -120,11 +120,12 @@ function searchUrls(): string[] {
     "- `q`: 关键词 keyword(支持中文、拼音、英文)",
     "- `make` / `model`: 英文品牌与车型,如 Toyota / Camry",
     "- `minPrice` / `maxPrice` (USD), `minYear` / `maxYear`, `maxMileage` (miles)",
-    "- `location`: 城市名或州缩写(如 Irvine、CA),或 5 位 ZIP(按距离筛选,配合 `maxDistance`,英里,默认 50)",
+    "- `location`: 城市名或州缩写(如 Irvine、CA),或邮编:美国 5 位 ZIP / 加拿大 A1A 1A1 / 澳新 4 位(先按国家筛,再按距离,配合 `maxDistance`,英里,默认 50)",
+    "- `country`: AU | NZ —— 4 位邮编(澳新格式相同)时指明国家,省略按 AU",
     `- \`bodyStyle\`: ${BODY_STYLE_OPTIONS.map((b) => b.value).join(" | ")}`,
     "- `sellerType`: private | dealer",
     "- `dealRating`: great | good(价格评估);`listedWithin`: 天数 days",
-    "- `noAccident` / `oneOwner` / `hasCarfax` / `cleanTitle`(仅清白产权 clean title only) / `priceDropped` / `hasVideo`: true",
+    "- `noAccident` / `oneOwner` / `hasCarfax` / `cleanTitle`(仅清白产权 clean title only;澳新车源的「无欠款(PPSR 已查)」也算) / `priceDropped` / `hasVideo`: true",
     "- `financing`: true(卖家车行支持 ITIN 贷款或无信用记录可贷 dealer offers ITIN / no-credit-history financing;本站不提供贷款 the site does not lend)",
     `- \`sort\`: ${SORT_OPTIONS.map((s) => s.value).join(" | ")}`,
   ];

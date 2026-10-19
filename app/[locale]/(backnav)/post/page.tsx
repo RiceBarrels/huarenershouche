@@ -21,8 +21,9 @@ import {
   Languages,
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
-import { TITLE_STATUS_OPTIONS, isTitleStatus } from "@/lib/title-status";
+import { isCheckViolationNamed, isMissingColumnError, isMissingColumnNamed } from "@/lib/supabase-compat";
+import { isTitleStatus, isTitleStatusFor, titleStatusOptionsFor } from "@/lib/title-status";
+import { PpsrLink } from "@/components/ppsr-link";
 import { requestModeration } from "@/lib/moderation-client";
 import { compressImage, isVideoFile, isImageFile, validateVideo } from "@/lib/image-compress";
 import { Button } from "@/components/ui/button";
@@ -66,12 +67,31 @@ import { loadContactApps, saveContactApps } from "@/lib/contact-apps-client";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 import { EASE } from "@/lib/motion";
 import {
-  isCanadianPostalCode,
-  normalizeCanadianPostalCode,
+  currencyPrefix,
   normalizeCurrency,
   normalizeMileageUnit,
   postalUnitsDecision,
+  unitsForCountry,
+  type Currency,
 } from "@/lib/currency";
+import {
+  COUNTRIES,
+  COUNTRY_LABELS,
+  isCountry,
+  isPostalCodeFor,
+  normalizeCountry,
+  normalizePostalCode,
+  normalizeRegionInput,
+  postalCountries,
+  postalInputMaxLength,
+  REGION_PLACEHOLDERS,
+  regionInputMaxLength,
+  resolvePostalCountry,
+  sanitizePostalInput,
+  withCountrySuffix,
+  type Country,
+} from "@/lib/postal";
+import { getIpGeo } from "@/lib/ip-geo";
 import { formatMileage, formatPrice } from "@/lib/format";
 import { CurrencyToggle, MileageUnitToggle } from "@/components/unit-toggle";
 import { CarConditionEditor } from "@/components/car-condition-editor";
@@ -343,14 +363,38 @@ function visibleSteps(checklistAvailable: boolean, carCondition: string) {
   return checklistAvailable && carCondition === "used" ? STEPS : STEPS.filter((s) => s.id !== "checklist");
 }
 
+// 车在哪个国家(美 / 加 / 澳 / 新,lib/postal.ts):卖家点选的 > 邮编格式唯一时按格式 > 访客 IP 国家 > 美国。
+// 澳 / 新邮编都是 4 位,只能靠这里的国家区分;它决定邮编校验、地理编码、默认币种 / 单位和 location 的写法
+function formCountry(f: { country: string; zipcode: string }, ipCountry: Country | null): Country {
+  return normalizeCountry(f.country) ?? resolvePostalCountry(f.zipcode, ipCountry) ?? ipCountry ?? "US";
+}
+
+// 邮编 + 国家给出的默认单位和已填数字冲突时的提问 / 按钮文案(按目标币种)
+const UNITS_ASK: Record<Currency, { question: string; accept: string }> = {
+  USD: { question: "这是美国邮编，要按美元 / 英里发布吗？", accept: "改成美元 / 英里" },
+  CAD: { question: "这是加拿大邮编，要按加元 / 公里发布吗？", accept: "改成加元 / 公里" },
+  AUD: { question: "这是澳大利亚邮编，要按澳元 / 公里发布吗？", accept: "改成澳元 / 公里" },
+  NZD: { question: "这是新西兰邮编，要按纽元 / 公里发布吗？", accept: "改成纽元 / 公里" },
+};
+
+// 非美国邮编自动切到当地币种 / 公里后的提示
+const UNITS_AUTO_HINT: Partial<Record<Country, string>> = {
+  CA: "加拿大邮编：价格按加元、里程按公里填写，可在价格和里程步骤切换",
+  AU: "澳大利亚邮编：价格按澳元、里程按公里填写，可在价格和里程步骤切换",
+  NZ: "新西兰邮编：价格按纽元、里程按公里填写，可在价格和里程步骤切换",
+};
+
 // 邮编默认单位 vs 当前币种 / 单位(见 postalUnitsDecision);币种列没建时不做任何自动切换
+// (列没建时库里只能存美元 / 英里,澳元 / 纽元 / 公里一律不写)
 function formUnitsDecision(
   f: { zipcode: string; currency: string; mileage_unit: string; units_manual: string; price: string; mileage: string },
-  unitsAvailable: boolean
+  unitsAvailable: boolean,
+  country: Country
 ) {
   if (!unitsAvailable) return { action: "none" } as const;
   return postalUnitsDecision({
     zipcode: f.zipcode,
+    country,
     currency: f.currency,
     mileage_unit: f.mileage_unit,
     manual: !!f.units_manual,
@@ -411,6 +455,8 @@ export default function PostCarPage() {
     price: "",
     mileage: "",
     zipcode: "",
+    // 车所在国家(US / CA / AU / NZ);"" = 还没选,按 formCountry 推断(邮编格式 / IP 国家)
+    country: "",
     address: "",
     address2: "",
     city: "",
@@ -656,22 +702,68 @@ export default function PostCarPage() {
   }, []);
   const currency = unitsAvailable ? normalizeCurrency(form.currency) : "USD";
   const mileageUnit = unitsAvailable ? normalizeMileageUnit(form.mileage_unit) : "mi";
-  // 加拿大邮编输入模式(全键盘 + A1A 1A1 提示):已输入字母开头的邮编,或卖家选了加元
-  const [caPostalMode, setCaPostalMode] = useState(false);
-  const postalTextMode = caPostalMode || /^[A-Za-z]/.test(form.zipcode) || currency === "CAD";
+  // 访客 IP 国家(/api/geo,四国之一才用):卖家还没选国家时作默认值,不写进表单 / 草稿
+  const [ipCountry, setIpCountry] = useState<Country | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    getIpGeo().then((geo) => {
+      const c = geo?.country;
+      if (!cancelled && isCountry(c)) setIpCountry(c);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  const country = formCountry(form, ipCountry);
+  // 产权状态按国家分两套(美 / 加:产权品牌;澳 / 新:PPSR 无欠款 / 曾报废,lib/title-status.ts)。车况步在位置步之前,
+  // 卖家之后改了国家时,先前选的另一套不再显示为选中、也不写库(派生值,不用 effect 去清表单)
+  const titleStatusValue = isTitleStatusFor(form.title_status, country) ? form.title_status : "";
+  // 先前选的产权属于另一套(常见于 /api/geo 超时按美国列了选项,位置步才选澳 / 新,或反过来):发布时不会写,
+  // 不能悄悄丢 —— 位置步和发布前核对都提示一句,并可一键回车况步重选。表单值保留,改回原国家时选中状态自动恢复
+  const titleStatusDropped =
+    form.condition === "used" && titleStatusAvailable && isTitleStatus(form.title_status) && !titleStatusValue;
+  const titleStatusDroppedNotice = titleStatusDropped && (
+    <div className="mb-4 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
+      <p className="text-xs leading-relaxed text-foreground">
+        {t("之前选的「{status}」不适用于{country}，发布时不会保存", {
+          status: t(form.title_status),
+          country: t(COUNTRY_LABELS[country]),
+        })}
+      </p>
+      <button
+        type="button"
+        onClick={() => goToStep("condition")}
+        className="mt-2 rounded-full bg-primary/30 px-3 py-1.5 text-sm font-medium text-brand-ink"
+      >
+        {t("重新选择产权状态")}
+      </button>
+    </div>
+  );
+  // 加拿大邮编输入模式(全键盘 + A1A 1A1 提示):选了加拿大,或已输入字母开头的邮编
+  const postalTextMode = country === "CA" || /^[A-Za-z]/.test(form.zipcode);
 
   // 邮编决定默认币种 / 里程单位:加拿大邮编 → 加元 + 公里,美国 zip → 美元 + 英里;卖家手动切换过就不再改。
   // 价格 / 里程两步在邮编之前:已经填了数字时不能悄悄换单位(数字不会换算,车价 / 里程会差出一截),
   // 改成在邮编步问一句(unitsDecision.action === "ask",答完才能继续);还没填数字时才直接改。
-  const unitsDecisionFor = (f: typeof form) => formUnitsDecision(f, unitsAvailable);
+  const unitsDecisionFor = (f: typeof form) => formUnitsDecision(f, unitsAvailable, formCountry(f, ipCountry));
   const unitsDecision = unitsDecisionFor(form);
   // (函数式 setForm,只在需要自动改时才返回新对象)
   useEffect(() => {
     setForm((f) => {
-      const d = formUnitsDecision(f, unitsAvailable);
+      const d = formUnitsDecision(f, unitsAvailable, formCountry(f, ipCountry));
       return d.action === "auto" ? { ...f, currency: d.currency, mileage_unit: d.mileage_unit } : f;
     });
-  }, [form.zipcode, unitsAvailable]);
+  }, [form.zipcode, form.country, ipCountry, unitsAvailable]);
+  // 价格 / 里程两步在邮编之前:还什么都没填时先按国家(IP 国家 / 草稿里选的)给默认币种 / 单位,
+  // 澳洲访客一开始看到的就是 A$ / 公里;已填数字、填了邮编或手动切换过就不动(之后由上面的邮编规则接管)
+  useEffect(() => {
+    if (!unitsAvailable) return;
+    setForm((f) => {
+      if (f.units_manual || f.zipcode || Number(f.price) > 0 || Number(f.mileage) > 0) return f;
+      const u = unitsForCountry(formCountry(f, ipCountry));
+      return normalizeCurrency(f.currency) === u.currency && normalizeMileageUnit(f.mileage_unit) === u.mileage_unit ? f : { ...f, ...u };
+    });
+  }, [ipCountry, unitsAvailable]);
 
   function setUnits(patch: { currency?: string; mileage_unit?: string }) {
     setForm((f) => ({ ...f, ...patch, units_manual: "1" }));
@@ -680,30 +772,34 @@ export default function PostCarPage() {
   // Auto-resolve zipcode to city name (English + Chinese)
   const [zipCity, setZipCity] = useState("");
   const [zipCityZh, setZipCityZh] = useState("");
+  // 上一次按邮编自动填的城市 / 州:换邮编或换国家(如澳 → 新)后,卖家没手改过的就跟着新邮编更新,不留上一个的
+  const autoCityRef = useRef({ city: "", state: "" });
   /* eslint-disable react-hooks/set-state-in-effect -- 邮编不完整时同步清空提示,开销极小 */
   useEffect(() => {
-    // 美国 5 位 zip 或加拿大邮编(A1A 1A1)
-    if (!/^\d{5}$/.test(form.zipcode) && !isCanadianPostalCode(form.zipcode)) {
+    // 所选国家的完整邮编:美国 5 位 zip / 加拿大 A1A 1A1 / 澳大利亚、新西兰 4 位(按国家查)
+    if (!isPostalCodeFor(form.zipcode, country)) {
       setZipCity("");
       setZipCityZh("");
       return;
     }
     Promise.all([
-      lookupZip(form.zipcode, "en"),
-      lookupZip(form.zipcode, "zh"),
+      lookupZip(form.zipcode, "en", country),
+      lookupZip(form.zipcode, "zh", country),
     ]).then(([en, zh]) => {
       setZipCity(en ? `${en.city}, ${en.stateCode}` : "");
       setZipCityZh(zh?.city || "");
       // Auto-fill city and state
       if (en) {
+        const prev = autoCityRef.current;
+        autoCityRef.current = { city: en.city, state: en.stateCode };
         setForm((f) => ({
           ...f,
-          city: f.city || en.city,
-          state: f.state || en.stateCode,
+          city: !f.city || f.city === prev.city ? en.city : f.city,
+          state: !f.state || f.state === prev.state ? en.stateCode : f.state,
         }));
       }
     });
-  }, [form.zipcode]);
+  }, [form.zipcode, country]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function update(key: string, value: string) {
@@ -1062,17 +1158,20 @@ export default function PostCarPage() {
     // Build location from structured fields
     const fullAddress = [form.address, form.address2].filter(Boolean).join(", ");
     const cityState = [form.city, form.state].filter(Boolean).join(", ");
-    // 加拿大邮编统一写成「A1A 1A1」
-    const zipcode = normalizeCanadianPostalCode(form.zipcode);
-    const locationEn = fullAddress
-      ? `${fullAddress}, ${cityState} ${zipcode}`.trim()
-      : cityState
-        ? `${cityState} ${zipcode}`.trim()
-        : zipCity || zipcode;
+    // 加拿大邮编统一写成「A1A 1A1」;澳 / 新车源末尾补英文国名(库里没有国家列,读时据此推断国家)
+    const zipcode = normalizePostalCode(form.zipcode);
+    const locationEn = withCountrySuffix(
+      fullAddress
+        ? `${fullAddress}, ${cityState} ${zipcode}`.trim()
+        : cityState
+          ? `${cityState} ${zipcode}`.trim()
+          : zipCity || zipcode,
+      country
+    );
     const locationZh = zipCityZh || cityState || zipCity || zipcode;
 
-    // Geocode zipcode to get lat/lng
-    const coords = zipcode ? await geocodeZipToCoords(zipcode) : null;
+    // Geocode zipcode to get lat/lng(按所选国家查,4 位邮编分得清澳 / 新)
+    const coords = zipcode ? await geocodeZipToCoords(zipcode, country) : null;
 
     // Also save phone to profile（车行身份下经 RPC 更新,普通身份直接更新）
     if (form.phone) {
@@ -1106,9 +1205,11 @@ export default function PostCarPage() {
     // 描述(任何语言,全空白视为没填)与配置标签按卖家原文保存;各语言译文、
     // 中英投影列由数据库触发器排队、服务端翻译管线生成,前端不再翻译
     const description = form.description.trim() ? form.description : null;
-    // 产权状态:只有二手车、列已建(title-status.sql)且卖家选了才写;不确定就不写(null)
+    // 产权状态:只有二手车、列已建(title-status.sql)且卖家选了当前国家那一套里的值才写;不确定就不写(null)
     const titleStatus =
-      form.condition === "used" && titleStatusAvailable && isTitleStatus(form.title_status) ? form.title_status : null;
+      form.condition === "used" && titleStatusAvailable && isTitleStatusFor(form.title_status, country)
+        ? form.title_status
+        : null;
     const listing = {
       seller_id: user,
       ...titles,
@@ -1151,11 +1252,17 @@ export default function PostCarPage() {
       description_original: description,
       features_original: features,
     });
-    // 探测之后可选列又不可用(schema cache 未刷新等):去掉缺的那组(产权 / 币种 + 单位 / 车况)再发,不挡发布
+    // 探测之后可选列又不可用(schema cache 未刷新等):去掉缺的那组(产权 / 币种 + 单位 / 车况)再发,不挡发布;
+    // 产权 CHECK 还是旧版(只认美式四项)而选的是澳新两项时同样去掉产权再发
     const optionalGroups = [["title_status"], ["currency", "mileage_unit"], ["condition"]];
     for (let i = 0; i < optionalGroups.length && insertError; i++) {
       const group = optionalGroups.find((cols) =>
-        cols.some((c) => c in listing && isMissingColumnNamed(insertError, c))
+        cols.some(
+          (c) =>
+            c in listing &&
+            (isMissingColumnNamed(insertError, c) ||
+              (c === "title_status" && isCheckViolationNamed(insertError, "cars_title_status_check")))
+        )
       );
       if (!group) break;
       for (const c of group) delete (listing as Record<string, unknown>)[c];
@@ -1208,7 +1315,7 @@ export default function PostCarPage() {
         return f.mileage !== "" && Number(f.mileage) >= 0;
       case "location":
         // 邮编与已填价格 / 里程的单位冲突时,卖家选定币种 / 单位后才能继续
-        return (/^\d{5}$/.test(f.zipcode) || isCanadianPostalCode(f.zipcode)) && unitsDecisionFor(f).action !== "ask";
+        return isPostalCodeFor(f.zipcode, formCountry(f, ipCountry)) && unitsDecisionFor(f).action !== "ask";
       case "contact": {
         const digits = f.phone.replace(/\D/g, "");
         return Boolean(f.seller_name.trim()) && digits.length >= 10 && !(contactAppsAvailable && contactAppsInvalid);
@@ -1670,19 +1777,23 @@ export default function PostCarPage() {
                         })}
                       </div>
 
-                      {/* 产权状态(选填,仅二手车;title-status.sql 未执行时不显示):每项一句白话解释 */}
+                      {/* 产权状态(选填,仅二手车;title-status.sql 未执行时不显示):按车所在国家列出对应那一套,
+                          每项一句白话解释;澳 / 新附官方 PPSR 查询链接 */}
                       {form.condition === "used" && titleStatusAvailable && (
                         <div className="mt-6">
                           <p className="text-sm font-medium text-foreground">
                             {t("产权状态")}
                             <span className="ml-1.5 text-xs font-normal text-muted-foreground">{t("选填")}</span>
                           </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {t("按{country}的产权类型列出，可在位置一步更改国家", { country: t(COUNTRY_LABELS[country]) })}
+                          </p>
                           <div className="mt-2 space-y-2" role="radiogroup" aria-label={t("产权状态")}>
                             {[
-                              ...TITLE_STATUS_OPTIONS,
+                              ...titleStatusOptionsFor(country),
                               { value: "", explain: "不清楚可以先不填,之后可在编辑页补充" },
                             ].map((o) => {
-                              const active = form.title_status === o.value;
+                              const active = titleStatusValue === o.value;
                               return (
                                 <button
                                   key={o.value || "none"}
@@ -1713,6 +1824,7 @@ export default function PostCarPage() {
                               );
                             })}
                           </div>
+                          <PpsrLink country={country} className="mt-3 text-xs text-muted-foreground" />
                         </div>
                       )}
                     </div>
@@ -1723,7 +1835,7 @@ export default function PostCarPage() {
                     <div>
                       <div className="flex items-baseline gap-2">
                         <span className={`text-3xl font-semibold ${priceCallOnly ? "text-muted-foreground/40" : "text-foreground"}`}>
-                          {currency === "CAD" ? "CA$" : "$"}
+                          {currencyPrefix(currency)}
                         </span>
                         <input
                           autoFocus
@@ -1737,7 +1849,7 @@ export default function PostCarPage() {
                         />
                       </div>
                       <div className="mt-2 h-px w-full bg-border" />
-                      {/* 币种(car-currency.sql 未执行时不显示,按美元):加拿大邮编会自动切成加元,这里可手动改 */}
+                      {/* 币种(car-currency.sql 未执行时不显示,按美元):加拿大邮编会自动切成加元,这里可手动改(USD / CAD / AUD / NZD) */}
                       {unitsAvailable && (
                         <CurrencyToggle
                           className="mt-4"
@@ -1902,13 +2014,18 @@ export default function PostCarPage() {
                               type="button"
                               onClick={() => {
                                 setSelectedStoreId(store.id);
-                                setForm((f) => ({
-                                  ...f,
-                                  address: store.address,
-                                  zipcode: store.zipcode || f.zipcode,
-                                  phone: store.phone || f.phone,
-                                  seller_name: store.name,
-                                }));
+                                setForm((f) => {
+                                  const zipcode = store.zipcode || f.zipcode;
+                                  return {
+                                    ...f,
+                                    address: store.address,
+                                    zipcode,
+                                    // 门店邮编的国家:格式唯一按格式;4 位保留已选的澳 / 新,否则按 IP 国家 / 澳大利亚
+                                    country: resolvePostalCountry(zipcode, f.country, ipCountry, "AU") ?? f.country,
+                                    phone: store.phone || f.phone,
+                                    seller_name: store.name,
+                                  };
+                                });
                               }}
                               className={`flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm transition-colors ${
                                 selectedStoreId === store.id
@@ -1922,43 +2039,67 @@ export default function PostCarPage() {
                           ))}
                         </div>
                       )}
-                      {/* 美国 5 位 zip 或加拿大邮编(A1A 1A1,字母开头时切到全键盘) */}
+                      {/* 先选国家:澳大利亚 / 新西兰邮编都是 4 位,靠国家区分(默认按访客 IP 国家) */}
+                      <div className="mb-4 flex flex-wrap gap-2">
+                        {COUNTRIES.map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() =>
+                              // 换国家时已填邮编不符合新国家格式就清掉(美国 5 位 zip 不能当澳洲邮编用)
+                              setForm((f) => ({ ...f, country: c, zipcode: isPostalCodeFor(f.zipcode, c) ? f.zipcode : "" }))
+                            }
+                            className={`rounded-full px-3.5 py-2 text-sm transition-colors ${
+                              country === c
+                                ? "bg-primary/30 font-medium text-brand-ink"
+                                : "bg-muted text-muted-foreground active:bg-muted/70"
+                            }`}
+                          >
+                            {t(COUNTRY_LABELS[c])}
+                          </button>
+                        ))}
+                      </div>
+                      {titleStatusDroppedNotice}
+                      {/* 美国 5 位 zip / 加拿大邮编(A1A 1A1,字母开头时切到全键盘)/ 澳大利亚、新西兰 4 位 */}
                       <input
                         autoFocus
                         inputMode={postalTextMode ? "text" : "numeric"}
                         autoCapitalize="characters"
-                        maxLength={7}
+                        maxLength={postalInputMaxLength(country, form.zipcode)}
                         className="w-full bg-transparent text-3xl font-semibold tracking-widest text-foreground placeholder:text-muted-foreground/40 placeholder:tracking-normal focus:outline-none"
-                        placeholder={postalTextMode ? "A1A 1A1" : t("邮编 Zip Code")}
+                        placeholder={
+                          country === "CA" || /^[A-Za-z]/.test(form.zipcode)
+                            ? "A1A 1A1"
+                            : country === "AU"
+                              ? "2000"
+                              : country === "NZ"
+                                ? "1010"
+                                : t("邮编 Zip Code")
+                        }
                         value={form.zipcode}
                         onChange={(e) => {
-                          const v = e.target.value.toUpperCase();
-                          update(
-                            "zipcode",
-                            /^[A-Z]/.test(v) ? v.replace(/[^A-Z0-9 -]/g, "").slice(0, 7) : v.replace(/\D/g, "").slice(0, 5)
-                          );
+                          const { value: next, letters } = sanitizePostalInput(e.target.value);
+                          // 格式唯一的完整邮编(美国 5 位 / 加拿大)直接定国家,字母开头就是加拿大;4 位不改已选国家
+                          // (选了澳 / 新也能输到 5 位:第 5 位一出现就切成美国,不会被截成 4 位的澳 / 新邮编)
+                          const cands = postalCountries(next);
+                          setForm((f) => ({
+                            ...f,
+                            zipcode: next,
+                            country: cands.length === 1 ? cands[0] : letters ? "CA" : f.country,
+                          }));
                         }}
                       />
                       <div className="mt-2 h-px w-full bg-border" />
-                      {!postalTextMode && !form.zipcode && (
-                        <button
-                          type="button"
-                          onClick={() => setCaPostalMode(true)}
-                          className="mt-2 text-xs text-muted-foreground underline underline-offset-2"
-                        >
-                          {t("输入加拿大邮编")}
-                        </button>
-                      )}
                       {/* 邮编和已填数字的单位冲突:问卖家按哪种发布(数字不换算),选完才能继续 */}
                       {unitsDecision.action === "ask" ? (
                         <div className="mt-3 rounded-md border border-amber-500/30 bg-amber-500/5 p-3">
                           <p className="text-sm font-medium text-foreground">
-                            {t(unitsDecision.currency === "CAD" ? "这是加拿大邮编，要按加元 / 公里发布吗？" : "这是美国邮编，要按美元 / 英里发布吗？")}
+                            {t(UNITS_ASK[unitsDecision.currency].question)}
                           </p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                             {t("已填的数字不会自动换算。目前将发布为 {price} · {mileage}", {
                               price: priceCallOnly ? t("电议") : formatPrice(Number(form.price) || 0, currency),
-                              mileage: formatMileage(Number(form.mileage) || 0, mileageUnit),
+                              mileage: formatMileage(Number(form.mileage) || 0, mileageUnit, t),
                             })}
                           </p>
                           <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -1967,7 +2108,7 @@ export default function PostCarPage() {
                               onClick={() => setUnits({ currency: unitsDecision.currency, mileage_unit: unitsDecision.mileage_unit })}
                               className="rounded-full bg-primary/30 px-3 py-1.5 text-sm font-medium text-brand-ink"
                             >
-                              {t(unitsDecision.currency === "CAD" ? "改成加元 / 公里" : "改成美元 / 英里")}
+                              {t(UNITS_ASK[unitsDecision.currency].accept)}
                             </button>
                             <button
                               type="button"
@@ -1979,11 +2120,18 @@ export default function PostCarPage() {
                           </div>
                         </div>
                       ) : (
-                        /* 加拿大邮编自动切成加元 / 公里时提示一句(卖家手动改过就不再提示) */
-                        unitsAvailable && isCanadianPostalCode(form.zipcode) && !form.units_manual && (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            {t("加拿大邮编：价格按加元、里程按公里填写，可在价格和里程步骤切换")}
-                          </p>
+                        /* 非美国邮编自动切成当地币种 / 公里时提示一句(卖家手动改过就不再提示);
+                           币种列还没建(car-currency.sql 未执行)时库里只能存美元 / 英里,提醒按美元 / 英里填 */
+                        isPostalCodeFor(form.zipcode, country) && country !== "US" && (
+                          unitsAvailable ? (
+                            !form.units_manual && UNITS_AUTO_HINT[country] && (
+                              <p className="mt-2 text-xs text-muted-foreground">{t(UNITS_AUTO_HINT[country])}</p>
+                            )
+                          ) : (
+                            <p className="mt-2 text-xs text-muted-foreground">
+                              {t("暂不支持按当地币种发布：价格请按美元、里程请按英里填写")}
+                            </p>
+                          )
                         )
                       )}
                       {(zipCityZh || zipCity) && (
@@ -2025,12 +2173,15 @@ export default function PostCarPage() {
                               value={form.city}
                               onChange={(e) => update("city", e.target.value)}
                             />
+                            {/* 美 / 加 / 澳填 2–3 位缩写(转大写);新西兰大区没有通行缩写,地理编码回填全称(Canterbury),不限 3 位、不转大写 */}
                             <input
-                              className="w-full rounded-xl bg-muted px-4 py-3 text-[15px] uppercase text-foreground transition-colors placeholder:normal-case placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40"
-                              placeholder={t("State 如 CA")}
-                              maxLength={2}
+                              className={`w-full rounded-xl bg-muted px-4 py-3 text-[15px] text-foreground transition-colors placeholder:text-muted-foreground/50 focus:bg-background focus:outline-none focus:ring-2 focus:ring-brand-ink/40 ${
+                                country === "NZ" ? "" : "uppercase placeholder:normal-case"
+                              }`}
+                              placeholder={t(REGION_PLACEHOLDERS[country])}
+                              maxLength={Math.max(regionInputMaxLength(country), form.state.length)}
                               value={form.state}
-                              onChange={(e) => update("state", e.target.value.toUpperCase())}
+                              onChange={(e) => update("state", normalizeRegionInput(e.target.value, country))}
                             />
                           </div>
                         </div>
@@ -2200,9 +2351,20 @@ export default function PostCarPage() {
                           onClick={() => goToStep("mileage")}
                           className="font-mono font-medium tabular-nums text-foreground underline decoration-border underline-offset-2"
                         >
-                          {formatMileage(Number(form.mileage) || 0, mileageUnit)}
+                          {formatMileage(Number(form.mileage) || 0, mileageUnit, t)}
                         </button>
+                        {/* 产权状态(选了才列出,点一下回车况步修改) */}
+                        {form.condition === "used" && titleStatusAvailable && titleStatusValue && (
+                          <button
+                            type="button"
+                            onClick={() => goToStep("condition")}
+                            className="font-medium text-foreground underline decoration-border underline-offset-2"
+                          >
+                            {t(titleStatusValue)}
+                          </button>
+                        )}
                       </div>
+                      {titleStatusDroppedNotice}
                       <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Languages className="h-3.5 w-3.5 shrink-0" strokeWidth={1.5} />
                         {t("可用任何语言填写，会自动翻译成其他语言")}
