@@ -181,6 +181,52 @@ export interface RankOpts {
   distanceHalfMi?: number; // 加成衰减半径,默认 40 英里
   limit?: number;
   locale?: Locale; // 传入时,卖家会说该语言的车加 W_LANGUAGE 分
+  // 偏好「计划持有年限」(lib/preferences ownershipHorizon,仅首页推荐传):
+  // short → 低价 + 保值品牌加分;long → 低里程 + 车龄新加分。不传 = 不加权
+  horizon?: "short" | "long" | null;
+  // rankCars 按候选池算好的分位区间(scoreCar 单独调用时可不传,此时只看品牌保值)
+  horizonPool?: HorizonPool;
+}
+
+// ── 持有年限加权 ────────────────────────────────────────────────────────────
+const W_HORIZON = 12; // 与 W_USER_POSTED 同级:能明显调序,但不压过口味
+// 公认保值较好的品牌(短期持有转手损失小)
+const VALUE_RETENTION_MAKES = new Set([
+  "toyota", "lexus", "honda", "acura", "subaru", "porsche", "tesla", "mazda", "jeep",
+]);
+
+export interface HorizonPool {
+  price: [number, number]; // 折合美元 [min, max]
+  mileage: [number, number]; // 折合英里
+  year: [number, number];
+}
+
+export function buildHorizonPool(cars: DbCar[]): HorizonPool {
+  const range = (xs: number[]): [number, number] =>
+    xs.length ? [Math.min(...xs), Math.max(...xs)] : [0, 0];
+  return {
+    price: range(cars.filter((c) => c.price > 0).map((c) => carPriceUsd(c))),
+    mileage: range(cars.filter((c) => c.mileage >= 0).map((c) => carMileageMi(c))),
+    year: range(cars.filter((c) => c.year > 0).map((c) => c.year)),
+  };
+}
+
+// x 在 [min,max] 里越小越接近 1;区间退化 → 0.5(不分高下)
+function lowIsGood(x: number, [min, max]: [number, number]): number {
+  if (!(max > min)) return 0.5;
+  return Math.min(1, Math.max(0, (max - x) / (max - min)));
+}
+
+/** 持有年限加分(0..W_HORIZON)。纯函数,scripts/recommendations-horizon-selftest.ts 覆盖 */
+export function horizonBonus(car: DbCar, horizon: "short" | "long", pool?: HorizonPool): number {
+  if (horizon === "short") {
+    const retention = VALUE_RETENTION_MAKES.has((car.make || "").trim().toLowerCase()) ? 1 : 0;
+    const cheap = pool && car.price > 0 ? lowIsGood(carPriceUsd(car), pool.price) : 0;
+    return W_HORIZON * (0.6 * cheap + 0.4 * retention);
+  }
+  const lowMiles = pool && car.mileage >= 0 ? lowIsGood(carMileageMi(car), pool.mileage) : 0;
+  const newer = pool && car.year > 0 ? 1 - lowIsGood(car.year, pool.year) : 0;
+  return W_HORIZON * (0.5 * lowMiles + 0.5 * newer);
 }
 
 // 对单台候选车打分(0 起,越高越推荐)。
@@ -216,6 +262,9 @@ export function scoreCar(car: DbCar, profile: TasteProfile, opts?: RankOpts): nu
   // 卖家会说用户当前界面语言:优先推荐能直接沟通的卖家
   if (opts?.locale && sellerSpeaksLocale(car.profiles?.languages, opts.locale)) score += W_LANGUAGE;
 
+  // 计划持有年限(首页推荐才传)
+  if (opts?.horizon) score += horizonBonus(car, opts.horizon, opts.horizonPool);
+
   // 新近度:新上架轻微加成
   const daysOld = (Date.now() - new Date(car.created_at).getTime()) / 86400000;
   if (daysOld < 3) score += W_RECENCY;
@@ -242,6 +291,7 @@ export function rankCars(
 ): DbCar[] {
   const profile = buildProfile(signals.favorites, signals.viewed);
   const exclude = opts?.excludeIds ?? new Set<string>();
+  if (opts?.horizon && !opts.horizonPool) opts = { ...opts, horizonPool: buildHorizonPool(candidates) };
 
   const ranked = candidates
     .filter((c) => !exclude.has(c.id))

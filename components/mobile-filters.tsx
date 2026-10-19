@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import {
-  MapPin, Car, CarFront, DollarSign, Gauge, Palette, ChevronRight, X, Check, Users, BadgePercent, ListChecks,
+  MapPin, Car, CarFront, DollarSign, Gauge, Palette, ChevronRight, ChevronDown, X, Check, Users, BadgePercent, ListChecks,
 } from "lucide-react";
+import { usePreferences } from "@/components/use-preferences";
 import { Slider } from "@/components/ui/slider";
 import {
   DrawerNested, DrawerContent, DrawerTrigger, DrawerClose,
@@ -755,6 +756,18 @@ export function MobileFilterDrawer({
     : MILEAGE_STOPS.length - 1;
   const isElectric = isElectricOnly;
 
+  // 偏好「界面密度」:simple 时次要条件(参数 / 卖家类型 / 配置 / 更多条件)先收起,
+  // 已有生效条件的话照样展开,免得用户看不到自己设过的筛选。detailed(默认)= 原来全部展开
+  const simple = usePreferences().prefs.ui === "simple";
+  const advancedActive = !!(
+    filters.fuelType || filters.transmission || filters.drivetrain || filters.exteriorColor || filters.interiorColor ||
+    filters.sellerType || filters.features || filters.dealRating || filters.priceDropped || filters.listedWithin ||
+    filters.noAccident || filters.oneOwner || filters.hasCarfax || filters.cleanTitle || filters.financing ||
+    filters.hasVideo || filters.hasPrice
+  );
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const showAdvanced = !simple || advancedOpen || advancedActive;
+
   return (
     <div>
       {/* Location */}
@@ -985,6 +998,19 @@ export function MobileFilterDrawer({
         </div>
       </FilterRow>
 
+      {!showAdvanced && (
+        <button
+          type="button"
+          className="flex w-full items-center justify-center gap-1 py-3 font-mono text-[13px] text-muted-foreground transition-colors active:bg-accent"
+          onClick={() => setAdvancedOpen(true)}
+        >
+          {t("更多筛选")}
+          <ChevronDown className="h-4 w-4" strokeWidth={1.5} />
+        </button>
+      )}
+
+      {showAdvanced && (
+      <>
       {/* Vehicle Specs */}
       <FilterRow
         icon={<Palette className="h-[18px] w-[18px]" strokeWidth={1.5} />}
@@ -1120,6 +1146,8 @@ export function MobileFilterDrawer({
           </div>
         </div>
       </FilterRow>
+      </>
+      )}
 
       {/* Reset — iOS 红色操作按钮 */}
       {activeCount > 0 && (

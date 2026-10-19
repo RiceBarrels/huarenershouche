@@ -94,6 +94,8 @@ import {
 import { getIpGeo } from "@/lib/ip-geo";
 import { formatMileage, formatPrice } from "@/lib/format";
 import { CurrencyToggle, MileageUnitToggle } from "@/components/unit-toggle";
+import { usePreferences, usePreferencesReady } from "@/components/use-preferences";
+import { preferredCountry } from "@/lib/preferences";
 import { CarConditionEditor } from "@/components/car-condition-editor";
 import { isConditionEmpty, normalizeCarCondition, type CarCondition } from "@/lib/car-condition";
 import type { DbDealerStore } from "@/lib/types";
@@ -703,17 +705,31 @@ export default function PostCarPage() {
   const currency = unitsAvailable ? normalizeCurrency(form.currency) : "USD";
   const mileageUnit = unitsAvailable ? normalizeMileageUnit(form.mileage_unit) : "mi";
   // 访客 IP 国家(/api/geo,四国之一才用):卖家还没选国家时作默认值,不写进表单 / 草稿
-  const [ipCountry, setIpCountry] = useState<Country | null>(null);
+  const [ipGeoCountry, setIpGeoCountry] = useState<Country | null>(null);
   useEffect(() => {
     let cancelled = false;
     getIpGeo().then((geo) => {
       const c = geo?.country;
-      if (!cancelled && isCountry(c)) setIpCountry(c);
+      if (!cancelled && isCountry(c)) setIpGeoCountry(c);
     });
     return () => {
       cancelled = true;
     };
   }, []);
+  // 偏好里填的居住国(/account/setup,只在本机)优先于 IP 国家作默认;卖家点选的国家 / 邮编格式仍然最优先。
+  // 下文沿用 ipCountry 这个名字 = 「卖家没选时的默认国家」,币种 / 单位默认值随之(A$ 仍要求币种列已建)
+  const { prefs } = usePreferences();
+  const prefsReady = usePreferencesReady();
+  const ipCountry = preferredCountry(prefs) ?? ipGeoCountry;
+  // 偏好邮编预填一次:表单邮编 / 国家都还空、没恢复草稿时才填;之后卖家清空或改写都不再覆盖
+  const prefPostalAppliedRef = useRef(false);
+  useEffect(() => {
+    if (!prefsReady || prefPostalAppliedRef.current) return;
+    prefPostalAppliedRef.current = true;
+    const postal = prefs.postal;
+    if (!postal || draftIdRef.current) return;
+    setForm((f) => (f.zipcode || f.country ? f : { ...f, zipcode: postal }));
+  }, [prefsReady, prefs.postal]);
   const country = formCountry(form, ipCountry);
   // 产权状态按国家分两套(美 / 加:产权品牌;澳 / 新:PPSR 无欠款 / 曾报废,lib/title-status.ts)。车况步在位置步之前,
   // 卖家之后改了国家时,先前选的另一套不再显示为选中、也不写库(派生值,不用 effect 去清表单)

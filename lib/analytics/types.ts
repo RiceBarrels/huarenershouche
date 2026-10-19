@@ -40,10 +40,11 @@ export interface TrackPayload {
 
 /**
  * 点击统计的种类(同走 POST /api/vt,写 click_events 表,见 supabase/click-events.sql):
- * contact 详情页联系按钮;financing_tag 卖家卡片的车行贷款标签;filter_chip 列表筛选开关被打开。
+ * contact 详情页联系按钮;financing_tag 卖家卡片的车行贷款标签;filter_chip 列表筛选开关被打开;
+ * setup_answer 偏好设置页的回答(target = `问题:选项`,lib/preferences.ts SETUP_ANSWER_TARGETS,不含邮编)。
  * 不进 analytics_events:那张表的 type 只收 pageview / car_view,后台各项口径都按全部行 / 会话算
  */
-export type ClickKind = "contact" | "financing_tag" | "filter_chip";
+export type ClickKind = "contact" | "financing_tag" | "filter_chip" | "setup_answer";
 
 /** 统计「被打开次数」的筛选开关(filter_chip 的 target;服务端按此白名单校验) */
 export const TRACKED_FILTER_CHIPS = ["financing"] as const;
@@ -58,7 +59,7 @@ export interface ClickEventPayload {
   car_id: string | null;
   /** 仅 contact:点的是哪种联系方式 */
   app: ContactChannel | null;
-  /** financing_tag:标签中文值(lib/dealer-financing.ts);filter_chip:筛选键;contact 为 null */
+  /** financing_tag:标签中文值(lib/dealer-financing.ts);filter_chip:筛选键;setup_answer:`问题:选项`;contact 为 null */
   target: string | null;
   locale: string | null;
   platform: AnalyticsPlatform;

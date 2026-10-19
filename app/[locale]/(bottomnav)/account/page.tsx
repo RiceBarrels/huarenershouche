@@ -11,7 +11,7 @@ import { useTheme } from "next-themes";
 import {
   Plus, Heart, Camera, Loader2, Store, MapPin, MessageSquare,
   FileText, ChevronRight, Car, Palette, ShieldCheck,
-  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText, Code2, Info,
+  Handshake, UserCircle, BarChart3, Lock, Bell, Headset, ScrollText, Code2, Info, SlidersHorizontal,
 } from "lucide-react";
 import { isNative } from "@/lib/capacitor";
 import { Button } from "@/components/ui/button";
@@ -425,6 +425,12 @@ function AccountContent() {
                   href="/account/settings/appearance"
                 />
               )}
+              {/* 偏好三问(只存本机,未登录也能改) */}
+              <SettingsRow
+                icon={<SlidersHorizontal className={`${iconCls} text-emerald-500`} strokeWidth={1.5} />}
+                label={t("偏好")}
+                href="/account/setup"
+              />
             </SettingsGroup>
 
             {user && (

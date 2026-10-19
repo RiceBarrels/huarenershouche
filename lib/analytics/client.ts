@@ -24,6 +24,7 @@ import type {
 } from "@/lib/analytics/types";
 import type { ContactChannel } from "@/lib/contact-apps";
 import type { FinancingTag } from "@/lib/dealer-financing";
+import type { SetupAnswerTarget } from "@/lib/preferences";
 
 const VISITOR_KEY = "clc_vid";
 const SESSION_KEY = "clc_session";
@@ -523,4 +524,9 @@ export function trackFinancingTagClick(carId: string, tag: FinancingTag, locale?
 /** 列表筛选开关被打开(只记打开,关掉不记) */
 export function trackFilterChipClick(chip: TrackedFilterChip, locale?: string | null): void {
   trackClick({ kind: "filter_chip", car_id: null, app: null, target: chip }, locale);
+}
+
+/** 偏好设置页(/account/setup)的回答,验证「三问各自的选择分布」假设;邮编从不上报 */
+export function trackSetupAnswer(target: SetupAnswerTarget, locale?: string | null): void {
+  trackClick({ kind: "setup_answer", car_id: null, app: null, target }, locale);
 }

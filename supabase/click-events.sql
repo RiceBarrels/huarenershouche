@@ -12,6 +12,8 @@
 --                  用途:按界面语言调整 lib/contact-apps.ts 的 CONTACT_APP_ORDER
 --   financing_tag  详情页卖家卡片的贷款标签(点开看解释);target = 标签中文值(lib/dealer-financing.ts),car_id 必填
 --   filter_chip    /browse 筛选开关被打开;target = 筛选键(如 financing),car_id 为空
+--   setup_answer   偏好设置页(/account/setup)的回答;target = 问题:选项(如 ui:simple / country:AU / own:lt1 /
+--                  setup:skipped,lib/preferences.ts SETUP_ANSWER_TARGETS),car_id 为空;邮编从不上报
 -- 隐私与 analytics_events 一致:不存 IP / UA / 地区;user_id 只在已登录且 token 校验通过时写;
 -- 删除账号前删掉该账号及其设备上的点击(click_events_forget_user);180 天后由 pg_cron 清理。
 -- =============================================================
@@ -19,7 +21,7 @@
 create table if not exists public.click_events (
   id          bigint generated always as identity primary key,
   created_at  timestamptz not null default now(),
-  kind        text not null check (kind in ('contact', 'financing_tag', 'filter_chip')),
+  kind        text not null check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer')),
   app         text check (app is null or app in ('wechat', 'kakao', 'line', 'whatsapp', 'sms')),
   target      text check (char_length(target) <= 32),
   car_id      uuid references public.cars(id) on delete set null,
@@ -35,7 +37,24 @@ create table if not exists public.click_events (
         and target in ('支持ITIN贷款', '无信用记录可贷', '自营分期', '接受现金'))
     or (kind = 'filter_chip' and app is null and car_id is null
         and target ~ '^[A-Za-z][A-Za-z0-9_]{0,31}$')
+    or (kind = 'setup_answer' and app is null and car_id is null
+        and target ~ '^(ui|country|own|setup):[A-Za-z0-9]{1,12}$')
   )
+);
+
+-- 表已存在(旧版本文件执行过)时,create table if not exists 不会更新约束:这里按当前定义重建,可重复执行
+alter table public.click_events drop constraint if exists click_events_kind_check;
+alter table public.click_events add constraint click_events_kind_check
+  check (kind in ('contact', 'financing_tag', 'filter_chip', 'setup_answer'));
+alter table public.click_events drop constraint if exists click_events_kind_fields;
+alter table public.click_events add constraint click_events_kind_fields check (
+  (kind = 'contact' and app is not null and target is null)
+  or (kind = 'financing_tag' and app is null
+      and target in ('支持ITIN贷款', '无信用记录可贷', '自营分期', '接受现金'))
+  or (kind = 'filter_chip' and app is null and car_id is null
+      and target ~ '^[A-Za-z][A-Za-z0-9_]{0,31}$')
+  or (kind = 'setup_answer' and app is null and car_id is null
+      and target ~ '^(ui|country|own|setup):[A-Za-z0-9]{1,12}$')
 );
 
 comment on table public.click_events is

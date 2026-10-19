@@ -25,6 +25,7 @@ import {
 } from "@/lib/analytics/types";
 import { CONTACT_CHANNELS, type ContactChannel } from "@/lib/contact-apps";
 import { FINANCING_TAGS } from "@/lib/dealer-financing";
+import { isSetupAnswerTarget } from "@/lib/preferences";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -247,6 +248,12 @@ export const clickEventSchema = z.discriminatedUnion("kind", [
     type: z.literal("click"),
     kind: z.literal("filter_chip"),
     target: z.enum(TRACKED_FILTER_CHIPS),
+    ...clickBase,
+  }),
+  z.object({
+    type: z.literal("click"),
+    kind: z.literal("setup_answer"),
+    target: z.string().max(32).refine(isSetupAnswerTarget),
     ...clickBase,
   }),
 ]);

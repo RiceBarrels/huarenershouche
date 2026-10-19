@@ -13,6 +13,7 @@ import { supabase } from "@/lib/supabase";
 import { addToCompare, isInCompare, removeFromCompare } from "@/lib/compare";
 import { estimateMonthlyPayment, formatCarMileage, formatCarPrice } from "@/lib/format";
 import { useCarOverlay } from "@/components/car-overlay-provider";
+import { usePreferences } from "@/components/use-preferences";
 import { useI18n } from "@/components/i18n-provider";
 import { carLocation, carTitle, localizePath } from "@/lib/i18n";
 import type { PriceInsight } from "@/lib/price-insight";
@@ -77,6 +78,8 @@ export function CarCard({
   const [inCompare, setInCompare] = useState(false);
   const { enabled: overlayEnabled, openCar, openUser } = useCarOverlay();
   const { t, locale } = useI18n();
+  // 偏好「界面密度」:simple 只留图 / 标题 / 价格 / 里程 / 位置;detailed(默认)= 原有全部信息
+  const detailed = usePreferences().prefs.ui !== "simple";
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- 读 localStorage,仅挂载时一次
@@ -179,12 +182,13 @@ export function CarCard({
                 {carTitle(car, locale)}
               </h3>
               <p className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
-                {t("{year}年", { year: car.year })} · {formatCarMileage(car, t)} · {t(car.fuel_type)}
+                {t("{year}年", { year: car.year })} · {formatCarMileage(car, t)}
+                {detailed ? ` · ${t(car.fuel_type)}` : ""}
                 {car.source_id ? ` · ${t("系统检索")}` : ""}
               </p>
 
               {/* 标签行:价格评级 / 降价 / 新上·热门(放右栏,填满图片旁空间) */}
-              {(priceInsight ||
+              {detailed && (priceInsight ||
                 (car.original_price && car.original_price > car.price) ||
                 daysListed(car) <= 3 ||
                 isHotListing(car)) && (
@@ -303,7 +307,7 @@ export function CarCard({
                 </Badge>
               )}
               {/* 非中文界面:卖家明确会说当前语言时标注(中文站默认视为会中文,不标) */}
-              {locale !== "zh" && !!car.profiles?.languages?.length && sellerSpeaksLocale(car.profiles.languages, locale) && (
+              {detailed && locale !== "zh" && !!car.profiles?.languages?.length && sellerSpeaksLocale(car.profiles.languages, locale) && (
                 <Badge variant="secondary" className="font-mono text-[11px] font-medium">
                   {languageLabel(localeLanguageCodes(locale)[0])} OK
                 </Badge>
@@ -317,7 +321,7 @@ export function CarCard({
                   {formatDistance(distance)}
                 </Badge>
               )}
-              {daysListed(car) < 1 ? (
+              {!detailed ? null : daysListed(car) < 1 ? (
                 <Badge
                   variant="outline"
                   className="bg-background/90 px-2 font-mono text-[10px] font-medium text-blue-600 dark:text-blue-400"
@@ -407,14 +411,14 @@ export function CarCard({
                   {formatCarPrice(car, car.original_price)}
                 </span>
               )}
-              {priceInsight && (
+              {detailed && priceInsight && (
                 <span
                   className={`rounded-full px-1.5 py-0.5 font-mono text-[11px] font-semibold ${priceInsight.className}`}
                 >
                   {t(priceInsight.label)}
                 </span>
               )}
-              {car.price > 0 && (
+              {detailed && car.price > 0 && (
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {/* 月供金额和车价同币种(加元车源显示 CA$) */}
                   {t("分期 ~{amt}/月", { amt: formatCarPrice(car, estimateMonthlyPayment(car.price)) })}
@@ -422,7 +426,8 @@ export function CarCard({
               )}
             </div>
 
-            {priceInsight &&
+            {detailed &&
+              priceInsight &&
               (priceInsight.level === "great" || priceInsight.level === "good") &&
               priceInsight.delta >= 300 && (
                 <p className="mt-1 truncate font-mono text-[12px] text-green-600 dark:text-green-400">
@@ -441,12 +446,14 @@ export function CarCard({
                   {formatCarMileage(car, t)}
                 </span>
               </div>
+              {detailed && (
               <div className="flex min-w-0 items-center gap-1.5">
                 <Fuel className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {t(car.fuel_type)}
                 </span>
               </div>
+              )}
               <div className="flex min-w-0 items-center gap-1.5">
                 <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
@@ -458,12 +465,14 @@ export function CarCard({
                   )}
                 </span>
               </div>
+              {detailed && (
               <div className="flex min-w-0 items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />
                 <span className="truncate font-mono text-[13px] text-muted-foreground">
                   {t("{year}年", { year: car.year })}
                 </span>
               </div>
+              )}
             </div>
 
             {/* 卖家/收藏数/系统检索 底栏 */}

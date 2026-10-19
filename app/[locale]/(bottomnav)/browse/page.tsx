@@ -30,6 +30,8 @@ import { CarCard } from "@/components/car-card";
 import { Reveal } from "@/components/reveal";
 import { SearchFilters, IOS_FILL, featureOptionLabel } from "@/components/search-filters";
 import { MobileFilterDrawer } from "@/components/mobile-filters";
+import { usePreferences } from "@/components/use-preferences";
+import { preferredCountry } from "@/lib/preferences";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -335,10 +337,13 @@ function BrowseContent() {
     return () => window.removeEventListener("clc-location-granted", onLocationGranted);
   }, []);
 
-  // 距离计算基准:优先用「位置」筛选里输入的邮编(美 / 加 / 澳 / 新,4 位按所选国家),
-  // 没有则用自动定位到的邮编。key = "邮编|国家",空串 = 没有
+  // 距离计算基准:优先用「位置」筛选里输入的邮编(美 / 加 / 澳 / 新,4 位按所选国家),key = "邮编|国家",空串 = 没有
+  // 其次是偏好里填的居住地邮编(只在本机,不上传),最后才是自动定位
   const filterPostal = postalFilter(filters);
-  const effectivePostal = filterPostal ?? userPostal;
+  const { prefs } = usePreferences();
+  const prefCountry = preferredCountry(prefs);
+  const prefPostal: UserPostal | null = prefCountry && prefs.postal ? { code: prefs.postal, country: prefCountry } : null;
+  const effectivePostal = filterPostal ?? prefPostal ?? userPostal;
   const effectiveKey = effectivePostal ? `${effectivePostal.code}|${effectivePostal.country}` : "";
   // 只在邮编从有效变无效时清坐标:挂载时邮编还没定位到,不能把缓存还原的坐标清掉
   const prevKeyRef = useRef(effectiveKey);

@@ -31,9 +31,12 @@ import { PriceDroppedCars } from "@/components/price-dropped-cars";
 import { TrendingSearches } from "@/components/trending-searches";
 import { RegionBrandEntry } from "@/components/region-brand-entry";
 import { TrustReviews } from "@/components/trust-reviews";
+import { SetupPromptCard } from "@/components/setup-prompt-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { hasUserHistory, rankCars, getFavoriteIds } from "@/lib/recommendations";
+import { ownershipHorizon } from "@/lib/preferences";
+import { getPreferences } from "@/components/use-preferences";
 import { sortCars } from "@/lib/car-filters";
 import { getRecentlyViewed } from "@/lib/recently-viewed";
 import {
@@ -416,7 +419,12 @@ export default function Home() {
 
         // 不把已经看过的车再推给用户;多排一些供手机端 tab 流无限滑
         const excludeIds = new Set(recentIds);
-        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, { excludeIds, limit: 30, locale });
+        recommendedNext = rankCars(cars, { favorites: favoriteCars, viewed: viewedCars }, {
+          excludeIds,
+          limit: 30,
+          locale,
+          horizon: ownershipHorizon(getPreferences()),
+        });
         setRecommended(recommendedNext);
       }
 
@@ -941,6 +949,9 @@ export default function Home() {
           </span>
         </div>
       </section>
+
+      {/* 一次性偏好卡片(完成 / 跳过后不再出现);放在 hero 之后,hero 的负 margin 布局不受影响 */}
+      <SetupPromptCard />
 
       {/* 桌面分类入口卡片(瓜子式金刚区) */}
       <section className="hidden md:block md:px-4">
