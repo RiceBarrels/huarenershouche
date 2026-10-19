@@ -489,3 +489,16 @@ html.native-map-behind [vaul-drawer-wrapper] { background: transparent !importan
 html.native-map-behind .native-map-hole { background: transparent !important; }
 /* 全屏地图页根元素:原生 behind 模式下也要透明,打洞才能穿透到 MapKit */
 html.native-map-behind .native-map-transparent { background: transparent !important; }
+
+/* 日文页(<html lang="ja">,网页 SSR 与 Capacitor 运行时切换都由 i18n-provider 写 lang):
+   中文字体栈会把汉字按简体字形渲染,这里把日文系统字体排在前面。@theme inline 把字体栈直接内联进 .font-mono 等工具类,
+   改变量不生效,所以按选择器覆盖;只作用于 ja,不影响 zh / zh-hant / en / ko。不引入网络字体。 */
+html:lang(ja),
+html:lang(ja) .font-sans,
+html:lang(ja) .font-mono {
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", "Noto Sans CJK JP", "Helvetica Neue", "Segoe UI", sans-serif;
+}
+/* 品牌名「常来カーネット」:ZCOOL 只覆盖汉字,假名回退到日文字体,而不是 PingFang SC 的中文字形 */
+html:lang(ja) .font-logo {
+  font-family: var(--font-zcool), "ZCOOL QingKe HuangYou", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", sans-serif;
+}
