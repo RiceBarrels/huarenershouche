@@ -4,14 +4,10 @@ import { useEffect, useState } from "react";
 import { Check, Settings2 } from "lucide-react";
 import { useRouter } from "@/components/localized-navigation";
 import { useI18n } from "@/components/i18n-provider";
-import { LOCALE_STORAGE_KEY, type Locale } from "@/lib/i18n";
+import { LOCALE_STORAGE_KEY, rememberLocaleCookie, type Locale } from "@/lib/i18n";
 import { isNative } from "@/lib/capacitor";
 import { openExternal } from "@/lib/open-external";
-import { en } from "@/lib/i18n/en";
-import { ko } from "@/lib/i18n/ko";
-import { ja } from "@/lib/i18n/ja";
-import { es } from "@/lib/i18n/es";
-import { fr } from "@/lib/i18n/fr";
+import { translate } from "@/lib/i18n/translate";
 import {
   Drawer,
   DrawerContent,
@@ -23,10 +19,9 @@ import {
 import { Button } from "@/components/ui/button";
 
 // 按指定语言取词(确认 drawer 要同时用当前语言和目标语言显示,
-// useI18n 的 t 只有当前语言,这里直接查词典;词典已随 provider 打进包,无额外体积)
-const DICTS: Partial<Record<Locale, Record<string, string>>> = { en, ko, ja, es, fr };
+// useI18n 的 t 只有当前语言,这里直接走同一套词典与回退链;词典已随 provider 打进包,无额外体积)
 function tIn(locale: Locale, key: string): string {
-  return locale === "zh" ? key : DICTS[locale]?.[key] ?? en[key] ?? key;
+  return translate(locale, key);
 }
 
 /** 两种语言各写一遍;译文相同(如 en/ja 都是 "OK")时只显示一遍 */
@@ -36,7 +31,8 @@ function bilingual(a: string, b: string): string {
 
 // 语言名用各自语言书写(不翻译),切错语言时用户也能认出自己的语言
 const OPTIONS: { value: Locale; label: string }[] = [
-  { value: "zh", label: "中文" },
+  { value: "zh", label: "简体中文" },
+  { value: "zh-hant", label: "繁體中文" },
   { value: "en", label: "English" },
   { value: "ko", label: "한국어" },
   { value: "ja", label: "日本語" },
@@ -109,6 +105,7 @@ export function LanguageOptions({
     } catch {
       // 存不了也照样跳转,本次会话生效
     }
+    rememberLocaleCookie(pending);
     setPending(null);
     onSelect?.();
     // 直接进新语言树的首页(带前缀路径,web/Capacitor 两端一致)

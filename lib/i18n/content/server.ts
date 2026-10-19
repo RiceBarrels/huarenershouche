@@ -10,7 +10,7 @@
 
 import { cache } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, type Locale } from "@/lib/i18n";
 import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import type { DbComment, DbCommunityPost, DbPostComment, PublicCar } from "@/lib/types";
 import {
@@ -53,7 +53,7 @@ const loadBundles = cache(
     try {
       const results = await Promise.all(
         chunks.map((chunk) =>
-          supabase.rpc("i18n_bundle", { p_entity: entity, p_ids: chunk, p_locale: locale }),
+          supabase.rpc("i18n_bundle", { p_entity: entity, p_ids: chunk, p_locale: dbLocale(locale) }),
         ),
       );
       const map: BundleMap = {};

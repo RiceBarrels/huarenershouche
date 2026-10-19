@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
+import { dbLocale } from "@/lib/i18n";
 import { isSiteLocale } from "@/lib/i18n/content-langs";
 import type { BundleRow } from "@/lib/i18n/content/types";
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
   }
 
   // i18n_bundle 只返回公开评论;RPC 失败(含 SQL 未执行)时按「还没有译文」返回空表
-  const { data, error } = await supabase.rpc("i18n_bundle", { p_entity: entity, p_ids: ids, p_locale: locale });
+  const { data, error } = await supabase.rpc("i18n_bundle", { p_entity: entity, p_ids: ids, p_locale: dbLocale(locale) });
   const result: Record<string, { content: string }> = {};
   for (const row of error ? [] : ((data as BundleRow[] | null) ?? [])) {
     const content = row.s === "ok" ? row.f?.content : undefined;

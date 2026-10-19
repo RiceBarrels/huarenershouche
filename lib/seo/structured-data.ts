@@ -27,6 +27,7 @@ const VIDEO_RE = /\.(mp4|mov|webm|avi|mkv|m4v)(\?|$)/i;
 // 各语言品牌名(与词典「常來車網」的译名一致)
 const BRAND: Record<Locale, string> = {
   zh: "常來車網",
+  "zh-hant": "常來車網",
   en: "CLCAuto",
   ko: "또와카",
   ja: "常来カーネット",
@@ -38,6 +39,7 @@ const BRAND_NAMES = Array.from(new Set(Object.values(BRAND)));
 // 站点简介:zh 沿用原文案;其他语言为中性描述(不做特定人群定位)
 const SITE_DESCRIPTION: Record<Locale, string> = {
   zh: "北美华人二手车交易平台，覆盖全美华人社区，提供中文买车卖车服务。",
+  "zh-hant": "二手車買賣平台：個人與車行直售，免費刊登、VIN 召回查詢與 Carfax 報告，買車賣車更簡單。",
   en: "Used car marketplace in North America. Buy and sell used cars from private sellers and dealers, with free listings, VIN recall checks and Carfax reports.",
   ko: "북미 중고차 거래 플랫폼. 개인 판매자와 딜러의 중고차를 사고팔 수 있으며, 무료 등록, VIN 리콜 조회, Carfax 리포트를 제공합니다.",
   ja: "北米の中古車マーケットプレイス。個人・ディーラーの中古車を売買でき、無料掲載、VIN リコール検索、Carfax レポートに対応しています。",

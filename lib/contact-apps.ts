@@ -24,6 +24,8 @@ export const CONTACT_CHANNELS = [...CONTACT_APPS, "sms"] as const satisfies read
  */
 export const CONTACT_APP_ORDER: Record<Locale, ContactApp[]> = {
   zh: ["wechat", "whatsapp", "line", "kakao"],
+  // 繁體(台灣 / 香港 / 澳門):台灣以 LINE 為主、港澳以 WhatsApp 為主,同樣是推斷
+  "zh-hant": ["line", "whatsapp", "wechat", "kakao"],
   en: ["whatsapp", "wechat", "line", "kakao"],
   fr: ["whatsapp", "wechat", "line", "kakao"],
   es: ["whatsapp", "wechat", "line", "kakao"],

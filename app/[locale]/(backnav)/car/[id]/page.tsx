@@ -8,7 +8,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { SITE_URL, SITE_NAME, getSeoPage, makeSlug, seoPageHref } from "@/lib/seo-pages";
-import { carLocation, type Locale } from "@/lib/i18n";
+import { carLocation, isZhLocale, type Locale } from "@/lib/i18n";
 import { serverT } from "@/lib/i18n/translate";
 import { ogLocale } from "@/lib/i18n/content-langs";
 import {
@@ -64,7 +64,7 @@ function buildDescription(car: PublicCar, view: CarView, locale: Locale, t: TFn)
     .filter(Boolean)
     .join(" · ");
   const body = (view.description?.text.description ?? "").replace(/\s+/g, " ").trim();
-  const sep = locale === "zh" ? "。" : ". ";
+  const sep = isZhLocale(locale) ? "。" : ". ";
   return truncate(`${specs}${sep}${body || t("买车卖车 · 就上常來車網")}`, DESCRIPTION_MAX);
 }
 
@@ -148,7 +148,7 @@ export default async function Page({
   const url = `${SITE_URL}/${locale}/car/${car.id}`;
 
   // 面包屑:首页 → 二手车 → 品牌落地页(/cars/* 只有中文版,仅 zh 树挂) → 本车
-  const makePage = locale === "zh" ? getSeoPage([makeSlug(car.make)]) : undefined;
+  const makePage = isZhLocale(locale) ? getSeoPage([makeSlug(car.make)]) : undefined;
   const crumbs = [
     { name: t("首页"), url: `${SITE_URL}/${locale}` },
     { name: t("二手车"), url: `${SITE_URL}/${locale}/browse` },

@@ -26,8 +26,14 @@ import {
   localizePath,
   stripLocale,
   detectLocale,
+  rememberLocaleCookie,
 } from "@/lib/i18n";
 import { translate } from "@/lib/i18n/translate";
+import {
+  loadZhHantConverter,
+  subscribeZhHantConverter,
+  zhHantConverterReady,
+} from "@/lib/i18n/zh-hant-runtime";
 import { htmlLang } from "@/lib/i18n/content-langs";
 import { isNative } from "@/lib/capacitor";
 
@@ -62,6 +68,8 @@ const subscribeNever = () => () => {};
 const readNativeLocale = (): Locale | null | undefined =>
   isNative() ? detectLocale(navigator.languages ?? [navigator.language]) : null;
 const readNativeLocaleOnServer = (): Locale | null | undefined => undefined;
+// 服务端与水合首帧都按「未加载」渲染(缺词显示简体 key),避免水合不一致
+const readConverterOnServer = () => false;
 
 export function I18nProvider({
   initialLocale = "zh",
@@ -96,6 +104,7 @@ export function I18nProvider({
         // 原生端语言跟随系统,应用内不可改(设置页只提供"去系统设置"入口)
         return;
       }
+      rememberLocaleCookie(next);
       // 网页端:跳到另一语言前缀下的同一路径(保留 query)
       if (next === locale) return;
       const rest = stripLocale(pathname ?? "/");
@@ -105,7 +114,23 @@ export function I18nProvider({
     [native, locale, pathname, router]
   );
 
-  const t = useCallback<TranslateFn>((text, vars) => translate(locale, text, vars), [locale]);
+  // zh-hant:生成词典之后新增的缺词靠 opencc-js 运行时转换,只在繁體界面下懒加载;
+  // 加载完成后 converterReady 变化 → t 换新引用 → 用到 t 的组件重渲染出繁体
+  const converterReady = useSyncExternalStore(
+    subscribeZhHantConverter,
+    zhHantConverterReady,
+    readConverterOnServer
+  );
+  useEffect(() => {
+    if (locale === "zh-hant") void loadZhHantConverter();
+  }, [locale]);
+
+  const t = useCallback<TranslateFn>(
+    (text, vars) => translate(locale, text, vars),
+    // converterReady 只用来让 t 在转换器就绪后换引用
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [locale, converterReady]
+  );
 
   // 原生端 URL 永远指向静态导出的那棵树(initialLocale=zh),显示语言另走 nativeLocale
   const pathLocale = native ? initialLocale : locale;

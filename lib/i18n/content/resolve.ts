@@ -8,7 +8,7 @@
 //   只有 bundle 行缺失或尚未检测时,才用本地 detectFields 兜底。
 // - available = row.al;未检测时:无正文 → 全部 6 种语言;否则 [原文主语言] ∪ {当前语言(若已有译文)}。
 
-import { carTitle, LOCALES, type Locale } from "@/lib/i18n";
+import { carTitle, dbLocale, LOCALES, withZhHant, type Locale } from "@/lib/i18n";
 import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { contentLangAttr, htmlLang, isSiteLocale } from "@/lib/i18n/content-langs";
 import { detectFields } from "@/lib/i18n/detect";
@@ -67,7 +67,8 @@ export function localize<F extends string>(
     const translation = row?.s === "ok" ? row.f?.[field] : undefined;
     if (translation && translation.trim()) {
       text[field] = translation;
-      textLang[field] = htmlLang(locale);
+      // zh-hant 拿到的是 zh(简体)译文,lang 按实际文字标 zh-CN
+      textLang[field] = htmlLang(dbLocale(locale));
       translated = true;
       const from = row?.fl?.[field];
       if (from) translatedFrom.add(from);
@@ -82,13 +83,15 @@ export function localize<F extends string>(
 
   let available: Locale[];
   if (row?.al) {
-    available = row.al;
+    // 库里没有 zh-hant:有 zh 版本即视为有 zh-hant 版本(内容同 zh)
+    available = withZhHant(row.al);
   } else if (!fields.some((field) => orig[field].trim())) {
     available = [...LOCALES];
   } else {
     const primary = detectLocal().primary;
     const hasTranslation = row?.s === "ok";
-    available = LOCALES.filter((l) => l === primary || (hasTranslation && l === locale));
+    // zh-hant 与 zh 同一份内容:按数据库语言比较
+    available = LOCALES.filter((l) => dbLocale(l) === primary || (hasTranslation && dbLocale(l) === dbLocale(locale)));
   }
 
   let sourceLang = row?.sl ?? null;

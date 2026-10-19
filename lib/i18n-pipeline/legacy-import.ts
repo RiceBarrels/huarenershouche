@@ -17,7 +17,7 @@
 // (先用旧译文顶上,管线随后重新生成)。可重复执行;dryRun 只校验统计、不写库。
 
 import type { PostgrestError, SupabaseClient } from "@supabase/supabase-js";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { DB_LOCALES as LOCALES, type DbLocale as Locale } from "@/lib/i18n";
 import { detectLang } from "@/lib/i18n/detect";
 import { validateUnmasked } from "@/lib/i18n-pipeline/validate";
 import { createServiceClient } from "@/lib/sources/service-client";

@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { isMissingColumnError } from "@/lib/supabase-compat";
 import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
 import { serverT } from "@/lib/i18n/translate";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { isZhLocale, LOCALES, type Locale } from "@/lib/i18n";
 import { isSiteLocale, ogLocale } from "@/lib/i18n/content-langs";
 import { getBundles } from "@/lib/i18n/content/server";
 import type { BundleMap } from "@/lib/i18n/content/types";
@@ -96,12 +96,12 @@ export async function generateMetadata({
   }
 
   const title =
-    locale === "zh"
+    isZhLocale(locale)
       ? `${profile.username} 的评价${rating ? ` - ${rating.avg.toFixed(1)} 分 (${rating.count} 条)` : ""}`
       : t("{name} 的评价", { name: profile.username }) +
         (rating ? ` - ${rating.avg.toFixed(1)}/5 (${rating.count})` : "");
   const description =
-    locale === "zh"
+    isZhLocale(locale)
       ? `${profile.username} 在常來車網的买家评价${
           rating ? `,综合评分 ${rating.avg.toFixed(1)}/5,共 ${rating.count} 条` : ""
         }。北美华人二手车买卖,真实交易评价。`

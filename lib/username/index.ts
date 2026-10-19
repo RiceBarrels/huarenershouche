@@ -6,7 +6,7 @@
 // - 每一段都按随机数可能被跳过,词库与拼接规则按界面语言(words.ts)
 
 import type { User } from "@supabase/supabase-js";
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, type Locale } from "@/lib/i18n";
 import type { IpGeo } from "@/lib/ip-geo";
 import { NAME_RULES, type Gender } from "./words";
 import { regionVariants } from "./regions";
@@ -78,7 +78,7 @@ export function hintsFromUser(user?: User | null): UsernameHints {
 
 /** 生成一个随机用户名;rand 可注入以便复现 */
 export function generateUsername(seed: UsernameSeed, rand: Rand = Math.random): string {
-  const rules = NAME_RULES[seed.locale] ?? NAME_RULES.zh;
+  const rules = NAME_RULES[dbLocale(seed.locale)] ?? NAME_RULES.zh;
   const regions = regionVariants(seed.geo, seed.locale);
   const names = nameCandidates(seed.fullName);
   const allAdjectives = [...rules.adjectives, ...rules.prefixAdjectives];

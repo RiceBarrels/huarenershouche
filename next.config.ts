@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 // build:static(Capacitor 原生包)设 NEXT_OUTPUT=static:纯静态导出,没有服务端
 const isStatic = process.env.NEXT_OUTPUT === "static";
+// 与 lib/i18n LOCALE_STORAGE_KEY 同名(这里不 import 应用代码)
+const LOCALE_COOKIE = "clc_locale";
 
 const nextConfig: NextConfig = {
   ...(isStatic && {
@@ -18,7 +20,19 @@ const nextConfig: NextConfig = {
       globalNotFound: true,
     },
     async redirects() {
-      return [{ source: "/", destination: "/zh", permanent: false }];
+      // 与 vercel.json 同序:首选语言为繁体(zh-TW / zh-HK / zh-MO / zh-Hant)且没选过语言 → /zh-hant;
+      // 选过繁体(clc_locale cookie,见 rememberLocaleCookie)→ /zh-hant;其余 → /zh
+      return [
+        {
+          source: "/",
+          has: [{ type: "header", key: "accept-language", value: "^\\s*[zZ][hH][-_](?:[tT][wW]|[hH][kK]|[mM][oO]|[hH][aA][nN][tT]).*" }],
+          missing: [{ type: "cookie", key: LOCALE_COOKIE }],
+          destination: "/zh-hant",
+          permanent: false,
+        },
+        { source: "/", has: [{ type: "cookie", key: LOCALE_COOKIE, value: "zh-hant" }], destination: "/zh-hant", permanent: false },
+        { source: "/", destination: "/zh", permanent: false },
+      ];
     },
   }),
   // /api/sync 用 sharp 压缩转存车源图片;Turbopack 追踪不到 sharp 按 rpath 加载的 libvips .so,

@@ -2,7 +2,7 @@
 // 先按城市命中都会区,再落到整州/省兜底;表里没有的美加州省直接用代码(如 "KS"),
 // 其他国家不出地区词。es/fr 缺省时回退 en 列表。
 
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, type Locale } from "@/lib/i18n";
 import type { IpGeo } from "@/lib/ip-geo";
 
 interface RegionEntry {
@@ -126,6 +126,7 @@ export function regionVariants(geo: IpGeo | null | undefined, locale: Locale): s
   const hit =
     (city && inRegion.find((r) => r.cities?.includes(city))) ||
     inRegion.find((r) => !r.cities);
-  if (hit) return hit[locale] ?? hit.en;
+  // zh-hant 暂用简体地区词(K2 再转繁体)
+  if (hit) return hit[dbLocale(locale)] ?? hit.en;
   return geo.country === "US" || geo.country === "CA" ? [geo.region] : [];
 }

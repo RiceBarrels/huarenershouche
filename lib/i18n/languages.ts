@@ -4,7 +4,7 @@
 // 自称(endonym),对会说该语言的人天然可读,不经 t() 翻译。
 // 列表按代码 a-z 排列;排序/推荐用 sellerSpeaksLocale():把「会说当前界面语言」的卖家排在前面。
 
-import type { Locale } from "./index";
+import { isZhLocale, type Locale } from "./index";
 
 export type SellerLanguage =
   | "zh" | "yue" | "en" | "ko" | "ja" | "es" | "fr"
@@ -39,7 +39,7 @@ export function languageLabel(code: string): string {
 
 /** 界面语言 → 视为「同一语言」的卖家语言代码(zh 界面下粤语也算能沟通) */
 export function localeLanguageCodes(locale: Locale): SellerLanguage[] {
-  return locale === "zh" ? ["zh", "yue"] : [locale];
+  return isZhLocale(locale) ? ["zh", "yue"] : [locale];
 }
 
 /**
@@ -48,7 +48,7 @@ export function localeLanguageCodes(locale: Locale): SellerLanguage[] {
  * 绝大多数老用户没填过语言,若按不匹配处理会把他们全部压到最后;其他语言不做假设。
  */
 export function sellerSpeaksLocale(languages: string[] | null | undefined, locale: Locale): boolean {
-  if (!languages || languages.length === 0) return locale === "zh";
+  if (!languages || languages.length === 0) return isZhLocale(locale);
   const codes: string[] = localeLanguageCodes(locale);
   return languages.some((l) => codes.includes(l));
 }

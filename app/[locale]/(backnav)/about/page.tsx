@@ -67,7 +67,7 @@ const OPEN_SOURCE: { category: string; items: { name: string; license?: string; 
 ];
 
 // 品牌图标随语言:中/日为汉字版,韩文为 또와카,其余为 CLC
-const LOGO_BY_LOCALE: Record<string, string> = { zh: "/logo.png", ja: "/logo.png", ko: "/logo-ko.png" };
+const LOGO_BY_LOCALE: Record<string, string> = { zh: "/logo.png", "zh-hant": "/logo.png", ja: "/logo.png", ko: "/logo-ko.png" };
 
 export default function AboutPage() {
   const { t, locale } = useI18n();

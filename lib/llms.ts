@@ -86,7 +86,7 @@ function header(): string[] {
     "> 常來車網(CLCAuto)是面向北美的非营利、多语言二手车交易平台:个人卖家与车行免费发布车源,买家可按品牌、车型、价格、年份、里程、地区筛选全美在售二手车,并提供 VIN 召回查询、NHTSA 安全评级、车行认证与站内私信。",
     "> CLCAuto is a non-profit, multilingual used-car marketplace for North America. Private sellers and dealers list for free; buyers search US inventory by make, model, price, year, mileage and location, with VIN recall lookup, NHTSA safety ratings, verified dealers and in-app messaging.",
     "",
-    `- 语言 / Languages: 每个页面都有 ${LOCALES.length} 个语言版本,路径前缀 ${langs}(中文 /zh 为主站)。下文链接以 /zh 为例,替换前缀即得其他语言版本;/cars/* 分类落地页与使用条款只有中文版。Every page exists under each locale prefix; /cars/* landing pages and the terms are Chinese-only.`,
+    `- 语言 / Languages: 每个页面都有 ${LOCALES.length} 个语言版本,路径前缀 ${langs}(中文 /zh 为主站,/zh-hant 为繁體中文界面,用户内容暂与 /zh 相同)。下文链接以 /zh 为例,替换前缀即得其他语言版本;/cars/* 分类落地页与使用条款只有中文版。Every page exists under each locale prefix (/zh-hant is the Traditional Chinese UI; user content currently matches /zh); /cars/* landing pages and the terms are Chinese-only.`,
     "- 车源详情 / Listing detail: `/zh/car/{id}`;卖家或车行主页 / Seller or dealer page: `/zh/user/{id}`。",
     "- 卖家会标注沟通语言(如中文、English、한국어),列表默认把讲当前界面语言的卖家排在前面。Sellers declare the languages they speak; listings rank sellers who speak the current UI language first.",
     "- 价格默认美元(USD)、里程默认英里(miles);加拿大 / 澳洲 / 新西兰车源按卖家所填用加元(CAD)/ 澳元(AUD)/ 纽元(NZD)及公里(km)显示,详情页附按固定近似汇率的折算。筛选参数 minPrice / maxPrice 按美元、maxMileage 按英里,其他币种 / 公里车源折算后比较。Prices default to USD and mileage to miles; Canadian, Australian and New Zealand listings show CAD / AUD / NZD and km as entered by the seller (detail pages add an approximate conversion). Price filters are in USD and mileage filters in miles; other currencies and km listings are converted before comparing.",

@@ -41,7 +41,7 @@ import { createHash, randomBytes, randomUUID } from "crypto";
 import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import { createClient, type PostgrestError, type SupabaseClient } from "@supabase/supabase-js";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { dbLocale, LOCALES, type Locale } from "@/lib/i18n";
 import { htmlLang, ogLocale } from "@/lib/i18n/content-langs";
 import { ENTITY_FIELDS, type ContentEntity } from "@/lib/i18n/content/types";
 import { detectFields } from "@/lib/i18n/detect";
@@ -257,7 +257,8 @@ async function sitemapCounts(
   svc: SupabaseClient,
   locale: Locale,
 ): Promise<{ counts: Record<Kind, number> | null; error: string | null }> {
-  const { data, error } = await svc.rpc("sitemap_counts", { p_locale: locale });
+  // zh-hant 分片复用 zh 的计数
+  const { data, error } = await svc.rpc("sitemap_counts", { p_locale: dbLocale(locale) });
   if (error) return { counts: null, error: `${error.code} ${error.message}` };
   const rows = (Array.isArray(data) ? data : []).filter(isRecord);
   const counts = {} as Record<Kind, number>;
@@ -388,7 +389,7 @@ function pathOf(url: string): string {
 
 const normUrl = (url: string) => url.trim().replace(/(?<=[^/])\/+$/, "");
 const localeOfHreflang = (code: string): Locale | null => {
-  const l = code === "zh-cn" ? "zh" : code;
+  const l = code === "zh-cn" ? "zh" : code; // zh-Hant 小写后即 zh-hant
   return (LOCALES as string[]).includes(l) ? (l as Locale) : null;
 };
 

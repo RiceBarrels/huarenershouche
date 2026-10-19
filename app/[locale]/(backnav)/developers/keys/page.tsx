@@ -21,6 +21,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LargeTitle, SettingsGroup, SettingsRow, GroupFooter } from "@/components/ios-settings";
 import { useI18n } from "@/components/i18n-provider";
+import { dateLocale, type Locale } from "@/lib/i18n";
 import { API_SCOPES, MAX_KEYS_PER_OWNER, type ApiScope, type QuotaInfo } from "@/lib/api/types";
 import type { DbApiKey } from "@/lib/types";
 import { portalFetch, portalErrorText, type KeysResponse, type CreatedKey } from "../portal-client";
@@ -40,9 +41,9 @@ const EXPIRY_OPTIONS: { value: string; label: string }[] = [
   { value: "365", label: "365 天" },
 ];
 
-function fmtDate(iso: string | null | undefined, locale: string): string {
+function fmtDate(iso: string | null | undefined, locale: Locale): string {
   if (!iso) return "";
-  return new Date(iso).toLocaleDateString(locale === "zh" ? "zh-CN" : locale, { year: "numeric", month: "short", day: "numeric" });
+  return new Date(iso).toLocaleDateString(dateLocale(locale), { year: "numeric", month: "short", day: "numeric" });
 }
 
 /** nowMs 在加载时取一次(避免渲染期读时钟),0 = 尚未加载 */
@@ -218,7 +219,7 @@ export default function KeysPage() {
               </div>
               <QuotaBars quota={quota} />
               <p className="mt-3 font-mono text-[11px] text-muted-foreground">
-                {t("{time} 重置(UTC 0 点)", { time: new Date(quota.resets_at).toLocaleString(locale === "zh" ? "zh-CN" : locale, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) })}
+                {t("{time} 重置(UTC 0 点)", { time: new Date(quota.resets_at).toLocaleString(dateLocale(locale), { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) })}
               </p>
             </SettingsGroup>
             {tier === "personal" && (

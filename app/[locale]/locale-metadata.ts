@@ -52,7 +52,17 @@ const ZH_METADATA: Metadata = {
 };
 
 // ja 品牌名「常来カーネット」,es/fr 用 CLCAuto,结构同 en/ko
+// zh-hant:繁體文案(港台用語),不提地域定位;品牌名同 zh
 const SITE_META: Record<string, { title: string; template: string; siteName: string; description: string; ogLocale: string; keywords: string[] }> = {
+  "zh-hant": {
+    title: "常來車網 CLCAuto - 二手車交易平台 | 買車賣車·免費刊登·中文服務",
+    template: "%s | 常來車網",
+    siteName: "常來車網",
+    description:
+      "常來車網是二手車買賣平台：個人與車行直售二手車，可依品牌、價格、里程、距離篩選，免費刊登賣車資訊，提供 VIN 召回查詢、Carfax 報告與全中文服務，讓買車賣車更簡單放心。",
+    ogLocale: "zh_TW",
+    keywords: ["二手車", "二手車買賣", "中古車", "中文二手車平台", "常來車網", "CLCAuto"],
+  },
   ja: {
     title: "常来カーネット - 北米の中古車マーケットプレイス | 購入・売却・無料掲載",
     template: "%s | 常来カーネット",

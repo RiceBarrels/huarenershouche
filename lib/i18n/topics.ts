@@ -12,7 +12,7 @@ import type { PostgrestError } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { LEGACY_POST_COLUMNS, POST_AUTHOR_EMBED, POST_COLUMNS } from "@/lib/i18n/content/columns";
 import { escapeLike, isMissingFunctionError } from "@/lib/supabase-compat";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { dbLocale, LOCALES, type Locale } from "@/lib/i18n";
 import type { DbCommunityPost } from "@/lib/types";
 
 /** 已解析话题的链接(不带语言前缀,由 localized Link / router 补) */
@@ -98,7 +98,7 @@ export interface TopicInfo {
  * 交给错误边界(暂时性故障不能当成 404,否则搜索引擎会把话题页当作已删除)。
  */
 export async function getTopic(slug: string, locale: Locale): Promise<TopicInfo | null> {
-  const { data, error } = await supabase.rpc("topic_get", { p_slug: slug, p_locale: locale });
+  const { data, error } = await supabase.rpc("topic_get", { p_slug: slug, p_locale: dbLocale(locale) });
   if (error) {
     if (isMissingFunctionError(error)) return null;
     throw new Error(`topic_get(${slug}): ${error.message}`, { cause: error });
@@ -113,7 +113,8 @@ function parseTopic(value: unknown): TopicInfo | null {
   const raw = o.labels && typeof o.labels === "object" ? (o.labels as Record<string, unknown>) : {};
   const labels: Partial<Record<Locale, string>> = {};
   for (const l of LOCALES) {
-    const v = raw[l];
+    // zh-hant 没有自己的标签:沿用 zh(与 dbLocale 一致),hreflang 也随 zh 一起声明
+    const v = raw[dbLocale(l)];
     if (typeof v === "string" && v.trim()) labels[l] = v.trim();
   }
   const count = Number(o.post_count);

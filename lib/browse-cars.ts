@@ -13,7 +13,7 @@ import { fetchLoanFinancingSellerIds } from "@/lib/dealer-financing-client";
 import type { Filters, SortKey } from "@/lib/car-filters";
 import { carCountry, postalFromFilter, type Country } from "@/lib/postal";
 import type { StoredDeal } from "@/lib/price-insight";
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, isZhLocale, type Locale } from "@/lib/i18n";
 import type { DbCar } from "@/lib/types";
 
 export const BROWSE_PAGE_SIZE = 24;
@@ -52,7 +52,7 @@ function buildQuery({ filters, sort, locale, coords }: BrowseQueryInput) {
     paymentPriceCap: filters.maxPayment ? paymentToPrice(Number(filters.maxPayment)) : null,
     // 默认排序「卖家会说当前界面语言的优先」:未填语言的卖家只在中文站算会说
     langs: localeLanguageCodes(locale),
-    emptyLangsMatch: locale === "zh",
+    emptyLangsMatch: isZhLocale(locale),
   };
 }
 
@@ -220,7 +220,7 @@ export async function fetchBrowseFacets(
   make: string | null,
   locale: Locale,
 ): Promise<{ models: FacetOption[]; features: FacetOption[] } | null> {
-  let { data, error } = await supabase.rpc("browse_facets", { p_make: make, p_locale: locale });
+  let { data, error } = await supabase.rpc("browse_facets", { p_make: make, p_locale: dbLocale(locale) });
   if (error && isMissingFunctionError(error)) {
     ({ data, error } = await supabase.rpc("browse_facets", { p_make: make }));
   }

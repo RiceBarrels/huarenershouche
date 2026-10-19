@@ -33,8 +33,8 @@ import {
 } from "@/lib/moderate";
 import { isMissingFunctionError } from "@/lib/supabase-compat";
 import { detectLang } from "@/lib/i18n/detect";
-import { isSiteLocale } from "@/lib/i18n/content-langs";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { isDbLocale as isSiteLocale } from "@/lib/i18n/content-langs";
+import { DB_LOCALES as LOCALES, type DbLocale as Locale } from "@/lib/i18n";
 
 export interface ResolveTermsOptions {
   /** 绝对截止时间(ms 时间戳);剩余 < 10 s 时不再开始新一轮 */

@@ -135,7 +135,8 @@ export function platformLabel(platform: string | null | undefined, t: TFn): stri
 
 // 界面语言名用各自语言书写(与语言选择器一致,不翻译)
 const LOCALE_NATIVE_NAMES: Record<string, string> = {
-  zh: "中文",
+  zh: "简体中文",
+  "zh-hant": "繁體中文",
   en: "English",
   ko: "한국어",
   ja: "日本語",

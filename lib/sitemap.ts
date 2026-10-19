@@ -10,10 +10,13 @@
 // hreflang 同一可用性规则:没有该语言可用版本的内容不进该语言分片,alternates / x-default 也取自 RPC。
 // PostgREST max-rows = 1000,所以一片 = 一次 sitemap_entries 调用(RPC 自身也把 p_limit 截到 1000)。
 // RPC 未部署(SQL 尚未执行)或没有 service key 时降级为旧口径的匿名查询:全语言互链,.range() 每 1000 行一页。
+// zh-hant(繁體界面)在库里没有自己的语言:分片计数 / 条目一律按 zh 查(dbLocale),
+// 有 zh 版本的内容即有 zh-hant 版本(withZhHant),两者互相声明 hreflang。
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { SEO_PAGES, SITE_URL } from "@/lib/seo-pages";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { dbLocale, LOCALES, withZhHant, type Locale } from "@/lib/i18n";
+import { htmlLang } from "@/lib/i18n/content-langs";
 import { supabase } from "@/lib/supabase";
 import { createServiceClient } from "@/lib/sources/service-client";
 import { isMissingFunctionError } from "@/lib/supabase-compat";
@@ -67,7 +70,8 @@ const ALL_LOCALES_ALTERNATES: NonNullable<SitemapUrl["alternates"]> = { locales:
 
 // ─── 分片命名 ───────────────────────────────────────────────────────────────
 
-const LOCALE_GROUP = `(${LOCALES.join("|")})`;
+// 长的排前面(zh-hant 先于 zh),免得依赖回溯
+const LOCALE_GROUP = `(${[...LOCALES].sort((a, b) => b.length - a.length).join("|")})`;
 const SHARD_RE = new RegExp(`^${LOCALE_GROUP}-(static|seo|${CONTENT_KINDS.join("|")})(?:-(\\d{1,6}))?\\.xml$`);
 const LEGACY_RE = new RegExp(`^${LOCALE_GROUP}\\.xml$`);
 
@@ -103,10 +107,10 @@ function esc(s: string): string {
     .replaceAll('"', "&quot;");
 }
 
-const hreflang = (l: Locale) => (l === "zh" ? "zh-CN" : l);
+const hreflang = htmlLang;
 const localeUrl = (l: Locale, path: string) => `${SITE_URL}/${l}${path}`;
 
-/** 渲染 locale 分片的 urlset;每条带 hreflang 互链(zh → zh-CN)与 x-default */
+/** 渲染 locale 分片的 urlset;每条带 hreflang 互链(zh → zh-CN、zh-hant → zh-Hant)与 x-default */
 export function renderUrlset(locale: Locale, urls: readonly SitemapUrl[]): string {
   const blocks = urls.map((u) => {
     const lines = ["  <url>", `    <loc>${esc(localeUrl(locale, u.path))}</loc>`];
@@ -197,7 +201,7 @@ function getServiceClient(): SupabaseClient | null {
 
 /** sitemap_counts(locale);RPC 未部署返回 null,其他错误抛出 */
 async function rpcCounts(client: SupabaseClient, locale: Locale): Promise<ShardCounts | null> {
-  const { data, error } = await client.rpc("sitemap_counts", { p_locale: locale });
+  const { data, error } = await client.rpc("sitemap_counts", { p_locale: dbLocale(locale) });
   if (error) {
     if (isMissingFunctionError(error)) return null;
     throw new Error(`sitemap_counts(${locale}): ${error.message}`);
@@ -220,7 +224,7 @@ async function rpcPage(
 ): Promise<SitemapUrl[] | null> {
   const { data, error } = await client.rpc("sitemap_entries", {
     p_kind: kind,
-    p_locale: locale,
+    p_locale: dbLocale(locale),
     p_offset: page * SHARD_SIZE,
     p_limit: SHARD_SIZE,
   });
@@ -231,7 +235,7 @@ async function rpcPage(
   return ((data ?? []) as SitemapEntryRow[]).map((row) => ({
     path: contentPath(kind, row.id),
     alternates: {
-      locales: (row.locales ?? []).filter(isLocale),
+      locales: withZhHant(row.locales ?? []),
       xDefault: isLocale(row.x_default) ? row.x_default : "zh",
     },
     lastmod: isoDate(row.lastmod),
@@ -305,7 +309,10 @@ async function legacyPage(kind: ContentKind, page: number): Promise<SitemapUrl[]
 async function countsPerLocale(): Promise<ShardCounts[]> {
   const client = getServiceClient();
   if (client) {
-    const counts = await Promise.all(LOCALES.map((l) => rpcCounts(client, l)));
+    // zh-hant 与 zh 计数相同:按数据库语言去重后各查一次
+    const byDb = new Map<string, Promise<ShardCounts | null>>();
+    for (const l of LOCALES) if (!byDb.has(dbLocale(l))) byDb.set(dbLocale(l), rpcCounts(client, l));
+    const counts = await Promise.all(LOCALES.map((l) => byDb.get(dbLocale(l))!));
     if (counts.every((c): c is ShardCounts => c !== null)) return counts;
   }
   const legacy = await legacyCounts();
@@ -323,6 +330,7 @@ async function contentPage(kind: ContentKind, locale: Locale, page: number): Pro
 }
 
 function staticUrls(locale: Locale): SitemapUrl[] {
+  // zh-only 页(/cars、/terms)只进 zh 分片:zh-hant 树里同样回 canonical /zh
   return STATIC_ROUTES.filter((r) => locale === "zh" || !r.zhOnly).map((r) => ({
     path: r.path,
     alternates: r.zhOnly ? null : ALL_LOCALES_ALTERNATES,

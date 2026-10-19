@@ -1,7 +1,7 @@
 // 内容语言工具(纯函数,server / client / Bun 通用):「已从 X 翻译」标签、<html lang>、og:locale、
 // 内容块的 lang 属性。语言代码来自 lib/i18n/detect.ts(DetectedLang)或翻译管线记录的 source_lang。
 
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { DB_LOCALES, LOCALES, type DbLocale, type Locale } from "@/lib/i18n";
 
 const own = (o: object, key: string) => Object.prototype.hasOwnProperty.call(o, key);
 
@@ -32,13 +32,15 @@ export function translatedFromKey(lang: string | null | undefined): string | nul
   return own(TRANSLATED_FROM, code) ? TRANSLATED_FROM[code] : "已翻译";
 }
 
-/** 页面 <html lang> / 译文块的 lang:zh 标成 zh-CN(站点中文为简体),其余语言即代码本身 */
+/** 页面 <html lang> / 译文块的 lang:zh 标成 zh-CN(简体),zh-hant 标成 zh-Hant,其余语言即代码本身
+ *  (hreflang 用同一套代码) */
 export function htmlLang(locale: Locale): string {
-  return locale === "zh" ? "zh-CN" : locale;
+  return locale === "zh" ? "zh-CN" : locale === "zh-hant" ? "zh-Hant" : locale;
 }
 
 const OG_LOCALES: Readonly<Record<Locale, string>> = {
   zh: "zh_CN",
+  "zh-hant": "zh_TW",
   en: "en_US",
   ko: "ko_KR",
   ja: "ja_JP",
@@ -63,6 +65,11 @@ export function contentLangAttr(lang: string | null | undefined): string | undef
 
 export function isSiteLocale(value: unknown): value is Locale {
   return typeof value === "string" && (LOCALES as readonly string[]).includes(value);
+}
+
+/** 数据库语言(不含 zh-hant):翻译管线、bundle 行的 pl / al 等 */
+export function isDbLocale(value: unknown): value is DbLocale {
+  return typeof value === "string" && (DB_LOCALES as readonly string[]).includes(value);
 }
 
 /** 语言代码 → 英文名(JSON-LD、API 文档、日志等面向机器/英文读者的场景) */

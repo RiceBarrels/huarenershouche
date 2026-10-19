@@ -76,7 +76,7 @@ import { avatarUrl } from "@/lib/avatar";
 import { useI18n } from "@/components/i18n-provider";
 import { useLocalized, useLocalizedPrefetch } from "@/hooks/use-localized";
 import { LocalizedText } from "@/components/content/localized-text";
-import { carTitle, brandLogoSrc } from "@/lib/i18n";
+import { carTitle, brandLogoSrc, isZhLocale } from "@/lib/i18n";
 
 // Map city names to Chinese region names, with NYC borough detection
 const CITY_ZH_MAP: Record<string, string> = {
@@ -570,7 +570,7 @@ export default function Home() {
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
             <p className="hidden font-mono text-[10px] uppercase tracking-[0.25em] text-muted-foreground md:block md:text-[11px]">
               {/* 英文装饰性标语按受众区分:zh 保留 Chinese、ko 用 Korean、en 不提族群 */}
-              {locale === "zh"
+              {isZhLocale(locale)
                 ? "North America · Chinese Used Car Marketplace"
                 : locale === "ko"
                   ? "North America · Korean Used Car Marketplace"
@@ -587,7 +587,7 @@ export default function Home() {
               ) : userLocation ? (
                 <span className="font-mono text-[11px] text-muted-foreground">
                   {userLocation.formatted}
-                  {userLocation.zhName && locale === "zh" && (
+                  {userLocation.zhName && isZhLocale(locale) && (
                     <span className="text-muted-foreground/50"> · {userLocation.zhName}</span>
                   )}
                 </span>

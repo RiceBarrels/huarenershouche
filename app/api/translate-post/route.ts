@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, type Locale } from "@/lib/i18n";
 import { isSiteLocale } from "@/lib/i18n/content-langs";
 import type { BundleRow } from "@/lib/i18n/content/types";
 
@@ -29,7 +29,7 @@ export async function OPTIONS() {
 
 /** 已有译文的帖子 → { title, content };i18n_bundle 只返回公开帖子,RPC 失败(含 SQL 未执行)时为空 */
 async function translatedPosts(ids: string[], locale: Locale): Promise<Record<string, PostI18n>> {
-  const { data, error } = await supabase.rpc("i18n_bundle", { p_entity: "post", p_ids: ids, p_locale: locale });
+  const { data, error } = await supabase.rpc("i18n_bundle", { p_entity: "post", p_ids: ids, p_locale: dbLocale(locale) });
   const rows = error ? [] : ((data as BundleRow[] | null) ?? []).filter((r) => r.s === "ok" && r.f);
   if (rows.length === 0) return {};
 

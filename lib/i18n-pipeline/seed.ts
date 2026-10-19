@@ -23,7 +23,7 @@ import { MODEL_ZH_BY_MAKE } from "@/lib/i18n/car-title";
 import { normTag } from "@/lib/i18n/hashtags";
 import { FEATURE_SUGGESTIONS, TAG_SUGGESTIONS } from "@/lib/i18n/tag-suggestions";
 import { translate } from "@/lib/i18n/translate";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { DB_LOCALES as LOCALES, type DbLocale as Locale } from "@/lib/i18n";
 
 type Make = Exclude<(typeof MAKES)[number], "Other">;
 type TermKind = "topic" | "feature";

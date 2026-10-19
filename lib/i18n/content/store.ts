@@ -16,7 +16,7 @@
 // 服务端渲染时每个导出都是空操作 —— 模块级状态不能跨请求共享,SSR 只用 Provider 的种子。
 
 import { supabase } from "@/lib/supabase";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { dbLocale, LOCALES, type Locale } from "@/lib/i18n";
 import { isMissingFunctionError } from "@/lib/supabase-compat";
 import { ENTITY_FIELDS, type BundleMap, type BundleRow, type ContentEntity } from "@/lib/i18n/content/types";
 
@@ -352,7 +352,7 @@ async function fetchRows(entity: ContentEntity, locale: Locale, ids: string[]): 
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
     const { data, error } = await supabase
-      .rpc("i18n_bundle", { p_entity: entity, p_ids: ids, p_locale: locale })
+      .rpc("i18n_bundle", { p_entity: entity, p_ids: ids, p_locale: dbLocale(locale) })
       .abortSignal(controller.signal);
     if (error) return isMissingFunctionError(error) ? { kind: "missing" } : { kind: "error" };
     const rows = new Map<string, BundleRow>();

@@ -35,8 +35,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { AI_MODEL, callModelJson, isAiConfigured, maxTokensFor, type AiResult } from "@/lib/ai/openrouter";
-import type { Locale } from "@/lib/i18n";
-import { isSiteLocale } from "@/lib/i18n/content-langs";
+import type { DbLocale as Locale } from "@/lib/i18n";
+import { isDbLocale as isSiteLocale } from "@/lib/i18n/content-langs";
 import { ENTITY_FIELDS, type ContentEntity } from "@/lib/i18n/content/types";
 import { detectFields, detectLang } from "@/lib/i18n/detect";
 import { extractHashtags } from "@/lib/i18n/hashtags";

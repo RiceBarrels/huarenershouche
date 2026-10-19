@@ -90,7 +90,7 @@ import { getPriceInsight, findComparables } from "@/lib/price-insight";
 import { useIdentity } from "@/components/identity-provider";
 import { trackCarView } from "@/lib/analytics/client";
 import { useI18n } from "@/components/i18n-provider";
-import { carTitle, carLocation } from "@/lib/i18n";
+import { carTitle, carLocation, isZhLocale } from "@/lib/i18n";
 import { localizeCarfaxSummary } from "@/lib/i18n/carfax";
 import { normTag } from "@/lib/i18n/hashtags";
 import { legacyOriginal } from "@/lib/i18n/content/resolve";
@@ -1171,7 +1171,7 @@ function CarDetailView({
                   <Languages className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={1.5} />
                   <span>
                     {languageList(car.profiles.languages)}
-                    {locale !== "zh" && sellerSpeaksLocale(car.profiles.languages, locale) && (
+                    {!isZhLocale(locale) && sellerSpeaksLocale(car.profiles.languages, locale) && (
                       <span className="ml-1.5 rounded-sm bg-primary/15 px-1 py-px text-[10px] font-medium text-foreground">
                         {t("可用你的语言沟通")}
                       </span>

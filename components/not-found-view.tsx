@@ -10,6 +10,7 @@ import { type Locale, localeFromPath, detectLocale } from "@/lib/i18n";
 
 const COPY: Record<Locale, { title: string; desc: string; home: string; browse: string }> = {
   zh: { title: "页面不存在", desc: "你访问的页面可能已被移除，或链接有误。", home: "返回首页", browse: "浏览车源" },
+  "zh-hant": { title: "頁面不存在", desc: "你訪問的頁面可能已被移除，或連結有誤。", home: "返回首頁", browse: "瀏覽車源" },
   en: { title: "Page not found", desc: "The page you're looking for may have been removed, or the link is incorrect.", home: "Back to home", browse: "Browse cars" },
   ko: { title: "페이지를 찾을 수 없습니다", desc: "찾으시는 페이지가 삭제되었거나 링크가 잘못되었을 수 있습니다.", home: "홈으로", browse: "매물 보기" },
   ja: { title: "ページが見つかりません", desc: "お探しのページは削除されたか、リンクが間違っている可能性があります。", home: "ホームへ", browse: "車両を見る" },

@@ -47,7 +47,7 @@ import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAiConfigured } from "@/lib/ai/openrouter";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { DB_LOCALES as LOCALES, type DbLocale as Locale } from "@/lib/i18n";
 import { ENTITY_FIELDS, type ContentEntity } from "@/lib/i18n/content/types";
 import { importLegacy, LEGACY_ENTITIES, type LegacyEntity } from "@/lib/i18n-pipeline/legacy-import";
 import { seedGlossary, seedTitleMaps } from "@/lib/i18n-pipeline/seed";

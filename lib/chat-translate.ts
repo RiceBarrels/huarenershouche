@@ -10,7 +10,7 @@ import { useSyncExternalStore } from "react";
 import { supabase } from "@/lib/supabase";
 import { apiOrigin } from "@/lib/capacitor";
 import { detectLang, type DetectedLang } from "@/lib/i18n/detect";
-import type { Locale } from "@/lib/i18n";
+import { dbLocale, type Locale } from "@/lib/i18n";
 import type { TranslateMessageRequest, TranslateMessageResponse } from "@/lib/chat-translate-shared";
 import { isMissingTableError } from "@/lib/chat-translate-shared";
 
@@ -108,7 +108,7 @@ export async function fetchCachedTranslations(
     const { data, error } = await supabase
       .from("message_translations")
       .select("message_id, text, source_lang")
-      .eq("locale", locale)
+      .eq("locale", dbLocale(locale))
       .in("message_id", messageIds.slice(0, 100));
     if (error) {
       if (isMissingTableError(error)) cacheTableMissing = true;
@@ -153,5 +153,6 @@ export function writeAutoTranslate(conversationId: string, on: boolean): void {
  */
 export function needsTranslation(content: string, locale: Locale): boolean {
   const lang: DetectedLang = detectLang(content).lang;
-  return lang !== "und" && lang !== locale;
+  // zh-hant 界面:中文来信(简繁都检测为 zh)不算外语
+  return lang !== "und" && lang !== dbLocale(locale);
 }

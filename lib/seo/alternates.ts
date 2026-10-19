@@ -4,11 +4,11 @@
 // 全站固定页面仍用 lib/seo-pages.ts 的 localeAlternates。
 
 import type { Locale } from "@/lib/i18n";
-import { ogLocale } from "@/lib/i18n/content-langs";
+import { htmlLang, ogLocale } from "@/lib/i18n/content-langs";
 import { SITE_URL } from "@/lib/seo-pages";
 
-/** hreflang 代码:中文按现有站点与 sitemap 约定标 zh-CN,其余即语言代码 */
-const hreflang = (locale: Locale) => (locale === "zh" ? "zh-CN" : locale);
+/** hreflang 代码:zh → zh-CN、zh-hant → zh-Hant,其余即语言代码(与 sitemap 同一约定) */
+const hreflang = htmlLang;
 
 /** path 不带语言前缀,如 "/car/<id>";"/" 表示语言首页 */
 export function contentAlternates(

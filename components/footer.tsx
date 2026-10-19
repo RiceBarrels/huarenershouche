@@ -7,7 +7,7 @@ import { useMemo } from "react";
 import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, SEO_MODELS, HOT_STATE_ABBRS } from "@/lib/seo-pages";
 import { HOT_MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { useI18n } from "@/components/i18n-provider";
-import { brandLogoSrc } from "@/lib/i18n";
+import { brandLogoSrc, isZhLocale } from "@/lib/i18n";
 
 const buyLinks = [
   { label: "搜索车辆", href: "/browse" },
@@ -36,7 +36,7 @@ export function Footer() {
 
   // SEO 链接文案由中文名拼接而成,英文下改用英文名 + "Used X" 句式,所以按语言构建
   const seoLinkRows = useMemo(() => {
-    const zh = locale === "zh";
+    const zh = isZhLocale(locale);
     return [
       {
         title: t("热门品牌"),

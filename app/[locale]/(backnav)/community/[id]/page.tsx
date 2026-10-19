@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { isMissingColumnError } from "@/lib/supabase-compat";
 import { SITE_URL, SITE_NAME } from "@/lib/seo-pages";
 import { serverT } from "@/lib/i18n/translate";
-import type { Locale } from "@/lib/i18n";
+import { isZhLocale, type Locale } from "@/lib/i18n";
 import { isSiteLocale, ogLocale } from "@/lib/i18n/content-langs";
 import {
   LEGACY_POST_COLUMNS,
@@ -139,7 +139,7 @@ export async function generateMetadata({
       ...view.topics.map((topic) => topic.label),
       post.make,
       post.model,
-      ...(L === "zh" ? ["二手车", "汽车社区"] : [t("二手车"), t("社区")]),
+      ...(isZhLocale(L) ? ["二手车", "汽车社区"] : [t("二手车"), t("社区")]),
     ].filter(Boolean) as string[],
     authors: [{ name: author, url: authorUrl }],
     alternates,

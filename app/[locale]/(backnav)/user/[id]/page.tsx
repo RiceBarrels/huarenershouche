@@ -10,7 +10,7 @@ import { supabase } from "@/lib/supabase";
 import { isMissingColumnError, queryWithColumnFallback } from "@/lib/supabase-compat";
 import { localeAlternates, SITE_URL, SITE_NAME } from "@/lib/seo-pages";
 import { serverT } from "@/lib/i18n/translate";
-import { carTitle, LOCALES, type Locale } from "@/lib/i18n";
+import { carTitle, isZhLocale, LOCALES, type Locale } from "@/lib/i18n";
 import { isSiteLocale, ogLocale } from "@/lib/i18n/content-langs";
 import {
   CAR_PROFILE_EMBED,
@@ -120,7 +120,7 @@ function isDealer(p: SellerProfile): boolean {
 
 /** 面向搜索/分享的一句话描述:身份 + 在售车亮点(carCount 为在售总数)+ 地区。 */
 function buildDescription(p: SellerProfile, cars: DbCar[], carCount: number, locale: string): string {
-  if (locale !== "zh") {
+  if (!isZhLocale(locale)) {
     const t = serverT(locale);
     const parts: string[] = [
       t(isDealer(p) ? "{name} · {site} 车行" : "{name} · {site} 个人卖家", {
@@ -169,7 +169,7 @@ export async function generateMetadata({
   const who = isDealer(profile) ? "车行主页" : "个人主页";
   const carLabel = carCount > 0 ? ` - 在售${carCount}辆二手车` : "";
   const title =
-    locale === "zh"
+    isZhLocale(locale)
       ? `${profile.username} 的${who}${carLabel}${profile.location ? ` - ${profile.location}` : ""}`
       : [
           t(isDealer(profile) ? "{name} 的车行主页" : "{name} 的个人主页", { name: profile.username }),
@@ -187,10 +187,10 @@ export async function generateMetadata({
     description,
     keywords: [
       profile.username,
-      locale === "zh" ? (isDealer(profile) ? "华人车行" : "华人卖车") : t("二手车"),
+      isZhLocale(locale) ? (isDealer(profile) ? "华人车行" : "华人卖车") : t("二手车"),
       profile.location,
       ...cars.slice(0, 5).map((c) => `${c.make} ${c.model}`),
-      ...(locale === "zh" ? ["北美华人二手车", "二手车"] : [t("常來車網")]),
+      ...(isZhLocale(locale) ? ["北美华人二手车", "二手车"] : [t("常來車網")]),
     ].filter(Boolean) as string[],
     // 主页在 6 种语言下都完整可用(界面文案本地化,无待翻译正文):全部 hreflang
     alternates: localeAlternates(locale, `/user/${profile.id}`),

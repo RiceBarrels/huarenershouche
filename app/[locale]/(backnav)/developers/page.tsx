@@ -15,6 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { SettingsGroup, SettingsRow, LargeTitle, GroupFooter } from "@/components/ios-settings";
 import { useI18n } from "@/components/i18n-provider";
 import { enumCatalog } from "@/lib/api/enums";
+import { dbLocale } from "@/lib/i18n";
 import {
   ANON_RATE_LIMIT_PER_MIN,
   DEFAULT_KEY_RATE_LIMIT_PER_MIN,
@@ -194,7 +195,7 @@ function Table({ head, rows }: { head: string[]; rows: React.ReactNode[][] }) {
 
 export default function DevelopersPage() {
   const { t, locale } = useI18n();
-  const enums = enumCatalog(locale);
+  const enums = enumCatalog(dbLocale(locale));
   const personal = QUOTA_LIMITS.personal;
   const dealer = QUOTA_LIMITS.dealer;
 

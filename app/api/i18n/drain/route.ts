@@ -7,7 +7,7 @@
 // start + 50 s 后不再领取新任务(maxDuration 60 s,留出收尾);I18N_DRAIN_DISABLED=1 时不翻译(紧急开关)。
 
 import { NextRequest, NextResponse } from "next/server";
-import { LOCALES, type Locale } from "@/lib/i18n";
+import { DB_LOCALES as LOCALES, type DbLocale as Locale } from "@/lib/i18n";
 import { ENTITY_FIELDS, type ContentEntity } from "@/lib/i18n/content/types";
 import { detectPass, drain, type DrainOptions } from "@/lib/i18n-pipeline/worker";
 import { createServiceClient } from "@/lib/sources/service-client";

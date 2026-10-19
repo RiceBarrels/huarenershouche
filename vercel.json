@@ -12,11 +12,41 @@
   "redirects": [
     {
       "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "accept-language",
+          "value": "^\\s*[zZ][hH][-_](?:[tT][wW]|[hH][kK]|[mM][oO]|[hH][aA][nN][tT]).*"
+        }
+      ],
+      "missing": [
+        {
+          "type": "cookie",
+          "key": "clc_locale"
+        }
+      ],
+      "destination": "/zh-hant",
+      "permanent": false
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "cookie",
+          "key": "clc_locale",
+          "value": "zh-hant"
+        }
+      ],
+      "destination": "/zh-hant",
+      "permanent": false
+    },
+    {
+      "source": "/",
       "destination": "/zh",
       "permanent": false
     },
     {
-      "source": "/((?!zh(?:/|$)|en(?:/|$)|ko(?:/|$)|ja(?:/|$)|es(?:/|$)|fr(?:/|$)|api/|_next/|.*\\..*).+)",
+      "source": "/((?!zh-hant(?:/|$)|zh(?:/|$)|en(?:/|$)|ko(?:/|$)|ja(?:/|$)|es(?:/|$)|fr(?:/|$)|api/|_next/|.*\\..*).+)",
       "destination": "/zh/$1",
       "permanent": true
     }

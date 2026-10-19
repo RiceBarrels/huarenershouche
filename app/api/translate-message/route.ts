@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/sources/service-client";
+import { dbLocale } from "@/lib/i18n";
 import { isSiteLocale } from "@/lib/i18n/content-langs";
 import { detectLang } from "@/lib/i18n/detect";
 import { isMissingColumnError } from "@/lib/supabase-compat";
@@ -84,7 +85,8 @@ export async function POST(req: NextRequest) {
     // fallthrough
   }
   const messageId = typeof body.messageId === "string" && UUID_RE.test(body.messageId) ? body.messageId : null;
-  const target = isSiteLocale(body.target) ? body.target : null;
+  // zh-hant 界面按 zh 翻译与缓存(message_translations.locale 只认数据库语言)
+  const target = isSiteLocale(body.target) ? dbLocale(body.target) : null;
   if (!messageId || !target) return fail(400, "bad_request");
 
   const token = bearerToken(req);

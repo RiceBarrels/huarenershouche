@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { carTitle } from "@/lib/i18n";
+import { carTitle, dbLocale } from "@/lib/i18n";
 import { isSiteLocale } from "@/lib/i18n/content-langs";
 import type { BundleRow } from "@/lib/i18n/content/types";
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   }
 
   // i18n_bundle 只返回公开车源;SQL 未执行(函数不存在)时同样按「还没有译文」处理
-  const { data: rows, error } = await supabase.rpc("i18n_bundle", { p_entity: "car", p_ids: [carId], p_locale: locale });
+  const { data: rows, error } = await supabase.rpc("i18n_bundle", { p_entity: "car", p_ids: [carId], p_locale: dbLocale(locale) });
   const row = error ? undefined : (rows as BundleRow[] | null)?.[0];
   if (!row || (row.s !== "ok" && row.s !== "source")) return pending();
 

@@ -9,7 +9,9 @@ export const SITE_URL = "https://www.clcauto.com";
 export const SITE_NAME = "常來車網";
 
 // 与 lib/i18n LOCALES 保持一致(这里不 import,避免纯数据模块拉进 i18n)
-const SEO_LOCALES = ["zh", "en", "ko", "ja", "es", "fr"] as const;
+const SEO_LOCALES = ["zh", "zh-hant", "en", "ko", "ja", "es", "fr"] as const;
+// hreflang 代码:zh → zh-CN、zh-hant → zh-Hant(同 lib/i18n/content-langs htmlLang)
+const SEO_HREFLANG: Record<string, string> = { zh: "zh-CN", "zh-hant": "zh-Hant" };
 
 /**
  * 页面级 canonical + hreflang。canonical 必须带语言前缀指向「本语言」自身:
@@ -25,7 +27,7 @@ export function localeAlternates(
   const href = (l: string) => `${SITE_URL}/${l}${path === "/" ? "" : path}`;
   if (opts.zhOnly) return { canonical: href("zh") };
   const languages: Record<string, string> = {};
-  for (const l of SEO_LOCALES) languages[l === "zh" ? "zh-CN" : l] = href(l);
+  for (const l of SEO_LOCALES) languages[SEO_HREFLANG[l] ?? l] = href(l);
   languages["x-default"] = href("zh");
   return { canonical: href(locale), languages };
 }

@@ -8,10 +8,51 @@
 // localizePath() 自动补当前语言前缀;Capacitor 原生端切换语言不跳转,
 // 由 I18nProvider 的原生分支直接替换文案。
 
-export type Locale = "zh" | "en" | "ko" | "ja" | "es" | "fr";
+export type Locale = "zh" | "zh-hant" | "en" | "ko" | "ja" | "es" | "fr";
 
-export const LOCALES: Locale[] = ["zh", "en", "ko", "ja", "es", "fr"];
+// zh-hant(繁體中文)只是界面语言:路径 /zh-hant/...,UI 文案走繁体词典;数据库里没有这个语言,
+// 内容(译文 / 可用语言 / sitemap 计数)一律按 zh 取,见 dbLocale()。
+export const LOCALES: Locale[] = ["zh", "zh-hant", "en", "ko", "ja", "es", "fr"];
+
+/** 数据库认识的语言(i18n_bundle / sitemap_* / topic_get / browse_facets / API 的 p_locale) */
+export type DbLocale = Exclude<Locale, "zh-hant">;
+export const DB_LOCALES: DbLocale[] = ["zh", "en", "ko", "ja", "es", "fr"];
+
+/** 界面语言 → 传给数据库的语言:zh-hant → zh(内容暂按简体中文版本显示),其余原样。
+ *  所有把 locale 传给 RPC / 查询的地方都必须经过它 */
+export function dbLocale(locale: Locale): DbLocale {
+  return locale === "zh-hant" ? "zh" : locale;
+}
+
+/** 中文界面(简体或繁体):品牌中文名、title_zh、location_zh 等「中文数据列」的取舍用 */
+export function isZhLocale(locale: string): locale is "zh" | "zh-hant" {
+  return locale === "zh" || locale === "zh-hant";
+}
+
+/** 数据库返回的可用语言(al / sitemap locales)→ 站点语言:有 zh 就同时有 zh-hant(紧随其后) */
+export function withZhHant(locales: readonly string[]): Locale[] {
+  const out: Locale[] = [];
+  for (const l of locales) {
+    if (!(DB_LOCALES as string[]).includes(l)) continue;
+    out.push(l as Locale);
+    if (l === "zh") out.push("zh-hant");
+  }
+  return out;
+}
 export const LOCALE_STORAGE_KEY = "clc_locale";
+
+/**
+ * 用户主动选语言时同时写同名 cookie:/ 的服务端重定向(vercel.json / next.config)据此
+ * 不再按 Accept-Language 把繁体浏览器送去 /zh-hant,选了繁体的回访用户则直接进 /zh-hant。
+ * 只在浏览器里生效;写不了就算了。
+ */
+export function rememberLocaleCookie(locale: Locale): void {
+  try {
+    document.cookie = `${LOCALE_STORAGE_KEY}=${locale}; path=/; max-age=31536000; samesite=lax`;
+  } catch {
+    // 非浏览器环境 / cookie 被禁用
+  }
+}
 
 // 构建期实际生成的语言树:静态导出(Capacitor)只出 zh 一棵树——
 // 原生端显示语言跟随系统、由 t() 纯客户端切换,不需要 6 份页面(体积 1/6);
@@ -22,7 +63,7 @@ export const BUILD_LOCALES: Locale[] =
 /** 界面语言 → Intl/toLocaleDateString 用的 BCP 47 区域标签 */
 export function dateLocale(locale: Locale): string {
   return (
-    { zh: "zh-CN", en: "en-US", ko: "ko-KR", ja: "ja-JP", es: "es-US", fr: "fr-CA" } as const
+    { zh: "zh-CN", "zh-hant": "zh-HK", en: "en-US", ko: "ko-KR", ja: "ja-JP", es: "es-US", fr: "fr-CA" } as const
   )[locale];
 }
 
@@ -37,6 +78,8 @@ export function interpolate(text: string, vars?: Record<string, string | number>
 /** 浏览器语言 → 默认站点语言(仅首次访问、无持久化偏好时使用) */
 export function detectLocale(languages: readonly string[]): Locale {
   for (const lang of languages) {
+    // 繁体:zh-TW / zh-HK / zh-MO / zh-Hant(-*);其余中文(zh-CN / zh-SG / zh-Hans / zh)→ 简体
+    if (/^zh-(tw|hk|mo|hant)\b/i.test(lang)) return "zh-hant";
     if (/^zh\b/i.test(lang)) return "zh";
     if (/^en\b/i.test(lang)) return "en";
     if (/^ko\b/i.test(lang)) return "ko";
@@ -47,7 +90,8 @@ export function detectLocale(languages: readonly string[]): Locale {
   return "zh";
 }
 
-const LOCALE_PREFIX_RE = /^\/(zh|en|ko|ja|es|fr)(?=\/|$|\?|#)/;
+// zh-hant 必须排在 zh 前面(否则 "/zh-hant" 会被当成 zh 前缀 + 残留 "-hant")
+const LOCALE_PREFIX_RE = /^\/(zh-hant|zh|en|ko|ja|es|fr)(?=\/|$|\?|#)/;
 
 /** 去掉路径上的语言前缀:"/en/browse" → "/browse","/zh" → "/" */
 export function stripLocale(pathname: string): string {
@@ -92,7 +136,7 @@ export function brandLabel(
   if (!zhName || locale === "en") return make;
   const localized = t(zhName);
   if (localized.toLowerCase() === make.toLowerCase()) return make;
-  if (locale !== "zh" && /[一-鿿]/.test(localized)) return make;
+  if (!isZhLocale(locale) && /[一-鿿]/.test(localized)) return make;
   return `${localized} ${make}`;
 }
 
@@ -105,14 +149,14 @@ export function brandShortLabel(
 ): string {
   if (!zhName || locale === "en") return make;
   const localized = t(zhName);
-  if (locale !== "zh" && /[一-鿿]/.test(localized)) return make;
+  if (!isZhLocale(locale) && /[一-鿿]/.test(localized)) return make;
   return localized;
 }
 
 /** 品牌 logo 图片按语言切换:zh 中文字样、en「CLC」、ko「또와카」(public/ 下同风格生成);
  *  其余语言(ja/es/fr)沿用英文版 logo */
 export function brandLogoSrc(locale: Locale): string {
-  if (locale === "zh") return "/logo.png";
+  if (isZhLocale(locale)) return "/logo.png";
   if (locale === "ko") return "/logo-ko.png";
   return "/logo-en.png";
 }
@@ -120,7 +164,7 @@ export function brandLogoSrc(locale: Locale): string {
 /** 车辆标题:zh 用 title_zh,其他语言用 title(都是确定性标题,见 lib/i18n/car-title.ts buildCarTitles);
  *  缺失时互相回退。描述等用户原文的译文走 lib/i18n/content(i18n_bundle),不在这里 */
 export function carTitle(car: { title?: string | null; title_zh?: string | null }, locale: Locale): string {
-  return locale === "zh" ? car.title_zh || car.title || "" : car.title || car.title_zh || "";
+  return isZhLocale(locale) ? car.title_zh || car.title || "" : car.title || car.title_zh || "";
 }
 
 /** 车辆位置:zh 用 location_zh(法拉盛, NY),其他语言用英文 location(Flushing, NY) */
@@ -128,5 +172,5 @@ export function carLocation(
   car: { location?: string | null; location_zh?: string | null },
   locale: Locale
 ): string {
-  return (locale === "zh" ? car.location_zh || car.location : car.location || car.location_zh) || "";
+  return (isZhLocale(locale) ? car.location_zh || car.location : car.location || car.location_zh) || "";
 }

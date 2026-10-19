@@ -2,7 +2,7 @@
 //   [形容词][地区](两者可互换) + [老/小][名字] + 先生/女士/酱
 // 每段都可能被随机跳过,组装逻辑见 lib/username/index.ts。
 
-import type { Locale } from "@/lib/i18n";
+import type { DbLocale } from "@/lib/i18n";
 
 export type Gender = "male" | "female";
 
@@ -25,7 +25,8 @@ export interface NameRules {
   maxLength: number;
 }
 
-export const NAME_RULES: Record<Locale, NameRules> = {
+// 按数据库语言建词库:zh-hant 暂复用 zh 词库(见 generateUsername 的 dbLocale)
+export const NAME_RULES: Record<DbLocale, NameRules> = {
   zh: {
     adjectives: [
       "留学生", "哥布林", "超级", "社恐", "熬夜", "摸鱼", "干饭", "佛系", "暴躁", "快乐",

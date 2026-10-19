@@ -15,7 +15,7 @@ import { estimateMonthlyPayment, formatCarMileage, formatCarPrice } from "@/lib/
 import { useCarOverlay } from "@/components/car-overlay-provider";
 import { usePreferences } from "@/components/use-preferences";
 import { useI18n } from "@/components/i18n-provider";
-import { carLocation, carTitle, localizePath } from "@/lib/i18n";
+import { carLocation, carTitle, isZhLocale, localizePath } from "@/lib/i18n";
 import type { PriceInsight } from "@/lib/price-insight";
 import type { DbCar } from "@/lib/types";
 
@@ -307,7 +307,7 @@ export function CarCard({
                 </Badge>
               )}
               {/* 非中文界面:卖家明确会说当前语言时标注(中文站默认视为会中文,不标) */}
-              {detailed && locale !== "zh" && !!car.profiles?.languages?.length && sellerSpeaksLocale(car.profiles.languages, locale) && (
+              {detailed && !isZhLocale(locale) && !!car.profiles?.languages?.length && sellerSpeaksLocale(car.profiles.languages, locale) && (
                 <Badge variant="secondary" className="font-mono text-[11px] font-medium">
                   {languageLabel(localeLanguageCodes(locale)[0])} OK
                 </Badge>

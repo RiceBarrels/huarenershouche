@@ -12,7 +12,7 @@
 //   ('#' 搜索只匹配帖子标签,这些词多半只出现在标题 / 正文里);搜过的兜底词仍归为 keyword。
 // 会话内缓存,一次会话只算一次。候选池合成与展示规则是纯函数,导入本文件不建 Supabase 客户端。
 
-import type { Locale } from "./i18n";
+import { isZhLocale, type Locale } from "./i18n";
 import { detectLang } from "./i18n/detect";
 
 export interface SuggestionItem {
@@ -222,7 +222,7 @@ export function presentSuggestions(
   const seenTopics = new Set<string>();
   const seenLabels = new Set<string>();
   const inUiLanguage = (text: string) => {
-    if (locale === "zh") return true;
+    if (isZhLocale(locale)) return true;
     const { lang } = detectLang(text);
     return lang === locale || lang === "und";
   };
