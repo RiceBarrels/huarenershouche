@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { useSeedEntry } from "@/components/content/content-i18n-provider";
+import { useZhHantContent } from "@/components/content/zh-hant-content";
 import { localize, type Localized } from "@/lib/i18n/content/resolve";
 import {
   IDLE_ENTRY,
@@ -25,6 +26,7 @@ import {
   sourceHash,
   subscribe,
 } from "@/lib/i18n/content/store";
+import { hantRowLabels } from "@/lib/i18n/content/resolve";
 import type { BundleRow, ContentEntity } from "@/lib/i18n/content/types";
 
 export interface LocalizedView<F extends string> extends Localized<F> {
@@ -97,7 +99,12 @@ export function useLocalized<F extends string>(
   // 被取代时:路由缓存恢复的旧页面,种子与页面原文同出一次服务端渲染,对得上就照旧显示种子的译文
   const seedRow = seed?.row;
   const shownRow = superseded ? (seedRow?.s === "ok" && seedRow.h === hash ? seedRow : undefined) : row;
-  const base = useMemo(() => localize(stableOriginal, shownRow, locale), [stableOriginal, shownRow, locale]);
+  // zh-hant:整句转繁体(SSR 与水合首帧经种子表保持一致,见 components/content/zh-hant-content.tsx)
+  const hant = useZhHantContent();
+  const base = useMemo(
+    () => localize(stableOriginal, shownRow, locale, hant),
+    [stableOriginal, shownRow, locale, hant],
+  );
 
   // 「显示原文」只对当前这条 (entity, id, locale) 生效:组件换了内容自动回到默认显示
   const viewKey = `${entity}|${id ?? ""}|${locale}`;
@@ -144,5 +151,8 @@ export function useLocalizedPrefetch(
 
 /** 当前显示语言下的 bundle 行(话题 / 配置标签 x、可用语言等);没有行时按需请求 */
 export function useBundleRow(entity: ContentEntity, id: string | null | undefined): BundleRow | undefined {
-  return useContentEntry(entity, id, true).entry.row ?? undefined;
+  const { entry, locale } = useContentEntry(entity, id, true);
+  const row = entry.row ?? undefined;
+  // zh-hant:话题 / 配置标签的显示名逐字转繁体(同步查表,SSR 与水合一致);raw / norm / slug 不变
+  return useMemo(() => (locale === "zh-hant" ? hantRowLabels(row) : row), [locale, row]);
 }

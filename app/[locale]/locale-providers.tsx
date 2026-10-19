@@ -7,6 +7,8 @@ import { MotionProvider } from "@/components/motion-provider";
 import { CapacitorProvider } from "@/components/capacitor-provider";
 import { IdentityProvider } from "@/components/identity-provider";
 import { UsernameGate } from "@/components/username-gate";
+import { ZhHantContentProvider } from "@/components/content/zh-hant-content";
+import { ZH_HANT_CHAR_PAIRS } from "@/lib/i18n/zh-hant-chars";
 import { OAuthLocaleRestore } from "@/components/oauth-locale-restore";
 import { CarOverlayProvider } from "@/components/car-overlay-provider";
 import { InitHaptic } from "@/components/init-haptic";
@@ -31,6 +33,8 @@ export function LocaleProviders({
 }>) {
   return (
     <I18nProvider initialLocale={locale}>
+      {/* 名称逐字表只随繁體树下发(约 15KB,作为 props 进 RSC payload) */}
+      <ZhHantContentProvider chars={locale === "zh-hant" ? ZH_HANT_CHAR_PAIRS : undefined}>
       <MotionProvider>
         <div
           vaul-drawer-wrapper=""
@@ -68,6 +72,7 @@ export function LocaleProviders({
           </CapacitorProvider>
         </div>
       </MotionProvider>
+      </ZhHantContentProvider>
     </I18nProvider>
   );
 }

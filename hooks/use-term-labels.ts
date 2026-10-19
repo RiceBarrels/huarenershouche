@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useI18n } from "@/components/i18n-provider";
 import { dbLocale, type Locale } from "@/lib/i18n";
-import { convertZhHant, loadZhHantConverter } from "@/lib/i18n/zh-hant-runtime";
+import { toHantName } from "@/lib/i18n/zh-hant-names";
 import { normTag } from "@/lib/i18n/hashtags";
 import { supabase } from "@/lib/supabase";
 import { isMissingFunctionError } from "@/lib/supabase-compat";
@@ -98,10 +98,9 @@ async function fetchLabels(kind: TermKind, locale: Locale, raws: string[]) {
       .abortSignal(controller.signal);
     if (!error) {
       rows = (data ?? []) as { raw: string; key: string; label: string }[];
-      // 繁體界面:库里只有 zh(简体)标签,转换器就绪时转成繁體;未就绪先显示简体并开始加载
+      // 繁體界面:库里只有 zh(简体)标签,逐字转成繁體(同 t() 的缺词规则,同步、确定)
       if (locale === "zh-hant") {
-        void loadZhHantConverter();
-        rows = rows.map((r) => ({ ...r, label: convertZhHant(r.label) ?? r.label }));
+        rows = rows.map((r) => ({ ...r, label: toHantName(r.label) }));
       }
     }
     else if (isMissingFunctionError(error)) rpcMissing = true;

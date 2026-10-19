@@ -8,6 +8,8 @@
 // localizePath() 自动补当前语言前缀;Capacitor 原生端切换语言不跳转,
 // 由 I18nProvider 的原生分支直接替换文案。
 
+import { toHantName } from "./zh-hant-names";
+
 export type Locale = "zh" | "zh-hant" | "en" | "ko" | "ja" | "es" | "fr";
 
 // zh-hant(繁體中文)只是界面语言:路径 /zh-hant/...,UI 文案走繁体词典;数据库里没有这个语言,
@@ -164,13 +166,18 @@ export function brandLogoSrc(locale: Locale): string {
 /** 车辆标题:zh 用 title_zh,其他语言用 title(都是确定性标题,见 lib/i18n/car-title.ts buildCarTitles);
  *  缺失时互相回退。描述等用户原文的译文走 lib/i18n/content(i18n_bundle),不在这里 */
 export function carTitle(car: { title?: string | null; title_zh?: string | null }, locale: Locale): string {
-  return isZhLocale(locale) ? car.title_zh || car.title || "" : car.title || car.title_zh || "";
+  if (!isZhLocale(locale)) return car.title || car.title_zh || "";
+  const zh = car.title_zh || car.title || "";
+  // 繁體:库里只有简体 title_zh,逐字查表转换(同步、服务端与客户端一致)
+  return locale === "zh-hant" ? toHantName(zh) : zh;
 }
 
-/** 车辆位置:zh 用 location_zh(法拉盛, NY),其他语言用英文 location(Flushing, NY) */
+/** 车辆位置:zh 用 location_zh(法拉盛, NY),zh-hant 再逐字转繁体,其他语言用英文 location(Flushing, NY) */
 export function carLocation(
   car: { location?: string | null; location_zh?: string | null },
   locale: Locale
 ): string {
-  return (isZhLocale(locale) ? car.location_zh || car.location : car.location || car.location_zh) || "";
+  if (!isZhLocale(locale)) return car.location || car.location_zh || "";
+  const zh = car.location_zh || car.location || "";
+  return locale === "zh-hant" ? toHantName(zh) : zh;
 }

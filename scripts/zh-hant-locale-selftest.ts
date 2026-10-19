@@ -94,7 +94,10 @@ eq("shard name", shardFileName("zh-hant", "car", 2), "zh-hant-car-2.xml");
 eq("parse zh-hant shard", parseShardName("zh-hant-car-2.xml"), { locale: "zh-hant", kind: "car", page: 2 });
 eq("parse zh-hant static", parseShardName("zh-hant-static.xml"), { locale: "zh-hant", kind: "static" });
 eq("parse zh shard", parseShardName("zh-post-0.xml"), { locale: "zh", kind: "post", page: 0 });
-eq("zh-hant seo shard rejected", parseShardName("zh-hant-seo.xml"), null);
+// K2:/cars/* 有服务端整页转换的繁體版,zh-hant-seo.xml 分片有效;非中文语言仍没有 seo 分片
+eq("zh-hant seo shard", parseShardName("zh-hant-seo.xml"), { locale: "zh-hant", kind: "seo" });
+eq("en seo shard rejected", parseShardName("en-seo.xml"), null);
+eq("static index has zh-hant seo", staticShardFiles().includes("zh-hant-seo.xml"), true);
 eq("static index has zh-hant", staticShardFiles().includes("zh-hant-static.xml"), true);
 eq(
   "urlset hreflang zh-Hant",

@@ -25,6 +25,32 @@ import {
   PUBLIC_CAR_COLUMN_SETS,
 } from "./columns";
 import type { BundleMap, BundleRow, ContentEntity } from "./types";
+import * as OpenCC from "opencc-js/cn2t";
+import { withOverrides } from "@/lib/i18n/zh-hant-convert";
+import { needsHant, registerServerHant, type HantFn } from "./hant";
+import { ZH_HANT_CHAR_PAIRS } from "@/lib/i18n/zh-hant-chars";
+import { registerHantChars } from "@/lib/i18n/zh-hant-names";
+
+// zh-hant:RSC 侧的整句繁体转换器(resolve.localize 在服务端自动取用;与运行时 / 生成词典同一套 opencc + 覆盖表)。
+// 只在服务端模块图里,不进客户端包
+const hantConvert = withOverrides(OpenCC.Converter({ from: "cn", to: "t" }));
+const hantCache = new Map<string, string>();
+const HANT_CACHE_MAX = 5000;
+
+/** 服务端繁体转换(带进程内缓存);非中文原样返回 */
+export const serverHant: HantFn = (text) => {
+  if (!needsHant(text)) return text;
+  let out = hantCache.get(text);
+  if (out === undefined) {
+    out = hantConvert(text);
+    if (hantCache.size >= HANT_CACHE_MAX) hantCache.clear();
+    hantCache.set(text, out);
+  }
+  return out;
+};
+registerServerHant(serverHant);
+// carTitle / carLocation 的名称逐字表(RSC 侧)
+registerHantChars(ZH_HANT_CHAR_PAIRS);
 
 // i18n_bundle 单次最多 200 个 id(超出 SQL 直接返回空)
 const BUNDLE_CHUNK = 200;

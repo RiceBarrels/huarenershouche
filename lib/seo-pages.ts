@@ -25,7 +25,14 @@ export function localeAlternates(
   opts: { zhOnly?: boolean } = {}
 ): { canonical: string; languages?: Record<string, string> } {
   const href = (l: string) => `${SITE_URL}/${l}${path === "/" ? "" : path}`;
-  if (opts.zhOnly) return { canonical: href("zh") };
+  if (opts.zhOnly) {
+    // 正文只有中文:简体 / 繁體(服务端整页转换)各自 canonical 并互链;其他语言树回 /zh
+    if (locale !== "zh" && locale !== "zh-hant") return { canonical: href("zh") };
+    return {
+      canonical: href(locale),
+      languages: { "zh-CN": href("zh"), "zh-Hant": href("zh-hant"), "x-default": href("zh") },
+    };
+  }
   const languages: Record<string, string> = {};
   for (const l of SEO_LOCALES) languages[SEO_HREFLANG[l] ?? l] = href(l);
   languages["x-default"] = href("zh");

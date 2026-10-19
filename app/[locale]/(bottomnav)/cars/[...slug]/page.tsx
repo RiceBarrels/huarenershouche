@@ -11,6 +11,7 @@ import { JsonLd } from "@/lib/seo/jsonld";
 import { breadcrumbJsonLd } from "@/lib/seo/structured-data";
 import { ogLocale } from "@/lib/i18n/content-langs";
 import type { Locale } from "@/lib/i18n";
+import { hantString, hantTree, zhContentLang } from "@/lib/i18n/content/hant-node";
 import {
   localeAlternates,
   SEO_PAGES,
@@ -37,36 +38,41 @@ export async function generateMetadata({
   if (!def) return {};
   return {
     // def.title 已含「| 站名」,absolute 跳过 layout 的 %s 模板,避免站名重复两次
-    title: { absolute: def.title },
-    description: def.description,
+    title: { absolute: hantString(locale, def.title) },
+    description: hantString(locale, def.description),
     alternates: localeAlternates(locale, `/cars/${def.slug}`, { zhOnly: true }),
-    openGraph: { title: def.title, description: def.description, locale: ogLocale(locale as Locale) },
+    openGraph: {
+      title: hantString(locale, def.title),
+      description: hantString(locale, def.description),
+      locale: ogLocale(locale as Locale),
+    },
   };
 }
 
 export default async function SeoLandingPage({
   params,
 }: {
-  params: Promise<{ slug: string[] }>;
+  params: Promise<{ locale: string; slug: string[] }>;
 }) {
-  const { slug } = await params;
+  const { locale, slug } = await params;
   const def = getSeoPage(slug);
   if (!def) notFound();
 
   const relatedGroups = getRelatedPages(def);
   const browseUrl = browseHref(def);
 
-  // 正文只有中文,各语言树的 canonical 都回 /zh:结构化数据里的 URL 同样用 zh 树地址
+  // 正文只有中文:非中文树的 canonical 回 /zh;繁體树是服务端整页转换的独立版本,结构化数据指向自身
+  const tree = locale === "zh-hant" ? "zh-hant" : "zh";
   const breadcrumb = breadcrumbJsonLd([
-    { name: SITE_NAME, url: "/zh" },
-    { name: "二手车", url: "/zh/cars" },
-    { name: def.label, url: `/zh/cars/${def.slug}` },
+    { name: hantString(locale, SITE_NAME), url: `/${tree}` },
+    { name: hantString(locale, "二手车"), url: `/${tree}/cars` },
+    { name: hantString(locale, def.label), url: `/${tree}/cars/${def.slug}` },
   ]);
 
   return (
     <>
       <Header />
-      <main lang="zh-CN" className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
+      {hantTree(locale, <main lang={zhContentLang(locale)} className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
         <nav
           aria-label="Breadcrumb"
           className="font-mono text-[11px] text-muted-foreground"
@@ -124,7 +130,7 @@ export default async function SeoLandingPage({
         ))}
 
         <JsonLd data={breadcrumb} />
-      </main>
+      </main>)}
       <Footer />
     </>
   );

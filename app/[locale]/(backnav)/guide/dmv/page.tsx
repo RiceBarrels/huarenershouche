@@ -6,6 +6,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { Header } from "@/components/header";
+import { HantProse } from "@/components/content/hant-prose";
 import { Footer } from "@/components/footer";
 
 function Section({
@@ -51,6 +52,7 @@ export default function DmvGuidePage() {
     <div className="flex min-h-screen flex-col bg-background font-mono">
       <Header />
       <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-8">
+        <HantProse>
         <div className="flex items-center gap-2">
           <FileText className="h-5 w-5" strokeWidth={1.5} />
           <h1 className="font-logo text-xl tracking-tight">
@@ -341,6 +343,7 @@ export default function DmvGuidePage() {
             </div>
           </div>
         </div>
+      </HantProse>
       </main>
       <Footer />
     </div>

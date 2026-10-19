@@ -2,7 +2,7 @@
 //
 // 分片命名(parseShardName):
 //   {L}-static.xml      站内静态页;/cars 与 /terms 正文只有中文 → 只进 zh 分片、不带 hreflang
-//   zh-seo.xml          /cars/* 程序化落地页(只有中文,单文件)
+//   zh-seo.xml / zh-hant-seo.xml  /cars/* 程序化落地页(只有中文;繁體版由服务端整页转换)
 //   {L}-{kind}-{p}.xml  内容页,kind = car | post | qa | user | topic,第 p 片 = 第 p 个 SHARD_SIZE 条
 //   {L}.xml             旧版命名(已提交给搜索引擎):静态页 + car 第 0 片 + post 第 0 片
 //
@@ -67,6 +67,9 @@ export type ShardRef =
 
 // 静态页与旧口径内容:全部语言互链、x-default 指向 zh
 const ALL_LOCALES_ALTERNATES: NonNullable<SitemapUrl["alternates"]> = { locales: LOCALES, xDefault: "zh" };
+// 只有中文正文的页(/cars/*、/terms):简体与繁體(服务端整页转换)两个版本互链
+const ZH_ALTERNATES: NonNullable<SitemapUrl["alternates"]> = { locales: ["zh", "zh-hant"], xDefault: "zh" };
+const isZhTree = (locale: Locale) => locale === "zh" || locale === "zh-hant";
 
 // ─── 分片命名 ───────────────────────────────────────────────────────────────
 
@@ -89,7 +92,7 @@ export function parseShardName(file: string): ShardRef | null {
   const kind = m[2] as SitemapKind;
   const pageText = m[3];
   if (kind === "static" || kind === "seo") {
-    if (pageText !== undefined || (kind === "seo" && locale !== "zh")) return null;
+    if (pageText !== undefined || (kind === "seo" && !isZhTree(locale))) return null;
     return { locale, kind };
   }
   // 内容分片必须带页码,且只认规范写法("car-01" 之类不算),一片只对应一个 URL
@@ -330,22 +333,22 @@ async function contentPage(kind: ContentKind, locale: Locale, page: number): Pro
 }
 
 function staticUrls(locale: Locale): SitemapUrl[] {
-  // zh-only 页(/cars、/terms)只进 zh 分片:zh-hant 树里同样回 canonical /zh
-  return STATIC_ROUTES.filter((r) => locale === "zh" || !r.zhOnly).map((r) => ({
+  // zh-only 页(/cars、/terms)进 zh 与 zh-hant 分片(繁體版由服务端整页转换,canonical 指向自身)
+  return STATIC_ROUTES.filter((r) => isZhTree(locale) || !r.zhOnly).map((r) => ({
     path: r.path,
-    alternates: r.zhOnly ? null : ALL_LOCALES_ALTERNATES,
+    alternates: r.zhOnly ? ZH_ALTERNATES : ALL_LOCALES_ALTERNATES,
   }));
 }
 
 function seoUrls(): SitemapUrl[] {
-  return SEO_PAGES.map((p) => ({ path: `/cars/${p.slug}`, alternates: null }));
+  return SEO_PAGES.map((p) => ({ path: `/cars/${p.slug}`, alternates: ZH_ALTERNATES }));
 }
 
 // ─── 对外 ───────────────────────────────────────────────────────────────────
 
 /** index 里不依赖数据库的分片:各语言静态页 + zh 落地页 */
 export function staticShardFiles(): string[] {
-  return [...LOCALES.map((l) => shardFileName(l, "static")), shardFileName("zh", "seo")];
+  return [...LOCALES.map((l) => shardFileName(l, "static")), shardFileName("zh", "seo"), shardFileName("zh-hant", "seo")];
 }
 
 /** index 里的内容分片:每种语言每种内容 ceil(n / SHARD_SIZE) 片 */

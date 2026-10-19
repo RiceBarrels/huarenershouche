@@ -8,6 +8,7 @@ import { makeSlug, SEO_STATES, SEO_CITIES, SEO_PRICE_PAGES, SEO_MODELS, HOT_STAT
 import { HOT_MAKES, MAKES_ZH } from "@/lib/mock-data";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLogoSrc, isZhLocale } from "@/lib/i18n";
+import { toHantName } from "@/lib/i18n/zh-hant-names";
 
 const buyLinks = [
   { label: "搜索车辆", href: "/browse" },
@@ -37,7 +38,9 @@ export function Footer() {
   // SEO 链接文案由中文名拼接而成,英文下改用英文名 + "Used X" 句式,所以按语言构建
   const seoLinkRows = useMemo(() => {
     const zh = isZhLocale(locale);
-    return [
+    // 繁體:拼出来的中文名逐字转繁体(同步查表,SSR 与水合一致)
+    const h = (text: string) => (locale === "zh-hant" ? toHantName(text) : text);
+    const rows = [
       {
         title: t("热门品牌"),
         links: HOT_MAKES.map((m) => ({
@@ -73,6 +76,7 @@ export function Footer() {
         })),
       },
     ];
+    return rows.map((row) => ({ ...row, links: row.links.map((l) => ({ ...l, label: h(l.label) })) }));
   }, [t, locale]);
 
   return (
@@ -115,7 +119,7 @@ export function Footer() {
 
           {/* Buy */}
           <div>
-            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">买车 / Buy</h4>
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{locale === "zh-hant" ? toHantName("买车 / Buy") : "买车 / Buy"}</h4>
             <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {buyLinks.map((link) => (
                 <li key={link.href + link.label}>
@@ -132,7 +136,7 @@ export function Footer() {
 
           {/* Sell */}
           <div>
-            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">卖车 / Sell</h4>
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{locale === "zh-hant" ? toHantName("卖车 / Sell") : "卖车 / Sell"}</h4>
             <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {sellLinks.map((link) => (
                 <li key={link.href + link.label}>
@@ -149,7 +153,7 @@ export function Footer() {
 
           {/* Help */}
           <div>
-            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">帮助 / Support</h4>
+            <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{locale === "zh-hant" ? toHantName("帮助 / Support") : "帮助 / Support"}</h4>
             <ul className="mt-4 space-y-2 border-t border-border pt-3">
               {helpLinks.map((link) => (
                 <li key={link.href + link.label}>
@@ -167,7 +171,7 @@ export function Footer() {
 
         {/* SEO internal links */}
         <div className="mt-10 border-t border-border pt-6">
-          <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">热门搜索 / Popular</h4>
+          <h4 className="font-mono text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">{locale === "zh-hant" ? toHantName("热门搜索 / Popular") : "热门搜索 / Popular"}</h4>
           <div className="mt-3 space-y-2">
             {seoLinkRows.map((row) => (
               <div key={row.title} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">

@@ -15,7 +15,8 @@ import { withOverrides } from "@/lib/i18n/zh-hant-convert";
 import { zhHant } from "@/lib/i18n/zh-hant";
 import { en } from "@/lib/i18n/en";
 import { translate } from "@/lib/i18n/translate";
-import { loadZhHantConverter, zhHantConverterReady } from "@/lib/i18n/zh-hant-runtime";
+import { registerHantChars } from "@/lib/i18n/zh-hant-names";
+import { ZH_HANT_CHAR_PAIRS } from "@/lib/i18n/zh-hant-chars";
 
 let failed = 0;
 function eq(name: string, actual: unknown, expected: unknown) {
@@ -41,11 +42,10 @@ eq("zh unchanged", translate("zh", "发布车辆"), "发布车辆");
 
 // 缺词:加载前原样简体,不回退英文;加载后运行时转换
 const missing = "这是一条词典里没有的测试文案后台";
-eq("missing before load", translate("zh-hant", missing), missing);
-eq("ready before load", zhHantConverterReady(), false);
-await loadZhHantConverter();
-eq("ready after load", zhHantConverterReady(), true);
-eq("missing after load", translate("zh-hant", missing), "這是一條詞典裡沒有的測試文案後台");
+// K2:缺词走同步逐字表(不再懒加载 opencc);字表注册前原样显示简体
+eq("missing before chars", translate("zh-hant", missing), missing);
+registerHantChars(ZH_HANT_CHAR_PAIRS);
+eq("missing after chars", translate("zh-hant", missing), "這是一條詞典裡沒有的測試文案後台");
 eq("dict still wins", translate("zh-hant", "登录"), "登入");
 
 // 生成词典是否跟上 en.ts

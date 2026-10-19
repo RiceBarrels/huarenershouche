@@ -9,20 +9,25 @@ import { ja } from "@/lib/i18n/ja";
 import { es } from "@/lib/i18n/es";
 import { fr } from "@/lib/i18n/fr";
 import { zhHant } from "@/lib/i18n/zh-hant";
-import { convertZhHant } from "@/lib/i18n/zh-hant-runtime";
+import { toHantName } from "@/lib/i18n/zh-hant-names";
 
 // 非中文语言的 UI 词典(key 均为中文原文;缺失先回退英文,再回退中文)
 export const DICTS: Partial<Record<Locale, Record<string, string>>> = { en, ko, ja, es, fr };
 
-/** zh-hant 取词:生成词典("" = 与 key 相同)→ 运行时 opencc 转换(已加载时)→ 简体 key 本身 */
+/**
+ * zh-hant 取词:生成词典("" = 与 key 相同)→ 名称逐字表(lib/i18n/zh-hant-names.ts)→ 简体 key 本身。
+ * 缺词(生成词典之后新增的文案、t(原始标签) 之类的用户数据)用同步逐字表而不是懒加载的 opencc:
+ * 逐字表在服务端与水合前的客户端都已就绪,结果确定 —— opencc 只在一侧加载完成时会让 SSR 与水合不一致
+ * (客户端加载完后上层重渲染,尚未水合的 Suspense 区块会拿新的 t 去比对服务端 HTML)
+ */
 export function zhHantText(text: string): string {
   const v = zhHant[text];
   if (v !== undefined) return v || text;
-  return convertZhHant(text) ?? text;
+  return toHantName(text);
 }
 
 /** 缺词回退链:目标语言 → 英文 → 中文原文(zh 及未知语言直接原样返回)。
- *  zh-hant:繁体词典 → 运行时转换 → 中文 key 本身(绝不回退英文) */
+ *  zh-hant:繁体词典 → 逐字表 → 中文 key 本身(绝不回退英文) */
 export function translate(
   locale: string,
   text: string,

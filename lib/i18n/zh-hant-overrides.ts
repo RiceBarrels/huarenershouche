@@ -3,7 +3,7 @@
 // OpenCC 的 "t" 只做字形转换(软件→軟件、视频→視頻),港台读者都会觉得是「简体转过来的」。
 // 这里只收港台都通行、不偏某一地的中性词(≤50 条);偏台湾独有的(如 网络→網路、默认→預設)
 // 暂不收,免得香港用户读着别扭。改了这里要重跑 bun scripts/gen-zh-hant.ts。
-// 运行时缺词转换(lib/i18n/zh-hant-runtime.ts)也套用同一张表。
+// 用户内容的整句转换(lib/i18n/zh-hant-runtime.ts、lib/i18n/content/server.ts)也套用同一张表。
 
 export const ZH_HANT_OVERRIDES: Record<string, string> = {
   "软件": "軟體",
@@ -44,4 +44,17 @@ export const ZH_HANT_OVERRIDES: Record<string, string> = {
   "吃": "吃",
   "床": "床",
   "峰": "峰",
+};
+
+// 转换结果上的直接修正(繁体错写 → 繁体正写):OpenCC "t" 按词组转出、港台都不用的写法,
+// 以及分词把「只」误判成量词「隻」的情况(「是不是只能」→「是不是隻能」)。
+// 「隻」作量词(一隻貓)是对的,所以只修「隻 + 副词后字」的固定搭配
+export const ZH_HANT_POSTFIX: Record<string, string> = {
+  "覈": "核",
+  "隻能": "只能",
+  "隻是": "只是",
+  "隻有": "只有",
+  "隻要": "只要",
+  "隻好": "只好",
+  "隻會": "只會",
 };

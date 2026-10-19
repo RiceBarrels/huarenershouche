@@ -13,6 +13,7 @@ import {
   type SeoPageDef,
   type SeoPageKind,
 } from "@/lib/seo-pages";
+import { hantString, hantTree, zhContentLang } from "@/lib/i18n/content/hant-node";
 
 export async function generateMetadata({
   params,
@@ -21,8 +22,8 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   return {
-    title: `二手车分类导航 - 按品牌、地区、价格找车 | ${SITE_NAME}`,
-    description: `${SITE_NAME}二手车分类导航：按丰田、本田、宝马等热门品牌，加州、纽约、德州等地区，以及车身类型、预算、年份、新能源快速找到适合你的二手车，北美华人买车卖车更放心。`,
+    title: hantString(locale, `二手车分类导航 - 按品牌、地区、价格找车 | ${SITE_NAME}`),
+    description: hantString(locale, `${SITE_NAME}二手车分类导航：按丰田、本田、宝马等热门品牌，加州、纽约、德州等地区，以及车身类型、预算、年份、新能源快速找到适合你的二手车，北美华人买车卖车更放心。`),
     alternates: localeAlternates(locale, "/cars", { zhOnly: true }),
   };
 }
@@ -39,7 +40,8 @@ const SECTIONS: { title: string; kind: SeoPageKind }[] = [
   { title: "精选专题", kind: "theme" },
 ];
 
-export default function CarsHubPage() {
+export default async function CarsHubPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
   const byKind = new Map<SeoPageKind, SeoPageDef[]>();
   for (const p of SEO_PAGES) {
     const list = byKind.get(p.kind);
@@ -50,7 +52,7 @@ export default function CarsHubPage() {
   return (
     <>
       <Header />
-      <main className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
+      {hantTree(locale, <main lang={zhContentLang(locale)} className="container mx-auto max-w-5xl px-4 py-8 2xl:max-w-6xl">
         <nav
           aria-label="Breadcrumb"
           className="font-mono text-[11px] text-muted-foreground"
@@ -87,7 +89,7 @@ export default function CarsHubPage() {
             </section>
           );
         })}
-      </main>
+      </main>)}
       <Footer />
     </>
   );

@@ -14,6 +14,8 @@ import { contentLangAttr, htmlLang, isSiteLocale } from "@/lib/i18n/content-lang
 import { detectFields } from "@/lib/i18n/detect";
 import { extractHashtags, normTag } from "@/lib/i18n/hashtags";
 import type { DbCar, PublicCar } from "@/lib/types";
+import { toHantName } from "@/lib/i18n/zh-hant-names";
+import { hantLangAttr, serverHantFn, type HantFn } from "./hant";
 import type { BundleRow, BundleState, FeatureLabel, TFn, TopicLabel } from "./types";
 
 // 与 SQL i18n.sync_post_tags 一致:tags[] + 标题/正文内联 #话题,每帖最多 12 个
@@ -42,7 +44,39 @@ export interface Localized<F extends string> {
 const siteLocale = (lang: string | null | undefined): Locale | null =>
   isSiteLocale(lang) ? lang : null;
 
+/**
+ * zh-hant:库里只有 zh(简体)的原文 / 译文,显示前整句转繁体(原文与译文都转,lang 标 zh-Hant)。
+ * 简→繁不算翻译:中文原文在繁體界面下 translated 仍为 false,不出「已从中文翻译」。
+ * hant 不传时取 RSC 侧注册的转换器(客户端组件必须经 useLocalized 显式传入,保证水合一致)。
+ */
 export function localize<F extends string>(
+  original: Record<F, string | null | undefined>,
+  row: BundleRow | undefined,
+  locale: Locale,
+  hant?: HantFn | null,
+): Localized<F> {
+  const result = localizeRaw(original, row, locale);
+  if (locale !== "zh-hant") return result;
+  const fn = hant === undefined ? serverHantFn() : hant;
+  return fn ? toHant(result, fn) : result;
+}
+
+function toHant<F extends string>(v: Localized<F>, fn: HantFn): Localized<F> {
+  const text = {} as Record<F, string>;
+  const original = {} as Record<F, string>;
+  const textLang = {} as Record<F, string | undefined>;
+  const originalLang = {} as Record<F, string | undefined>;
+  for (const field of Object.keys(v.text) as F[]) {
+    text[field] = fn(v.text[field]);
+    original[field] = fn(v.original[field]);
+    textLang[field] = text[field] !== v.text[field] ? hantLangAttr(v.textLang[field]) : v.textLang[field];
+    originalLang[field] =
+      original[field] !== v.original[field] ? hantLangAttr(v.originalLang[field]) : v.originalLang[field];
+  }
+  return { ...v, text, original, textLang, originalLang };
+}
+
+function localizeRaw<F extends string>(
   original: Record<F, string | null | undefined>,
   row: BundleRow | undefined,
   locale: Locale,
@@ -177,16 +211,17 @@ export function resolveCarView(
   row: BundleRow | undefined,
   locale: Locale,
   t: TFn,
+  hant?: HantFn | null,
 ): CarView {
   const original = legacyOriginal(car);
   // 无描述也走 localize:available / sourceLocale 仍按 bundle 行(空原文 = 6 种语言都可用)
-  const description = localize({ description: original }, row, locale);
+  const description = localize({ description: original }, row, locale, hant);
   const featuresOriginal = car.features_original ?? car.features ?? [];
   const bundled = row?.x?.features;
   return {
     title: carTitle(car, locale),
     description: original ? description : null,
-    features: bundled && bundled.length > 0 ? bundled : rawFeatureLabels(featuresOriginal),
+    features: hantLabels(bundled && bundled.length > 0 ? bundled : rawFeatureLabels(featuresOriginal), locale),
     featuresOriginal,
     carfax: localizeCarfaxSummary(car.carfax_summary, t),
     available: description.available,
@@ -194,6 +229,10 @@ export function resolveCarView(
     xDefault: xDefaultLocale(description.sourceLocale, description.available),
     originalUncertain: car.original_uncertain === true,
   };
+}
+
+function hantLabels<T extends { label: string }>(labels: T[], locale: Locale): T[] {
+  return locale === "zh-hant" ? labels.map((l) => ({ ...l, label: toHantName(l.label) })) : labels;
 }
 
 export interface PostView {
@@ -224,14 +263,29 @@ export function resolvePostView(
   post: { title: string; content: string; tags: string[] | null },
   row: BundleRow | undefined,
   locale: Locale,
+  hant?: HantFn | null,
 ): PostView {
-  const body = localize({ title: post.title, content: post.content }, row, locale);
+  const body = localize({ title: post.title, content: post.content }, row, locale, hant);
   const bundled = row?.x?.topics;
   return {
     body,
-    topics: bundled && bundled.length > 0 ? bundled : rawTopics(post),
+    topics: hantLabels(bundled && bundled.length > 0 ? bundled : rawTopics(post), locale),
     available: body.available,
     sourceLocale: body.sourceLocale,
     xDefault: xDefaultLocale(body.sourceLocale, body.available),
+  };
+}
+
+/** zh-hant:bundle 行里话题 / 配置标签的显示名逐字转繁体(raw / norm / slug / key 不变);没有标签原样返回 */
+export function hantRowLabels(row: BundleRow | undefined): BundleRow | undefined {
+  if (!row?.x) return row;
+  const { topics, features } = row.x;
+  return {
+    ...row,
+    x: {
+      ...row.x,
+      ...(topics ? { topics: topics.map((tp) => ({ ...tp, label: toHantName(tp.label) })) } : {}),
+      ...(features ? { features: features.map((f) => ({ ...f, label: toHantName(f.label) })) } : {}),
+    },
   };
 }

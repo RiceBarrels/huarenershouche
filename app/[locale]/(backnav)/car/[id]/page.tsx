@@ -16,6 +16,7 @@ import {
   getBundles,
   getPublicCar,
   getPublicCarComments,
+  serverHant,
 } from "@/lib/i18n/content/server";
 import { resolveCarView, type CarView } from "@/lib/i18n/content/resolve";
 import type { TFn } from "@/lib/i18n/content/types";
@@ -147,13 +148,18 @@ export default async function Page({
   const view = resolveCarView(car, row, locale, t);
   const url = `${SITE_URL}/${locale}/car/${car.id}`;
 
-  // 面包屑:首页 → 二手车 → 品牌落地页(/cars/* 只有中文版,仅 zh 树挂) → 本车
+  // 面包屑:首页 → 二手车 → 品牌落地页(/cars/* 只有中文版,zh / zh-hant 树挂各自的版本) → 本车
   const makePage = isZhLocale(locale) ? getSeoPage([makeSlug(car.make)]) : undefined;
   const crumbs = [
     { name: t("首页"), url: `${SITE_URL}/${locale}` },
     { name: t("二手车"), url: `${SITE_URL}/${locale}/browse` },
     ...(makePage?.kind === "make"
-      ? [{ name: makePage.label, url: `${SITE_URL}/zh${seoPageHref(makePage)}` }]
+      ? [
+          {
+            name: locale === "zh-hant" ? serverHant(makePage.label) : makePage.label,
+            url: `${SITE_URL}/${locale === "zh-hant" ? "zh-hant" : "zh"}${seoPageHref(makePage)}`,
+          },
+        ]
       : []),
     { name: view.title, url },
   ];
