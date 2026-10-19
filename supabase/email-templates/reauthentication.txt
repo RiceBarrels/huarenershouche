@@ -1,0 +1,66 @@
+{{ if eq (printf "%v" .Data.locale) "zh" }}
+常來車網
+买车卖车 · 就上常來車網
+
+你正在进行一项需要再次确认身份的操作。请输入下面的验证码：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，并尽快修改密码。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+买车卖车 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "zh-hant" }}
+常來車網
+買車賣車 · 就上常來車網
+
+你正在進行一項需要再次確認身份的操作。請輸入下面的驗證碼：
+
+    {{ .Token }}
+
+請盡快輸入，驗證碼有時效。
+不是你本人操作？請忽略這封郵件，並盡快修改密碼。
+請勿把驗證碼告訴任何人，包括自稱客服的人。
+
+買車賣車 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "en" }}
+CLCAuto
+Find your next car
+
+You are doing something that needs a second identity check. Enter this code:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email and change your password soon.
+Never share this code with anyone, including people who say they are support.
+
+CLCAuto · Find your next car
+{{ else }}
+常來車網
+买车卖车 · 就上常來車網
+
+你正在进行一项需要再次确认身份的操作。请输入下面的验证码：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，并尽快修改密码。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+────────────
+
+CLCAuto
+Find your next car
+
+You are doing something that needs a second identity check. Enter this code:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email and change your password soon.
+Never share this code with anyone, including people who say they are support.
+
+买车卖车 · 就上常來車網
+{{ end }}

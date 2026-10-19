@@ -67,7 +67,7 @@ const LOCALE_ENDONYM: Record<string, string> = {
 };
 const CHIP_LOCALES = ["zh", "en", "ko", "ja", "es", "fr"];
 
-export function OnboardingScreen({ onClose }: { onClose: () => void }) {
+export function OnboardingScreen({ onClose, preview = false }: { onClose: () => void; preview?: boolean }) {
   const { t, locale } = useI18n();
   const reduced = useReducedMotion();
   const [page, setPage] = useState(0);
@@ -76,6 +76,8 @@ export function OnboardingScreen({ onClose }: { onClose: () => void }) {
   // 末页国家按 IP 预选(零必填:不改直接「完成」也有效);用户「以后再说」时撤回这个预选
   const prefilledRef = useRef<PrefCountry | null>(null);
   const last = page === ONBOARDING_PAGES - 1;
+  // 测试预览:关闭时把本机偏好恢复成打开前的样子(不记 onboarded、不留偏好改动);埋点由调用方暂停
+  const [before] = useState(() => (preview ? getPreferences() : null));
 
   useEffect(() => {
     trackOnboarding(`view:${page + 1}`, locale);
@@ -108,6 +110,19 @@ export function OnboardingScreen({ onClose }: { onClose: () => void }) {
     (how: "completed" | "skipped") => {
       if (closedRef.current) return;
       closedRef.current = true;
+      if (before) {
+        // 显式列出每个键:打开前没有的键要传 undefined 才会被删掉
+        updatePreferences({
+          ui: before.ui,
+          country: before.country,
+          postal: before.postal,
+          ownership: before.ownership,
+          setupDone: before.setupDone,
+          onboarded: before.onboarded,
+        });
+        onClose();
+        return;
+      }
       trackOnboarding(how === "completed" ? "done" : `skip:${page + 1}`, locale);
       const patch: { onboarded: typeof how; setupDone?: typeof how; country?: undefined } = { onboarded: how };
       if (how === "skipped" && prefilledRef.current && getPreferences().country === prefilledRef.current) {
@@ -120,7 +135,7 @@ export function OnboardingScreen({ onClose }: { onClose: () => void }) {
       updatePreferences(patch);
       onClose();
     },
-    [page, locale, onClose]
+    [page, locale, onClose, before]
   );
 
   const go = useCallback(

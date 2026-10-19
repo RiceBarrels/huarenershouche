@@ -1,0 +1,66 @@
+{{ if eq (printf "%v" .Data.locale) "zh" }}
+常來車網
+买车卖车 · 就上常來車網
+
+有人正在用这个邮箱登录常來車網。请输入下面的验证码完成登录：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，不会有任何变化。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+买车卖车 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "zh-hant" }}
+常來車網
+買車賣車 · 就上常來車網
+
+有人正在用這個郵箱登入常來車網。請輸入下面的驗證碼完成登入：
+
+    {{ .Token }}
+
+請盡快輸入，驗證碼有時效。
+不是你本人操作？請忽略這封郵件，不會有任何變化。
+請勿把驗證碼告訴任何人，包括自稱客服的人。
+
+買車賣車 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "en" }}
+CLCAuto
+Find your next car
+
+Someone is signing in to CLCAuto with this email. Enter this code to finish signing in:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email, nothing will change.
+Never share this code with anyone, including people who say they are support.
+
+CLCAuto · Find your next car
+{{ else }}
+常來車網
+买车卖车 · 就上常來車網
+
+有人正在用这个邮箱登录常來車網。请输入下面的验证码完成登录：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，不会有任何变化。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+────────────
+
+CLCAuto
+Find your next car
+
+Someone is signing in to CLCAuto with this email. Enter this code to finish signing in:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email, nothing will change.
+Never share this code with anyone, including people who say they are support.
+
+买车卖车 · 就上常來車網
+{{ end }}

@@ -63,7 +63,7 @@ export default function RegisterPage() {
       email,
       password,
       options: {
-        data: { username },
+        data: { username, locale },
       },
     });
 

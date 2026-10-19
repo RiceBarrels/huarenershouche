@@ -96,7 +96,7 @@ export function AuthDialog({
         email,
         password,
         options: {
-          data: { username },
+          data: { username, locale },
         },
       });
       if (error) {

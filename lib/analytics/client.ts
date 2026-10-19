@@ -261,6 +261,17 @@ function nativeShell(): boolean {
   }
 }
 
+// 测试预览(?onboarding=1)期间暂停点击埋点,避免测试数据写进生产 click_events;返回恢复函数
+let clicksPaused = 0;
+export function pauseClickTracking(): () => void {
+  clicksPaused++;
+  let done = false;
+  return () => {
+    if (!done) clicksPaused--;
+    done = true;
+  };
+}
+
 function trackingEnabled(): boolean {
   if (typeof window === "undefined") return false;
   if (enabled === null) {
@@ -486,7 +497,7 @@ function trackClick(
   locale: string | null | undefined
 ): void {
   try {
-    if (!trackingEnabled()) return;
+    if (!trackingEnabled() || clicksPaused > 0) return;
     if (input.car_id !== null && !UUID_RE.test(input.car_id)) return;
     const { session } = resolveSession(readSession(), Date.now(), null, uuidv4);
     writeSession(session);

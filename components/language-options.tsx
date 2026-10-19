@@ -8,6 +8,7 @@ import { LOCALE_STORAGE_KEY, rememberLocaleCookie, type Locale } from "@/lib/i18
 import { isNative } from "@/lib/capacitor";
 import { openExternal } from "@/lib/open-external";
 import { translate } from "@/lib/i18n/translate";
+import { syncAccountLocale } from "@/lib/i18n/account-locale";
 import {
   Drawer,
   DrawerContent,
@@ -106,6 +107,7 @@ export function LanguageOptions({
       // 存不了也照样跳转,本次会话生效
     }
     rememberLocaleCookie(pending);
+    syncAccountLocale(pending);
     setPending(null);
     onSelect?.();
     // 直接进新语言树的首页(带前缀路径,web/Capacitor 两端一致)

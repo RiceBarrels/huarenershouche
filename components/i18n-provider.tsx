@@ -29,6 +29,7 @@ import {
   rememberLocaleCookie,
 } from "@/lib/i18n";
 import { translate } from "@/lib/i18n/translate";
+import { syncAccountLocale } from "@/lib/i18n/account-locale";
 import { htmlLang } from "@/lib/i18n/content-langs";
 import { isNative } from "@/lib/capacitor";
 
@@ -98,6 +99,7 @@ export function I18nProvider({
         return;
       }
       rememberLocaleCookie(next);
+      syncAccountLocale(next);
       // 网页端:跳到另一语言前缀下的同一路径(保留 query)
       if (next === locale) return;
       const rest = stripLocale(pathname ?? "/");

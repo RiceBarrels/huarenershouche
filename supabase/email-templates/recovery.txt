@@ -1,0 +1,66 @@
+{{ if eq (printf "%v" .Data.locale) "zh" }}
+常來車網
+买车卖车 · 就上常來車網
+
+有人请求重置你的账号密码。请输入下面的验证码继续：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，你的密码不会改变。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+买车卖车 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "zh-hant" }}
+常來車網
+買車賣車 · 就上常來車網
+
+有人要求重置你的帳號密碼。請輸入下面的驗證碼繼續：
+
+    {{ .Token }}
+
+請盡快輸入，驗證碼有時效。
+不是你本人操作？請忽略這封郵件，你的密碼不會改變。
+請勿把驗證碼告訴任何人，包括自稱客服的人。
+
+買車賣車 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "en" }}
+CLCAuto
+Find your next car
+
+Someone asked to reset the password on your account. Enter this code to continue:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email, your password will not change.
+Never share this code with anyone, including people who say they are support.
+
+CLCAuto · Find your next car
+{{ else }}
+常來車網
+买车卖车 · 就上常來車網
+
+有人请求重置你的账号密码。请输入下面的验证码继续：
+
+    {{ .Token }}
+
+请尽快输入，验证码有时效。
+不是你本人操作？请忽略这封邮件，你的密码不会改变。
+请勿把验证码告诉任何人，包括自称客服的人。
+
+────────────
+
+CLCAuto
+Find your next car
+
+Someone asked to reset the password on your account. Enter this code to continue:
+
+    {{ .Token }}
+
+Please enter it soon; the code expires.
+Didn't ask for this? Ignore this email, your password will not change.
+Never share this code with anyone, including people who say they are support.
+
+买车卖车 · 就上常來車網
+{{ end }}
