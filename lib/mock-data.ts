@@ -127,63 +127,6 @@ export const MAKES_ZH: Record<string, string> = {
   Other: "其他",
 };
 
-// Brand logo URLs — using raw GitHub car-logos-dataset (optimized thumbs)
-const LOGO_URLS: Record<string, string> = {
-  Acura: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/acura.png",
-  "Alfa Romeo": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/alfa-romeo.png",
-  "Aston Martin": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/aston-martin.png",
-  Audi: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/audi.png",
-  Bentley: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/bentley.png",
-  BMW: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/bmw.png",
-  Bugatti: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/bugatti.png",
-  Buick: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/buick.png",
-  Cadillac: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/cadillac.png",
-  Chevrolet: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/chevrolet.png",
-  Chrysler: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/chrysler.png",
-  Dodge: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/dodge.png",
-  Ferrari: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/ferrari.png",
-  Fiat: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/fiat.png",
-  Ford: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/ford.png",
-  Genesis: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/genesis.png",
-  GMC: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/gmc.png",
-  Honda: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/honda.png",
-  Hummer: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/hummer.png",
-  Hyundai: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/hyundai.png",
-  Infiniti: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/infiniti.png",
-  Jaguar: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/jaguar.png",
-  Jeep: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/jeep.png",
-  Kia: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/kia.png",
-  Lamborghini: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/lamborghini.png",
-  "Land Rover": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/land-rover.png",
-  Lexus: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/lexus.png",
-  Lincoln: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/lincoln.png",
-  Lotus: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/lotus.png",
-  Lucid: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/lucid.png",
-  Maserati: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/maserati.png",
-  Mazda: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/mazda.png",
-  McLaren: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/mclaren.png",
-  "Mercedes-Benz": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/mercedes-benz.png",
-  Mini: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/mini.png",
-  Mitsubishi: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/mitsubishi.png",
-  Nissan: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/nissan.png",
-  Polestar: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/polestar.png",
-  Porsche: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/porsche.png",
-  Ram: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/ram.png",
-  Rivian: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/rivian.png",
-  "Rolls-Royce": "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/rolls-royce.png",
-  Smart: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/smart.png",
-  Subaru: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/subaru.png",
-  Suzuki: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/suzuki.png",
-  Tesla: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/tesla.png",
-  Toyota: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/toyota.png",
-  Volkswagen: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/volkswagen.png",
-  Volvo: "https://raw.githubusercontent.com/filippofilip95/car-logos-dataset/master/logos/thumb/volvo.png",
-};
-
-export function getBrandLogoUrl(make: string): string | null {
-  return LOGO_URLS[make] || null;
-}
-
 export const HOT_MAKES = ["Toyota", "Honda", "Hyundai", "Kia", "BMW", "Mercedes-Benz", "Audi", "Porsche", "Volkswagen", "Tesla", "Lexus"] as const;
 
 

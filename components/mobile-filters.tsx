@@ -9,7 +9,8 @@ import { Slider } from "@/components/ui/slider";
 import {
   DrawerNested, DrawerContent, DrawerTrigger, DrawerClose,
 } from "@/components/ui/drawer";
-import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
+import { MAKES, MAKES_ZH, HOT_MAKES } from "@/lib/mock-data";
+import { BrandLogo } from "@/components/brand-logo";
 import { match } from "pinyin-pro";
 import { useI18n } from "@/components/i18n-provider";
 import { interpolate, brandLabel, brandShortLabel, type Locale } from "@/lib/i18n";
@@ -556,7 +557,6 @@ export function LocationDrawerContent({
 // --- Brand drawer content with search ---
 function BrandItem({ make, selected, onToggle }: { make: string; selected: boolean; onToggle: () => void }) {
   const { t, locale } = useI18n();
-  const logo = getBrandLogoUrl(make);
   return (
     <button
       type="button"
@@ -566,13 +566,7 @@ function BrandItem({ make, selected, onToggle }: { make: string; selected: boole
         onToggle();
       }}
     >
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center">
-        {logo ? (
-          <img src={logo} alt={make} className="h-6 w-6 object-contain" />
-        ) : (
-          <Car className="h-4 w-4 text-muted-foreground" strokeWidth={1.5} />
-        )}
-      </span>
+      <BrandLogo make={make} size="md" />
       <span className="flex-1 text-left">{brandLabel(make, MAKES_ZH[make], t, locale)}</span>
       {selected && <Check className="h-4 w-4 shrink-0 text-brand-ink" strokeWidth={2} />}
     </button>
@@ -617,9 +611,7 @@ export function BrandDrawerContent({
                 onUpdate("make", toggleInList(filters.make, make));
               }}
             >
-              {getBrandLogoUrl(make) && (
-                <img src={getBrandLogoUrl(make)!} alt="" className="h-3.5 w-3.5 object-contain brightness-0 invert" />
-              )}
+              <BrandLogo make={make} size="xs" />
               {brandShortLabel(make, MAKES_ZH[make], t, locale)}
               <X className="h-3 w-3" strokeWidth={2} />
             </button>
@@ -646,7 +638,6 @@ export function BrandDrawerContent({
           <p className="px-1 font-mono text-[13px] font-semibold">{t("热门品牌")}</p>
           <div className="grid grid-cols-4 gap-2">
             {HOT_MAKES.map((make) => {
-              const logo = getBrandLogoUrl(make);
               const selected = isInList(filters.make, make);
               return (
                 <button
@@ -658,13 +649,7 @@ export function BrandDrawerContent({
                     onUpdate("make", toggleInList(filters.make, make));
                   }}
                 >
-                  <span className="flex h-8 w-8 items-center justify-center">
-                    {logo ? (
-                      <img src={logo} alt={make} className="h-7 w-7 object-contain" />
-                    ) : (
-                      <Car className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-                    )}
-                  </span>
+                  <BrandLogo make={make} size="lg" />
                   <span className="font-mono text-[10px] leading-tight">{t(MAKES_ZH[make])}</span>
                 </button>
               );

@@ -6,7 +6,8 @@ import { Slider } from "@/components/ui/slider";
 import { useI18n } from "@/components/i18n-provider";
 import { brandLabel } from "@/lib/i18n";
 import { formatMileageCap } from "@/lib/format";
-import { MAKES, MAKES_ZH, HOT_MAKES, getBrandLogoUrl } from "@/lib/mock-data";
+import { MAKES, MAKES_ZH, HOT_MAKES } from "@/lib/mock-data";
+import { BrandLogo } from "@/components/brand-logo";
 import { BODY_STYLE_OPTIONS } from "@/lib/body-style";
 import { LOAN_FILTER_LABEL } from "@/lib/dealer-financing";
 import { trackFilterChipClick } from "@/lib/analytics/client";
@@ -454,7 +455,6 @@ export function SearchFilters({
       <Section title={t("品牌")} active={!!filters.make}>
         <div className="grid grid-cols-3 gap-1.5">
           {HOT_MAKES.map((make) => {
-            const logo = getBrandLogoUrl(make);
             const selected = isInList(filters.make, make);
             return (
               <button
@@ -463,11 +463,7 @@ export function SearchFilters({
                 className={`flex flex-col items-center gap-1 rounded-2xl p-2 transition-colors ${selected ? "bg-brand/30 text-brand-ink" : `${IOS_FILL} hover:opacity-80`}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
-                <span className="flex h-6 w-6 items-center justify-center">
-                  {logo ? (
-                    <img src={logo} alt={make} className="h-5 w-5 object-contain" />
-                  ) : null}
-                </span>
+                <BrandLogo make={make} size="sm" />
                 <span className="font-mono text-[10px] leading-tight">{t(MAKES_ZH[make])}</span>
               </button>
             );
@@ -484,7 +480,6 @@ export function SearchFilters({
             {!filters.make && <Check className="h-3 w-3 text-brand-ink" strokeWidth={2} />}
           </button>
           {MAKES.map((make) => {
-            const logo = getBrandLogoUrl(make);
             return (
               <button
                 key={make}
@@ -492,9 +487,7 @@ export function SearchFilters({
                 className={`flex w-full items-center gap-2 px-3 py-1.5 font-mono text-[11px] transition-colors hover:bg-muted ${isInList(filters.make, make) ? "bg-brand/30 font-medium text-brand-ink" : ""}`}
                 onClick={() => update("make", toggleInList(filters.make, make))}
               >
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                  {logo ? <img src={logo} alt="" className="h-4 w-4 object-contain" /> : null}
-                </span>
+                <BrandLogo make={make} size="xs" />
                 <span className="flex-1 text-left">{brandLabel(make, MAKES_ZH[make], t, locale)}</span>
                 {isInList(filters.make, make) && <Check className="h-3 w-3 shrink-0 text-brand-ink" strokeWidth={2} />}
               </button>

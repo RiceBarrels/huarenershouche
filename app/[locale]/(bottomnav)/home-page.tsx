@@ -54,7 +54,8 @@ import {
 } from "@/components/mobile-filters";
 import { INITIAL_FILTERS, type Filters } from "@/components/search-filters";
 import { FeatureRow } from "@/components/feature-grid";
-import { MAKES_ZH, getBrandLogoUrl } from "@/lib/mock-data";
+import { MAKES_ZH } from "@/lib/mock-data";
+import { BrandLogo } from "@/components/brand-logo";
 import { BODY_STYLE_OPTIONS, type BodyStyle } from "@/lib/body-style";
 import { formatCarPrice, formatPrice, paymentToPrice, LOAN_ASSUMPTION } from "@/lib/format";
 import { supabase } from "@/lib/supabase";
@@ -689,7 +690,6 @@ export default function Home() {
             <FeatureRow
               brandTiles={[
                 ...MOBILE_BRANDS.map((m) => {
-                  const logo = getBrandLogoUrl(m);
                   return (
                     <button
                       key={m}
@@ -697,13 +697,7 @@ export default function Home() {
                       onClick={() => router.push(buildUrl({ make: m }))}
                       className="flex flex-col items-center gap-1.5 py-2 transition-opacity active:opacity-60"
                     >
-                      <span className="flex h-7 w-7 items-center justify-center">
-                        {logo ? (
-                          <img src={logo} alt={m} className="h-6 w-6 object-contain" />
-                        ) : (
-                          <Car className="h-5 w-5 text-muted-foreground" strokeWidth={1.5} />
-                        )}
-                      </span>
+                      <BrandLogo make={m} size="md" />
                       <span className="font-mono text-[11px]">{t(MAKES_ZH[m] || m)}</span>
                     </button>
                   );
