@@ -25,7 +25,7 @@ const BRAND_MODEL = new RegExp(
   "\\b(?:" + [
     "Acura","Audi","BMW","Buick","Cadillac","Chevrolet","Chevy","Chrysler","Dodge","Ford","GMC","Genesis","Honda","Hyundai",
     "Infiniti","Jaguar","Jeep","Kia","Land Rover","Lexus","Lincoln","Mazda","Mercedes(?:-Benz)?","Mini","Mitsubishi","Nissan",
-    "Porsche","Ram","Rivian","Subaru","Tesla","Toyota","Volkswagen","VW","Volvo","Lucid","Polestar",
+    "Porsche","Ram","Rivian","Subaru","Tesla","Toyota","Volkswagen","VW","Volvo","Lucid","Polestar","BYD","GWM","Haval","Holden",
     "Camry","Corolla","RAV4","Highlander","Prius","Sienna","Tacoma","Tundra","Civic","Accord","CR-V","HR-V","Pilot","Odyssey",
     "Model\\s?[3SXY]","Altima","Rogue","Sentra","Outback","Forester","Mustang","Explorer","F-150","Wrangler","Cherokee",
     "XLE","XSE","LE","SE","EX","EX-L","LX","Sport","Limited","Touring","Premium","Long Range","Performance",

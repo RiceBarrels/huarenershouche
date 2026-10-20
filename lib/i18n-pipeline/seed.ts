@@ -146,6 +146,18 @@ export const EXTRA_BRAND_ALIASES: Readonly<Partial<Record<Make, readonly SeedAli
     { alias: "ニッサン", lang: "ja" },
   ],
   Polestar: [{ alias: "極星", lang: "zh" }],
+  BYD: [{ alias: "比亞迪", lang: "zh" }],
+  GWM: [
+    { alias: "長城", lang: "zh" },
+    { alias: "哈弗", lang: "zh" },
+    { alias: "Haval", lang: "en" },
+  ],
+  Holden: [
+    { alias: "霍頓", lang: "zh" },
+    { alias: "ホールデン", lang: "ja" },
+    { alias: "홀덴", lang: "ko" },
+  ],
+  MG: [{ alias: "名爵", lang: "zh" }],
   Porsche: [{ alias: "保時捷", lang: "zh" }],
   Rivian: [{ alias: "リビアン", lang: "ja" }],
   "Rolls-Royce": [{ alias: "勞斯萊斯", lang: "zh" }],

@@ -462,7 +462,10 @@ export function makeSlug(make: string): string {
   return make.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 }
 
-const SELLABLE_MAKES = MAKES.filter((m) => m !== "Other");
+// 澳新品牌(BYD / GWM / Holden / MG)暂不生成 /cars 品牌落地页:落地页文案是北美的(州、城市、Carfax),
+// 等澳新落地页文案就绪再放开
+const NO_SEO_PAGE_MAKES = new Set<string>(["BYD", "GWM", "Holden", "MG"]);
+const SELLABLE_MAKES = MAKES.filter((m) => m !== "Other" && !NO_SEO_PAGE_MAKES.has(m));
 
 function makePage(make: string): SeoPageDef {
   const zh = MAKES_ZH[make] || make;

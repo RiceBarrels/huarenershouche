@@ -23,6 +23,11 @@ const MAKE_ALIASES: Record<string, string> = {
   saturn: "Saturn",
   mercury: "Mercury",
   isuzu: "Isuzu",
+  // 澳新:哈弗是长城旗下品牌,统一归到 GWM
+  haval: "GWM",
+  greatwall: "GWM",
+  greatwallmotors: "GWM",
+  mgmotor: "MG",
 };
 
 const alnum = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
