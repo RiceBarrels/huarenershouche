@@ -498,7 +498,8 @@ html:lang(ja) .font-sans,
 html:lang(ja) .font-mono {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", "Noto Sans CJK JP", "Helvetica Neue", "Segoe UI", sans-serif;
 }
-/* 品牌名「常来カーネット」:ZCOOL 只覆盖汉字,假名回退到日文字体,而不是 PingFang SC 的中文字形 */
+/* 日文品牌名 / 大标题:Mochiy Pop One(app/fonts.ts)假名和汉字同一套圆粗字形,与中文的 ZCOOL 气质接近;
+   字体没加载出来前回退到日文系统字体 */
 html:lang(ja) .font-logo {
-  font-family: var(--font-zcool), "ZCOOL QingKe HuangYou", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", sans-serif;
+  font-family: var(--font-ja-logo), "Mochiy Pop One", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "YuGothic", Meiryo, "Noto Sans JP", sans-serif;
 }

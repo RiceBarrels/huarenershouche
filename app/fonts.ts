@@ -1,7 +1,7 @@
 // 全站字体(next/font):web 根 layout(app/[locale]/layout.tsx)、静态导出根 layout
 // (app/layout.static.tsx)与 app/global-not-found.tsx 共用,body 上挂 fontVariables 暴露 CSS 变量。
 
-import { Geist, Geist_Mono, Bagel_Fat_One } from "next/font/google";
+import { Geist, Geist_Mono, Bagel_Fat_One, Mochiy_Pop_One } from "next/font/google";
 import localFont from "next/font/local";
 
 const geistSans = Geist({
@@ -34,5 +34,15 @@ const bagelFatOne = Bagel_Fat_One({
   preload: false,
 });
 
-/** 四套字体的 CSS 变量 className,挂在 <body> 上 */
-export const fontVariables = `${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} ${bagelFatOne.variable}`;
+// 日文品牌 / 大标题字体 Mochiy Pop One:假名和汉字同一套圆粗字形(只在 html:lang(ja) 的 .font-logo 里用,见 globals.css)。
+// Google 把 CJK 字形切成按 unicode-range 的分片,浏览器只下载页面用到的分片;不 preload
+const mochiyPopOne = Mochiy_Pop_One({
+  weight: "400",
+  subsets: ["latin"],
+  variable: "--font-ja-logo",
+  display: "swap",
+  preload: false,
+});
+
+/** 五套字体的 CSS 变量 className,挂在 <body> 上 */
+export const fontVariables = `${geistSans.variable} ${geistMono.variable} ${zcoolQingKe.variable} ${bagelFatOne.variable} ${mochiyPopOne.variable}`;
