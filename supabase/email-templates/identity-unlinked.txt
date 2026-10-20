@@ -1,0 +1,92 @@
+{{ if eq (printf "%v" .Data.locale) "zh" }}
+常來車網
+买车卖车 · 就上常來車網
+
+你的账号刚刚移除了一种登录方式。
+
+    登录方式：{{ .Provider }}
+
+如果是你本人操作的，无需任何处理。
+如果不是你本人操作，请立即修改密码并检查账号安全设置。
+需要帮助？请联系我们。
+
+买车卖车 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "zh-hant" }}
+常來車網
+買車賣車 · 就上常來車網
+
+你的帳號剛剛移除了一種登入方式。
+
+    登入方式：{{ .Provider }}
+
+如果是你本人操作的，無需任何處理。
+如果不是你本人操作，請立即修改密碼並檢查帳號安全設定。
+需要協助？請聯絡我們。
+
+買車賣車 · 就上常來車網
+{{ else if eq (printf "%v" .Data.locale) "ko" }}
+또와카
+차 사고팔 땐 · 또와카
+
+계정에서 로그인 방법이 방금 제거되었습니다.
+
+    로그인 방법: {{ .Provider }}
+
+본인이 한 일이라면 별도로 할 일은 없습니다.
+본인이 아니라면 지금 바로 비밀번호를 변경하고 계정 보안 설정을 확인하세요.
+도움이 필요하신가요? 문의해 주세요.
+
+차 사고팔 땐 · 또와카
+{{ else if eq (printf "%v" .Data.locale) "ja" }}
+常来カーネット
+クルマの売り買いは · 常来カーネットで
+
+ログイン方法がたった今アカウントから削除されました。
+
+    ログイン方法：{{ .Provider }}
+
+ご自身での操作であれば、対応は不要です。
+ご自身の操作でない場合は、今すぐパスワードを変更し、アカウントのセキュリティ設定を確認してください。
+お困りの場合は、お問い合わせください。
+
+クルマの売り買いは · 常来カーネットで
+{{ else if eq (printf "%v" .Data.locale) "es" }}
+CLCAuto
+Compra y vende autos · CLCAuto
+
+Se acaba de eliminar un método de acceso de tu cuenta.
+
+    Método de acceso: {{ .Provider }}
+
+Si fuiste tú, no tienes que hacer nada.
+Si no fuiste tú, cambia tu contraseña de inmediato y revisa la seguridad de tu cuenta.
+¿Necesitas ayuda? Contáctanos.
+
+Compra y vende autos · CLCAuto
+{{ else if eq (printf "%v" .Data.locale) "fr" }}
+CLCAuto
+Achetez et vendez votre voiture · CLCAuto
+
+Une méthode de connexion vient d'être supprimée de votre compte.
+
+    Méthode de connexion : {{ .Provider }}
+
+Si c'était vous, aucune action n'est nécessaire.
+Si ce n'était pas vous, changez votre mot de passe immédiatement et vérifiez les paramètres de sécurité de votre compte.
+Besoin d'aide ? Contactez-nous.
+
+Achetez et vendez votre voiture · CLCAuto
+{{ else }}
+CLCAuto
+Buy & sell cars · CLCAuto
+
+A sign-in method was just removed from your account.
+
+    Sign-in method: {{ .Provider }}
+
+If this was you, no action is needed.
+If it wasn't you, change your password right away and review your account's security settings.
+Need help? Contact us.
+
+Buy & sell cars · CLCAuto
+{{ end }}

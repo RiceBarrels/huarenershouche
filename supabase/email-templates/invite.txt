@@ -6,9 +6,9 @@
 
     {{ .ConfirmationURL }}
 
-请尽快输入，验证码有时效。
+请尽快打开链接，链接有时效。
 不认识邀请你的人？请忽略这封邮件。
-请勿把验证码告诉任何人，包括自称客服的人。
+请勿转发这封邮件。
 
 买车卖车 · 就上常來車網
 {{ else if eq (printf "%v" .Data.locale) "zh-hant" }}
@@ -19,48 +19,74 @@
 
     {{ .ConfirmationURL }}
 
-請盡快輸入，驗證碼有時效。
+請盡快開啟連結，連結有時效。
 不認識邀請你的人？請忽略這封郵件。
-請勿把驗證碼告訴任何人，包括自稱客服的人。
+請勿轉發這封郵件。
 
 買車賣車 · 就上常來車網
-{{ else if eq (printf "%v" .Data.locale) "en" }}
-CLCAuto
-Find your next car
+{{ else if eq (printf "%v" .Data.locale) "ko" }}
+또와카
+차 사고팔 땐 · 또와카
 
-You have been invited to join CLCAuto. Open the link below to accept and set up your account:
+또와카에 초대받았습니다. 아래 링크를 열어 초대를 수락하고 계정을 설정하세요:
 
     {{ .ConfirmationURL }}
 
-Please enter it soon; the code expires.
-Don't know who invited you? Ignore this email.
-Never share this code with anyone, including people who say they are support.
+링크에는 유효 시간이 있으니 빨리 열어 주세요.
+초대한 사람을 모르시나요? 이 메일을 무시하세요.
+이 메일을 다른 사람에게 전달하지 마세요.
 
-CLCAuto · Find your next car
+차 사고팔 땐 · 또와카
+{{ else if eq (printf "%v" .Data.locale) "ja" }}
+常来カーネット
+クルマの売り買いは · 常来カーネットで
+
+常来カーネットに招待されました。次のリンクを開いて招待を受け、アカウントを設定してください：
+
+    {{ .ConfirmationURL }}
+
+リンクには有効期限があります。お早めにお開きください。
+招待した人に心当たりがない場合は、このメールを無視してください。
+このメールを転送しないでください。
+
+クルマの売り買いは · 常来カーネットで
+{{ else if eq (printf "%v" .Data.locale) "es" }}
+CLCAuto
+Compra y vende autos · CLCAuto
+
+Te han invitado a unirte a CLCAuto. Abre el enlace de abajo para aceptar la invitación y configurar tu cuenta:
+
+    {{ .ConfirmationURL }}
+
+Abre el enlace pronto; caduca.
+¿No conoces a quien te invitó? Ignora este correo.
+No reenvíes este correo.
+
+Compra y vende autos · CLCAuto
+{{ else if eq (printf "%v" .Data.locale) "fr" }}
+CLCAuto
+Achetez et vendez votre voiture · CLCAuto
+
+Vous êtes invité(e) à rejoindre CLCAuto. Ouvrez le lien ci-dessous pour accepter l'invitation et configurer votre compte :
+
+    {{ .ConfirmationURL }}
+
+Ouvrez le lien rapidement ; il expire.
+Vous ne savez pas qui vous a invité(e) ? Ignorez cet e-mail.
+Ne transférez pas cet e-mail.
+
+Achetez et vendez votre voiture · CLCAuto
 {{ else }}
-常來車網
-买车卖车 · 就上常來車網
-
-你被邀请加入常來車網。点击下面的链接接受邀请并设置账号：
-
-    {{ .ConfirmationURL }}
-
-请尽快输入，验证码有时效。
-不认识邀请你的人？请忽略这封邮件。
-请勿把验证码告诉任何人，包括自称客服的人。
-
-────────────
-
 CLCAuto
-Find your next car
+Buy & sell cars · CLCAuto
 
 You have been invited to join CLCAuto. Open the link below to accept and set up your account:
 
     {{ .ConfirmationURL }}
 
-Please enter it soon; the code expires.
+Please open the link soon; it expires.
 Don't know who invited you? Ignore this email.
-Never share this code with anyone, including people who say they are support.
+Don't forward this email.
 
-买车卖车 · 就上常來車網
+Buy & sell cars · CLCAuto
 {{ end }}

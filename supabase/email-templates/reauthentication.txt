@@ -24,35 +24,61 @@
 請勿把驗證碼告訴任何人，包括自稱客服的人。
 
 買車賣車 · 就上常來車網
-{{ else if eq (printf "%v" .Data.locale) "en" }}
-CLCAuto
-Find your next car
+{{ else if eq (printf "%v" .Data.locale) "ko" }}
+또와카
+차 사고팔 땐 · 또와카
 
-You are doing something that needs a second identity check. Enter this code:
+추가 본인 확인이 필요한 작업을 진행 중입니다. 아래 인증 코드를 입력하세요:
 
     {{ .Token }}
 
-Please enter it soon; the code expires.
-Didn't ask for this? Ignore this email and change your password soon.
-Never share this code with anyone, including people who say they are support.
+코드에는 유효 시간이 있으니 빨리 입력해 주세요.
+본인이 요청하지 않았다면 이 메일을 무시하고 가능한 한 빨리 비밀번호를 변경하세요.
+고객센터를 사칭하는 사람을 포함해 누구에게도 이 코드를 알려주지 마세요.
 
-CLCAuto · Find your next car
+차 사고팔 땐 · 또와카
+{{ else if eq (printf "%v" .Data.locale) "ja" }}
+常来カーネット
+クルマの売り買いは · 常来カーネットで
+
+追加の本人確認が必要な操作を行っています。次の認証コードを入力してください：
+
+    {{ .Token }}
+
+コードには有効期限があります。お早めに入力してください。
+お心当たりがない場合は、このメールを無視し、できるだけ早くパスワードを変更してください。
+サポート担当を名乗る人を含め、誰にもこのコードを教えないでください。
+
+クルマの売り買いは · 常来カーネットで
+{{ else if eq (printf "%v" .Data.locale) "es" }}
+CLCAuto
+Compra y vende autos · CLCAuto
+
+Estás realizando una acción que requiere confirmar de nuevo tu identidad. Introduce este código:
+
+    {{ .Token }}
+
+Introdúcelo pronto; el código caduca.
+¿No fuiste tú? Ignora este correo y cambia tu contraseña lo antes posible.
+No compartas este código con nadie, ni siquiera con quien diga ser de soporte.
+
+Compra y vende autos · CLCAuto
+{{ else if eq (printf "%v" .Data.locale) "fr" }}
+CLCAuto
+Achetez et vendez votre voiture · CLCAuto
+
+Vous effectuez une action qui nécessite une nouvelle vérification d'identité. Saisissez ce code :
+
+    {{ .Token }}
+
+Saisissez-le rapidement ; le code expire.
+Vous n'êtes pas à l'origine de cette demande ? Ignorez cet e-mail et changez votre mot de passe dès que possible.
+Ne communiquez ce code à personne, y compris à une personne se disant du support.
+
+Achetez et vendez votre voiture · CLCAuto
 {{ else }}
-常來車網
-买车卖车 · 就上常來車網
-
-你正在进行一项需要再次确认身份的操作。请输入下面的验证码：
-
-    {{ .Token }}
-
-请尽快输入，验证码有时效。
-不是你本人操作？请忽略这封邮件，并尽快修改密码。
-请勿把验证码告诉任何人，包括自称客服的人。
-
-────────────
-
 CLCAuto
-Find your next car
+Buy & sell cars · CLCAuto
 
 You are doing something that needs a second identity check. Enter this code:
 
@@ -62,5 +88,5 @@ Please enter it soon; the code expires.
 Didn't ask for this? Ignore this email and change your password soon.
 Never share this code with anyone, including people who say they are support.
 
-买车卖车 · 就上常來車網
+Buy & sell cars · CLCAuto
 {{ end }}

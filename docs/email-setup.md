@@ -28,13 +28,8 @@ Dashboard → Project Settings → Authentication → **SMTP Settings** → 打�
 
 ## 3. 模板
 
-Dashboard → Authentication → **Email Templates**:
+Dashboard → Authentication → **Emails**:共 13 个(认证 6 个 + 安全通知 7 个)。后台名称、文件名、Subject 的对照表在 `supabase/email-templates/subjects.md`,逐行粘贴:Subject 粘表里那一列,Message body 粘对应 `.html` 全文。安全通知要先在同一页打开对应开关才会发送。
 
-| 模板 | Subject | Message body 粘贴 |
-|---|---|---|
-| Confirm signup | 见 `subjects.md` | `confirm-signup.html` 全文 |
-| Reset password | 见 `subjects.md` | `recovery.html` 全文 |
+正文按用户资料里的 `locale` 分 7 种语言,没有 locale 的老账号发英文。`.txt` 是同文案的纯文本版,留作核对;Dashboard 只有 HTML 正文一栏,不需要粘贴。
 
-`.txt` 是同文案的纯文本版，留作核对;Dashboard 只有 HTML 正文一栏，不需要粘贴。
-
-保存后用一个测试邮箱分别走一遍注册和忘记密码，确认收到的是验证码、不是链接。
+保存后用测试邮箱走一遍注册和忘记密码,确认收到的是验证码、语言正确;再到 Logs → Auth 看有无 `templatemailer` 报错(模板出错时 Supabase 会改发默认模板)。

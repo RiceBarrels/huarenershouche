@@ -24,35 +24,61 @@
 請勿把驗證碼告訴任何人，包括自稱客服的人。
 
 買車賣車 · 就上常來車網
-{{ else if eq (printf "%v" .Data.locale) "en" }}
-CLCAuto
-Find your next car
+{{ else if eq (printf "%v" .Data.locale) "ko" }}
+또와카
+차 사고팔 땐 · 또와카
 
-Someone asked to reset the password on your account. Enter this code to continue:
+누군가 회원님 계정의 비밀번호 재설정을 요청했습니다. 계속하려면 아래 인증 코드를 입력하세요:
 
     {{ .Token }}
 
-Please enter it soon; the code expires.
-Didn't ask for this? Ignore this email, your password will not change.
-Never share this code with anyone, including people who say they are support.
+코드에는 유효 시간이 있으니 빨리 입력해 주세요.
+본인이 요청하지 않았다면 이 메일을 무시하세요. 비밀번호는 변경되지 않습니다.
+고객센터를 사칭하는 사람을 포함해 누구에게도 이 코드를 알려주지 마세요.
 
-CLCAuto · Find your next car
+차 사고팔 땐 · 또와카
+{{ else if eq (printf "%v" .Data.locale) "ja" }}
+常来カーネット
+クルマの売り買いは · 常来カーネットで
+
+どなたかがアカウントのパスワード再設定を求めました。続けるには、次の認証コードを入力してください：
+
+    {{ .Token }}
+
+コードには有効期限があります。お早めに入力してください。
+お心当たりがない場合は、このメールを無視してください。パスワードは変更されません。
+サポート担当を名乗る人を含め、誰にもこのコードを教えないでください。
+
+クルマの売り買いは · 常来カーネットで
+{{ else if eq (printf "%v" .Data.locale) "es" }}
+CLCAuto
+Compra y vende autos · CLCAuto
+
+Alguien ha pedido restablecer la contraseña de tu cuenta. Introduce este código para continuar:
+
+    {{ .Token }}
+
+Introdúcelo pronto; el código caduca.
+¿No fuiste tú? Ignora este correo; tu contraseña no cambiará.
+No compartas este código con nadie, ni siquiera con quien diga ser de soporte.
+
+Compra y vende autos · CLCAuto
+{{ else if eq (printf "%v" .Data.locale) "fr" }}
+CLCAuto
+Achetez et vendez votre voiture · CLCAuto
+
+Quelqu'un a demandé la réinitialisation du mot de passe de votre compte. Saisissez ce code pour continuer :
+
+    {{ .Token }}
+
+Saisissez-le rapidement ; le code expire.
+Vous n'êtes pas à l'origine de cette demande ? Ignorez cet e-mail, votre mot de passe ne changera pas.
+Ne communiquez ce code à personne, y compris à une personne se disant du support.
+
+Achetez et vendez votre voiture · CLCAuto
 {{ else }}
-常來車網
-买车卖车 · 就上常來車網
-
-有人请求重置你的账号密码。请输入下面的验证码继续：
-
-    {{ .Token }}
-
-请尽快输入，验证码有时效。
-不是你本人操作？请忽略这封邮件，你的密码不会改变。
-请勿把验证码告诉任何人，包括自称客服的人。
-
-────────────
-
 CLCAuto
-Find your next car
+Buy & sell cars · CLCAuto
 
 Someone asked to reset the password on your account. Enter this code to continue:
 
@@ -62,5 +88,5 @@ Please enter it soon; the code expires.
 Didn't ask for this? Ignore this email, your password will not change.
 Never share this code with anyone, including people who say they are support.
 
-买车卖车 · 就上常來車網
+Buy & sell cars · CLCAuto
 {{ end }}
