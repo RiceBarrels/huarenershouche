@@ -181,7 +181,7 @@ function optional(): string[] {
     "",
     link("全部分类落地页索引 / Full landing-page index", `${SITE_URL}/llms-full.txt`),
     link("Sitemap(按语言分片 / per-locale shards)", `${SITE_URL}/sitemap.xml`),
-    "- 联系 / Contact: contact@clcauto.com",
+    "- 联系 / Contact: colinwilsonfan@gmail.com",
   ];
 }
 

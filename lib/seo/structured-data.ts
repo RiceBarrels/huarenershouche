@@ -139,7 +139,7 @@ export function siteGraphJsonLd(locale: Locale) {
         url: home,
         logo: `${SITE_URL}${brandLogoSrc(locale)}`,
         description: SITE_DESCRIPTION[locale],
-        email: "contact@clcauto.com",
+        email: "colinwilsonfan@gmail.com",
         areaServed: "US",
       },
       {

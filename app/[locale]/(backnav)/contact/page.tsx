@@ -96,13 +96,13 @@ export default function ContactPage() {
 
         {/* Contact info */}
         <SettingsGroup className="mt-5">
-          <a href="mailto:contact@clcauto.com" className="group/row flex items-center gap-3 pl-4 transition-colors active:bg-muted/60">
+          <a href="mailto:colinwilsonfan@gmail.com" className="group/row flex items-center gap-3 pl-4 transition-colors active:bg-muted/60">
             <span className="flex h-6 w-6 shrink-0 items-center justify-center">
               <Mail className="h-5 w-5" strokeWidth={1.5} />
             </span>
             <span className="flex min-h-[56px] min-w-0 flex-1 items-center gap-2 border-b border-border/50 py-2 pr-4 group-last/row:border-0">
               <span className="min-w-0 flex-1 font-mono text-[15px]">{t("邮件联系")}</span>
-              <span className="shrink-0 font-mono text-[13px] text-muted-foreground">contact@clcauto.com</span>
+              <span className="shrink-0 font-mono text-[13px] text-muted-foreground">colinwilsonfan@gmail.com</span>
             </span>
           </a>
           {CONTACT_INFO.map((c) => (
